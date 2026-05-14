@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
-import { Copy, Mic, Send } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Copy, Gift, Mic, Send } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -17,7 +17,7 @@ import type { MiomiContentPayload } from "@/types";
 
 type OutputLang = "thai" | "english" | "both";
 
-type MiomiExpression = "idle" | "listening" | "thinking" | "speaking";
+type MiomiExpression = "idle" | "listening" | "thinking" | "happy";
 
 type ConversationStage =
   | "awaiting_topic"
@@ -63,9 +63,9 @@ const FREE_TONES = ["Cute Thai", "Professional"] as const;
 const PAID_TONES = ["Gen-Z", "Korean", "Anime", "Luxury"] as const;
 
 const INITIAL_MIOMI_TH =
-  "สวัสดีค่า~ วันนี้จะโพสต์เรื่องอะไรดีคะ? บอก Miomi ได้เลยนะคะ พูดหรือพิมพ์ก็ได้ค่า~";
+  "หนูชื่อ Miomi ค่า วันนี้จะโพสต์เรื่องอะไรดีคะ? เล่าให้หนูฟังก่อนได้เลย พูดหรือพิมพ์ก็ได้นะคะ";
 const INITIAL_MIOMI_EN =
-  "Hi~ What do you want to post about today? Just tell me — voice or text both work!";
+  "I'm Miomi~ What do you want to post today? Tell me first — voice or typing both work.";
 
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
@@ -144,6 +144,7 @@ function TypingDots() {
 }
 
 export default function CreatePage() {
+  const reduceMotion = useReducedMotion();
   const idRef = useRef(0);
   const genId = () => `${Date.now()}-${++idRef.current}`;
 
@@ -164,6 +165,7 @@ export default function CreatePage() {
   const [isRecording, setIsRecording] = useState(false);
   const [apiLoading, setApiLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [postGiftMood, setPostGiftMood] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const [toast, setToast] = useState(false);
 
@@ -181,6 +183,12 @@ export default function CreatePage() {
   useEffect(() => {
     setSpeechSupported(!!getSpeechRecognitionCtor());
   }, []);
+
+  useEffect(() => {
+    if (!postGiftMood) return;
+    const id = window.setTimeout(() => setPostGiftMood(false), 4200);
+    return () => window.clearTimeout(id);
+  }, [postGiftMood]);
 
   useLayoutEffect(() => {
     const el = threadRef.current;
@@ -202,9 +210,9 @@ export default function CreatePage() {
   );
 
   const miomiExpression: MiomiExpression = (() => {
-    if (isSpeaking) return "speaking";
-    if (apiLoading) return "thinking";
     if (isRecording) return "listening";
+    if (apiLoading || isSpeaking) return "thinking";
+    if (postGiftMood) return "happy";
     return "idle";
   })();
 
@@ -222,9 +230,9 @@ export default function CreatePage() {
         th: "กำลังคิดให้ค่า...",
         en: "Let me think...",
       },
-      speaking: {
-        th: "เสร็จแล้วค่า~",
-        en: "Here you go~",
+      happy: {
+        th: "นี่คือของขวัญจากหนูนะคะ หวังว่าจะชอบค่า~",
+        en: "A little gift from me — hope you like it~",
       },
     };
 
@@ -234,8 +242,8 @@ export default function CreatePage() {
         return "/miomi/happy.png";
       case "thinking":
         return "/miomi/thinking.png";
-      case "speaking":
-        return "/miomi/speaking.png";
+      case "happy":
+        return "/miomi/happy.png";
       default:
         return "/miomi/idle.png";
     }
@@ -303,8 +311,8 @@ export default function CreatePage() {
         card: Omit<Extract<ThreadMessage, { type: "card" }>, "id" | "type">;
       }[] = [
         {
-          th: "เริ่มจาก Hook ก่อนเลยนะคะ~",
-          en: "Let's start with your hook~",
+          th: "หนูจัด Hook ให้ก่อนนะคะ เขียนมาจากใจให้เลยค่า~",
+          en: "Here's a hook straight from the heart~",
           card: {
             cardType: "hook",
             label: "HOOK",
@@ -353,6 +361,7 @@ export default function CreatePage() {
       }
 
       setIsSpeaking(false);
+      setPostGiftMood(true);
       pushMiomi(
         "เสร็จแล้วค่า~ อยากให้ Miomi ช่วยอะไรเพิ่มอีกไหมคะ?",
         "All done~ Want Miomi to help with anything else?",
@@ -422,6 +431,7 @@ export default function CreatePage() {
       }
 
       setIsSpeaking(false);
+      setPostGiftMood(true);
       pushMiomi(
         "เสร็จแล้วค่า~ อยากให้ Miomi ช่วยอะไรเพิ่มอีกไหมคะ?",
         "All done~ Want Miomi to help with anything else?",
@@ -675,37 +685,39 @@ export default function CreatePage() {
 
   return (
     <AppShell>
-      <div className="relative mx-auto flex h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)] w-full max-w-[390px] flex-col overflow-hidden bg-white md:max-w-none">
-        {/* ZONE 1 */}
-        <div className="relative h-[35vh] w-full shrink-0 overflow-hidden bg-white">
+      <div className="relative mx-auto flex h-full min-h-0 w-full max-w-[390px] flex-col overflow-hidden bg-white md:max-w-none">
+        {/* Fixed top: Miomi stage + pill controls (not scrollable) */}
+        <div className="shrink-0 border-b border-[#EAD0DB] bg-white">
+          <div className="relative h-[30vh] min-h-[140px] max-h-[260px] w-full overflow-hidden bg-white">
           <div
             className="pointer-events-none absolute inset-x-0 bottom-0 top-1/3 bg-gradient-to-b from-white to-[#fdf5f8]"
             aria-hidden
           />
-          <div className="flex h-full items-end gap-2 px-3 pb-3 pt-10">
+          <div className="flex h-full items-end gap-2 px-3 pb-2 pt-8">
             <div className="miomi-login-float w-[min(42%,140px)] shrink-0">
-              <Image
-                src={stageImage}
-                alt="Miomi"
-                width={200}
-                height={200}
-                className="h-auto w-full min-w-[120px] object-contain"
-                priority
-              />
+              <div className={cn(!reduceMotion && "miomi-breathe")}>
+                <Image
+                  src={stageImage}
+                  alt="Miomi"
+                  width={200}
+                  height={200}
+                  className="h-auto w-full min-w-[120px] object-contain"
+                  priority
+                />
+              </div>
             </div>
-            <div className="min-w-0 max-w-[58%] self-center rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2 shadow-sm">
-              <p className="whitespace-pre-line text-[11px] font-medium leading-snug text-neutral-800">
+            <div className="min-w-0 max-w-[58%] self-center rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-2.5 py-1.5 shadow-sm">
+              <p className="line-clamp-3 whitespace-pre-line text-[10px] font-medium leading-snug text-neutral-800">
                 {bubble.th}
               </p>
-              <p className="mt-1 text-[9px] leading-snug text-[#888888]">
+              <p className="mt-0.5 line-clamp-2 text-[8px] leading-snug text-[#888888]">
                 {bubble.en}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Pills row */}
-        <div className="shrink-0 border-b border-[#EAD0DB] bg-white px-3 py-2">
+        <div className="shrink-0 bg-white px-3 py-1">
           <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <span className="shrink-0 self-center text-[9px] font-medium text-[#888888]">
               แพลตฟอร์ม
@@ -721,7 +733,7 @@ export default function CreatePage() {
               </button>
             ))}
           </div>
-          <div className="mt-1.5 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mt-1 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <span className="shrink-0 self-center text-[9px] font-medium text-[#888888]">
               โทน
             </span>
@@ -750,7 +762,7 @@ export default function CreatePage() {
               </button>
             ))}
           </div>
-          <div className="mt-1.5 flex items-center gap-1.5">
+          <div className="mt-1 flex items-center gap-1.5 pb-0.5">
             <span className="text-[9px] font-medium text-[#888888]">ภาษา</span>
             {(["thai", "english", "both"] as const).map((lang) => (
               <button
@@ -769,8 +781,9 @@ export default function CreatePage() {
             ))}
           </div>
         </div>
+        </div>
 
-        {/* ZONE 2 */}
+        {/* Scrollable thread only */}
         <div
           ref={threadRef}
           className="min-h-0 flex-1 overflow-y-auto px-3 py-2"
@@ -833,11 +846,27 @@ export default function CreatePage() {
                   </div>
                 ) : null}
                 {m.type === "card" ? (
-                  <div className="w-full rounded-2xl border border-[#EAD0DB] bg-white p-3">
+                  <div
+                    className={cn(
+                      "w-full rounded-2xl border bg-white p-3",
+                      m.cardType === "hook"
+                        ? "border-[#EAD0DB] shadow-md shadow-[#8B1A35]/[0.07] ring-1 ring-[#8B1A35]/10"
+                        : "border-[#EAD0DB]",
+                    )}
+                  >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-[8px] font-semibold uppercase tracking-wide text-[#B8860B]">
-                        {m.label}
-                      </p>
+                      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                        {m.cardType === "hook" ? (
+                          <Gift
+                            className="h-3.5 w-3.5 shrink-0 text-[#B8860B]"
+                            strokeWidth={2}
+                            aria-hidden
+                          />
+                        ) : null}
+                        <p className="text-[8px] font-semibold uppercase tracking-wide text-[#B8860B]">
+                          {m.label}
+                        </p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => copyThai(m.th)}

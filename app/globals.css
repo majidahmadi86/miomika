@@ -35,3 +35,24 @@ body {
 .miomi-login-float {
   animation: miomi-login-float 3s ease-in-out infinite;
 }
+
+@keyframes miomi-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+.miomi-breathe {
+  transform-origin: center bottom;
+  animation: miomi-breathe 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .miomi-breathe {
+    animation: none;
+  }
+}

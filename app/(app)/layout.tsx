@@ -7,9 +7,14 @@ import {
   Copy,
   Home,
   LayoutDashboard,
+  Lock,
   Sparkles,
   User,
 } from "lucide-react";
+import {
+  GuestExplorationProvider,
+  useGuestExploration,
+} from "@/components/guest/GuestExplorationContext";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -44,7 +49,20 @@ export default function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  return (
+    <GuestExplorationProvider>
+      <AppLayoutInner>{children}</AppLayoutInner>
+    </GuestExplorationProvider>
+  );
+}
+
+function AppLayoutInner({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   const pathname = usePathname();
+  const { isGuest, authReady, openLockedTabPrompt } = useGuestExploration();
 
   return (
     <div className="min-h-screen w-full md:flex md:h-screen md:bg-[#F2EEF0] md:overflow-hidden">
@@ -86,17 +104,62 @@ export default function AppLayout({
         <nav className="flex flex-1 flex-col gap-0.5 px-2 py-4">
           {navItems.map(({ href, Icon, thai, english }) => {
             const active = pathname === href;
+            const navClass = cn(
+              "flex items-center gap-2 rounded-lg py-2.5 pl-4 pr-4 transition-colors",
+              active
+                ? "border-l-2 border-[#8B1A35] bg-[#FBEAF0]"
+                : "border-l-2 border-transparent hover:bg-[#FAFAFA]",
+            );
+            const guestLocked =
+              authReady &&
+              isGuest &&
+              (href === "/create" || href === "/dashboard");
+            const guestMe = authReady && isGuest && href === "/profile";
+
+            if (guestLocked) {
+              return (
+                <button
+                  key={href}
+                  type="button"
+                  onClick={() => openLockedTabPrompt()}
+                  className={cn(navClass, "w-full text-left")}
+                >
+                  <span className="relative shrink-0">
+                    <Icon
+                      className={cn(
+                        "h-4 w-4 blur-[0.35px] contrast-75",
+                        active ? "text-[#8B1A35]" : "text-neutral-600",
+                      )}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                    <Lock
+                      className="absolute -right-1 -top-1 h-2.5 w-2.5 text-[#8B1A35]"
+                      strokeWidth={2.5}
+                      aria-hidden
+                    />
+                  </span>
+                  <span className="min-w-0 flex flex-col gap-0.5 opacity-60">
+                    <span
+                      className={cn(
+                        "text-[11px] font-medium leading-none",
+                        active ? "text-[#8B1A35]" : "text-neutral-900",
+                      )}
+                    >
+                      {thai}
+                    </span>
+                    <span className="text-[9px] leading-none text-[#888888]">
+                      {english}
+                    </span>
+                  </span>
+                </button>
+              );
+            }
+
+            const linkHref = guestMe ? "/signup" : href;
+
             return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg py-2.5 pl-4 pr-4 transition-colors",
-                  active
-                    ? "border-l-2 border-[#8B1A35] bg-[#FBEAF0]"
-                    : "border-l-2 border-transparent hover:bg-[#FAFAFA]",
-                )}
-              >
+              <Link key={href} href={linkHref} className={navClass}>
                 <Icon
                   className={cn(
                     "h-4 w-4 shrink-0",

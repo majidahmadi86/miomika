@@ -1,17 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const PROTECTED_PREFIXES = [
-  "/home",
-  "/create",
-  "/dashboard",
-  "/profile",
-  "/onboarding",
-] as const;
+const ONBOARDING_PREFIX = "/onboarding";
 
-function isProtectedPath(pathname: string): boolean {
-  return PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+function isOnboardingPath(pathname: string): boolean {
+  return pathname === ONBOARDING_PREFIX || pathname.startsWith(`${ONBOARDING_PREFIX}/`);
+}
+
+/** Logged-in only; guests explore from /home instead of a login wall */
+function isAuthRequiredPath(pathname: string): boolean {
+  return isOnboardingPath(pathname);
+}
+
+/** Guests may not open app tools — send them back to exploration home */
+function isGuestBlockedPath(pathname: string): boolean {
+  const blocked = [
+    "/create",
+    "/dashboard",
+    "/profile",
+    "/friends",
+  ] as const;
+  return blocked.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
 }
 
@@ -23,7 +33,11 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  if (isProtectedPath(pathname) && !user) {
+  if (!user && isGuestBlockedPath(pathname)) {
+    return NextResponse.redirect(new URL("/home", request.url));
+  }
+
+  if (!user && isAuthRequiredPath(pathname)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

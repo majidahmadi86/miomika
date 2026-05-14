@@ -174,16 +174,17 @@ export default function ProfilePage() {
 
   return (
     <AppShell>
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[390px] flex-col bg-white px-4 pb-28 pt-4">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[390px] flex-col overflow-hidden bg-white px-3 pt-2">
         {loading ? (
-          <div className="flex flex-1 flex-col items-center justify-center py-20">
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
             <p className="text-sm font-medium text-neutral-700">กำลังโหลด...</p>
             <p className="mt-1 text-xs text-nav-muted">Loading profile</p>
           </div>
         ) : (
-          <>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pb-2">
             {/* Identity card */}
-            <section className="mb-3 rounded-2xl border border-rose-border bg-white p-4">
+            <section className="mb-2 rounded-2xl border border-rose-border bg-white p-3">
               <div className="flex gap-4">
                 <div className="h-[60px] w-[60px] shrink-0">
                   <Image
@@ -263,7 +264,7 @@ export default function ProfilePage() {
             </section>
 
             {/* Plan */}
-            <section className="mt-6">
+            <section className="mt-3">
               <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-gold">
                 แพลน
               </p>
@@ -297,7 +298,7 @@ export default function ProfilePage() {
             </section>
 
             {/* Settings */}
-            <section className="mt-6">
+            <section className="mt-3">
               <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-gold">
                 ตั้งค่า
               </p>
@@ -421,7 +422,7 @@ export default function ProfilePage() {
             </section>
 
             {/* Account */}
-            <section className="mt-6">
+            <section className="mt-3">
               <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-gold">
                 บัญชี
               </p>
@@ -462,7 +463,8 @@ export default function ProfilePage() {
                 </button>
               </div>
             </section>
-          </>
+            </div>
+          </div>
         )}
       </div>
     </AppShell>
