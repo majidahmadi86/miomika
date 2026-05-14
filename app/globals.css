@@ -1,26 +1,37 @@
+@config "../tailwind.config.ts";
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --miomika-bg: #ffffff;
+  --miomika-rose-accent: #8b1a35;
+  --miomika-gold: #b8860b;
+  --miomika-rose-mid: #d4537e;
+  --miomika-rose-light: #fbeaf0;
+  --miomika-rose-border: #ead0db;
+  --miomika-gold-light: #fdf5e0;
+  --miomika-foreground: #171717;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  color: var(--miomika-foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+@keyframes miomi-login-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.miomi-login-float {
+  animation: miomi-login-float 3s ease-in-out infinite;
 }

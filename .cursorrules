@@ -1,0 +1,31 @@
+You are building Miomika — a voice AI companion app for Thai creators.
+
+PRODUCT: A kawaii cat companion named Miomi that helps users create social media content through voice conversation. The pet emotional bond is the core product.
+
+TECH STACK:
+- Next.js 14, TypeScript, Tailwind CSS, App Router
+- Supabase for database and auth
+- Claude API (Haiku for free users, Sonnet for paid)
+- Web Speech API for voice (free, browser-native)
+- Framer Motion for Miomi animations
+
+DESIGN RULES — NEVER BREAK THESE:
+- Background always #FFFFFF, never colored
+- Rose accent #8B1A35 for buttons and active states
+- Gold #B8860B for premium and level badges
+- Miomi always free on white canvas — NO frames, NO circles, NO containers around her
+- Mobile-first, every screen designed for 375px width first
+- Bottom tab navigation — Home, Create, Dashboard, Friends, Me
+- NEVER use generic AI emojis or standard Unicode emojis anywhere in the UI. No 🐱 🐶 ✨ 💕 🌸 or any standard emoji. Every visual element must feel Miomika branded and unique. Use Miomika's own character assets, custom icons, or text only. If an icon is needed use lucide-react icons only. This rule applies to all UI text, buttons, labels, speech bubbles, and messages.
+
+CODE RULES:
+- Always use TypeScript, never plain JavaScript
+- Always use Tailwind classes, never inline styles
+- Component files in /components folder
+- Page files in /app folder following Next.js App Router structure
+- All Supabase calls in /lib/supabase folder
+- All API routes in /app/api folder
+- Environment variables never hardcoded, always from .env.local
+
+CURRENT PHASE: Phase 1 MVP — Week 1
+Building: Project structure, Supabase schema, auth, home screen with Miomi
