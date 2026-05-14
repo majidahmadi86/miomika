@@ -200,8 +200,8 @@ export default function OnboardingPage() {
   const nameOk = catName.trim().length > 0;
 
   return (
-    <div className="min-h-[100dvh] w-full bg-white">
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[390px] flex-col bg-white">
+    <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-white">
+      <div className="mx-auto flex h-full max-h-[100dvh] min-h-0 w-full max-w-[390px] flex-col overflow-y-auto bg-white">
         <ProgressBar step={step} />
 
         <header className="relative flex h-11 shrink-0 items-center px-3">

@@ -1,7 +1,11 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { Check, Star } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { GuestScreenLockOverlay } from "@/components/guest/GuestScreenLockOverlay";
+import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 
 const CALENDAR_DAYS = [
   { label: "จ", key: "mon", posted: true, isToday: false, best: false },
@@ -29,6 +33,8 @@ const TOPICS = [
 ] as const;
 
 export default function DashboardPage() {
+  const { isGuest } = useGuestExploration();
+
   return (
     <AppShell>
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[390px] flex-col overflow-hidden bg-white px-3 pt-2">
@@ -182,6 +188,7 @@ export default function DashboardPage() {
             </div>
           </section>
         </div>
+        {isGuest ? <GuestScreenLockOverlay /> : null}
       </div>
     </AppShell>
   );

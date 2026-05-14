@@ -31,6 +31,16 @@ const TAP_BUBBLE_CYCLE = [
 
 const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
 
+const FEED_BUBBLE = {
+  th: "อิ่มแล้วค่า~ ขอบคุณนะคะ!",
+  en: "All full now~ thank you~",
+};
+
+const PLAY_BUBBLE = {
+  th: "เย้~ เล่นด้วยกันนะคะ!",
+  en: "Yay~ let's play together~",
+};
+
 const WALK_TRANSITION = {
   duration: 1.5,
   ease: "easeInOut" as const,
@@ -135,6 +145,28 @@ export default function HomePage() {
     setExpressionFlip("happy");
     scheduleHappyEnd();
   }, [dismissGuestInvite, markActivity, wakeFromSleep, scheduleHappyEnd]);
+
+  const handleFeedPress = useCallback(() => {
+    markActivity();
+    wakeFromSleep();
+    setBubble(FEED_BUBBLE);
+    setBubbleVisible(true);
+    happyUntilRef.current = Date.now() + 2000;
+    setExpressionFlip("happy");
+    scheduleHappyEnd();
+  }, [markActivity, wakeFromSleep, scheduleHappyEnd]);
+
+  const handlePlayPress = useCallback(() => {
+    markActivity();
+    wakeFromSleep();
+    setBubble(PLAY_BUBBLE);
+    setBubbleVisible(true);
+    setTapBounceKey((k) => k + 1);
+    setTapSpinKey((k) => k + 1);
+    happyUntilRef.current = Date.now() + 2000;
+    setExpressionFlip("happy");
+    scheduleHappyEnd();
+  }, [markActivity, wakeFromSleep, scheduleHappyEnd]);
 
   const handleStagePointerDown = useCallback(() => {
     markActivity();
@@ -474,6 +506,7 @@ export default function HomePage() {
         <div className="flex h-12 shrink-0 gap-2 px-2 pt-1">
           <button
             type="button"
+            onClick={handleFeedPress}
             className="flex flex-1 flex-col items-center justify-center gap-0 rounded-xl border border-rose-border bg-rose-light leading-tight text-rose-accent transition-colors hover:bg-white"
           >
             <span className="text-xs font-medium">ฟีด</span>
@@ -481,6 +514,7 @@ export default function HomePage() {
           </button>
           <button
             type="button"
+            onClick={handlePlayPress}
             className="flex flex-1 flex-col items-center justify-center gap-0 rounded-xl border border-rose-border bg-rose-light leading-tight text-rose-accent transition-colors hover:bg-white"
           >
             <span className="text-xs font-medium">เล่น</span>

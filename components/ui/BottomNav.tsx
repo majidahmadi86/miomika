@@ -15,7 +15,7 @@ const tabs = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { isGuest, authReady, openLockedTabPrompt } = useGuestExploration();
+  const { isGuest, authReady } = useGuestExploration();
 
   return (
     <nav
@@ -38,11 +38,10 @@ export function BottomNav() {
           if (guestLocked) {
             return (
               <li key={href} className="flex flex-1">
-                <button
-                  type="button"
-                  onClick={() => openLockedTabPrompt()}
+                <Link
+                  href={href}
                   className={cn(tabClass, "relative")}
-                  aria-label={`${label} — sign up to unlock`}
+                  aria-label={`${label} — preview, sign up to use`}
                 >
                   <span className="relative">
                     <Icon
@@ -58,7 +57,7 @@ export function BottomNav() {
                   <span className="text-[8px] font-medium leading-none opacity-55">
                     {label}
                   </span>
-                </button>
+                </Link>
               </li>
             );
           }

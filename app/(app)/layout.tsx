@@ -62,7 +62,7 @@ function AppLayoutInner({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const { isGuest, authReady, openLockedTabPrompt } = useGuestExploration();
+  const { isGuest, authReady } = useGuestExploration();
 
   return (
     <div className="min-h-screen w-full md:flex md:h-screen md:bg-[#F2EEF0] md:overflow-hidden">
@@ -118,11 +118,10 @@ function AppLayoutInner({
 
             if (guestLocked) {
               return (
-                <button
+                <Link
                   key={href}
-                  type="button"
-                  onClick={() => openLockedTabPrompt()}
-                  className={cn(navClass, "w-full text-left")}
+                  href={href}
+                  className={cn(navClass, "relative")}
                 >
                   <span className="relative shrink-0">
                     <Icon
@@ -152,7 +151,7 @@ function AppLayoutInner({
                       {english}
                     </span>
                   </span>
-                </button>
+                </Link>
               );
             }
 

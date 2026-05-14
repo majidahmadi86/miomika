@@ -68,7 +68,7 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <main className="mx-auto flex min-h-[100dvh] w-full max-w-[400px] flex-col bg-white px-6 py-10">
+      <main className="mx-auto flex max-h-[100dvh] min-h-0 w-full max-w-[400px] flex-col overflow-y-auto bg-white px-6 py-10">
         <p className="text-center text-2xl font-bold text-rose-accent">Miomika</p>
 
         <div className="mt-6 flex justify-center">
@@ -116,7 +116,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-[400px] flex-col bg-white px-6 py-10">
+    <main className="mx-auto flex max-h-[100dvh] min-h-0 w-full max-w-[400px] flex-col overflow-y-auto bg-white px-6 py-10">
       <p className="text-center text-2xl font-bold text-rose-accent">Miomika</p>
 
       <div className="mt-6 flex justify-center">

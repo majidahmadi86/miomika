@@ -10,8 +10,11 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type MutableRefObject,
 } from "react";
 import { AppShell } from "@/components/layout/AppShell";
+import { GuestScreenLockOverlay } from "@/components/guest/GuestScreenLockOverlay";
+import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { cn } from "@/lib/utils";
 import type { MiomiContentPayload } from "@/types";
 
@@ -83,17 +86,25 @@ type SpeechRecLike = {
   stop: () => void;
 };
 
-function transcriptFromResultEvent(event: unknown): string {
+/** Append only finalized segments; rebuild interim from this event only (no duplication). */
+function speechDisplayFromResultEvent(
+  event: unknown,
+  committedRef: MutableRefObject<string>,
+): string {
   const e = event as {
-    results: ArrayLike<{ 0?: { transcript?: string } }>;
+    resultIndex: number;
+    results: ArrayLike<{ isFinal: boolean; 0?: { transcript?: string } }>;
   };
-  if (!e.results) return "";
-  let text = "";
-  for (let i = 0; i < e.results.length; i++) {
-    const seg = e.results[i]?.[0]?.transcript;
-    if (seg) text += seg;
+  if (!e.results) return committedRef.current;
+  let interim = "";
+  for (let i = e.resultIndex; i < e.results.length; i++) {
+    const r = e.results[i];
+    if (!r?.[0]?.transcript) continue;
+    const t = r[0].transcript;
+    if (r.isFinal) committedRef.current += t;
+    else interim += t;
   }
-  return text.trim();
+  return committedRef.current + interim;
 }
 
 function getSpeechRecognitionCtor():
@@ -145,6 +156,7 @@ function TypingDots() {
 
 export default function CreatePage() {
   const reduceMotion = useReducedMotion();
+  const { isGuest } = useGuestExploration();
   const idRef = useRef(0);
   const genId = () => `${Date.now()}-${++idRef.current}`;
 
@@ -172,6 +184,7 @@ export default function CreatePage() {
   const threadRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecLike | null>(null);
   const transcriptLiveRef = useRef("");
+  const speechCommittedRef = useRef("");
   const lastTopicRef = useRef("");
   const stageRef = useRef<ConversationStage>("awaiting_topic");
   const processingLockRef = useRef(false);
@@ -558,11 +571,11 @@ export default function CreatePage() {
 
   const attachRecognitionHandlers = useCallback(
     (rec: SpeechRecLike) => {
-      rec.lang = outputLang === "english" ? "en-US" : "th-TH";
+      rec.lang = "th-TH";
       rec.onresult = (event: unknown) => {
-        const text = transcriptFromResultEvent(event);
-        transcriptLiveRef.current = text;
-        setInputText(text);
+        const display = speechDisplayFromResultEvent(event, speechCommittedRef);
+        transcriptLiveRef.current = display;
+        setInputText(display);
       };
       rec.onerror = () => {
         setIsRecording(false);
@@ -571,6 +584,7 @@ export default function CreatePage() {
         setIsRecording(false);
         const finalText = transcriptLiveRef.current.trim();
         transcriptLiveRef.current = "";
+        speechCommittedRef.current = "";
         if (finalText) {
           setInputText(finalText);
           if (stageRef.current === "awaiting_topic") {
@@ -581,7 +595,7 @@ export default function CreatePage() {
         }
       };
     },
-    [outputLang, runCommentPipeline, runTopicPipeline],
+    [runCommentPipeline, runTopicPipeline],
   );
 
   const toggleMic = useCallback(() => {
@@ -594,6 +608,7 @@ export default function CreatePage() {
 
     if (!isRecording) {
       try {
+        speechCommittedRef.current = "";
         transcriptLiveRef.current = "";
         setInputText("");
         rec.start();
@@ -688,20 +703,20 @@ export default function CreatePage() {
       <div className="relative mx-auto flex h-full min-h-0 w-full max-w-[390px] flex-col overflow-hidden bg-white md:max-w-none">
         {/* Fixed top: Miomi stage + pill controls (not scrollable) */}
         <div className="shrink-0 border-b border-[#EAD0DB] bg-white">
-          <div className="relative h-[30vh] min-h-[140px] max-h-[260px] w-full overflow-hidden bg-white">
+          <div className="relative h-[30vh] min-h-[140px] max-h-[260px] w-full shrink-0 overflow-hidden bg-white">
           <div
             className="pointer-events-none absolute inset-x-0 bottom-0 top-1/3 bg-gradient-to-b from-white to-[#fdf5f8]"
             aria-hidden
           />
           <div className="flex h-full items-end gap-2 px-3 pb-2 pt-8">
-            <div className="miomi-login-float w-[min(42%,140px)] shrink-0">
+            <div className="miomi-login-float max-md:max-h-[200px] max-md:overflow-hidden w-[min(42%,140px)] shrink-0">
               <div className={cn(!reduceMotion && "miomi-breathe")}>
                 <Image
                   src={stageImage}
                   alt="Miomi"
                   width={200}
                   height={200}
-                  className="h-auto w-full min-w-[120px] object-contain"
+                  className="h-auto w-full min-w-[120px] max-h-[200px] object-contain md:max-h-none"
                   priority
                 />
               </div>
@@ -1027,6 +1042,7 @@ export default function CreatePage() {
             </motion.div>
           ) : null}
         </AnimatePresence>
+        {isGuest ? <GuestScreenLockOverlay /> : null}
       </div>
     </AppShell>
   );
