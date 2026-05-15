@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Coffee, Heart, Mic, Zap, type LucideIcon } from "lucide-react";
@@ -19,6 +18,7 @@ import {
   useGuestHomeSoftNudgeTimer,
 } from "@/components/guest/GuestExplorationContext";
 import { AppShell } from "@/components/layout/AppShell";
+import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { PillButton } from "@/components/ui/PillButton";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +48,95 @@ const PLAY_BUBBLE = {
   en: "Yay~ let's play together~",
 };
 
+const LEVEL_UP_BUBBLE = {
+  th: "เลเวลอัพแล้วค่า~!",
+  en: "You leveled up~!",
+};
+
+const PET_STORAGE_KEY = "miomika-home-pet-v1";
+const DECAY_INTERVAL_MS = 10 * 60 * 1000;
+const DECAY_AMOUNT = 5;
+const MIN_STAT = 10;
+
+type PetStats = {
+  mood: number;
+  energy: number;
+  hunger: number;
+  level: number;
+  xp: number;
+  lastUpdated: number;
+};
+
+const DEFAULT_PET: PetStats = {
+  mood: 82,
+  energy: 65,
+  hunger: 45,
+  level: 3,
+  xp: 40,
+  lastUpdated: 0,
+};
+
+function clampStat(value: number) {
+  return Math.min(100, Math.max(MIN_STAT, value));
+}
+
+function applyDecay(stats: PetStats): PetStats {
+  const now = Date.now();
+  if (!stats.lastUpdated) {
+    return { ...stats, lastUpdated: now };
+  }
+  const ticks = Math.floor((now - stats.lastUpdated) / DECAY_INTERVAL_MS);
+  if (ticks <= 0) {
+    return stats;
+  }
+  return {
+    mood: clampStat(stats.mood - ticks * DECAY_AMOUNT),
+    energy: clampStat(stats.energy - ticks * DECAY_AMOUNT),
+    hunger: clampStat(stats.hunger - ticks * DECAY_AMOUNT),
+    level: stats.level,
+    xp: stats.xp,
+    lastUpdated: now,
+  };
+}
+
+function loadPetStats(): PetStats {
+  try {
+    const raw = localStorage.getItem(PET_STORAGE_KEY);
+    if (!raw) {
+      return { ...DEFAULT_PET, lastUpdated: Date.now() };
+    }
+    const parsed = JSON.parse(raw) as Partial<PetStats>;
+    return applyDecay({
+      mood: clampStat(parsed.mood ?? DEFAULT_PET.mood),
+      energy: clampStat(parsed.energy ?? DEFAULT_PET.energy),
+      hunger: clampStat(parsed.hunger ?? DEFAULT_PET.hunger),
+      level: parsed.level ?? DEFAULT_PET.level,
+      xp: parsed.xp ?? DEFAULT_PET.xp,
+      lastUpdated: parsed.lastUpdated ?? Date.now(),
+    });
+  } catch {
+    return { ...DEFAULT_PET, lastUpdated: Date.now() };
+  }
+}
+
+function addXp(
+  stats: PetStats,
+  amount: number,
+): { stats: PetStats; leveledUp: boolean } {
+  let { level, xp } = stats;
+  let leveledUp = false;
+  xp += amount;
+  while (xp >= 100) {
+    xp -= 100;
+    level += 1;
+    leveledUp = true;
+  }
+  return {
+    stats: { ...stats, level, xp, lastUpdated: Date.now() },
+    leveledUp,
+  };
+}
+
 const WALK_TRANSITION = {
   duration: 1.5,
   ease: "easeInOut" as const,
@@ -55,17 +144,18 @@ const WALK_TRANSITION = {
 
 function PetStatusCircle({
   icon: Icon,
-  percentLabel,
+  percent,
   iconClass,
   textClass,
   ariaLabel,
 }: {
   icon: LucideIcon;
-  percentLabel: string;
+  percent: number;
   iconClass: string;
   textClass: string;
   ariaLabel: string;
 }) {
+  const label = `${Math.round(percent)}%`;
   return (
     <div
       className="flex h-9 w-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border border-[#8B1A35] bg-white shadow-sm"
@@ -74,7 +164,7 @@ function PetStatusCircle({
     >
       <Icon className={cn("h-2.5 w-2.5", iconClass)} strokeWidth={2.5} />
       <span className={cn("text-[8px] font-bold leading-none", textClass)}>
-        {percentLabel}
+        {label}
       </span>
     </div>
   );
@@ -105,13 +195,29 @@ export default function HomePage() {
   );
   const [tapBounceKey, setTapBounceKey] = useState(0);
   const [tapSpinKey, setTapSpinKey] = useState(0);
+  const [feedAnimKey, setFeedAnimKey] = useState(0);
+  const [playAnimKey, setPlayAnimKey] = useState(0);
+  const [levelUpAnimKey, setLevelUpAnimKey] = useState(0);
+  const [xpTick, setXpTick] = useState(0);
+  const [pet, setPet] = useState<PetStats>(DEFAULT_PET);
+  const [petReady, setPetReady] = useState(false);
   const tapCycleIndexRef = useRef(0);
 
   const lastActivityRef = useRef(0);
 
   useLayoutEffect(() => {
     lastActivityRef.current = Date.now();
+    const loaded = loadPetStats();
+    queueMicrotask(() => {
+      setPet(loaded);
+      setPetReady(true);
+    });
   }, []);
+
+  useEffect(() => {
+    if (!petReady) return;
+    localStorage.setItem(PET_STORAGE_KEY, JSON.stringify(pet));
+  }, [pet, petReady]);
   const happyUntilRef = useRef(0);
   const happyTimeoutRef = useRef<number | null>(null);
   const walkTimeoutRef = useRef<number | null>(null);
@@ -157,27 +263,64 @@ export default function HomePage() {
     scheduleHappyEnd();
   }, [dismissGuestInvite, markActivity, wakeFromSleep, scheduleHappyEnd]);
 
+  const triggerLevelUpCelebration = useCallback(() => {
+    window.setTimeout(() => {
+      setLevelUpAnimKey((k) => k + 1);
+      setBubble(LEVEL_UP_BUBBLE);
+      setBubbleVisible(true);
+      setExpressionFlip("happy");
+      happyUntilRef.current = Date.now() + 3000;
+      scheduleHappyEnd();
+    }, 450);
+  }, [scheduleHappyEnd]);
+
   const handleFeedPress = useCallback(() => {
     markActivity();
     wakeFromSleep();
+    setFeedAnimKey((k) => k + 1);
     setBubble(FEED_BUBBLE);
     setBubbleVisible(true);
     happyUntilRef.current = Date.now() + 2000;
     setExpressionFlip("happy");
     scheduleHappyEnd();
-  }, [markActivity, wakeFromSleep, scheduleHappyEnd]);
+    setPet((prev) => {
+      const withHunger = {
+        ...prev,
+        hunger: clampStat(prev.hunger + 15),
+      };
+      const { stats, leveledUp } = addXp(withHunger, 10);
+      if (leveledUp) {
+        triggerLevelUpCelebration();
+      }
+      return stats;
+    });
+    setXpTick((t) => t + 1);
+  }, [
+    markActivity,
+    wakeFromSleep,
+    scheduleHappyEnd,
+    triggerLevelUpCelebration,
+  ]);
 
   const handlePlayPress = useCallback(() => {
     markActivity();
     wakeFromSleep();
+    setPlayAnimKey((k) => k + 1);
     setBubble(PLAY_BUBBLE);
     setBubbleVisible(true);
-    setTapBounceKey((k) => k + 1);
-    setTapSpinKey((k) => k + 1);
-    happyUntilRef.current = Date.now() + 2000;
-    setExpressionFlip("happy");
-    scheduleHappyEnd();
-  }, [markActivity, wakeFromSleep, scheduleHappyEnd]);
+    setPet((prev) => {
+      const withEnergy = {
+        ...prev,
+        energy: clampStat(prev.energy + 15),
+      };
+      const { stats, leveledUp } = addXp(withEnergy, 10);
+      if (leveledUp) {
+        triggerLevelUpCelebration();
+      }
+      return stats;
+    });
+    setXpTick((t) => t + 1);
+  }, [markActivity, wakeFromSleep, triggerLevelUpCelebration]);
 
   const handleStagePointerDown = useCallback(() => {
     markActivity();
@@ -266,10 +409,7 @@ export default function HomePage() {
   const bubbleShown =
     bubbleVisible || (isGuest && guestInvitePhase !== "none");
 
-  const imageSrc =
-    (sleeping ? "idle" : expressionFlip) === "happy"
-      ? "/miomi/happy.png"
-      : "/miomi/idle.png";
+  const miomiExpression = sleeping ? "idle" : expressionFlip;
 
   const floatTransition = sleeping
     ? { duration: 5.5, repeat: Infinity, ease: "easeInOut" as const }
@@ -281,6 +421,27 @@ export default function HomePage() {
 
   return (
     <AppShell>
+      <style>{`
+        @keyframes miomi-xp-tick {
+          0% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          40% {
+            transform: scale(1.2);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        .miomi-xp-tick {
+          display: inline-block;
+          animation: miomi-xp-tick 0.5s ease-out;
+          transition: color 0.5s ease-out;
+        }
+      `}</style>
       <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white">
         {/* Miomi stage — flex-1, white canvas */}
         <div
@@ -397,22 +558,14 @@ export default function HomePage() {
                         transition={{ duration: 0.55, ease: "easeOut" }}
                         className="origin-bottom"
                       >
-                        <div
-                          className={cn(
-                            "origin-bottom",
-                            !reduceMotion && "miomi-breathe",
-                          )}
-                        >
-                          <Image
-                            key={imageSrc}
-                            src={imageSrc}
-                            alt="Miomi"
-                            width={560}
-                            height={560}
-                            priority
-                            className="pointer-events-none h-full max-h-full w-auto max-w-[min(92vw,100%)] select-none object-contain object-bottom"
-                          />
-                        </div>
+                        <MiomiCharacter
+                          expression={miomiExpression}
+                          sleeping={sleeping}
+                          feedAnimKey={feedAnimKey}
+                          playAnimKey={playAnimKey}
+                          levelUpAnimKey={levelUpAnimKey}
+                          breathe={!reduceMotion}
+                        />
                       </motion.div>
                     </motion.div>
                   </motion.button>
@@ -425,29 +578,35 @@ export default function HomePage() {
           <div className="pointer-events-none absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-2">
             <PetStatusCircle
               icon={Heart}
-              percentLabel="82%"
+              percent={pet.mood}
               iconClass="text-[#D4537E]"
               textClass="text-[#D4537E]"
-              ariaLabel="Mood 82 percent"
+              ariaLabel={`Mood ${Math.round(pet.mood)} percent`}
             />
             <PetStatusCircle
               icon={Zap}
-              percentLabel="65%"
+              percent={pet.energy}
               iconClass="text-[#B8860B]"
               textClass="text-[#B8860B]"
-              ariaLabel="Energy 65 percent"
+              ariaLabel={`Energy ${Math.round(pet.energy)} percent`}
             />
             <PetStatusCircle
               icon={Coffee}
-              percentLabel="45%"
+              percent={pet.hunger}
               iconClass="text-[#639922]"
               textClass="text-[#639922]"
-              ariaLabel="Hunger 45 percent"
+              ariaLabel={`Hunger ${Math.round(pet.hunger)} percent`}
             />
           </div>
-          <p className="pointer-events-none absolute bottom-2 right-3 z-20 text-[8px] font-medium leading-none text-[#B8860B]">
-            Lv.3
-          </p>
+          <div className="pointer-events-none absolute bottom-2 right-3 z-20 flex items-baseline gap-1 text-[8px] font-medium leading-none text-[#B8860B]">
+            <span>Lv.{pet.level}</span>
+            <span
+              key={`xp-${pet.xp}-${xpTick}`}
+              className="miomi-xp-tick tabular-nums"
+            >
+              {pet.xp} XP
+            </span>
+          </div>
         </div>
 
         {/* Daily topic — fixed band, no vertical growth */}
