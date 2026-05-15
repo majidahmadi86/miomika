@@ -13,6 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
   viewportFit: "cover",
 };
 
@@ -32,10 +35,10 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${geistSans.variable} ${geistMono.variable} h-[100dvh] max-h-[100dvh] overflow-hidden bg-white antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
+      className={`${geistSans.variable} ${geistMono.variable} overflow-hidden bg-white antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
     >
-      <body className="h-[100dvh] max-h-[100dvh] overflow-hidden bg-white text-[var(--miomika-foreground)] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
-        <div className="relative h-[100dvh] max-h-[100dvh] min-h-0 w-full overflow-hidden bg-white md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
+      <body className="overflow-hidden bg-white text-[var(--miomika-foreground)] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
+        <div className="relative miomika-app-height min-h-0 w-full overflow-hidden bg-white md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
           {children}
         </div>
       </body>

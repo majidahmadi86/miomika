@@ -28,14 +28,29 @@ body {
   background: #ffffff;
   margin: 0;
   padding: 0;
+  width: 100%;
   height: 100dvh;
+  height: 100svh;
   max-height: 100dvh;
+  max-height: 100svh;
+}
+
+.miomika-app-height {
+  height: 100dvh;
+  height: 100svh;
+  max-height: 100dvh;
+  max-height: 100svh;
 }
 
 @media (min-width: 768px) {
   html,
   body {
     overflow: visible;
+    height: auto;
+    max-height: none;
+  }
+
+  .miomika-app-height {
     height: auto;
     max-height: none;
   }
