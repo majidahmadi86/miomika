@@ -7,16 +7,10 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
-import {
-  GUEST_SOFT_SIGNUP_COPY,
-  GUEST_TAB_LOCK_COPY,
-  useGuestExploration,
-  useGuestHomeSoftNudgeTimer,
-} from "@/components/guest/GuestExplorationContext";
+import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { PillButton } from "@/components/ui/PillButton";
@@ -39,14 +33,21 @@ const TAP_BUBBLE_CYCLE = [
 const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
 
 const FEED_BUBBLE = {
-  th: "อิ่มแล้วค่า~ ขอบคุณนะคะ!",
-  en: "All full now~ thank you~",
+  th: "อิ่มแล้วค่า~",
+  en: "All full now~",
 };
 
 const PLAY_BUBBLE = {
-  th: "เย้~ เล่นด้วยกันนะคะ!",
-  en: "Yay~ let's play together~",
+  th: "เย้~ สนุกจัง!",
+  en: "Yay~ so fun~",
 };
+
+const GUEST_SIGNUP_BUBBLE = {
+  th: "อยากให้หนูจำชื่อคุณได้ไหมคะ~ จะได้เรียกคุณว่าที่รักได้นะคะ",
+  en: "Do you want me to remember your name? So I can call you my darling~",
+};
+
+const GUEST_SIGNUP_STORAGE_KEY = "miomika-guest-signup-moment-v1";
 
 const LEVEL_UP_BUBBLE = {
   th: "เลเวลอัพแล้วค่า~!",
@@ -175,16 +176,10 @@ export default function HomePage() {
   const {
     isGuest,
     authReady,
-    guestInvitePhase,
     openLockedTabPrompt,
     openSoftSignupPrompt,
     dismissGuestInvite,
   } = useGuestExploration();
-
-  useGuestHomeSoftNudgeTimer(
-    authReady && isGuest,
-    openSoftSignupPrompt,
-  );
 
   const [miomiX, setMiomiX] = useState(0);
   const [sleeping, setSleeping] = useState(false);
@@ -201,6 +196,7 @@ export default function HomePage() {
   const [xpTick, setXpTick] = useState(0);
   const [pet, setPet] = useState<PetStats>(DEFAULT_PET);
   const [petReady, setPetReady] = useState(false);
+  const [guestSignupMoment, setGuestSignupMoment] = useState(false);
   const tapCycleIndexRef = useRef(0);
 
   const lastActivityRef = useRef(0);
@@ -236,6 +232,20 @@ export default function HomePage() {
       return s;
     });
   }, []);
+
+  const showGuestSignupIfFirst = useCallback(() => {
+    if (!authReady || !isGuest) return false;
+    try {
+      if (localStorage.getItem(GUEST_SIGNUP_STORAGE_KEY)) return false;
+      localStorage.setItem(GUEST_SIGNUP_STORAGE_KEY, "1");
+    } catch {
+      return false;
+    }
+    setGuestSignupMoment(true);
+    setBubble(GUEST_SIGNUP_BUBBLE);
+    setBubbleVisible(true);
+    return true;
+  }, [authReady, isGuest]);
 
   const scheduleHappyEnd = useCallback(() => {
     if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current);
@@ -277,9 +287,12 @@ export default function HomePage() {
   const handleFeedPress = useCallback(() => {
     markActivity();
     wakeFromSleep();
+    const firstGuest = showGuestSignupIfFirst();
     setFeedAnimKey((k) => k + 1);
-    setBubble(FEED_BUBBLE);
-    setBubbleVisible(true);
+    if (!firstGuest) {
+      setBubble(FEED_BUBBLE);
+      setBubbleVisible(true);
+    }
     happyUntilRef.current = Date.now() + 2000;
     setExpressionFlip("happy");
     scheduleHappyEnd();
@@ -300,14 +313,18 @@ export default function HomePage() {
     wakeFromSleep,
     scheduleHappyEnd,
     triggerLevelUpCelebration,
+    showGuestSignupIfFirst,
   ]);
 
   const handlePlayPress = useCallback(() => {
     markActivity();
     wakeFromSleep();
+    const firstGuest = showGuestSignupIfFirst();
     setPlayAnimKey((k) => k + 1);
-    setBubble(PLAY_BUBBLE);
-    setBubbleVisible(true);
+    if (!firstGuest) {
+      setBubble(PLAY_BUBBLE);
+      setBubbleVisible(true);
+    }
     setPet((prev) => {
       const withEnergy = {
         ...prev,
@@ -320,7 +337,18 @@ export default function HomePage() {
       return stats;
     });
     setXpTick((t) => t + 1);
-  }, [markActivity, wakeFromSleep, triggerLevelUpCelebration]);
+  }, [
+    markActivity,
+    wakeFromSleep,
+    triggerLevelUpCelebration,
+    showGuestSignupIfFirst,
+  ]);
+
+  const handleGuestCreatePress = useCallback(() => {
+    if (!showGuestSignupIfFirst()) {
+      openSoftSignupPrompt();
+    }
+  }, [showGuestSignupIfFirst, openSoftSignupPrompt]);
 
   const handleStagePointerDown = useCallback(() => {
     markActivity();
@@ -396,18 +424,8 @@ export default function HomePage() {
     };
   }, []);
 
-  const guestInviteCopy = useMemo(() => {
-    if (!isGuest) return null;
-    if (guestInvitePhase === "tab_lock") return GUEST_TAB_LOCK_COPY;
-    if (guestInvitePhase === "soft_nudge") return GUEST_SOFT_SIGNUP_COPY;
-    return null;
-  }, [isGuest, guestInvitePhase]);
-
-  const bubbleTh = guestInviteCopy?.th ?? bubble.th;
-  const bubbleEn = guestInviteCopy?.en ?? bubble.en;
-
-  const bubbleShown =
-    bubbleVisible || (isGuest && guestInvitePhase !== "none");
+  const bubbleTh = bubble.th;
+  const bubbleEn = bubble.en;
 
   const miomiExpression = sleeping ? "idle" : expressionFlip;
 
@@ -442,7 +460,7 @@ export default function HomePage() {
           transition: color 0.5s ease-out;
         }
       `}</style>
-      <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white">
+      <div className="flex h-svh max-h-svh min-h-0 w-full max-w-full flex-col overflow-hidden bg-white">
         {/* Miomi stage — flex-1, white canvas */}
         <div
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
@@ -454,38 +472,41 @@ export default function HomePage() {
             </span>
           </div>
 
-          <div className="absolute right-3 top-3 z-20 flex max-w-[58%] flex-col items-end gap-2">
+          <motion.div className="pointer-events-none absolute inset-x-0 top-[8%] z-30 flex justify-center px-4">
             <motion.div
-              key={guestInvitePhase}
-              className="w-full rounded-[14px] border border-rose-border bg-white px-3 py-2.5 shadow-sm"
+              className="pointer-events-auto w-full max-w-[min(92%,280px)] rounded-[14px] border border-rose-border bg-white px-3 py-2.5 shadow-sm"
               initial={false}
               animate={{
-                opacity: bubbleShown ? 1 : 0,
-                y: bubbleShown ? 0 : 6,
+                opacity: bubbleVisible ? 1 : 0,
+                y: bubbleVisible ? 0 : 6,
               }}
               transition={{ duration: 0.45, ease: "easeOut" }}
             >
               <p className="text-[11px] font-medium leading-snug text-neutral-800">
                 {bubbleTh}
               </p>
-              <p className="mt-1 text-[8px] leading-snug text-nav-muted">
-                {bubbleEn}
-              </p>
+              {bubbleEn ? (
+                <p className="mt-1 text-[8px] leading-snug text-nav-muted">
+                  {bubbleEn}
+                </p>
+              ) : null}
+              {guestSignupMoment ? (
+                <Link
+                  href="/signup"
+                  className="mt-2 flex w-full flex-col items-center rounded-full border border-rose-border bg-rose-light px-3 py-2 text-center transition-colors hover:bg-white"
+                >
+                  <span className="text-[10px] font-semibold text-rose-accent">
+                    จำชื่อฉันนะคะ
+                  </span>
+                  <span className="text-[8px] font-normal text-nav-muted">
+                    Remember my name
+                  </span>
+                </Link>
+              ) : null}
             </motion.div>
-            {isGuest && guestInvitePhase !== "none" ? (
-              <Link
-                href="/signup"
-                className="shrink-0 rounded-full border border-rose-border bg-rose-light px-3 py-1.5 text-center text-[10px] font-semibold text-rose-accent shadow-sm transition-colors hover:bg-white"
-              >
-                สมัครฟรี
-                <span className="mt-0.5 block text-[8px] font-normal text-nav-muted">
-                  Sign up free
-                </span>
-              </Link>
-            ) : null}
-          </div>
+          </motion.div>
 
-          <div className="absolute inset-x-0 bottom-12 top-0 z-10 flex h-full min-h-0 items-end justify-center px-2">
+          <motion.div className="absolute inset-x-0 bottom-12 top-0 z-10 flex h-full min-h-0 items-end justify-center px-2">
             <motion.div
               className="flex h-full max-h-full items-end justify-center"
               initial={
@@ -573,7 +594,7 @@ export default function HomePage() {
               </motion.div>
             </motion.div>
             </motion.div>
-          </div>
+          </motion.div>
 
           <div className="pointer-events-none absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-2">
             <PetStatusCircle
@@ -598,14 +619,22 @@ export default function HomePage() {
               ariaLabel={`Hunger ${Math.round(pet.hunger)} percent`}
             />
           </div>
-          <div className="pointer-events-none absolute bottom-2 right-3 z-20 flex items-baseline gap-1 text-[8px] font-medium leading-none text-[#B8860B]">
-            <span>Lv.{pet.level}</span>
-            <span
-              key={`xp-${pet.xp}-${xpTick}`}
-              className="miomi-xp-tick tabular-nums"
-            >
-              {pet.xp} XP
-            </span>
+          <div className="pointer-events-none absolute bottom-2 right-3 z-20 flex flex-col items-end gap-0.5">
+            <motion.div className="flex items-baseline gap-1 text-[8px] font-medium leading-none text-[#B8860B]">
+              <span>Lv.{pet.level}</span>
+              <span
+                key={`xp-${pet.xp}-${xpTick}`}
+                className="miomi-xp-tick tabular-nums"
+              >
+                {pet.xp}/100 XP
+              </span>
+            </motion.div>
+            <div className="h-[3px] w-14 overflow-hidden rounded-full bg-[#F0E0E8]">
+              <div
+                className="h-full rounded-full bg-[#B8860B] transition-all duration-500 ease-out"
+                style={{ width: `${pet.xp}%` }}
+              />
+            </div>
           </div>
         </div>
 
@@ -637,7 +666,7 @@ export default function HomePage() {
               <button
                 type="button"
                 title="Create now"
-                onClick={() => openSoftSignupPrompt()}
+                onClick={handleGuestCreatePress}
                 className="inline-flex h-7 shrink-0 items-center justify-center rounded-full bg-rose-accent px-3 text-[10px] font-medium leading-none text-white transition-colors hover:bg-rose-mid"
               >
                 สร้างเลย
@@ -675,7 +704,7 @@ export default function HomePage() {
           {authReady && isGuest ? (
             <button
               type="button"
-              onClick={() => openSoftSignupPrompt()}
+              onClick={handleGuestCreatePress}
               className="flex flex-[2] flex-col items-center justify-center gap-0 rounded-xl bg-rose-accent leading-tight text-white transition-colors hover:bg-rose-mid"
             >
               <span className="text-xs font-medium">สร้างกันเลย</span>
