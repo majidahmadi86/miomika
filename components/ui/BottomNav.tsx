@@ -22,7 +22,7 @@ export function BottomNav() {
       className="z-50 flex w-full shrink-0 flex-col border-t-[0.5px] border-rose-border bg-white pb-[env(safe-area-inset-bottom,0px)]"
       aria-label="Primary"
     >
-      <ul className="flex h-14 w-full shrink-0 items-stretch justify-between px-1">
+      <ul className="flex h-16 w-full shrink-0 items-stretch justify-between px-1">
         {tabs.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           const tabClass = cn(
@@ -45,7 +45,7 @@ export function BottomNav() {
                 >
                   <span className="relative">
                     <Icon
-                      className="h-5 w-5 shrink-0 blur-[0.4px] contrast-90 opacity-50"
+                      className="h-6 w-6 shrink-0 blur-[0.4px] contrast-90 opacity-50"
                       aria-hidden
                     />
                     <Lock
@@ -67,7 +67,7 @@ export function BottomNav() {
           return (
             <li key={href} className="flex flex-1">
               <Link href={linkHref} className={tabClass}>
-                <Icon className="h-5 w-5 shrink-0" aria-hidden />
+                <Icon className="h-6 w-6 shrink-0" aria-hidden />
                 <span className="text-[8px] font-medium leading-none">
                   {label}
                 </span>

@@ -282,16 +282,11 @@ export default function HomePage() {
   return (
     <AppShell>
       <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white">
-        {/* Miomi stage — Miomi ~55vh, white canvas */}
+        {/* Miomi stage — flex-1, white canvas */}
         <div
-          className="relative h-[55vh] w-full shrink-0 overflow-hidden bg-white"
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
           onPointerDown={handleStagePointerDown}
         >
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-b from-white to-[#fdf5f8]"
-            aria-hidden
-          />
-
           <div className="absolute left-3 top-3 z-20 rounded-full bg-rose-light px-3 py-1.5">
             <span className="text-[11px] font-semibold text-rose-deep">
               Miomi
@@ -329,8 +324,9 @@ export default function HomePage() {
             ) : null}
           </div>
 
-          <div className="absolute bottom-[52px] left-1/2 z-10 min-w-0 max-w-full -translate-x-1/2 px-2">
+          <div className="absolute inset-x-0 bottom-12 top-0 z-10 flex h-full min-h-0 items-end justify-center px-2">
             <motion.div
+              className="flex h-full max-h-full items-end justify-center"
               initial={
                 reduceMotion
                   ? { y: 0, scale: 1, opacity: 1 }
@@ -340,7 +336,7 @@ export default function HomePage() {
               transition={{ duration: 1.2, ease: "easeOut" }}
             >
               <motion.div
-                className="flex justify-center"
+                className="flex h-full max-h-full items-end justify-center"
                 animate={reduceMotion ? { x: 0 } : { x: miomiX }}
                 transition={WALK_TRANSITION}
               >
@@ -414,7 +410,7 @@ export default function HomePage() {
                             width={560}
                             height={560}
                             priority
-                            className="pointer-events-none h-[55vh] w-auto max-w-[min(92vw,100%)] select-none object-contain object-bottom"
+                            className="pointer-events-none h-full max-h-full w-auto max-w-[min(92vw,100%)] select-none object-contain object-bottom"
                           />
                         </div>
                       </motion.div>
@@ -423,7 +419,7 @@ export default function HomePage() {
                 </motion.div>
               </motion.div>
             </motion.div>
-          </motion.div>
+            </motion.div>
           </div>
 
           <div className="pointer-events-none absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-2">
@@ -541,8 +537,8 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Mic — 56px row */}
-        <div className="flex h-14 shrink-0 items-center justify-center">
+        {/* Mic */}
+        <div className="flex shrink-0 items-center justify-center pb-2">
           <div className="relative flex h-14 w-14 items-center justify-center">
             <motion.div
               className="pointer-events-none absolute inset-0 rounded-full border-2 border-rose-mid/50"
