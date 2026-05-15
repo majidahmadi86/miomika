@@ -12,9 +12,9 @@ function isAuthRequiredPath(pathname: string): boolean {
   return isOnboardingPath(pathname);
 }
 
-/** Guests may not open profile/friends without account */
+/** Guests may not open dashboard/profile without account */
 function isGuestBlockedPath(pathname: string): boolean {
-  const blocked = ["/profile", "/friends"] as const;
+  const blocked = ["/dashboard", "/profile"] as const;
   return blocked.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );

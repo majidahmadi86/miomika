@@ -23,8 +23,7 @@ export const metadata: Metadata = {
   title: "Miomika",
   description: "Voice AI companion for Thai creators",
   icons: {
-    icon: "/miomi/idle.png",
-    apple: "/miomi/idle.png",
+    icon: "/favicon.ico",
   },
 };
 

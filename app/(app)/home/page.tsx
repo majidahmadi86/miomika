@@ -460,53 +460,13 @@ export default function HomePage() {
           transition: color 0.5s ease-out;
         }
       `}</style>
-      <div className="flex h-svh max-h-svh min-h-0 w-full max-w-full flex-col overflow-hidden bg-white">
+      <div className="flex h-svh max-h-svh flex-col overflow-hidden min-h-0 w-full bg-white">
         {/* Miomi stage — flex-1, white canvas */}
         <div
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
           onPointerDown={handleStagePointerDown}
         >
-          <div className="absolute left-3 top-3 z-20 rounded-full bg-rose-light px-3 py-1.5">
-            <span className="text-[11px] font-semibold text-rose-deep">
-              Miomi
-            </span>
-          </div>
-
-          <motion.div className="pointer-events-none absolute inset-x-0 top-[8%] z-30 flex justify-center px-4">
-            <motion.div
-              className="pointer-events-auto w-full max-w-[min(92%,280px)] rounded-[14px] border border-rose-border bg-white px-3 py-2.5 shadow-sm"
-              initial={false}
-              animate={{
-                opacity: bubbleVisible ? 1 : 0,
-                y: bubbleVisible ? 0 : 6,
-              }}
-              transition={{ duration: 0.45, ease: "easeOut" }}
-            >
-              <p className="text-[11px] font-medium leading-snug text-neutral-800">
-                {bubbleTh}
-              </p>
-              {bubbleEn ? (
-                <p className="mt-1 text-[8px] leading-snug text-nav-muted">
-                  {bubbleEn}
-                </p>
-              ) : null}
-              {guestSignupMoment ? (
-                <Link
-                  href="/signup"
-                  className="mt-2 flex w-full flex-col items-center rounded-full border border-rose-border bg-rose-light px-3 py-2 text-center transition-colors hover:bg-white"
-                >
-                  <span className="text-[10px] font-semibold text-rose-accent">
-                    จำชื่อฉันนะคะ
-                  </span>
-                  <span className="text-[8px] font-normal text-nav-muted">
-                    Remember my name
-                  </span>
-                </Link>
-              ) : null}
-            </motion.div>
-          </motion.div>
-
-          <motion.div className="absolute inset-x-0 bottom-12 top-0 z-10 flex h-full min-h-0 items-end justify-center px-2">
+          <motion.div className="absolute inset-0 bottom-12 z-10 flex min-h-0 items-end justify-center px-2">
             <motion.div
               className="flex h-full max-h-full items-end justify-center"
               initial={
@@ -596,6 +556,40 @@ export default function HomePage() {
             </motion.div>
           </motion.div>
 
+          <div className="pointer-events-none absolute inset-x-0 top-[12%] z-30 flex justify-end px-3">
+            <motion.div
+              className="pointer-events-auto max-w-[min(72%,260px)] rounded-[14px] border border-rose-border bg-white px-3 py-2.5 shadow-sm"
+              initial={false}
+              animate={{
+                opacity: bubbleVisible ? 1 : 0,
+                y: bubbleVisible ? 0 : 6,
+              }}
+              transition={{ duration: 0.45, ease: "easeOut" }}
+            >
+              <p className="text-[11px] font-medium leading-snug text-neutral-800">
+                {bubbleTh}
+              </p>
+              {bubbleEn ? (
+                <p className="mt-1 text-[8px] leading-snug text-nav-muted">
+                  {bubbleEn}
+                </p>
+              ) : null}
+              {guestSignupMoment ? (
+                <Link
+                  href="/signup"
+                  className="mt-2 flex w-full flex-col items-center rounded-full border border-rose-border bg-rose-light px-3 py-2 text-center transition-colors hover:bg-white"
+                >
+                  <span className="text-[10px] font-semibold text-rose-accent">
+                    จำชื่อฉันนะคะ
+                  </span>
+                  <span className="text-[8px] font-normal text-nav-muted">
+                    Remember my name
+                  </span>
+                </Link>
+              ) : null}
+            </motion.div>
+          </div>
+
           <div className="pointer-events-none absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-2">
             <PetStatusCircle
               icon={Heart}
@@ -639,7 +633,7 @@ export default function HomePage() {
         </div>
 
         {/* Daily topic — fixed band, no vertical growth */}
-        <section className="mx-2 mt-1 flex h-[68px] shrink-0 flex-col justify-center overflow-hidden rounded-xl border border-gold-border bg-gold-light px-2 py-1">
+        <section className="mx-2 flex h-[68px] shrink-0 flex-col justify-center overflow-hidden rounded-xl border border-gold-border bg-gold-light px-2 py-1">
           <p className="text-[7px] font-semibold uppercase tracking-wide text-gold">
             หยิบมาให้วันนี้ · MIOMI&apos;S PICK
           </p>
