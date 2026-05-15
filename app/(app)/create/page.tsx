@@ -13,8 +13,6 @@ import {
   type MutableRefObject,
 } from "react";
 import { AppShell } from "@/components/layout/AppShell";
-import { GuestScreenLockOverlay } from "@/components/guest/GuestScreenLockOverlay";
-import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { cn } from "@/lib/utils";
 import type { MiomiContentPayload } from "@/types";
 
@@ -156,7 +154,6 @@ function TypingDots() {
 
 export default function CreatePage() {
   const reduceMotion = useReducedMotion();
-  const { isGuest } = useGuestExploration();
   const idRef = useRef(0);
   const genId = () => `${Date.now()}-${++idRef.current}`;
 
@@ -1044,7 +1041,6 @@ export default function CreatePage() {
             </motion.div>
           ) : null}
         </AnimatePresence>
-        {isGuest ? <GuestScreenLockOverlay /> : null}
       </div>
     </AppShell>
   );
