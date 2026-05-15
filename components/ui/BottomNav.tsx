@@ -19,7 +19,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="z-50 flex w-full shrink-0 flex-col border-t-[0.5px] border-rose-border bg-white"
+      className="z-50 flex w-full shrink-0 flex-col border-t-[0.5px] border-rose-border bg-white pb-[env(safe-area-inset-bottom,0px)]"
       aria-label="Primary"
     >
       <ul className="flex h-14 w-full shrink-0 items-stretch justify-between px-1">
@@ -76,10 +76,6 @@ export function BottomNav() {
           );
         })}
       </ul>
-      <div
-        className="shrink-0 bg-white [height:env(safe-area-inset-bottom,0px)]"
-        aria-hidden
-      />
     </nav>
   );
 }

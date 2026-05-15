@@ -37,7 +37,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[390px] flex-col overflow-hidden bg-white px-3 pt-2">
+      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white px-3 pt-2">
         <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
           {/* Briefing — single compact strip */}
           <section className="flex shrink-0 gap-2 rounded-lg border border-gold-border bg-gold-light px-2 py-1.5">

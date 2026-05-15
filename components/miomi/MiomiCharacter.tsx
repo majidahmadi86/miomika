@@ -1,8 +1,6 @@
 import Image from "next/image";
 
-const moods = ["idle", "happy", "thinking", "speaking"] as const;
-
-export type MiomiMood = (typeof moods)[number];
+export type MiomiMood = "idle" | "happy" | "thinking" | "speaking";
 
 type MiomiCharacterProps = {
   mood?: MiomiMood;

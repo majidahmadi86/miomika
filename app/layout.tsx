@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -11,6 +11,10 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+export const viewport: Viewport = {
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "Miomika",
@@ -28,10 +32,10 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${geistSans.variable} ${geistMono.variable} h-[100dvh] max-h-[100dvh] overflow-hidden bg-white min-[390px]:bg-[#F2EEF0] antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
+      className={`${geistSans.variable} ${geistMono.variable} h-[100dvh] max-h-[100dvh] overflow-hidden bg-white antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
     >
-      <body className="h-[100dvh] max-h-[100dvh] overflow-hidden bg-white text-[var(--miomika-foreground)] min-[390px]:bg-[#F2EEF0] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
-        <div className="relative mx-auto h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-[390px] overflow-hidden bg-white min-[390px]:shadow-xl md:h-auto md:max-h-none md:min-h-screen md:overflow-visible md:max-w-none md:shadow-none">
+      <body className="h-[100dvh] max-h-[100dvh] overflow-hidden bg-white text-[var(--miomika-foreground)] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
+        <div className="relative h-[100dvh] max-h-[100dvh] min-h-0 w-full overflow-hidden bg-white md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
           {children}
         </div>
       </body>

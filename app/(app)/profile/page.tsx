@@ -140,7 +140,10 @@ export default function ProfilePage() {
   }, [router]);
 
   useEffect(() => {
-    void loadProfile();
+    const id = window.setTimeout(() => {
+      void loadProfile();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [loadProfile]);
 
   async function handleLogout() {
@@ -174,7 +177,7 @@ export default function ProfilePage() {
 
   return (
     <AppShell>
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[390px] flex-col overflow-hidden bg-white px-3 pt-2">
+      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white px-3 pt-2">
         {loading ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
             <p className="text-sm font-medium text-neutral-700">กำลังโหลด...</p>

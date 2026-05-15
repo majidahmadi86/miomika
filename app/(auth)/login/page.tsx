@@ -35,7 +35,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex max-h-[100dvh] min-h-0 w-full max-w-[400px] flex-col overflow-y-auto bg-white px-6 py-10">
+    <main className="flex h-[100dvh] max-h-[100dvh] min-h-0 w-full flex-col overflow-hidden bg-white">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-10">
       <p className="text-center text-2xl font-bold text-rose-accent">Miomika</p>
 
       <div className="mt-6 flex justify-center">
@@ -111,6 +112,7 @@ export default function LoginPage() {
           ยังไม่มีบัญชี? สมัครเลยค่า
         </Link>
       </p>
+      </div>
     </main>
   );
 }

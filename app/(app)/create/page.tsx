@@ -194,7 +194,9 @@ export default function CreatePage() {
   }, [stage]);
 
   useEffect(() => {
-    setSpeechSupported(!!getSpeechRecognitionCtor());
+    queueMicrotask(() => {
+      setSpeechSupported(!!getSpeechRecognitionCtor());
+    });
   }, []);
 
   useEffect(() => {
@@ -700,7 +702,7 @@ export default function CreatePage() {
 
   return (
     <AppShell>
-      <div className="relative mx-auto flex h-full min-h-0 w-full max-w-[390px] flex-col overflow-hidden bg-white md:max-w-none">
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-white">
         {/* Fixed top: Miomi stage + pill controls (not scrollable) */}
         <div className="shrink-0 border-b border-[#EAD0DB] bg-white">
           <div className="relative h-[30vh] min-h-[140px] max-h-[260px] w-full shrink-0 overflow-hidden bg-white">

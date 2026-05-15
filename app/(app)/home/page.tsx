@@ -4,7 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Coffee, Heart, Mic, Zap, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   GUEST_SOFT_SIGNUP_COPY,
   GUEST_TAB_LOCK_COPY,
@@ -100,7 +107,11 @@ export default function HomePage() {
   const [tapSpinKey, setTapSpinKey] = useState(0);
   const tapCycleIndexRef = useRef(0);
 
-  const lastActivityRef = useRef(Date.now());
+  const lastActivityRef = useRef(0);
+
+  useLayoutEffect(() => {
+    lastActivityRef.current = Date.now();
+  }, []);
   const happyUntilRef = useRef(0);
   const happyTimeoutRef = useRef<number | null>(null);
   const walkTimeoutRef = useRef<number | null>(null);
@@ -187,15 +198,10 @@ export default function HomePage() {
   }, [dismissGuestInvite, markActivity, sleeping, wakeFromSleep, scheduleHappyEnd]);
 
   useEffect(() => {
-    if (reduceMotion) {
-      setBubble(WELCOME_BUBBLE);
-      setBubbleVisible(true);
-      return;
-    }
     const id = window.setTimeout(() => {
       setBubble(WELCOME_BUBBLE);
       setBubbleVisible(true);
-    }, 1200);
+    }, reduceMotion ? 0 : 1200);
     return () => window.clearTimeout(id);
   }, [reduceMotion]);
 
@@ -224,10 +230,7 @@ export default function HomePage() {
     if (reduceMotion || sleeping) return;
     const id = window.setInterval(() => {
       if (Date.now() < happyUntilRef.current) return;
-      setExpressionFlip((prev) => {
-        const next = Math.random() < 0.5 ? "idle" : "happy";
-        return next;
-      });
+      setExpressionFlip(() => (Math.random() < 0.5 ? "idle" : "happy"));
     }, 5000);
     return () => clearInterval(id);
   }, [reduceMotion, sleeping]);
@@ -250,17 +253,6 @@ export default function HomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (sleeping) {
-      setExpressionFlip("idle");
-    }
-  }, [sleeping]);
-
-  useEffect(() => {
-    if (!isGuest || guestInvitePhase === "none") return;
-    setBubbleVisible(true);
-  }, [isGuest, guestInvitePhase]);
-
   const guestInviteCopy = useMemo(() => {
     if (!isGuest) return null;
     if (guestInvitePhase === "tab_lock") return GUEST_TAB_LOCK_COPY;
@@ -271,8 +263,13 @@ export default function HomePage() {
   const bubbleTh = guestInviteCopy?.th ?? bubble.th;
   const bubbleEn = guestInviteCopy?.en ?? bubble.en;
 
+  const bubbleShown =
+    bubbleVisible || (isGuest && guestInvitePhase !== "none");
+
   const imageSrc =
-    expressionFlip === "happy" ? "/miomi/happy.png" : "/miomi/idle.png";
+    (sleeping ? "idle" : expressionFlip) === "happy"
+      ? "/miomi/happy.png"
+      : "/miomi/idle.png";
 
   const floatTransition = sleeping
     ? { duration: 5.5, repeat: Infinity, ease: "easeInOut" as const }
@@ -307,8 +304,8 @@ export default function HomePage() {
               className="w-full rounded-[14px] border border-rose-border bg-white px-3 py-2.5 shadow-sm"
               initial={false}
               animate={{
-                opacity: bubbleVisible ? 1 : 0,
-                y: bubbleVisible ? 0 : 6,
+                opacity: bubbleShown ? 1 : 0,
+                y: bubbleShown ? 0 : 6,
               }}
               transition={{ duration: 0.45, ease: "easeOut" }}
             >

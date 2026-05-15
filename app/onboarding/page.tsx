@@ -201,7 +201,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-white">
-      <div className="mx-auto flex h-full max-h-[100dvh] min-h-0 w-full max-w-[390px] flex-col overflow-y-auto bg-white">
+      <div className="flex h-full min-h-0 w-full flex-col overflow-y-auto bg-white">
         <ProgressBar step={step} />
 
         <header className="relative flex h-11 shrink-0 items-center px-3">

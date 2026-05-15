@@ -65,7 +65,7 @@ function AppLayoutInner({
   const { isGuest, authReady } = useGuestExploration();
 
   return (
-    <div className="min-h-screen w-full md:flex md:h-screen md:bg-[#F2EEF0] md:overflow-hidden">
+    <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden md:flex md:h-screen md:max-h-none md:bg-[#F2EEF0] md:overflow-hidden">
       <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-[#EAD0DB] bg-white md:flex">
         <div className="flex flex-col items-center px-4 pb-4 pt-6">
           <p className="text-base font-medium text-[#8B1A35]">Miomika</p>
@@ -193,7 +193,7 @@ function AppLayoutInner({
         </div>
       </aside>
 
-      <div className="flex min-h-screen flex-1 flex-col bg-white md:min-h-0 md:h-full md:overflow-hidden">
+      <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-white md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="mx-auto w-full max-w-[680px]">{children}</div>
         </div>

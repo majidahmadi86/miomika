@@ -25,6 +25,9 @@ body {
 html,
 body {
   overflow: hidden;
+  background: #ffffff;
+  margin: 0;
+  padding: 0;
   height: 100dvh;
   max-height: 100dvh;
 }
