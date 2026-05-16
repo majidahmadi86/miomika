@@ -16,12 +16,15 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
   title: "Miomika",
   description: "Voice AI companion for Thai creators",
+  manifest: "/manifest.json",
+  themeColor: "#8B1A35",
   icons: {
     icon: "/favicon.ico",
   },
@@ -41,6 +44,15 @@ export default function RootLayout({
         <div className="relative miomika-app-height min-h-0 w-full overflow-hidden bg-white md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
           {children}
         </div>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+  if('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+  }
+`,
+          }}
+        />
       </body>
     </html>
   );

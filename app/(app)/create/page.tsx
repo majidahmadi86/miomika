@@ -52,21 +52,10 @@ type ThreadMessage =
       en: string;
     };
 
-const PLATFORMS = [
-  "Instagram",
-  "TikTok",
-  "Facebook",
-  "YouTube",
-  "LINE OA",
-] as const;
-
-const FREE_TONES = ["Cute Thai", "Professional"] as const;
-const PAID_TONES = ["Gen-Z", "Korean", "Anime", "Luxury"] as const;
-
 const INITIAL_MIOMI_TH =
-  "หนูชื่อ Miomi ค่า วันนี้จะโพสต์เรื่องอะไรดีคะ? เล่าให้หนูฟังก่อนได้เลย พูดหรือพิมพ์ก็ได้นะคะ";
+  "วันนี้อยากฝึก English เรื่องอะไรดีคะ~ พูดหรือพิมพ์ได้เลยนะคะ ไม่ต้องเป็นทางการค่า";
 const INITIAL_MIOMI_EN =
-  "I'm Miomi~ What do you want to post today? Tell me first — voice or typing both work.";
+  "What would you like to practice in English today~? Just talk to me — no need to be formal";
 
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
@@ -115,21 +104,6 @@ function getSpeechRecognitionCtor():
       webkitSpeechRecognition?: new () => SpeechRecLike;
     };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
-}
-
-function pillClass(selected: boolean) {
-  return cn(
-    "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-medium whitespace-nowrap transition-colors",
-    selected
-      ? "border-[#8B1A35] bg-[#FBEAF0] text-[#8B1A35]"
-      : "border-[#EAD0DB] bg-[#FAFAFA] text-[#666666]",
-  );
-}
-
-function paidTonePillClass() {
-  return cn(
-    "inline-flex shrink-0 cursor-not-allowed items-center gap-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2.5 py-1 text-[10px] font-medium whitespace-nowrap text-[#AAAAAA] opacity-75",
-  );
 }
 
 function TypingDots() {
@@ -231,8 +205,8 @@ export default function CreatePage() {
   const bubbleByExpression: Record<MiomiExpression, { th: string; en: string }> =
     {
       idle: {
-        th: "วันนี้จะโพสต์อะไรดีคะ~",
-        en: "What shall we post today?",
+        th: "วันนี้อยากฝึก English เรื่องอะไรดีคะ~",
+        en: "What would you like to practice in English today~?",
       },
       listening: {
         th: "กำลังฟังอยู่นะคะ~",
@@ -731,69 +705,10 @@ export default function CreatePage() {
           </div>
         </div>
 
-        <div className="shrink-0 bg-white px-3 py-1">
-          <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span className="shrink-0 self-center text-[9px] font-medium text-[#888888]">
-              แพลตฟอร์ม
-            </span>
-            {PLATFORMS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPlatform(p)}
-                className={pillClass(platform === p)}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-          <div className="mt-1 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span className="shrink-0 self-center text-[9px] font-medium text-[#888888]">
-              โทน
-            </span>
-            {FREE_TONES.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTone(t)}
-                className={pillClass(tone === t)}
-              >
-                {t}
-              </button>
-            ))}
-            {PAID_TONES.map((t) => (
-              <button
-                key={t}
-                type="button"
-                disabled
-                aria-disabled
-                className={paidTonePillClass()}
-              >
-                <span>{t}</span>
-                <span className="rounded border border-[#B8860B]/50 bg-[#fdf5e0] px-0.5 text-[7px] font-semibold leading-none text-[#B8860B]">
-                  Pro
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="mt-1 flex items-center gap-1.5 pb-0.5">
-            <span className="text-[9px] font-medium text-[#888888]">ภาษา</span>
-            {(["thai", "english", "both"] as const).map((lang) => (
-              <button
-                key={lang}
-                type="button"
-                onClick={() => setOutputLang(lang)}
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[9px] font-medium transition-colors",
-                  outputLang === lang
-                    ? "bg-[#8B1A35] text-white"
-                    : "border border-[#EAD0DB] bg-[#FAFAFA] text-neutral-700",
-                )}
-              >
-                {lang === "thai" ? "ไทย" : lang === "english" ? "EN" : "ทั้งคู่"}
-              </button>
-            ))}
-          </div>
+        <div className="shrink-0 bg-white px-3 py-2">
+          <p className="text-center text-[10px] leading-snug text-[#888888]">
+            พูดคุยกับมิโอมิเป็นภาษาไทยหรืออังกฤษก็ได้นะคะ~
+          </p>
         </div>
         </div>
 

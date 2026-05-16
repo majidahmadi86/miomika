@@ -1,3 +1,11 @@
+## PIVOT — May 16, 2026
+PRIMARY: English learning through AI companion (Miomi)
+SECONDARY: Social media content (Month 3+)
+PLATFORM: PWA now → React Native Month 3
+FIRST FEELING: "WOW — this is a superpower AI app"
+SOUL: Miomi is a warm bilingual best friend who teaches naturally
+TARGET USER: Thai people who want to speak English confidently
+
 # MIOMIKA — MASTER PROJECT BRIEF v3.0
 > Last updated: May 15, 2026 — Session 3 deep brainstorm
 > This is the single source of truth. Paste into every new Claude chat and every Cursor session.

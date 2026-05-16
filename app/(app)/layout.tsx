@@ -15,6 +15,7 @@ import {
   GuestExplorationProvider,
   useGuestExploration,
 } from "@/components/guest/GuestExplorationContext";
+import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -197,6 +198,7 @@ function AppLayoutInner({
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="mx-auto w-full max-w-[680px]">{children}</div>
         </div>
+        <InstallPrompt />
       </div>
 
       <aside className="hidden h-screen w-72 shrink-0 flex-col border-l border-[#EAD0DB] bg-white md:flex">
