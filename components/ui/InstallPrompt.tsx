@@ -11,7 +11,7 @@ export function InstallPrompt() {
     const handler = (e: any) => {
       e.preventDefault();
       setPrompt(e);
-      setTimeout(() => setShow(true), 30000);
+      setTimeout(() => setShow(true), 5000);
     };
     
     window.addEventListener('beforeinstallprompt', handler);
