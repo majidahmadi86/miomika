@@ -22,6 +22,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Miomika",
   description: "Voice AI companion for Thai creators",
+  manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
   },
