@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { Coffee, Heart, Mic, Zap, type LucideIcon } from "lucide-react";
+import { Coffee, Gamepad2, Heart, MessageCircle, Zap, type LucideIcon } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -13,13 +13,22 @@ import {
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
-import { PillButton } from "@/components/ui/PillButton";
 import { cn } from "@/lib/utils";
 
 const WELCOME_BUBBLE = {
-  th: "สวัสดีค่า~ หนูรอคุณอยู่นะคะ",
-  en: "I've been right here waiting for you~",
+  th: "สวัสดีค่า~ วันนี้อยากพูด English เก่งขึ้นไหมคะ?",
+  en: "Hi~ Want to speak better English today?",
 };
+
+const DAILY_CHALLENGE = {
+  phrase: "I'm up for it",
+  th: "ฉันพร้อมแล้ว — ใช้ตอบตกลงทำอะไรด้วยกัน",
+  meaning:
+    "แปลว่า “เอาล่ะ ทำได้” หรือ “ฉันพร้อมแล้ว” ไม่ใช่แค่ตื่นนอนนะคะ",
+};
+
+const tapFeedback =
+  "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8B1A35]";
 
 /** Five Thai-first lines, cycled on each tap (bounce + rotate). */
 const TAP_BUBBLE_CYCLE = [
@@ -143,30 +152,28 @@ const WALK_TRANSITION = {
   ease: "easeInOut" as const,
 };
 
-function PetStatusCircle({
+function StatPill({
   icon: Icon,
   percent,
   iconClass,
-  textClass,
   ariaLabel,
 }: {
   icon: LucideIcon;
   percent: number;
   iconClass: string;
-  textClass: string;
   ariaLabel: string;
 }) {
-  const label = `${Math.round(percent)}%`;
   return (
     <div
-      className="flex h-9 w-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border border-[#8B1A35] bg-white shadow-sm"
+      className={cn(
+        "flex items-center gap-1.5 rounded-full border border-[#EAD0DB] bg-white px-3 py-1.5 text-[11px] font-medium text-[#1A1A1A] shadow-sm",
+        tapFeedback,
+      )}
       role="img"
       aria-label={ariaLabel}
     >
-      <Icon className={cn("h-2.5 w-2.5", iconClass)} strokeWidth={2.5} />
-      <span className={cn("text-[8px] font-bold leading-none", textClass)}>
-        {label}
-      </span>
+      <Icon className={cn("h-3.5 w-3.5", iconClass)} strokeWidth={2.5} />
+      <span>{Math.round(percent)}%</span>
     </div>
   );
 }
@@ -176,7 +183,6 @@ export default function HomePage() {
   const {
     isGuest,
     authReady,
-    openLockedTabPrompt,
     openSoftSignupPrompt,
     dismissGuestInvite,
   } = useGuestExploration();
@@ -197,6 +203,7 @@ export default function HomePage() {
   const [pet, setPet] = useState<PetStats>(DEFAULT_PET);
   const [petReady, setPetReady] = useState(false);
   const [guestSignupMoment, setGuestSignupMoment] = useState(false);
+  const [meaningExpanded, setMeaningExpanded] = useState(false);
   const tapCycleIndexRef = useRef(0);
 
   const lastActivityRef = useRef(0);
@@ -460,7 +467,7 @@ export default function HomePage() {
           transition: color 0.5s ease-out;
         }
       `}</style>
-      <div className="flex h-svh max-h-svh flex-col overflow-hidden min-h-0 w-full bg-white">
+      <div className="flex h-svh max-h-svh min-h-0 w-full flex-col overflow-hidden bg-white md:hidden">
         {/* Miomi stage — flex-1, white canvas */}
         <div
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
@@ -556,9 +563,9 @@ export default function HomePage() {
             </motion.div>
           </motion.div>
 
-          <div className="pointer-events-none absolute inset-x-0 top-[12%] z-30 flex justify-end px-3">
+          <motion.div className="pointer-events-none absolute right-4 top-4 z-30 max-w-[65%]">
             <motion.div
-              className="pointer-events-auto max-w-[min(72%,260px)] rounded-[14px] border border-rose-border bg-white px-3 py-2.5 shadow-sm"
+              className="pointer-events-auto rounded-2xl border border-[#EAD0DB] bg-white px-3 py-2.5 shadow-sm"
               initial={false}
               animate={{
                 opacity: bubbleVisible ? 1 : 0,
@@ -566,184 +573,240 @@ export default function HomePage() {
               }}
               transition={{ duration: 0.45, ease: "easeOut" }}
             >
-              <p className="text-[11px] font-medium leading-snug text-neutral-800">
+              <p className="text-sm font-medium leading-[1.6] text-[#1A1A1A]">
                 {bubbleTh}
               </p>
               {bubbleEn ? (
-                <p className="mt-1 text-[8px] leading-snug text-nav-muted">
+                <p className="mt-1 text-[11px] leading-[1.6] text-[#666666]">
                   {bubbleEn}
                 </p>
               ) : null}
               {guestSignupMoment ? (
                 <Link
                   href="/signup"
-                  className="mt-2 flex w-full flex-col items-center rounded-full border border-rose-border bg-rose-light px-3 py-2 text-center transition-colors hover:bg-white"
+                  className={cn(
+                    "mt-2 flex w-full flex-col items-center rounded-full border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2 text-center",
+                    tapFeedback,
+                  )}
                 >
-                  <span className="text-[10px] font-semibold text-rose-accent">
+                  <span className="text-[10px] font-medium text-[#8B1A35]">
                     จำชื่อฉันนะคะ
                   </span>
-                  <span className="text-[8px] font-normal text-nav-muted">
+                  <span className="text-[11px] font-normal leading-[1.6] text-[#666666]">
                     Remember my name
                   </span>
                 </Link>
               ) : null}
             </motion.div>
-          </div>
+          </motion.div>
 
-          <div className="pointer-events-none absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 gap-2">
-            <PetStatusCircle
-              icon={Heart}
-              percent={pet.mood}
-              iconClass="text-[#D4537E]"
-              textClass="text-[#D4537E]"
-              ariaLabel={`Mood ${Math.round(pet.mood)} percent`}
-            />
-            <PetStatusCircle
-              icon={Zap}
-              percent={pet.energy}
-              iconClass="text-[#B8860B]"
-              textClass="text-[#B8860B]"
-              ariaLabel={`Energy ${Math.round(pet.energy)} percent`}
-            />
-            <PetStatusCircle
-              icon={Coffee}
-              percent={pet.hunger}
-              iconClass="text-[#639922]"
-              textClass="text-[#639922]"
-              ariaLabel={`Hunger ${Math.round(pet.hunger)} percent`}
-            />
-          </div>
-          <div className="pointer-events-none absolute bottom-2 right-3 z-20 flex flex-col items-end gap-0.5">
-            <motion.div className="flex items-baseline gap-1 text-[8px] font-medium leading-none text-[#B8860B]">
-              <span>Lv.{pet.level}</span>
-              <span
-                key={`xp-${pet.xp}-${xpTick}`}
-                className="miomi-xp-tick tabular-nums"
-              >
-                {pet.xp}/100 XP
-              </span>
-            </motion.div>
-            <div className="h-[3px] w-14 overflow-hidden rounded-full bg-[#F0E0E8]">
+          <div className="pointer-events-none absolute inset-x-4 bottom-4 z-20 flex flex-col items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <StatPill
+                icon={Heart}
+                percent={pet.mood}
+                iconClass="text-[#D4537E]"
+                ariaLabel={`Mood ${Math.round(pet.mood)} percent`}
+              />
+              <StatPill
+                icon={Zap}
+                percent={pet.energy}
+                iconClass="text-[#B8860B]"
+                ariaLabel={`Energy ${Math.round(pet.energy)} percent`}
+              />
+              <StatPill
+                icon={Coffee}
+                percent={pet.hunger}
+                iconClass="text-[#639922]"
+                ariaLabel={`Hunger ${Math.round(pet.hunger)} percent`}
+              />
+            </div>
+            <div className="h-px w-full max-w-[200px] overflow-hidden rounded-full bg-[#F0E0E8]">
               <div
-                className="h-full rounded-full bg-[#B8860B] transition-all duration-500 ease-out"
+                key={`xp-${pet.xp}-${xpTick}`}
+                className="miomi-xp-tick h-full rounded-full bg-[#B8860B] transition-all duration-500 ease-out"
                 style={{ width: `${pet.xp}%` }}
               />
             </div>
           </div>
+          <p className="pointer-events-none absolute bottom-4 right-4 z-20 text-[10px] font-medium text-[#B8860B]">
+            Lv.{pet.level}
+          </p>
         </div>
 
-        {/* Daily topic — fixed band, no vertical growth */}
-        <section className="mx-2 flex h-[68px] shrink-0 flex-col justify-center overflow-hidden rounded-xl border border-gold-border bg-gold-light px-2 py-1">
-          <p className="text-[7px] font-semibold uppercase tracking-wide text-gold">
-            หยิบมาให้วันนี้ · MIOMI&apos;S PICK
+        <section className="flex h-20 shrink-0 flex-col justify-center border-l-4 border-[#B8860B] bg-[#FDF5E0] px-4 py-3">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-[#B8860B]">
+            MIOMI&apos;S PICK · วันนี้
           </p>
-          <p
-            className="mt-0.5 truncate text-[10px] font-bold leading-tight text-neutral-900"
-            title="คาเฟ่ใหม่ย่านทองหล่อ กำลังเทรนด์ค่า"
-          >
-            คาเฟ่ใหม่ย่านทองหล่อ กำลังเทรนด์ค่า
+          <p className="mt-0.5 truncate text-[15px] font-medium leading-[1.6] text-[#1A1A1A]">
+            {DAILY_CHALLENGE.phrase} — {DAILY_CHALLENGE.th}
           </p>
-          <div className="mt-1 flex shrink-0 flex-nowrap gap-2">
-            <PillButton
-              variant="ghost"
-              title="Save topic"
-              onClick={
-                authReady && isGuest
-                  ? () => openLockedTabPrompt()
-                  : undefined
-              }
-              className="h-7 shrink-0 rounded-full border-rose-border bg-rose-light px-3 py-0 text-[10px] font-medium leading-none text-rose-deep hover:bg-white"
-            >
-              บันทึกหัวข้อ
-            </PillButton>
+          {meaningExpanded ? (
+            <p className="mt-0.5 text-xs leading-[1.6] text-[#666666]">
+              {DAILY_CHALLENGE.meaning}
+            </p>
+          ) : null}
+          <div className="mt-2 flex gap-2">
             {authReady && isGuest ? (
               <button
                 type="button"
-                title="Create now"
                 onClick={handleGuestCreatePress}
-                className="inline-flex h-7 shrink-0 items-center justify-center rounded-full bg-rose-accent px-3 text-[10px] font-medium leading-none text-white transition-colors hover:bg-rose-mid"
+                className={cn(
+                  "inline-flex h-7 items-center rounded-full bg-[#8B1A35] px-3 text-[10px] font-medium text-white",
+                  tapFeedback,
+                )}
               >
-                สร้างเลย
+                ฝึกเลย
               </button>
             ) : (
               <Link
                 href="/create"
-                title="Create now"
-                className="inline-flex h-7 shrink-0 items-center justify-center rounded-full bg-rose-accent px-3 text-[10px] font-medium leading-none text-white transition-colors hover:bg-rose-mid"
+                className={cn(
+                  "inline-flex h-7 items-center rounded-full bg-[#8B1A35] px-3 text-[10px] font-medium text-white",
+                  tapFeedback,
+                )}
               >
-                สร้างเลย
+                ฝึกเลย
               </Link>
             )}
+            <button
+              type="button"
+              onClick={() => setMeaningExpanded((v) => !v)}
+              className={cn(
+                "inline-flex h-7 items-center rounded-full border border-[#EAD0DB] bg-white px-3 text-[10px] font-medium text-[#8B1A35]",
+                tapFeedback,
+              )}
+            >
+              ดูความหมาย
+            </button>
           </div>
         </section>
 
-        {/* Actions — 48px */}
-        <div className="flex h-12 shrink-0 gap-2 px-2 pt-1">
+        <div className="grid h-[100px] shrink-0 grid-cols-[30%_30%_40%] gap-2 px-4 py-3">
           <button
             type="button"
             onClick={handleFeedPress}
-            className="flex flex-1 flex-col items-center justify-center gap-0 rounded-xl border border-rose-border bg-rose-light leading-tight text-rose-accent transition-colors hover:bg-white"
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] text-[#8B1A35]",
+              tapFeedback,
+            )}
           >
-            <span className="text-xs font-medium">ฟีด</span>
-            <span className="text-[8px] font-normal text-nav-muted">Feed</span>
+            <Coffee className="h-5 w-5" strokeWidth={2} />
+            <span className="text-[11px] font-medium leading-[1.6]">ฟีด</span>
           </button>
           <button
             type="button"
             onClick={handlePlayPress}
-            className="flex flex-1 flex-col items-center justify-center gap-0 rounded-xl border border-rose-border bg-rose-light leading-tight text-rose-accent transition-colors hover:bg-white"
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] text-[#8B1A35]",
+              tapFeedback,
+            )}
           >
-            <span className="text-xs font-medium">เล่น</span>
-            <span className="text-[8px] font-normal text-nav-muted">Play</span>
+            <Gamepad2 className="h-5 w-5" strokeWidth={2} />
+            <span className="text-[11px] font-medium leading-[1.6]">เล่น</span>
           </button>
           {authReady && isGuest ? (
             <button
               type="button"
               onClick={handleGuestCreatePress}
-              className="flex flex-[2] flex-col items-center justify-center gap-0 rounded-xl bg-rose-accent leading-tight text-white transition-colors hover:bg-rose-mid"
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#8B1A35] px-2 text-white",
+                tapFeedback,
+              )}
             >
-              <span className="text-xs font-medium">สร้างกันเลย</span>
-              <span className="text-[8px] font-normal text-white/85">
-                Let&apos;s create
+              <span className="flex items-center gap-1">
+                <MessageCircle className="h-5 w-5 shrink-0" strokeWidth={2} />
+                <span className="text-sm font-medium leading-[1.6]">
+                  คุยกับมิโอมิ
+                </span>
+              </span>
+              <span className="text-[11px] leading-[1.6] text-white/85">
+                Talk to Miomi
               </span>
             </button>
           ) : (
             <Link
               href="/create"
-              className="flex flex-[2] flex-col items-center justify-center gap-0 rounded-xl bg-rose-accent leading-tight text-white transition-colors hover:bg-rose-mid"
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#8B1A35] px-2 text-white",
+                tapFeedback,
+              )}
             >
-              <span className="text-xs font-medium">สร้างกันเลย</span>
-              <span className="text-[8px] font-normal text-white/85">
-                Let&apos;s create
+              <span className="flex items-center gap-1">
+                <MessageCircle className="h-5 w-5 shrink-0" strokeWidth={2} />
+                <span className="text-sm font-medium leading-[1.6]">
+                  คุยกับมิโอมิ
+                </span>
+              </span>
+              <span className="text-[11px] leading-[1.6] text-white/85">
+                Talk to Miomi
               </span>
             </Link>
           )}
         </div>
+      </div>
 
-        {/* Mic */}
-        <div className="flex shrink-0 items-center justify-center pb-2">
-          <div className="relative flex h-14 w-14 items-center justify-center">
-            <motion.div
-              className="pointer-events-none absolute inset-0 rounded-full border-2 border-rose-mid/50"
-              initial={false}
-              animate={{ scale: [1, 1.5], opacity: [0.6, 0] }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeOut",
-              }}
-            />
-            <button
-              type="button"
-              onClick={
-                authReady && isGuest ? () => openLockedTabPrompt() : undefined
-              }
-              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full border border-rose-border bg-rose-light transition-colors hover:bg-white"
-              aria-label="Hold to speak"
-            >
-              <Mic className="h-6 w-6 text-rose-accent" strokeWidth={2} />
-            </button>
-          </div>
-        </div>
+      <div className="hidden flex-col gap-4 md:flex">
+        <motion.div className="rounded-2xl border border-[#EAD0DB] bg-white p-5">
+          <p className="text-base font-medium leading-[1.6] text-[#1A1A1A]">
+            {WELCOME_BUBBLE.th}
+          </p>
+          <p className="mt-1 text-xs leading-[1.6] text-[#666666]">
+            {WELCOME_BUBBLE.en}
+          </p>
+        </motion.div>
+        <motion.div className="rounded-2xl border-l-4 border-[#B8860B] bg-[#FDF5E0] p-5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-[#B8860B]">
+            MIOMI&apos;S PICK · วันนี้
+          </p>
+          <p className="mt-2 text-lg font-medium leading-[1.6] text-[#1A1A1A]">
+            {DAILY_CHALLENGE.phrase}
+          </p>
+          <p className="mt-1 text-sm leading-[1.6] text-[#1A1A1A]">
+            {DAILY_CHALLENGE.th}
+          </p>
+          <p className="mt-2 text-xs leading-[1.6] text-[#666666]">
+            {DAILY_CHALLENGE.meaning}
+          </p>
+          <Link
+            href="/create"
+            className={cn(
+              "mt-4 inline-flex h-9 items-center rounded-full bg-[#8B1A35] px-4 text-sm font-medium text-white",
+              tapFeedback,
+            )}
+          >
+            ฝึกเลย
+          </Link>
+        </motion.div>
+        <motion.div>
+          <p className="text-sm font-medium text-[#1A1A1A]">เซสชันล่าสุด</p>
+          <p className="text-xs text-[#666666]">Recent sessions</p>
+          <ul className="mt-3 space-y-2">
+            {[
+              "คาเฟ่ใหม่ย่านทองหล่อ",
+              "รีวิวสกินแคร์ตัวโปรด",
+              "คลิปสั้น TikTok 30 วิ",
+            ].map((title) => (
+              <li
+                key={title}
+                className="rounded-xl border border-[#EAD0DB] bg-white px-4 py-3 text-sm leading-[1.6] text-[#1A1A1A]"
+              >
+                {title}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+        <motion.div className="rounded-2xl border border-[#B8860B]/35 bg-[#FDF5E0] p-4">
+          <p className="text-[8px] font-medium uppercase tracking-wide text-[#B8860B]">
+            Miomi tip
+          </p>
+          <p className="mt-2 text-sm font-medium leading-[1.6] text-[#1A1A1A]">
+            ลองใช้ &quot;I&apos;m up for it&quot; ตอบตกลงทำอะไรด้วยกัน ฟังเป็นธรรมชาติมากค่า
+          </p>
+          <p className="mt-1 text-xs leading-[1.6] text-[#666666]">
+            Use &quot;I&apos;m up for it&quot; when you agree to join something — sounds natural.
+          </p>
+        </motion.div>
       </div>
     </AppShell>
   );

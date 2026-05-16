@@ -68,6 +68,9 @@ const INITIAL_MIOMI_TH =
 const INITIAL_MIOMI_EN =
   "I'm Miomi~ What do you want to post today? Tell me first — voice or typing both work.";
 
+const tapFeedback =
+  "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8B1A35]";
+
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
@@ -248,16 +251,16 @@ export default function CreatePage() {
       },
     };
 
-  const stageImage = (() => {
+  const headImage = (() => {
     switch (miomiExpression) {
       case "listening":
-        return "/miomi/happy.png";
+        return "/miomi/head-speaking.png";
       case "thinking":
-        return "/miomi/thinking.png";
+        return "/miomi/head-thinking.png";
       case "happy":
-        return "/miomi/happy.png";
+        return "/miomi/head-happy.png";
       default:
-        return "/miomi/idle.png";
+        return "/miomi/head-idle.png";
     }
   })();
 
@@ -699,39 +702,48 @@ export default function CreatePage() {
 
   return (
     <AppShell>
-      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-white">
-        {/* Fixed top: Miomi stage + pill controls (not scrollable) */}
-        <div className="shrink-0 border-b border-[#EAD0DB] bg-white">
-          <div className="relative h-[30vh] min-h-[140px] max-h-[260px] w-full shrink-0 overflow-hidden bg-white">
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 top-1/3 bg-gradient-to-b from-white to-[#fdf5f8]"
-            aria-hidden
-          />
-          <div className="flex h-full items-end gap-2 px-3 pb-2 pt-8">
-            <div className="miomi-login-float max-md:max-h-[200px] max-md:overflow-hidden w-[min(42%,140px)] shrink-0">
-              <div className={cn(!reduceMotion && "miomi-breathe")}>
-                <Image
-                  src={stageImage}
-                  alt="Miomi"
-                  width={200}
-                  height={200}
-                  className="h-auto w-full min-w-[120px] max-h-[200px] object-contain md:max-h-none"
-                  priority
-                />
-              </div>
-            </div>
-            <div className="min-w-0 max-w-[58%] self-center rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-2.5 py-1.5 shadow-sm">
-              <p className="line-clamp-3 whitespace-pre-line text-[10px] font-medium leading-snug text-neutral-800">
-                {bubble.th}
-              </p>
-              <p className="mt-0.5 line-clamp-2 text-[8px] leading-snug text-[#888888]">
-                {bubble.en}
-              </p>
-            </div>
+      <div className="relative flex h-svh max-h-svh min-h-0 w-full flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:max-h-none">
+        <div className="flex h-[100px] shrink-0 items-center gap-3 border-b border-[#EAD0DB] bg-white px-4 md:hidden">
+          <motion.div className={cn("shrink-0", !reduceMotion && "miomi-breathe")}>
+            <Image
+              src={headImage}
+              alt="Miomi"
+              width={72}
+              height={72}
+              className="h-[72px] w-[72px] object-contain"
+              priority
+            />
+          </motion.div>
+          <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2 shadow-sm">
+            <p className="line-clamp-2 text-[13px] font-medium leading-[1.6] text-[#1A1A1A]">
+              {bubble.th}
+            </p>
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-[1.6] text-[#666666]">
+              {bubble.en}
+            </p>
           </div>
         </div>
 
-        <div className="shrink-0 bg-white px-3 py-1">
+        <div className="hidden shrink-0 flex-col items-center border-b border-[#EAD0DB] bg-white px-6 py-5 md:flex">
+          <motion.div className={cn("shrink-0", !reduceMotion && "miomi-breathe")}>
+            <Image
+              src={headImage}
+              alt="Miomi"
+              width={120}
+              height={120}
+              className="h-[120px] w-[120px] object-contain"
+              priority
+            />
+          </motion.div>
+          <div className="mt-3 max-w-md rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] px-4 py-3 text-center shadow-sm">
+            <p className="text-base font-medium leading-[1.6] text-[#1A1A1A]">
+              {bubble.th}
+            </p>
+            <p className="mt-1 text-xs leading-[1.6] text-[#666666]">{bubble.en}</p>
+          </div>
+        </div>
+
+        <div className="hidden shrink-0 bg-white px-3 py-1">
           <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <span className="shrink-0 self-center text-[9px] font-medium text-[#888888]">
               แพลตฟอร์ม
@@ -795,12 +807,11 @@ export default function CreatePage() {
             ))}
           </div>
         </div>
-        </div>
 
         {/* Scrollable thread only */}
         <div
           ref={threadRef}
-          className="min-h-0 flex-1 overflow-y-auto px-3 py-2"
+          className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
         >
           <AnimatePresence initial={false} mode="popLayout">
             {messages.map((m) => (
@@ -824,20 +835,18 @@ export default function CreatePage() {
                 ) : null}
                 {m.type === "miomi" ? (
                   <div className="flex justify-start gap-2">
-                    <div className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full border border-[#EAD0DB] bg-white">
-                      <Image
-                        src="/miomi/idle.png"
-                        alt=""
-                        width={20}
-                        height={20}
-                        className="h-5 w-5 object-cover"
-                      />
-                    </div>
+                    <Image
+                      src="/miomi/head-idle.png"
+                      alt=""
+                      width={24}
+                      height={24}
+                      className="h-6 w-6 shrink-0 object-contain"
+                    />
                     <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2">
-                      <p className="whitespace-pre-line text-[12px] font-medium leading-snug text-neutral-800">
+                      <p className="whitespace-pre-line text-[13px] font-medium leading-[1.6] text-[#1A1A1A]">
                         {m.th}
                       </p>
-                      <p className="mt-1 text-[9px] leading-snug text-[#888888]">
+                      <p className="mt-1 text-[11px] leading-[1.6] text-[#666666]">
                         {m.en}
                       </p>
                     </div>
@@ -845,15 +854,13 @@ export default function CreatePage() {
                 ) : null}
                 {m.type === "typing" ? (
                   <div className="flex justify-start gap-2">
-                    <div className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full border border-[#EAD0DB] bg-white">
-                      <Image
-                        src="/miomi/thinking.png"
-                        alt=""
-                        width={20}
-                        height={20}
-                        className="h-5 w-5 object-cover"
-                      />
-                    </div>
+                    <Image
+                      src="/miomi/head-thinking.png"
+                      alt=""
+                      width={24}
+                      height={24}
+                      className="h-6 w-6 shrink-0 object-contain"
+                    />
                     <div className="rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2">
                       <TypingDots />
                     </div>
@@ -890,11 +897,11 @@ export default function CreatePage() {
                         <Copy className="h-4 w-4" strokeWidth={2} />
                       </button>
                     </div>
-                    <p className="mt-2 text-sm font-bold leading-snug text-neutral-900">
+                    <p className="mt-2 text-[15px] font-medium leading-[1.6] text-[#1A1A1A]">
                       {m.th}
                     </p>
                     {m.en ? (
-                      <p className="mt-1.5 text-xs leading-snug text-[#888888]">
+                      <p className="mt-1.5 text-xs leading-[1.6] text-[#666666]">
                         {m.en}
                       </p>
                     ) : null}
@@ -962,16 +969,16 @@ export default function CreatePage() {
         </div>
 
         {/* ZONE 3 */}
-        <div className="flex h-14 shrink-0 items-center gap-2 border-t border-[#EAD0DB] bg-white px-3 py-2">
+        <div className="flex h-16 shrink-0 items-center gap-2 border-t border-[#EAD0DB] bg-white px-3 py-2 md:shrink-0">
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={onKeyDownInput}
             disabled={inputDisabled}
-            placeholder="พิมพ์ที่นี่..."
-            title="Type here..."
-            className="min-w-0 flex-1 rounded-2xl border border-[#EAD0DB] bg-[#FAFAFA] px-3.5 py-2 text-sm text-neutral-900 outline-none ring-0 placeholder:text-[#AAAAAA] focus:border-[#8B1A35] disabled:opacity-50"
+            placeholder="พิมพ์หรือพูดกับมิโอมิ..."
+            title="Type or talk to Miomi"
+            className="min-w-0 flex-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-3.5 py-2 text-sm text-[#1A1A1A] outline-none ring-0 placeholder:text-[#AAAAAA] focus:border-[#8B1A35] disabled:opacity-50"
           />
           <button
             type="button"
@@ -983,7 +990,8 @@ export default function CreatePage() {
               (stage !== "awaiting_topic" && stage !== "awaiting_comment")
             }
             className={cn(
-              "relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#EAD0DB] transition-colors",
+              "relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full transition-transform",
+              tapFeedback,
               isRecording
                 ? "border-[#8B1A35] bg-[#8B1A35]"
                 : "bg-[#FBEAF0]",
@@ -1020,7 +1028,8 @@ export default function CreatePage() {
             onClick={handleSend}
             disabled={!inputText.trim() || inputDisabled || isRecording}
             className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#8B1A35] text-white transition-opacity",
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#8B1A35] text-white",
+              tapFeedback,
               (!inputText.trim() || inputDisabled || isRecording) && "opacity-50",
             )}
             aria-label="Send"

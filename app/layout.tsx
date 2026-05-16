@@ -24,7 +24,9 @@ export const metadata: Metadata = {
   description: "Voice AI companion for Thai creators",
   manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/miomi/icon-512.png",
+    apple: "/miomi/icon-512.png",
+    shortcut: "/miomi/icon-512.png",
   },
 };
 
