@@ -6,11 +6,12 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.map(k => caches.delete(k)))
-    )
+    caches.keys().then(async keys => {
+      await Promise.all(keys.map(k => caches.delete(k)));
+      await new Promise(r => setTimeout(r, 100));
+      await self.clients.claim();
+    }),
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {

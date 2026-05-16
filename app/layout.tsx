@@ -24,7 +24,10 @@ export const metadata: Metadata = {
   description: "Voice AI companion for Thai creators",
   manifest: "/manifest.json",
   icons: {
-    icon: "/miomi/icon-512.png",
+    icon: [
+      { url: "/miomi/icon-512.png", sizes: "32x32" },
+      { url: "/miomi/icon-512.png", sizes: "192x192" },
+    ],
     apple: "/miomi/icon-512.png",
     shortcut: "/miomi/icon-512.png",
   },
@@ -40,6 +43,9 @@ export default function RootLayout({
       lang="th"
       className={`${geistSans.variable} ${geistMono.variable} overflow-hidden bg-white antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
     >
+      <head>
+        <link rel="icon" href="/miomi/icon-512.png" />
+      </head>
       <body className="overflow-hidden bg-white text-[var(--miomika-foreground)] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
         <div className="relative miomika-app-height min-h-0 w-full overflow-hidden bg-white md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
           {children}
