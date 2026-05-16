@@ -17,22 +17,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-* {
-  -webkit-tap-highlight-color: transparent;
-}
-
-* {
-  -webkit-touch-callout: none;
-}
-
-html {
-  scroll-behavior: auto;
-}
-
 body {
   color: var(--miomika-foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
-  overscroll-behavior: none;
 }
 
 html,

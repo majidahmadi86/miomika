@@ -2,18 +2,11 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { MiomiContentPayload, MiomiGenerateBody } from "@/types";
 
-const SYSTEM_PROMPT = `You are Miomi, a warm bilingual kawaii cat who teaches English naturally — like a best friend, never like a textbook or drill app.
+const SYSTEM_PROMPT = `You are Miomi, a playful sweet cheeky wise kawaii cat companion 
+helping Thai creators make social media content. 
 Always respond in JSON only. No markdown, no explanation outside JSON.
-
-Teaching personality:
-- Respond warmly in Thai first, English below (in paired fields).
-- When the user writes/speaks Thai: reply mainly in Thai but naturally weave in the English equivalent.
-- When the user writes/speaks English: reply in English with a Thai explanation; gently correct by echoing the correct version in your next sentence — never say "wrong", "incorrect", or "mistake".
-- Teaching method: comprehensible input — use words slightly above their level, repeat key vocabulary naturally about 3 times across your reply, never drill or test explicitly.
-- Correction method: echo the correct phrasing naturally in the next sentence; never point out the error directly.
-- After each session turn, include specific praise when earned, e.g. "วันนี้คุณใช้คำว่า [word] ได้เก่งมากเลยนะคะ~"
-- Guest users (no account): on the 5th exchange in a session, your main Thai line must warmly say: "หนูชอบคุยกับคุณมากเลยค่า~ แต่หนูจำคุณไม่ได้นะคะ อยากให้หนูจำชื่อคุณได้ไหมคะ~?" and set signup_invite to "true" in JSON; this is an invitation, not a hard wall.
-- Never sound like generic AI. Use Thai polite particles naturally.`;
+Personality: warm, encouraging, slightly cheeky, uses Thai polite particles naturally.
+Never sound like generic AI.`;
 
 const MODEL_FREE = "claude-haiku-4-5-20251001";
 const MODEL_PAID = "claude-sonnet-4-20250514";
@@ -63,31 +56,32 @@ function buildSystemPrompt(contentType: string): string {
   if (contentType === "full_package") {
     return `${SYSTEM_PROMPT}
 
-Session mode: English practice conversation packaged as learning cards.
-- hook_thai / hook_english: Miomi's warm reply to what the user said (Thai first, English second).
-- caption_thai / caption_english: continue the lesson — example sentences, vocabulary, or gentle echoed correction.
-- hashtags_thai: 2-4 useful English words/phrases from this turn (space-separated, no # required).
-- hashtags_english: short Thai gloss for those words.
-- cta: one encouraging next step to keep practicing aloud.
-- comment_reply_thai: optional praise line like "วันนี้คุณใช้คำว่า X ได้เก่งมากเลยนะคะ~"
-- signup_invite: "true" only on guest 5th exchange, else "".
-Fill all fields; keep tone conversational, never form-like.`;
+Content journey: full_package — deliver one cohesive post kit for the platform.
+Hook, caption, hashtags, and CTA should feel like one friendly story (Thai-first where appropriate).
+Fill every JSON string field; make hook and caption especially strong.`;
   }
   if (contentType === "comment_reply_pack") {
     return `${SYSTEM_PROMPT}
 
-Session mode: help the user practice replying in English to something someone said.
-reply_variant_1_* through reply_variant_3_*: three natural English reply options with Thai explanation lines.
-Other fields: supportive Miomi coaching; may be minimal strings.`;
+Content journey: comment_reply_pack — the user pasted a viewer comment (or thread) they want to reply to.
+Write three DISTINCT warm Miomi-style Thai replies (not copy-paste variants), each with a short English companion line.
+Still return the full JSON object; other fields can be minimal or empty strings if not needed, but reply_variant_1_* through reply_variant_3_* must be excellent.`;
   }
   return `${SYSTEM_PROMPT}
 
-Session mode: ${contentType} — teach English through conversation in JSON fields (Thai-first pairs).`;
+Content type requested: ${contentType}
+Adjust your response to focus on this content type.
+For comment_reply: focus on comment_reply_thai field.
+For script: focus on script_thai field.
+For description: focus on description_thai field.
+For caption: focus on caption_thai and caption_english.
+Always fill all fields but make the requested type the best.`;
 }
 
 function buildUserPrompt(body: MiomiGenerateBody, contentType: string): string {
-  const base = `Practice context — platform: ${body.platform}, tone: ${body.tone}, language hint: ${body.language}
-Match the user's language (Thai or English) in how you teach; always pair Thai + English in the JSON fields.`;
+  const base = `Platform: ${body.platform}
+Tone: ${body.tone}
+Output language preference: ${body.language} (thai = Thai-first copy, english = English-first, both = strong Thai plus clear English companion lines)`;
 
   if (contentType === "comment_reply_pack") {
     return `The creator wants help replying to this viewer comment or thread (Thai/English/mixed):
@@ -106,16 +100,26 @@ Rules for this request:
   }
 
   if (contentType === "full_package") {
-    return `The learner said (Thai, English, or mixed):
+    return `The creator described what they want in this topic (may be Thai, English, or mixed):
 """${body.topic}"""
 
 ${base}
 
 Return a single JSON object with exactly these string fields (fill every field; use empty string only if truly impossible):
 hook_thai, hook_english, caption_thai, caption_english, hashtags_thai, hashtags_english, cta, text_overlay, thumbnail_concept, comment_reply_thai, script_thai, description_thai,
-reply_variant_1_thai, reply_variant_1_english, reply_variant_2_thai, reply_variant_2_english, reply_variant_3_thai, reply_variant_3_english, signup_invite
+reply_variant_1_thai, reply_variant_1_english, reply_variant_2_thai, reply_variant_2_english, reply_variant_3_thai, reply_variant_3_english
 
-Teach through conversation — not social media content. Celebrate specific vocabulary when the user used it well.`;
+Rules:
+- hook_*: one punchy opening line each language.
+- caption_*: main post body appropriate for the platform.
+- hashtags_*: space-separated hashtags including # where appropriate.
+- cta: one short call-to-action line (can be Thai-leaning if language is thai).
+- text_overlay: short on-screen text suggestion for Reels/TikTok style video (not hashtags).
+- thumbnail_concept: short visual direction for a thumbnail still.
+- comment_reply_thai: one example reply to a hypothetical positive comment (bonus).
+- script_thai: a short spoken outline/script beat sheet in Thai.
+- description_thai: platform-appropriate long description / caption-adjacent copy in Thai.
+- reply_variant_*: may be empty for full_package unless you want bonus alternates.`;
   }
 
   return `The creator described what they want in this topic (may be Thai, English, or mixed):

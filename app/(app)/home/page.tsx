@@ -13,19 +13,12 @@ import {
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
+import { PillButton } from "@/components/ui/PillButton";
 import { cn } from "@/lib/utils";
 
 const WELCOME_BUBBLE = {
-  th: "สวัสดีค่า~ วันนี้อยากพูด English เก่งขึ้นไหมคะ?",
-  en: "Hi~ Want to speak better English today?",
-};
-
-const DAILY_ENGLISH_CHALLENGE = {
-  phrase: "I'm up for it",
-  meaningTh:
-    "แปลว่า “เอาล่ะ ทำได้” หรือ “ฉันพร้อมแล้ว” — ใช้ตอบตกลงทำอะไรด้วยกัน ไม่ใช่แค่ตื่นนอนนะคะ",
-  meaningEn:
-    "Means “sure, let's do it” or “I'm ready” — for agreeing to plans, not waking up.",
+  th: "สวัสดีค่า~ หนูรอคุณอยู่นะคะ",
+  en: "I've been right here waiting for you~",
 };
 
 /** Five Thai-first lines, cycled on each tap (bounce + rotate). */
@@ -184,6 +177,7 @@ export default function HomePage() {
     isGuest,
     authReady,
     openLockedTabPrompt,
+    openSoftSignupPrompt,
     dismissGuestInvite,
   } = useGuestExploration();
 
@@ -203,7 +197,6 @@ export default function HomePage() {
   const [pet, setPet] = useState<PetStats>(DEFAULT_PET);
   const [petReady, setPetReady] = useState(false);
   const [guestSignupMoment, setGuestSignupMoment] = useState(false);
-  const [meaningExpanded, setMeaningExpanded] = useState(false);
   const tapCycleIndexRef = useRef(0);
 
   const lastActivityRef = useRef(0);
@@ -350,6 +343,12 @@ export default function HomePage() {
     triggerLevelUpCelebration,
     showGuestSignupIfFirst,
   ]);
+
+  const handleGuestCreatePress = useCallback(() => {
+    if (!showGuestSignupIfFirst()) {
+      openSoftSignupPrompt();
+    }
+  }, [showGuestSignupIfFirst, openSoftSignupPrompt]);
 
   const handleStagePointerDown = useCallback(() => {
     markActivity();
@@ -633,43 +632,48 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Today's English challenge */}
-        <section
-          className={cn(
-            "mx-2 flex shrink-0 flex-col justify-center overflow-hidden rounded-xl border border-gold-border bg-gold-light px-2 py-1.5",
-            meaningExpanded ? "min-h-[88px]" : "h-[68px]",
-          )}
-        >
+        {/* Daily topic — fixed band, no vertical growth */}
+        <section className="mx-2 flex h-[68px] shrink-0 flex-col justify-center overflow-hidden rounded-xl border border-gold-border bg-gold-light px-2 py-1">
           <p className="text-[7px] font-semibold uppercase tracking-wide text-gold">
-            ภาษาอังกฤษวันนี้ · TODAY&apos;S ENGLISH CHALLENGE
+            หยิบมาให้วันนี้ · MIOMI&apos;S PICK
           </p>
-          <p className="mt-0.5 text-[11px] font-bold leading-tight text-neutral-900">
-            {DAILY_ENGLISH_CHALLENGE.phrase}
+          <p
+            className="mt-0.5 truncate text-[10px] font-bold leading-tight text-neutral-900"
+            title="คาเฟ่ใหม่ย่านทองหล่อ กำลังเทรนด์ค่า"
+          >
+            คาเฟ่ใหม่ย่านทองหล่อ กำลังเทรนด์ค่า
           </p>
-          <p className="truncate text-[9px] leading-tight text-nav-muted">
-            {DAILY_ENGLISH_CHALLENGE.meaningTh}
-          </p>
-          {meaningExpanded ? (
-            <p className="mt-0.5 text-[8px] leading-snug text-nav-muted">
-              {DAILY_ENGLISH_CHALLENGE.meaningEn}
-            </p>
-          ) : null}
           <div className="mt-1 flex shrink-0 flex-nowrap gap-2">
-            <Link
-              href="/create"
-              title="Practice with Miomi"
-              className="inline-flex h-7 shrink-0 items-center justify-center rounded-full bg-rose-accent px-3 text-[10px] font-medium leading-none text-white transition-colors hover:bg-rose-mid"
+            <PillButton
+              variant="ghost"
+              title="Save topic"
+              onClick={
+                authReady && isGuest
+                  ? () => openLockedTabPrompt()
+                  : undefined
+              }
+              className="h-7 shrink-0 rounded-full border-rose-border bg-rose-light px-3 py-0 text-[10px] font-medium leading-none text-rose-deep hover:bg-white"
             >
-              ฝึกกับมิโอมิ
-            </Link>
-            <button
-              type="button"
-              title="See meaning"
-              onClick={() => setMeaningExpanded((v) => !v)}
-              className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-rose-border bg-rose-light px-3 text-[10px] font-medium leading-none text-rose-deep transition-colors hover:bg-white"
-            >
-              ดูความหมาย
-            </button>
+              บันทึกหัวข้อ
+            </PillButton>
+            {authReady && isGuest ? (
+              <button
+                type="button"
+                title="Create now"
+                onClick={handleGuestCreatePress}
+                className="inline-flex h-7 shrink-0 items-center justify-center rounded-full bg-rose-accent px-3 text-[10px] font-medium leading-none text-white transition-colors hover:bg-rose-mid"
+              >
+                สร้างเลย
+              </button>
+            ) : (
+              <Link
+                href="/create"
+                title="Create now"
+                className="inline-flex h-7 shrink-0 items-center justify-center rounded-full bg-rose-accent px-3 text-[10px] font-medium leading-none text-white transition-colors hover:bg-rose-mid"
+              >
+                สร้างเลย
+              </Link>
+            )}
           </div>
         </section>
 
@@ -691,15 +695,28 @@ export default function HomePage() {
             <span className="text-xs font-medium">เล่น</span>
             <span className="text-[8px] font-normal text-nav-muted">Play</span>
           </button>
-          <Link
-            href="/create"
-            className="flex flex-[2] flex-col items-center justify-center gap-0 rounded-xl bg-rose-accent leading-tight text-white transition-colors hover:bg-rose-mid"
-          >
-            <span className="text-xs font-medium">คุยกับมิโอมิ</span>
-            <span className="text-[8px] font-normal text-white/85">
-              Talk to Miomi
-            </span>
-          </Link>
+          {authReady && isGuest ? (
+            <button
+              type="button"
+              onClick={handleGuestCreatePress}
+              className="flex flex-[2] flex-col items-center justify-center gap-0 rounded-xl bg-rose-accent leading-tight text-white transition-colors hover:bg-rose-mid"
+            >
+              <span className="text-xs font-medium">สร้างกันเลย</span>
+              <span className="text-[8px] font-normal text-white/85">
+                Let&apos;s create
+              </span>
+            </button>
+          ) : (
+            <Link
+              href="/create"
+              className="flex flex-[2] flex-col items-center justify-center gap-0 rounded-xl bg-rose-accent leading-tight text-white transition-colors hover:bg-rose-mid"
+            >
+              <span className="text-xs font-medium">สร้างกันเลย</span>
+              <span className="text-[8px] font-normal text-white/85">
+                Let&apos;s create
+              </span>
+            </Link>
+          )}
         </div>
 
         {/* Mic */}
