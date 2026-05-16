@@ -42,6 +42,17 @@ export default function RootLayout({
         <div className="relative miomika-app-height min-h-0 w-full overflow-hidden bg-white md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
           {children}
         </div>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('/sw.js')
+  })
+}
+`,
+          }}
+        />
       </body>
     </html>
   );
