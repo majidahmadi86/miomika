@@ -438,8 +438,8 @@ export default function HomePage() {
   const miomiExpression = sleeping ? "idle" : expressionFlip;
 
   return (
-    <motion.div className="-mx-6 -my-6 flex h-svh max-h-svh min-h-0 flex-col overflow-hidden py-0 md:mx-0 md:my-0 md:h-auto md:max-h-none">
-      <AppShell>
+    <AppShell>
+      <div className="flex h-full flex-col overflow-hidden">
       <style>{`
         @keyframes miomi-xp-tick {
           0% {
@@ -461,7 +461,7 @@ export default function HomePage() {
           transition: color 0.5s ease-out;
         }
       `}</style>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white md:hidden">
+      <div className="flex h-full flex-col overflow-hidden bg-white md:hidden">
         {/* Miomi stage — flex-1, white canvas */}
         <div
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
@@ -755,7 +755,7 @@ export default function HomePage() {
           </p>
         </motion.div>
       </div>
+      </div>
     </AppShell>
-    </motion.div>
   );
 }

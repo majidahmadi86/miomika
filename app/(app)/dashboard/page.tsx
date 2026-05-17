@@ -7,7 +7,7 @@ import Link from "next/link";
 export default function DashboardPage() {
   return (
     <AppShell>
-      <div className="flex h-svh max-h-svh flex-col overflow-hidden bg-white">
+      <div className="flex h-full flex-col overflow-hidden bg-white">
         <div className="flex shrink-0 items-center gap-3 border-b border-[#EAD0DB] px-4 py-3">
           <Link href="/home" className="text-[#8B1A35]">
             <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
@@ -18,7 +18,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-4 px-4">
           <div className="rounded-2xl border border-[#B8860B]/30 bg-[#FDF5E0] p-4 text-center">
             <Trophy className="mx-auto mb-1 h-8 w-8 text-[#B8860B]" strokeWidth={2} />
             <p className="text-3xl font-bold text-[#B8860B]">7</p>

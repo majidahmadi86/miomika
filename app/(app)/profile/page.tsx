@@ -178,7 +178,7 @@ export default function ProfilePage() {
 
   return (
     <AppShell>
-      <div className="flex h-svh max-h-svh flex-col overflow-hidden bg-white">
+      <div className="flex h-full flex-col overflow-hidden bg-white">
         <div className="flex shrink-0 items-center gap-3 border-b border-[#EAD0DB] px-4 py-3">
           <Link href="/home" className="text-[#8B1A35]">
             <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
@@ -194,7 +194,7 @@ export default function ProfilePage() {
             <p className="mt-1 text-xs text-nav-muted">Loading profile</p>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
+          <div className="min-h-0 flex-1 overflow-y-auto py-4 px-4">
             {/* Identity card */}
             <section className="mb-2 rounded-2xl border border-rose-border bg-white p-3">
               <div className="flex gap-4">
