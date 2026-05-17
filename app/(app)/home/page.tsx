@@ -1,4 +1,5 @@
-﻿"use client";
+﻿// @ts-ignore
+"use client";
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -16,15 +17,15 @@ import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { cn } from "@/lib/utils";
 
 const WELCOME_BUBBLE = {
-  th: "à¸ªà¸§à¸±à¸ªà¸”à¸µà¸„à¹ˆà¸²~ à¸§à¸±à¸™à¸™à¸µà¹‰à¸­à¸¢à¸²à¸à¸žà¸¹à¸” English à¹€à¸à¹ˆà¸‡à¸‚à¸¶à¹‰à¸™à¹„à¸«à¸¡à¸„à¸°?",
+  th: "สวัสดีค่า~ วันนี้อยากพูด English เก่งขึ้นไหมคะ?",
   en: "Hi~ Want to speak better English today?",
 };
 
 const DAILY_CHALLENGE = {
   phrase: "I'm up for it",
-  th: "à¸‰à¸±à¸™à¸žà¸£à¹‰à¸­à¸¡à¹à¸¥à¹‰à¸§ â€” à¹ƒà¸Šà¹‰à¸•à¸­à¸šà¸•à¸à¸¥à¸‡à¸—à¸³à¸­à¸°à¹„à¸£à¸”à¹‰à¸§à¸¢à¸à¸±à¸™",
+  th: "ฉันพร้อมแล้ว — ใช้ตอบตกลงทำอะไรด้วยกัน",
   meaning:
-    "à¹à¸›à¸¥à¸§à¹ˆà¸² â€œà¹€à¸­à¸²à¸¥à¹ˆà¸° à¸—à¸³à¹„à¸”à¹‰â€ à¸«à¸£à¸·à¸­ â€œà¸‰à¸±à¸™à¸žà¸£à¹‰à¸­à¸¡à¹à¸¥à¹‰à¸§â€ à¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆà¹à¸„à¹ˆà¸•à¸·à¹ˆà¸™à¸™à¸­à¸™à¸™à¸°à¸„à¸°",
+    'แปลว่า "เอาล่ะ ทำได้" หรือ "ฉันพร้อมแล้ว" ไม่ใช่แค่ตื่นนอนนะคะ',
 };
 
 const tapFeedback =
@@ -32,34 +33,34 @@ const tapFeedback =
 
 /** Five Thai-first lines, cycled on each tap (bounce + rotate). */
 const TAP_BUBBLE_CYCLE = [
-  { th: "à¸§à¸±à¸™à¸™à¸µà¹‰à¹‚à¸žà¸ªà¸•à¹Œà¸­à¸°à¹„à¸£à¸”à¸µà¸„à¸° à¸„à¸´à¸”à¸–à¸¶à¸‡à¹€à¸¥à¸¢à¸„à¹ˆà¸²", en: "What are we posting today? I missed you~" },
-  { th: "à¸­à¸¢à¸²à¸à¹ƒà¸«à¹‰à¸«à¸™à¸¹à¸Šà¹ˆà¸§à¸¢à¸­à¸°à¹„à¸£ à¸šà¸­à¸à¹„à¸”à¹‰à¹€à¸¥à¸¢à¸™à¸°à¸„à¸°", en: "Tell me what you need â€” I'm all ears~" },
-  { th: "à¸¡à¸²à¸­à¸¢à¸¹à¹ˆà¸‚à¹‰à¸²à¸‡à¹† à¹à¸šà¸šà¸™à¸µà¹‰à¸à¹‡à¸­à¸šà¸­à¸¸à¹ˆà¸™à¸”à¸µà¸™à¸°à¸„à¸°", en: "Having you here with me feels warm~" },
-  { th: "à¸«à¸™à¸¹à¸žà¸£à¹‰à¸­à¸¡à¸Ÿà¸±à¸‡à¸—à¸¸à¸à¹€à¸£à¸·à¹ˆà¸­à¸‡à¸‚à¸­à¸‡à¸„à¸¸à¸“à¹€à¸¥à¸¢à¸„à¹ˆà¸²", en: "I'm ready to hear everything~" },
-  { th: "à¸žà¸±à¸à¸ªà¸²à¸¢à¸•à¸²à¹à¸¥à¹‰à¸§à¸¡à¸²à¸„à¸¸à¸¢à¸à¸±à¸šà¸«à¸™à¸¹à¸«à¸™à¹ˆà¸­à¸¢à¹„à¸«à¸¡à¸„à¸°", en: "Rest your eyes and chat with me a bit~" },
+  { th: "วันนี้โพสต์อะไรดีคะ คิดถึงเลยค่า", en: "What are we posting today? I missed you~" },
+  { th: "อยากให้หนูช่วยอะไร บอกได้เลยนะคะ", en: "Tell me what you need — I'm all ears~" },
+  { th: "มาอยู่ข้างๆ แบบนี้ก็อบอุ่นดีนะคะ", en: "Having you here with me feels warm~" },
+  { th: "หนูพร้อมฟังทุกเรื่องของคุณเลยค่า", en: "I'm ready to hear everything~" },
+  { th: "พักสายตาแล้วมาคุยกับหนูหน่อยไหมคะ", en: "Rest your eyes and chat with me a bit~" },
 ] as const;
 
 const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
 
 const FEED_BUBBLE = {
-  th: "à¸­à¸´à¹ˆà¸¡à¹à¸¥à¹‰à¸§à¸„à¹ˆà¸²~",
+  th: "อิ่มแล้วค่า~",
   en: "All full now~",
 };
 
 const PLAY_BUBBLE = {
-  th: "à¹€à¸¢à¹‰~ à¸ªà¸™à¸¸à¸à¸ˆà¸±à¸‡!",
+  th: "เย้~ สนุกจัง!",
   en: "Yay~ so fun~",
 };
 
 const GUEST_SIGNUP_BUBBLE = {
-  th: "à¸­à¸¢à¸²à¸à¹ƒà¸«à¹‰à¸«à¸™à¸¹à¸ˆà¸³à¸Šà¸·à¹ˆà¸­à¸„à¸¸à¸“à¹„à¸”à¹‰à¹„à¸«à¸¡à¸„à¸°~ à¸ˆà¸°à¹„à¸”à¹‰à¹€à¸£à¸µà¸¢à¸à¸„à¸¸à¸“à¸§à¹ˆà¸²à¸—à¸µà¹ˆà¸£à¸±à¸à¹„à¸”à¹‰à¸™à¸°à¸„à¸°",
+  th: "อยากให้หนูจำชื่อคุณได้ไหมคะ~ จะได้เรียกคุณว่าที่รักได้นะคะ",
   en: "Do you want me to remember your name? So I can call you my darling~",
 };
 
 const GUEST_SIGNUP_STORAGE_KEY = "miomika-guest-signup-moment-v1";
 
 const LEVEL_UP_BUBBLE = {
-  th: "à¹€à¸¥à¹€à¸§à¸¥à¸­à¸±à¸žà¹à¸¥à¹‰à¸§à¸„à¹ˆà¸²~!",
+  th: "เลเวลอัพแล้วค่า~!",
   en: "You leveled up~!",
 };
 
@@ -445,7 +446,8 @@ export default function HomePage() {
   const wagDuration = 0.85;
 
   return (
-    <AppShell>
+    <motion.div className="-mx-6 -my-6 flex h-svh max-h-svh min-h-0 flex-col overflow-hidden py-0 md:mx-0 md:my-0 md:h-auto md:max-h-none">
+      <AppShell>
       <style>{`
         @keyframes miomi-xp-tick {
           0% {
@@ -468,7 +470,7 @@ export default function HomePage() {
         }
       `}</style>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white md:hidden">
-        {/* Miomi stage â€” flex-1, white canvas */}
+        {/* Miomi stage — flex-1, white canvas */}
         <div
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
           onPointerDown={handleStagePointerDown}
@@ -590,7 +592,7 @@ export default function HomePage() {
                   )}
                 >
                   <span className="text-[10px] font-medium text-[#8B1A35]">
-                    à¸ˆà¸³à¸Šà¸·à¹ˆà¸­à¸‰à¸±à¸™à¸™à¸°à¸„à¸°
+                    จำชื่อฉันนะคะ
                   </span>
                   <span className="text-[11px] font-normal leading-[1.6] text-[#666666]">
                     Remember my name
@@ -636,10 +638,10 @@ export default function HomePage() {
 
         <section className="flex h-[88px] max-h-[88px] shrink-0 flex-col justify-center overflow-hidden border-l-4 border-[#B8860B] bg-[#FDF5E0] px-4 py-2">
           <p className="text-[10px] font-medium uppercase tracking-wide text-[#B8860B]">
-            MIOMI&apos;S PICK Â· à¸§à¸±à¸™à¸™à¸µà¹‰
+            MIOMI&apos;S PICK · วันนี้
           </p>
           <p className="mt-0.5 truncate text-[15px] font-medium leading-[1.6] text-[#1A1A1A]">
-            {DAILY_CHALLENGE.phrase} â€” {DAILY_CHALLENGE.th}
+            {DAILY_CHALLENGE.phrase} — {DAILY_CHALLENGE.th}
           </p>
           {meaningExpanded ? (
             <p className="mt-0.5 text-xs leading-[1.6] text-[#666666]">
@@ -656,7 +658,7 @@ export default function HomePage() {
                   tapFeedback,
                 )}
               >
-                à¸à¸¶à¸à¹€à¸¥à¸¢
+                ฝึกเลย
               </button>
             ) : (
               <Link
@@ -666,7 +668,7 @@ export default function HomePage() {
                   tapFeedback,
                 )}
               >
-                à¸à¸¶à¸à¹€à¸¥à¸¢
+                ฝึกเลย
               </Link>
             )}
             <button
@@ -677,7 +679,7 @@ export default function HomePage() {
                 tapFeedback,
               )}
             >
-              à¸”à¸¹à¸„à¸§à¸²à¸¡à¸«à¸¡à¸²à¸¢
+              ดูความหมาย
             </button>
           </div>
         </section>
@@ -692,7 +694,7 @@ export default function HomePage() {
             )}
           >
             <Heart className="h-5 w-5" strokeWidth={2} />
-            <span className="text-[11px] font-medium leading-[1.6]">à¸Ÿà¸µà¸”</span>
+            <span className="text-[11px] font-medium leading-[1.6]">ฟีด</span>
           </button>
           <button
             type="button"
@@ -703,7 +705,7 @@ export default function HomePage() {
             )}
           >
             <Sparkles className="h-5 w-5" strokeWidth={2} />
-            <span className="text-[11px] font-medium leading-[1.6]">à¹€à¸¥à¹ˆà¸™</span>
+            <span className="text-[11px] font-medium leading-[1.6]">เล่น</span>
           </button>
           {authReady && isGuest ? (
             <button
@@ -717,7 +719,7 @@ export default function HomePage() {
               <span className="flex items-center gap-1">
                 <MessageCircle className="h-5 w-5 shrink-0" strokeWidth={2} />
                 <span className="text-sm font-medium leading-[1.6]">
-                  à¸„à¸¸à¸¢à¸à¸±à¸šà¸¡à¸´à¹‚à¸­à¸¡à¸´
+                  คุยกับมิโอมิ
                 </span>
               </span>
               <span className="text-[11px] leading-[1.6] text-white/85">
@@ -735,7 +737,7 @@ export default function HomePage() {
               <span className="flex items-center gap-1">
                 <MessageCircle className="h-5 w-5 shrink-0" strokeWidth={2} />
                 <span className="text-sm font-medium leading-[1.6]">
-                  à¸„à¸¸à¸¢à¸à¸±à¸šà¸¡à¸´à¹‚à¸­à¸¡à¸´
+                  คุยกับมิโอมิ
                 </span>
               </span>
               <span className="text-[11px] leading-[1.6] text-white/85">
@@ -757,7 +759,7 @@ export default function HomePage() {
         </motion.div>
         <motion.div className="rounded-2xl border-l-4 border-[#B8860B] bg-[#FDF5E0] p-5">
           <p className="text-[10px] font-medium uppercase tracking-wide text-[#B8860B]">
-            MIOMI&apos;S PICK Â· à¸§à¸±à¸™à¸™à¸µà¹‰
+            MIOMI&apos;S PICK · วันนี้
           </p>
           <p className="mt-2 text-lg font-medium leading-[1.6] text-[#1A1A1A]">
             {DAILY_CHALLENGE.phrase}
@@ -775,17 +777,17 @@ export default function HomePage() {
               tapFeedback,
             )}
           >
-            à¸à¸¶à¸à¹€à¸¥à¸¢
+            ฝึกเลย
           </Link>
         </motion.div>
         <motion.div>
-          <p className="text-sm font-medium text-[#1A1A1A]">à¹€à¸‹à¸ªà¸Šà¸±à¸™à¸¥à¹ˆà¸²à¸ªà¸¸à¸”</p>
+          <p className="text-sm font-medium text-[#1A1A1A]">เซสชันล่าสุด</p>
           <p className="text-xs text-[#666666]">Recent sessions</p>
           <ul className="mt-3 space-y-2">
             {[
-              "à¸„à¸²à¹€à¸Ÿà¹ˆà¹ƒà¸«à¸¡à¹ˆà¸¢à¹ˆà¸²à¸™à¸—à¸­à¸‡à¸«à¸¥à¹ˆà¸­",
-              "à¸£à¸µà¸§à¸´à¸§à¸ªà¸à¸´à¸™à¹à¸„à¸£à¹Œà¸•à¸±à¸§à¹‚à¸›à¸£à¸”",
-              "à¸„à¸¥à¸´à¸›à¸ªà¸±à¹‰à¸™ TikTok 30 à¸§à¸´",
+              "คาเฟ่ใหม่ย่านทองหล่อ",
+              "รีวิวสกินแคร์ตัวโปรด",
+              "คลิปสั้น TikTok 30 วิ",
             ].map((title) => (
               <li
                 key={title}
@@ -801,13 +803,14 @@ export default function HomePage() {
             Miomi tip
           </p>
           <p className="mt-2 text-sm font-medium leading-[1.6] text-[#1A1A1A]">
-            à¸¥à¸­à¸‡à¹ƒà¸Šà¹‰ &quot;I&apos;m up for it&quot; à¸•à¸­à¸šà¸•à¸à¸¥à¸‡à¸—à¸³à¸­à¸°à¹„à¸£à¸”à¹‰à¸§à¸¢à¸à¸±à¸™ à¸Ÿà¸±à¸‡à¹€à¸›à¹‡à¸™à¸˜à¸£à¸£à¸¡à¸Šà¸²à¸•à¸´à¸¡à¸²à¸à¸„à¹ˆà¸²
+            ลองใช้ &quot;I&apos;m up for it&quot; ตอบตกลงทำอะไรด้วยกัน ฟังเป็นธรรมชาติมากค่า
           </p>
           <p className="mt-1 text-xs leading-[1.6] text-[#666666]">
-            Use &quot;I&apos;m up for it&quot; when you agree to join something â€” sounds natural.
+            Use &quot;I&apos;m up for it&quot; when you agree to join something — sounds natural.
           </p>
         </motion.div>
       </div>
     </AppShell>
+    </motion.div>
   );
 }
