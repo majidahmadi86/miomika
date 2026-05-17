@@ -12,7 +12,6 @@ import {
   useState,
   type MutableRefObject,
 } from "react";
-import { AppShell } from "@/components/layout/AppShell";
 import { cn } from "@/lib/utils";
 import type { MiomiContentPayload } from "@/types";
 
@@ -702,7 +701,7 @@ export default function CreatePage() {
 
   return (
     <div className="-mx-6 -my-6 flex h-svh max-h-svh min-h-0 flex-col overflow-hidden py-0 md:mx-0 md:my-0 md:h-auto md:max-h-none">
-      <AppShell>
+      <>
       <div className="relative flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:max-h-none">
         <Link
           href="/home"
@@ -1059,7 +1058,7 @@ export default function CreatePage() {
           ) : null}
         </AnimatePresence>
       </div>
-    </AppShell>
+    </>
     </div>
   );
 }

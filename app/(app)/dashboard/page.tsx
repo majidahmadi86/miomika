@@ -1,12 +1,12 @@
 "use client";
 
-import { AppShell } from "@/components/layout/AppShell";
+
 import { BookOpen, ChevronLeft, Clock, Trophy } from "lucide-react";
 import Link from "next/link";
 
 export default function DashboardPage() {
   return (
-    <AppShell>
+    <>
       <div className="flex h-full flex-col overflow-hidden bg-white">
         <div className="flex shrink-0 items-center gap-3 border-b border-[#EAD0DB] px-4 py-3">
           <Link href="/home" className="text-[#8B1A35]">
@@ -77,6 +77,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

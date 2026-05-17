@@ -16,7 +16,6 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { AppShell } from "@/components/layout/AppShell";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -176,7 +175,7 @@ export default function ProfilePage() {
   const pers = personalityLabel(profile.personality);
 
   return (
-    <AppShell>
+    <>
       <div className="flex h-full flex-col overflow-hidden bg-white">
         <div className="flex shrink-0 items-center gap-3 border-b border-[#EAD0DB] px-4 py-3">
           <Link href="/home" className="text-[#8B1A35]">
@@ -484,6 +483,6 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
-    </AppShell>
+    </>
   );
 }
