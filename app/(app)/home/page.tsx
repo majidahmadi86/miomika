@@ -437,14 +437,6 @@ export default function HomePage() {
 
   const miomiExpression = sleeping ? "idle" : expressionFlip;
 
-  const floatTransition = sleeping
-    ? { duration: 5.5, repeat: Infinity, ease: "easeInOut" as const }
-    : { duration: 3, repeat: Infinity, ease: "easeInOut" as const };
-
-  const floatY = sleeping ? [0, -3, 0] : [0, -12, 0];
-  const wagRotate = [-5, 5, -5];
-  const wagDuration = 0.85;
-
   return (
     <motion.div className="-mx-6 -my-6 flex h-svh max-h-svh min-h-0 flex-col overflow-hidden py-0 md:mx-0 md:my-0 md:h-auto md:max-h-none">
       <AppShell>
@@ -491,30 +483,11 @@ export default function HomePage() {
                 animate={reduceMotion ? { x: 0 } : { x: miomiX }}
                 transition={WALK_TRANSITION}
               >
-              <motion.div
-                animate={reduceMotion ? { y: 0 } : { y: floatY }}
-                transition={floatTransition}
-              >
                 <motion.div
-                  className="origin-bottom"
-                  animate={
-                    reduceMotion
-                      ? { rotate: sleeping ? 14 : 0 }
-                      : sleeping
-                        ? { rotate: 14 }
-                        : { rotate: wagRotate }
-                  }
-                  transition={
-                    reduceMotion
-                      ? { duration: 0.35, ease: "easeInOut" }
-                      : sleeping
-                        ? { duration: 2.4, ease: "easeInOut" }
-                        : {
-                            duration: wagDuration,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                          }
-                  }
+                  className={cn(
+                    "origin-bottom",
+                    sleeping && "rotate-[14deg]",
+                  )}
                 >
                   <motion.button
                     type="button"
@@ -523,45 +496,17 @@ export default function HomePage() {
                     onClick={triggerPetTap}
                     className="relative block cursor-pointer appearance-none border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-accent"
                   >
-                    <motion.div
-                      key={tapBounceKey}
-                      initial={false}
-                      animate={
-                        reduceMotion || tapBounceKey === 0
-                          ? { y: 0 }
-                          : { y: [0, -20, 0] }
-                      }
-                      transition={{
-                        duration: 0.45,
-                        times: [0, 0.35, 1],
-                        ease: "easeOut",
-                      }}
-                    >
-                      <motion.div
-                        key={tapSpinKey}
-                        initial={false}
-                        animate={
-                          reduceMotion || tapSpinKey === 0
-                            ? { rotate: 0 }
-                            : { rotate: [0, -10, 10, -6, 0] }
-                        }
-                        transition={{ duration: 0.55, ease: "easeOut" }}
-                        className="origin-bottom"
-                      >
-                        <MiomiCharacter
-                          expression={miomiExpression}
-                          sleeping={sleeping}
-                          feedAnimKey={feedAnimKey}
-                          playAnimKey={playAnimKey}
-                          levelUpAnimKey={levelUpAnimKey}
-                          breathe={!reduceMotion}
-                        />
-                      </motion.div>
-                    </motion.div>
+                    <MiomiCharacter
+                      expression={miomiExpression}
+                      sleeping={sleeping}
+                      feedAnimKey={feedAnimKey}
+                      playAnimKey={playAnimKey}
+                      levelUpAnimKey={levelUpAnimKey}
+                      breathe={!reduceMotion && !sleeping}
+                    />
                   </motion.button>
                 </motion.div>
               </motion.div>
-            </motion.div>
             </motion.div>
           </motion.div>
 

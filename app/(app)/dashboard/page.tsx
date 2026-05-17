@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Check, Star } from "lucide-react";
+import { Check, ChevronLeft, Star } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { GuestScreenLockOverlay } from "@/components/guest/GuestScreenLockOverlay";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
@@ -36,9 +36,17 @@ export default function DashboardPage() {
   const { isGuest } = useGuestExploration();
 
   return (
-    <AppShell>
-      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white px-3 pt-2">
-        <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
+    <div className="-mx-6 -my-6 flex h-svh max-h-svh min-h-0 flex-col overflow-hidden py-0 md:mx-0 md:my-0 md:h-auto md:max-h-none">
+      <AppShell>
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-white px-3 pt-2">
+        <Link
+          href="/home"
+          className="absolute left-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full text-rose-accent transition-transform active:scale-[0.97] md:hidden"
+          aria-label="Back to home"
+        >
+          <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </Link>
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain pt-10 [-webkit-overflow-scrolling:touch] md:pt-2">
           {/* Briefing — single compact strip */}
           <section className="flex shrink-0 gap-2 rounded-lg border border-gold-border bg-gold-light px-2 py-1.5">
             <div className="w-12 shrink-0 self-end pb-0.5">
@@ -191,5 +199,6 @@ export default function DashboardPage() {
         {isGuest ? <GuestScreenLockOverlay /> : null}
       </div>
     </AppShell>
+    </div>
   );
 }

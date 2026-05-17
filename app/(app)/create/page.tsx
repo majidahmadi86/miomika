@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Copy, Gift, Mic, Send } from "lucide-react";
+import { ChevronLeft, Copy, Gift, Mic, Send } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -701,9 +701,17 @@ export default function CreatePage() {
     stage === "followup";
 
   return (
-    <AppShell>
-      <div className="relative flex h-svh max-h-svh min-h-0 w-full flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:max-h-none">
-        <div className="flex h-[100px] shrink-0 items-center gap-3 border-b border-[#EAD0DB] bg-white px-4 md:hidden">
+    <div className="-mx-6 -my-6 flex h-svh max-h-svh min-h-0 flex-col overflow-hidden py-0 md:mx-0 md:my-0 md:h-auto md:max-h-none">
+      <AppShell>
+      <div className="relative flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:max-h-none">
+        <Link
+          href="/home"
+          className="absolute left-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-[#8B1A35] transition-transform active:scale-[0.97] md:hidden"
+          aria-label="Back to home"
+        >
+          <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </Link>
+        <div className="flex h-[100px] shrink-0 items-center gap-3 border-b border-[#EAD0DB] bg-white px-4 pl-12 md:hidden md:pl-4">
           <motion.div className={cn("shrink-0", !reduceMotion && "miomi-breathe")}>
             <Image
               src={headImage}
@@ -1052,5 +1060,6 @@ export default function CreatePage() {
         </AnimatePresence>
       </div>
     </AppShell>
+    </div>
   );
 }

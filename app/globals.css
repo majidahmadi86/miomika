@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 @config "../tailwind.config.ts";
 @import "tailwindcss";
 
@@ -73,16 +75,16 @@ body {
 @keyframes miomi-breathe {
   0%,
   100% {
-    transform: scale(1);
+    transform: translateY(0) scale(1);
   }
   50% {
-    transform: scale(1.03);
+    transform: translateY(-4px) scale(1.015);
   }
 }
 
 .miomi-breathe {
+  animation: miomi-breathe 4s ease-in-out infinite;
   transform-origin: center bottom;
-  animation: miomi-breathe 3s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

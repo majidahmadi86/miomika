@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
+  ChevronLeft,
   ChevronRight,
   Globe,
   HelpCircle,
@@ -176,8 +177,16 @@ export default function ProfilePage() {
   const pers = personalityLabel(profile.personality);
 
   return (
-    <AppShell>
-      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white px-3 pt-2">
+    <div className="-mx-6 -my-6 flex h-svh max-h-svh min-h-0 flex-col overflow-hidden py-0 md:mx-0 md:my-0 md:h-auto md:max-h-none">
+      <AppShell>
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-white px-3 pt-2">
+        <Link
+          href="/home"
+          className="absolute left-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full text-rose-accent transition-transform active:scale-[0.97] md:hidden"
+          aria-label="Back to home"
+        >
+          <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </Link>
         {loading ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
             <p className="text-sm font-medium text-neutral-700">กำลังโหลด...</p>
@@ -185,7 +194,7 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pb-2">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pt-10 pb-2 md:pt-0">
             {/* Identity card */}
             <section className="mb-2 rounded-2xl border border-rose-border bg-white p-3">
               <div className="flex gap-4">
@@ -471,5 +480,6 @@ export default function ProfilePage() {
         )}
       </div>
     </AppShell>
+    </div>
   );
 }
