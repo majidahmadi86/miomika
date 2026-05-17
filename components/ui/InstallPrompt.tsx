@@ -103,7 +103,7 @@ export function InstallPrompt() {
   if (!show || !prompt) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-50 rounded-2xl border border-[#EAD0DB] bg-white p-4 shadow-xl">
+    <div className="fixed bottom-24 left-4 right-4 z-50 rounded-2xl border border-[#EAD0DB] bg-white p-4 shadow-xl">
       <p className="text-sm font-medium text-[#1A1A1A]">
         {comeback
           ? "กลับมาแล้วค่า~ ติดตั้งหนูไว้เลยนะคะ จะได้เจอกันง่ายขึ้น~"
