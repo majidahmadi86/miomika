@@ -47,9 +47,10 @@ body {
 @media (min-width: 768px) {
   html,
   body {
-    overflow: visible;
     height: auto;
     max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .miomika-app-height {

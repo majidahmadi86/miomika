@@ -177,24 +177,24 @@ export default function ProfilePage() {
   const pers = personalityLabel(profile.personality);
 
   return (
-    <div className="-mx-6 -my-6 flex h-svh max-h-svh min-h-0 flex-col overflow-hidden py-0 md:mx-0 md:my-0 md:h-auto md:max-h-none">
-      <AppShell>
-      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-white px-3 pt-2">
-        <Link
-          href="/home"
-          className="absolute left-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full text-rose-accent transition-transform active:scale-[0.97] md:hidden"
-          aria-label="Back to home"
-        >
-          <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
-        </Link>
+    <AppShell>
+      <div className="flex h-svh max-h-svh flex-col overflow-hidden bg-white">
+        <div className="flex shrink-0 items-center gap-3 border-b border-[#EAD0DB] px-4 py-3">
+          <Link href="/home" className="text-[#8B1A35]">
+            <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </Link>
+          <div>
+            <p className="text-[15px] font-semibold text-[#1A1A1A]">ฉัน</p>
+            <p className="text-[11px] text-[#888888]">Me</p>
+          </div>
+        </div>
         {loading ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
             <p className="text-sm font-medium text-neutral-700">กำลังโหลด...</p>
             <p className="mt-1 text-xs text-nav-muted">Loading profile</p>
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pt-10 pb-2 md:pt-0">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
             {/* Identity card */}
             <section className="mb-2 rounded-2xl border border-rose-border bg-white p-3">
               <div className="flex gap-4">
@@ -475,11 +475,9 @@ export default function ProfilePage() {
                 </button>
               </div>
             </section>
-            </div>
           </div>
         )}
       </div>
     </AppShell>
-    </div>
   );
 }

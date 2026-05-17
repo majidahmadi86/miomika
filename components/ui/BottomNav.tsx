@@ -6,10 +6,10 @@ import { Home, LayoutDashboard, Sparkles, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/create", label: "Create", icon: Sparkles },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/profile", label: "Me", icon: User },
+  { href: "/home", label: "หน้าหลัก", icon: Home },
+  { href: "/create", label: "เรียน", icon: Sparkles },
+  { href: "/dashboard", label: "แดชบอร์ด", icon: LayoutDashboard },
+  { href: "/profile", label: "ฉัน", icon: User },
 ] as const;
 
 const tapClass =
