@@ -91,7 +91,6 @@ export default function ProfilePage() {
 
     if (!user) {
       setLoading(false);
-      router.replace("/login");
       return;
     }
 
@@ -189,11 +188,18 @@ export default function ProfilePage() {
           </div>
         </div>
         {loading ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
-            <p className="text-sm font-medium text-neutral-700">กำลังโหลด...</p>
-            <p className="mt-1 text-xs text-nav-muted">Loading profile</p>
-          </div>
-        ) : (
+  <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+    <p className="text-sm font-medium text-neutral-700">กำลังโหลด...</p>
+    <p className="mt-1 text-xs text-nav-muted">Loading profile</p>
+  </div>
+) : !authEmail && !profile.email ? (
+  <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+    <p className="text-[15px] font-medium text-[#1A1A1A]">อยากให้หนูจำคุณได้ไหมคะ~</p>
+    <p className="text-[12px] text-[#888888]">Sign up so Miomi can remember you</p>
+    <Link href="/signup" className="rounded-full bg-[#8B1A35] px-6 py-3 text-sm font-medium text-white">สมัครฟรี</Link>
+    <Link href="/login" className="text-[12px] text-[#8B1A35]">มีบัญชีแล้ว? เข้าสู่ระบบ</Link>
+  </div>
+) : (
           <div className="min-h-0 flex-1 overflow-y-auto py-4 px-4">
             {/* Identity card */}
             <section className="mb-2 rounded-2xl border border-rose-border bg-white p-3">
@@ -264,7 +270,7 @@ export default function ProfilePage() {
                   />
                 </div>
                 <Link
-                  href="/upgrade"
+                  href="/profile"
                   className="mt-2 inline-block text-[9px] text-rose-accent underline underline-offset-2"
                 >
                   อัพเกรดเพื่อใช้งานไม่จำกัด
@@ -288,7 +294,7 @@ export default function ProfilePage() {
                   </p>
                   {!isPaid ? (
                     <Link
-                      href="/upgrade"
+                      href="/profile"
                       title="Upgrade"
                       className="shrink-0 whitespace-nowrap rounded-full bg-rose-accent px-3 py-1.5 text-[10px] font-semibold text-white transition-colors hover:bg-rose-mid"
                     >
