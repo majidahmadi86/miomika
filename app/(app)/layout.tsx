@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BottomNav } from "@/components/ui/BottomNav";
 import {
   Copy,
   Home,
@@ -195,11 +196,12 @@ function AppLayoutInner({
       </aside>
 
       <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-white md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <div className="mx-auto h-full w-full max-w-[680px]">{children}</div>
-        </div>
-        <InstallPrompt />
-      </div>
+ <div className="flex-1 min-h-0 overflow-hidden">
+    <div className="mx-auto h-full w-full max-w-[680px]">{children}</div>
+  </div>
+  <BottomNav />
+  <InstallPrompt />
+</div>
 
       <aside className="hidden h-screen w-72 shrink-0 flex-col border-l border-[#EAD0DB] bg-white md:flex">
         <div className="flex flex-1 flex-col overflow-y-auto px-4 py-6">
