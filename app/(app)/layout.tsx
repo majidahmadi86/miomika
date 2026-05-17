@@ -196,7 +196,7 @@ function AppLayoutInner({
 
       <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-white md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
         <div className="flex-1 min-h-0 overflow-hidden">
-          <div className="mx-auto w-full max-w-[680px]">{children}</div>
+          <div className="mx-auto h-full w-full max-w-[680px]">{children}</div>
         </div>
         <InstallPrompt />
       </div>
