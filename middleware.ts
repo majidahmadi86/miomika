@@ -12,24 +12,12 @@ function isAuthRequiredPath(pathname: string): boolean {
   return isOnboardingPath(pathname);
 }
 
-/** Guests may not open dashboard/profile without account */
-function isGuestBlockedPath(pathname: string): boolean {
-  const blocked = ["/dashboard", "/profile"] as const;
-  return blocked.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
-}
-
 export async function middleware(request: NextRequest) {
   const { response, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api")) {
     return response;
-  }
-
-  if (!user && isGuestBlockedPath(pathname)) {
-    return NextResponse.redirect(new URL("/home", request.url));
   }
 
   if (!user && isAuthRequiredPath(pathname)) {

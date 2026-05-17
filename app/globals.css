@@ -49,8 +49,8 @@ body {
   body {
     height: auto;
     max-height: none;
-    overflow-y: auto;
     overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .miomika-app-height {
