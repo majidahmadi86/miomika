@@ -1,7 +1,7 @@
-# MIOMIKA — MASTER CHECKLIST v3
-> Last updated: May 15, 2026 — End of Session 3
-> Rule: Update this document every session. Never lose an idea or task.
-> Read BRIEF_v3.md first. This checklist means nothing without that context.
+# MIOMIKA — MASTER CHECKLIST v4.0
+> Updated: May 18, 2026
+> Aligned with language learning pivot + fuel economy + Gemini AI
+> Read BRIEF.md first. This checklist means nothing without that context.
 
 ---
 
@@ -9,405 +9,319 @@
 - [ ] Not started
 - [~] In progress
 - [x] Complete
-- [!] Blocked — needs decision or resource
-- [*] Idea — not scheduled yet
+- [!] Blocked
+- [*] Phase 2+
 
 ---
 
-## THE FOUR FOUNDATIONS — DO THESE BEFORE ANYTHING ELSE
-
-These are not features. These are the minimum for the product to be credible.
-Nothing new gets built until all four are done.
-
-### FOUNDATION 1 — Mobile feels native (no frame, edge to edge)
-- [ ] html and body: `overflow: hidden; background: #FFFFFF`
-- [ ] Every screen exactly 100dvh, zero page scroll
-- [ ] App background white everywhere — no gray shell visible
-- [ ] Content bleeds edge to edge — feels installed like Line/Shopee
-- [ ] Bottom nav icons positioned correctly (not too low, safe area insets)
-- [ ] Remove any visible frame or container around the app
-- [ ] Test on real phone: iPhone and Android
-
-### FOUNDATION 2 — Miomi feels alive on home
-- [ ] Miomi minimum 55% screen height
-- [ ] Breathing animation running always (scale 1.0→1.03, 3s loop)
-- [ ] Tap: bounce + wiggle + rotating Thai speech bubble (5 messages)
-- [ ] Feed button: happy expression + bounce + hunger bar fills + XP earned
-- [ ] Play button: bounce sequence + energy bar fills + XP earned
-- [ ] Sleep after 30s inactivity (sleep expression, gentle breathing)
-- [ ] Wake animation when user returns (excited jump)
-- [ ] Random position drift every 8-12 seconds (8px left/right)
-- [ ] NO frame, circle, or container around Miomi — ever
-- [ ] XP system: numbers increment visibly when earned
-- [ ] Level display: shows current level, progress to next
-
-### FOUNDATION 3 — Create screen is real conversation, not a form
-- [ ] Remove platform/tone/language selector from user's face
-  (hide in collapsible advanced section or remove entirely)
-- [ ] Miomi opens conversation first — never waits for user
-- [ ] Opening line: "วันนี้จะสร้างอะไรดีคะ~ บอกมิโอมิได้เลยนะคะ"
-- [ ] Miomi extracts platform from what user says (not from form)
-- [ ] Miomi extracts language from how user speaks (not from form)
-- [ ] Miomi asks smart follow-up if she doesn't know:
-      niche, platform, content type, specific topic
-- [ ] ONE question at a time — never a list of questions
-- [ ] Voice input: `lang='th-TH'` always
-- [ ] Voice input: process `isFinal` results ONLY — fix repeat bug
-- [ ] Voice: 1.5s silence detection = user finished speaking
-- [ ] Miomi switches to thinking expression while generating
-- [ ] Miomi switches to happy expression when done
-- [ ] Output presented as gift: "นี่คือของขวัญจากหนูนะคะ~"
-- [ ] Chain continues naturally after each output:
-      hook → caption → hashtags → CTA → comment replies → done
-- [ ] Each chain step: Miomi offers, user accepts or declines
-- [ ] End of chain: celebration + "สร้างอีกไหมคะ?" option
-
-### FOUNDATION 4 — Guest experience is generous
-- [ ] Zero login wall — guest goes directly to home screen with Miomi
-- [ ] Guest gets real AI output (3 per session, Claude Haiku)
-- [ ] Miomi is fully alive and reactive for guests
-- [ ] Pet interactions (feed, play) work for guests (no AI cost)
-- [ ] Signup invitation comes FROM Miomi emotionally:
-      "อยากให้หนูจำชื่อคุณได้ไหมคะ~ จะได้เรียกคุณว่าที่รักได้นะคะ"
-- [ ] NO forced walls before user feels the product
-- [ ] After 3 guest outputs: Miomi gently says she wants to remember them
-- [ ] Guest can still play with Miomi after limit — just no more generation
-- [ ] ANTHROPIC_API_KEY added to Vercel environment variables
-- [ ] Real content generation tested and working end to end
-
----
-
-## PHASE 1 — MVP (Current sprint)
-
-### Infrastructure — done
-- [x] Next.js 14 project created
-- [x] Supabase connected — schema, RLS, auth
-- [x] All 5 screens built and working locally
+## INFRASTRUCTURE — DONE
+- [x] Next.js 14 project built
+- [x] Supabase connected (schema, RLS, auth)
+- [x] All screens exist (home, learn/create, dashboard, profile)
 - [x] Deployed to Vercel
 - [x] miomika.com domain connected
-- [x] Mobile shell — 390px centered (needs edge-to-edge fix)
-- [x] Guest mode — no login wall on home
-- [x] Miomi breathing animation
-- [x] Miomi entrance animation on first load
-- [x] Tap interaction — bounce + speech bubble
-
-### Infrastructure — still needed
-- [!] ANTHROPIC_API_KEY — add to Vercel env vars (go to console.anthropic.com, add $5)
-- [ ] Test real content generation end to end
-- [ ] Custom SMTP — Resend.io for branded emails
-- [ ] Favicon — Miomi PNG as favicon
-- [ ] Google OAuth (Thai users expect this)
-- [ ] LINE OAuth (critical for Thai market)
-- [ ] Stripe payments setup
-
-### Known bugs — fix immediately
-- [ ] Voice input repeat bug (interim results being processed — use isFinal only)
-- [ ] Miomi clips outside container on Create screen mobile
-- [ ] Slight scroll still happening on some screens
-- [ ] Create screen: platform/tone forms feel wrong — redesign as conversation
-- [ ] Bottom nav icons too low on some devices
+- [x] PWA manifest + service worker
+- [x] Install prompt (5 second delay)
+- [x] Guest mode (no login wall)
+- [x] Bottom nav on all pages
+- [x] Favicon using Miomi icon
+- [x] Head expression images (idle, happy, thinking, speaking)
+- [x] App icon 192x192 and 512x512
 
 ---
 
-## PHASE 2 — GROWTH (Month 2-4)
+## WEEK 1 — FOUNDATION FIXES (do these before ANY new features)
 
-### Desktop UI — full redesign
-Current desktop is broken. Do not touch until mobile is perfect.
+### Critical bugs
+- [ ] Voice input repeat bug — process isFinal only, lang=th-TH
+- [ ] Welcome screen (2-4s emotional arrival, shows once)
+- [ ] Fuel interactions working (tap → animation → Miomi reacts → bar fills)
+- [ ] Guest 5-exchange limit enforced SERVER-SIDE in Supabase
+- [ ] After exchange 5: Miomi emotional signup invitation (never a wall)
 
-Vision:
-- Left panel: Miomi alive (large, animated), pet stats, navigation
-- Center: professional content workspace (Figma/Canva feeling)
-- Right: history, saved outputs, insights
-- Top bar: Miomika logo, tier badge, upgrade CTA
-- Reference: Figma, Canva, Vidu AI
+### Mobile polish
+- [ ] Home screen: Miomi minimum 58% stage height
+- [ ] All screens: 100svh no scroll confirmed on Samsung + iPhone
+- [ ] Nav labels correct: หน้าหลัก / เรียน / แดชบอร์ด / ฉัน
+- [ ] Back navigation on all non-home screens
 
-### Character system
-- [ ] Companion Store screen designed
-- [ ] Character 2: K-pop Bunny (Korean culture + language)
-- [ ] Character 3: The Wise Fox (strategy + analytics)
-- [ ] Character 4: Anime Hero (gaming + storytelling)
-- [ ] Character 5: Gen-Z Street Girl (TikTok + viral content)
-- [ ] Character unlock flow: Miomi introduces them personally
-- [ ] Character preview: personality, voice sample, example output
-
-### Pet mechanics — deeper
-- [ ] Rive animation file integrated (when file is ready from founder)
-- [ ] Walking/running animation
-- [ ] Feeding animation (real food item visual)
-- [ ] Playing animation (Miomi chases something)
-- [ ] Level-up celebration animation
-- [ ] Outfit/dress-up store
-- [ ] Seasonal limited items
-
-### Memory system
-- [ ] Guest: zero memory confirmed
-- [ ] Free: name + niche stored in Supabase
-- [ ] Paid starter: style + tone preferences stored
-- [ ] Paid creator: full conversation history stored
-- [ ] Pro: custom tone model (learns user's voice)
-
-### Monetization
-- [ ] Stripe subscription tiers (THB):
-      Guest: free, 3 outputs/session
-      Free: 0 THB, 10 outputs/month
-      Starter: 299 THB/month, 100 outputs
-      Creator: 599 THB/month, unlimited
-      Pro: 1,299 THB/month, team + custom tone
-- [ ] Upgrade experience: Miomi asks in her voice, not a pricing table
-- [ ] Referral system:
-      +20 outputs when friend signs up
-      1 free month when friend goes paid
-      Referred friend gets +20 bonus outputs
-- [ ] Coupon code system
-
-### Retention mechanics
-- [ ] Push notifications — Miomi's morning nudge in her voice
-- [ ] Pet neglect system — mood/energy decay if user ignores app
-- [ ] Streak system connected to real output data
-- [ ] Level-up celebrations — Miomi gets visibly excited
-- [ ] Weekly summary from Miomi
+### AI integration
+- [ ] Gemini Flash Lite API key added (aistudio.google.com — FREE)
+- [ ] /api/miomi route updated to use Gemini
+- [ ] Language learning system prompt (Krashen i+1 method)
+- [ ] Miomi teaches English naturally through conversation
+- [ ] Silent level assessment working
+- [ ] Echo correction (never says "wrong")
+- [ ] Session-end specific praise
 
 ---
 
-## PHASE 3 — PLATFORM (Month 5-8)
+## WEEK 2 — CORE PRODUCT
 
-### Language Learning — HIGH VIRAL POTENTIAL
-- [ ] Language learning mode designed
-- [ ] Miomi as teacher: conversational, not lesson-based
-- [ ] Business English for creators
-- [ ] Korean basics for K-style creators
-- [ ] Pronunciation via voice (free: Web Speech, paid: ElevenLabs)
-- [ ] Progress tracking: vocabulary, XP, levels separate from pet levels
-- [ ] "Today's word" from Miomi every morning
-- [ ] Miomi unlocks this feature naturally in conversation
+### Fuel economy
+- [ ] Supabase: fuel_state table (user_id, heart, zap, brain, last_reset)
+- [ ] Midnight Bangkok reset (Vercel cron)
+- [ ] Free user limits enforced server-side
+- [ ] Pro users: unlimited (tier check server-side)
+- [ ] Fuel bars visible on home screen with real data
+- [ ] Fuel tap animation (lightweight, fast, emotional)
 
-### Community
-- [ ] Public creator profiles
-- [ ] Follow other creators
-- [ ] Community feed
-- [ ] Miomi matchmaking between creators
-- [ ] Harassment protection layer (Orange's problem — Miomi moderates)
+### Vocabulary tracking
+- [ ] Supabase: vocabulary table (user_id, word, stage, times_used, last_seen)
+- [ ] Three stages: heard → used → mastered
+- [ ] Auto-save when word appears in conversation
+- [ ] Stage updates when used correctly 3x
+- [ ] Vocabulary visible in dashboard and desktop right panel
 
-### Social media connection
-- [ ] Instagram API (apply NOW — 2-4 week approval)
-- [ ] TikTok API (apply NOW)
-- [ ] Auto-scheduler — Miomi posts at optimal time
+### XP and levels
+- [ ] Supabase: xp column in users table
+- [ ] XP awarded on: session complete (+20), word mastered (+10), streak (+15)
+- [ ] Level calculation (every 100 XP = 1 level)
+- [ ] Level-up detection and celebration trigger
+- [ ] Level-up animation + Miomi speech bubble
 
----
-
-## PHASE 4 — EXPANSION (Month 9+)
-
-- [*] SEA expansion: Vietnam, Indonesia, Philippines, Malaysia
-- [*] Japanese market (kawaii culture)
-- [*] Korean market
-- [*] Brand partnerships and sponsored daily topics
-- [*] Creator marketplace — brands find creators
-- [*] Agency dashboard — Mikaro Studio integration
+### Growth dashboard (real data)
+- [ ] Streak display (real, from Supabase)
+- [ ] Words mastered count (real)
+- [ ] Sessions this week (real)
+- [ ] Speaking confidence (estimated from session patterns)
+- [ ] Miomi's weekly observation (AI generated, changes weekly)
+- [ ] Vocabulary bank with mastery stages
+- [ ] Achievement badges (at least 3 milestone badges)
 
 ---
 
-## CONTENT TYPES — built in Create screen
+## WEEK 3 — MONETIZATION
 
-- [x] Caption (แคปชั่น)
-- [x] Hook
-- [x] Hashtags (แฮชแท็ก)
-- [x] Script/Scenario (สคริปต์)
-- [x] Thumbnail idea (ธัมบ์เนล)
-- [x] Description (คำบรรยาย)
-- [x] Comment reply (ตอบคอมเมนต์)
-- [x] DM reply (ตอบ DM)
-- [x] CTA
-- [x] Text overlay
+### Referral system
+- [ ] Guest: shortened link + QR code (no rewards)
+- [ ] Free user: full referral system
+  - Personal link: miomika.com/join/[username]
+  - QR code (save as image)
+  - Pre-filled Thai share message
+  - Reward: 3 signups = +1 Brain fuel for 7 days
+- [ ] Referral tracking in Supabase
+- [ ] Miomi delivers reward message when referral activates
 
----
+### Payments (Omise)
+- [ ] Omise account registered (omise.co)
+- [ ] Test API keys added to Vercel env
+- [ ] Pro Miomi checkout (299 THB/month)
+- [ ] PromptPay QR payment method
+- [ ] Credit card payment method
+- [ ] Subscription management (cancel, upgrade)
+- [ ] Webhook handling (payment success, failure, renewal)
 
-## TONE OPTIONS
+### Post-payment experience
+- [ ] Miomi celebration on payment success
+- [ ] Push notification
+- [ ] Email receipt (Resend.io): transaction ID, date, amount, next billing
+- [ ] Fuel bars animate to full after payment
+- [ ] Pro features unlock immediately
 
-### Free tier
-- [x] Cute Thai
-- [x] Professional
-
-### Paid tiers (shown locked with tier badge)
-- [x] Gen-Z hype
-- [x] Korean aesthetic
-- [x] Anime
-- [x] Luxury brand
-- [x] Western casual
-- [x] Entertainment
-- [x] Motivational
-- [x] Educational
-- [x] Storytelling
-- [x] Humorous
-- [ ] Custom tone — Pro tier, Miomi learns user's style
-
----
-
-## MIOMI CHARACTER — CURRENT STATUS
-
-### Assets
-- [x] PNG files: idle, happy, thinking, speaking (4 expressions)
-- [x] CSS breathing animation
-- [x] CSS entrance animation (runs in from bottom)
-- [x] Expression switching based on app state
-- [x] Tap interaction — bounce, expression change, speech bubble
-- [x] Sleep mode after 30s inactivity
-
-### Still needed
-- [ ] Rive file — founder building in Rive.app
-      Parts: body, head, ears (separate), eyes (separate), nose, mouth,
-      paws (separate), tail, collar, ear bows
-      States: idle, happy, thinking, speaking, sleeping, eating, playing
-      Export as .riv file
-- [ ] Rive integrated into Next.js
-- [ ] Feeding animation (PNG swap + CSS for now)
-- [ ] Playing animation (PNG swap + CSS for now)
-- [ ] Level-up celebration animation
-- [ ] Touch reactions: purr sound, hearts appear
+### Email system (Resend.io)
+- [ ] Resend.io account + API key
+- [ ] Welcome email (after signup)
+- [ ] Payment receipt email
+- [ ] Failed payment email (helpful, not scary)
+- [ ] Weekly progress email from Miomi
 
 ---
 
-## UI/UX RULES — LOCKED, NEVER BREAK
+## WEEK 4 — DESKTOP + POLISH
 
-- Background: #FFFFFF primary everywhere
-- Rose accent: #8B1A35 buttons, active states
-- Rose mid: #D4537E highlights
-- Rose light: #FBEAF0 soft backgrounds
-- Rose border: #EAD0DB dividers
-- Gold: #B8860B premium, level, XP
-- Gold light: #FDF5E0 briefing cards
-- Text: #1A1A1A primary, #888888 muted
-- NO emojis EVER — lucide-react icons only
-- Miomi ALWAYS free on white canvas — NO frames, NO circles
-- Thai text ALWAYS first, English below in muted smaller text
-- White dominant — Miomi brings all the color
-- Mobile: edge to edge, 100dvh, feels installed
-- Create: conversation-driven, NEVER form-like
-- Every feature delivered through Miomi's personality
+### Desktop UI
+- [ ] 4-zone layout (Rail + Left Panel + Canvas + Right Panel)
+- [ ] Collapsible left and right panels
+- [ ] Icon rail with hover tooltips (Canva-style)
+- [ ] Miomi intelligence bar in canvas (context-aware)
+- [ ] Tool grid (8 features visible immediately)
+- [ ] Feature badges (Pro, New, Coming, B2B)
+- [ ] Mode switching (Home, Conversation, Growth, Translate)
+- [ ] Right panel: streak, progress bars, vocabulary bank
 
----
+### Progress certificates (viral mechanic)
+- [ ] Certificate image generated at Level 10, 15, 20
+- [ ] Miomi's face prominent on certificate
+- [ ] User name + achievement visible
+- [ ] Instagram/LINE optimized dimensions
+- [ ] Share button (one tap)
 
-## TECH STACK — LOCKED
-
-- Next.js 14, TypeScript, Tailwind CSS, App Router
-- Supabase (PostgreSQL) — database and auth
-- Claude Haiku — free and guest users
-- Claude Sonnet — paid users
-- Web Speech API — voice input (`th-TH` default)
-- Web Speech API TTS — Miomi voice for free users
-- ElevenLabs — Miomi voice for paid users
-- Rive.app — final animation (Phase 2)
-- Stripe (THB) — payments
-- Vercel — deployment
-- Resend.io — transactional emails
-- Cursor Pro — development IDE
+### Pro upgrade flow
+- [ ] Day 7 trigger: Miomi shows what Pro can do
+- [ ] Upgrade page (Miomi voice, not pricing table)
+- [ ] "Unlock Pro Miomi" framing throughout
+- [ ] Comparison shown through Miomi's voice
 
 ---
 
-## AI COST STRATEGY
+## MONTH 2 — GROWTH FEATURES
 
-- Free/guest: Claude Haiku
-- Paid: Claude Sonnet
-- Guest limit: 3 outputs per session (real AI, real value)
-- Batch daily topics nightly by niche
-- Cache hashtag sets weekly by niche
-- Pet interactions (feed, play, sleep): ZERO AI cost — pure CSS/JS
-- Memory depth is a paid feature
-- Never expose model names — always just "Miomi"
+### Content creation mode (social media)
+- [ ] Platform selector (Instagram, TikTok, Facebook, YouTube, LINE OA)
+- [ ] Miomi asks questions first, never generates blind
+- [ ] Hook, Caption, Hashtags, CTA chain
+- [ ] Free: 3/month, Pro: unlimited
+- [ ] Available after at least one learning session
+
+### Instant translator
+- [ ] Text or voice input
+- [ ] Thai cultural context note from Miomi
+- [ ] Free: 10/day, Pro: unlimited
+- [ ] Save favorites
+- [ ] One-tap share
+
+### Thai for foreigners mode
+- [ ] English-first responses
+- [ ] Thai woven in naturally
+- [ ] Cultural context always explained
+- [ ] Tourist → student → expat journey
+
+### Daily challenge system
+- [ ] AI generates daily English phrase (batched nightly, 1 call serves all)
+- [ ] Relevant to trending Thai topics
+- [ ] Difficulty matched to user level
+- [ ] "ฝึกเลย" button goes straight to conversation about that phrase
 
 ---
 
-## COMPLIANCE — TODO before launch
+## PHASE 2 — PLATFORM (Month 3+)
 
+### Max Miomi tier (launch after 50+ Pro users)
+- [ ] Deep memory (complete history)
+- [ ] Custom tone (learns user's style)
+- [ ] AI e-book generation
+- [ ] Multiple characters (K-pop Bunny first)
+- [ ] Team seats (up to 3)
+
+### Additional characters
+- [ ] K-pop Bunny (Korean language + K-culture)
+- [ ] Wise Fox (business English, strategy)
+- [ ] Anime Hero (storytelling, gaming)
+- [ ] Gen-Z Street Girl (TikTok, viral content)
+
+### React Native (Month 3)
+- [ ] Expo framework
+- [ ] Same Supabase backend
+- [ ] Firebase push notifications
+- [ ] App Store + Play Store submission
+
+### Enterprise (Phase 2)
+- [ ] School package (per-student pricing)
+- [ ] Custom CI (school logo + colors)
+- [ ] Admin panel (student roster, progress reports)
+- [ ] Cafe/hospitality package
+- [ ] B2B landing page (desktop)
+
+---
+
+## COMPLIANCE (before public launch)
 - [ ] PDPA privacy policy (Thailand)
 - [ ] Terms of service
 - [ ] Cookie consent
-- [ ] Stripe business registration
-- [ ] Meta API developer application (apply NOW — takes weeks)
-- [ ] TikTok API developer application (apply NOW)
-- [ ] ElevenLabs terms review
+- [ ] Omise business registration
+- [ ] Meta API application (apply early — takes weeks)
+- [ ] TikTok API application (apply early)
+
+---
+
+## SUPABASE SCHEMA — NEEDED
+
+```sql
+-- Core tables (existing)
+users: id, email, name, tier, created_at, last_seen
+profiles: user_id, level, xp, streak, language_goal, cat_name
+
+-- Fuel economy (new)
+fuel_state: user_id, heart, zap, brain, last_reset, updated_at
+
+-- Learning (new)
+sessions: user_id, started_at, duration_minutes, mode, xp_earned
+vocabulary: user_id, word, translation, stage, times_used, last_seen, mastered_at
+
+-- Referral (new)
+referrals: id, referrer_id, referred_email, signed_up_at, paid_at, reward_given
+
+-- Payments (new)
+transactions: id, user_id, amount_thb, product, status, omise_charge_id, created_at
+
+-- Daily stats (admin)
+daily_stats: date, new_users, dau, paid_users, ai_cost_usd, revenue_thb
+```
+
+---
+
+## AI COST MONITORING (critical)
+- [ ] Log every AI call to usage_events table
+- [ ] Cost estimate per call stored
+- [ ] Daily cost alert if >$10/day
+- [ ] Per-user cost cap (free users max $0.10/day)
+- [ ] Kill switch in Vercel env (DISABLE_AI=true)
 
 ---
 
 ## SESSION LOG
 
-### Session 1 — May 14, 2026 (morning)
-- Product concept finalized
-- Name: Miomika (app) + Miomi (cat)
-- Domain: miomika.com
-- Visual direction locked
-- Miomi character generated: 4 PNG expressions
-- Full architecture designed
-- BRIEF_v1.md created
-- Trojan horse strategy defined
-
-### Session 2 — May 14, 2026 (afternoon/evening)
-- Full Next.js project built in Cursor
-- All 5 screens built and working locally
-- Supabase connected — schema, RLS, seed data
-- Auth working — signup, login, email confirmation
-- Onboarding 6-step flow
-- Mobile shell — 390px centered
-- Desktop 3-column layout (basic)
-- Create screen — conversation interface
-- Home screen — pet status circles, no-scroll layout
-- Dashboard, Profile screens
-- CHECKLIST_v2.md created
+### Session 1-2 — May 14, 2026
+- Product concept, Miomi character, all 5 screens built locally
+- Supabase connected, auth working
 
 ### Session 3 — May 15, 2026
-- Deployed to Vercel — miomika.com live
-- GitHub repo connected
-- Guest mode implemented — no login wall
-- Miomi breathing + entrance animations added
-- No-scroll audit — 100dvh on all screens
-- Miomi soul layer — thinking/happy expressions on Create
-- Deep brainstorm: identified all major problems
-- Problems identified:
-  - Create screen is a form pretending to be a conversation
-  - Voice input has repeat bug (interim results)
-  - Mobile still has frame/shell feeling
-  - Guest experience not generous enough
-  - Pet mechanics (feed/play) have no real function
-  - Create generates before understanding user
-  - No favicon
-  - Miomi too small on Create mobile
-- BRIEF_v3.md and CHECKLIST_v3.md created with full understanding
-- Four foundations defined and prioritized
-- Character system fully designed
-- Memory tier system defined
-- Signup emotional moment defined
+- Deployed to Vercel, miomika.com live
+- Guest mode, no login wall
+- Miomi animations, breathing, entrance
+- PWA manifest + service worker
 
-### Known issues at end of Session 3
-- Voice repeat bug — not yet fixed
-- Create workflow still form-based — needs conversation redesign
-- Mobile frame feeling — not fully fixed
-- API key not in Vercel — real generation untested live
-- Pet mechanics have no real function (feed/play are visual only)
-- No favicon
-- Miomi clips on Create mobile
+### Session 4-5 — May 16-17, 2026
+- Major redesign sessions
+- Scroll fixed on most screens
+- Dashboard rebuilt
+- Profile guest view added
+- App icons 192x512 correct
+- Desktop UI iterations (v1-v4)
+- Architecture documents created
+
+### Session 6 — May 18, 2026
+- PIVOT CONFIRMED: Language learning primary, content creation Month 2
+- Fuel economy mechanic designed
+- Welcome screen spec finalized
+- User journey fully documented
+- Free AI: Gemini Flash Lite (zero cost)
+- Pricing: Pro 299 THB at launch, Max later
+- Tiers: Guest → Free → Pro → Max
+- All documents updated to v4
+
+### Known issues at end of Session 6
+- Voice input repeat bug — not fixed
+- Welcome screen — not built
+- Fuel mechanic — not built
+- Gemini AI — not integrated
+- Real learning conversation — not working
+- Payments — not set up
+- Desktop UI — 5/10, needs more work
 
 ---
 
 ## HOW TO START A NEW CHAT
 
-Paste in this order:
-1. BRIEF_v3.md (full content)
-2. CHECKLIST_v3.md (full content)
-3. This opening message:
+Paste in order:
+1. BRIEF.md
+2. CHECKLIST.md (this file)
+3. MIOMIKA_BIBLE.md
+4. MIOMIKA_USER_JOURNEY.md
 
+Opening message:
 ```
-You are the technical co-founder of Miomika.
-Read both documents above completely before responding.
-We are in BUILD MODE — direct, efficient, no motivation speeches.
-The soul: Miomi is the product. Tools are what she delivers.
-Never add features before the four foundations are complete.
-Never use emojis — lucide-react icons only.
-Never put Miomi in a frame or container.
-Give me step by step instructions. One thing at a time.
-[State your specific goal for this session]
+You are technical co-founder of Miomika.
+Read all four documents completely before responding.
+BUILD MODE — direct, no speeches.
+Zero cost before revenue. Never a wall. Foundation before features.
+No emojis. Lucide icons only. Miomi leads every screen.
+Current goal: [state specific goal]
 ```
 
 ---
 
-*Update this file at the end of every session*
-*The Four Foundations must be complete before any new features*
-*The Trojan Horse story is the soul — every decision serves it*
+*Update this file at the end of every session.*
+*Never a wall. Always an invitation.*
+*The fuel economy IS the product mechanic.*

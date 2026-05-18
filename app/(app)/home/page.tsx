@@ -439,7 +439,7 @@ export default function HomePage() {
 
   return (
     <AppShell>
-      <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex h-full max-h-full flex-col overflow-hidden">
       <style>{`
         @keyframes miomi-xp-tick {
           0% {
