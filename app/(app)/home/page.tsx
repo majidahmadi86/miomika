@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { Coffee, Heart, MessageCircle, Sparkles, Zap, type LucideIcon } from "lucide-react";
+import { Coffee, Heart, MessageCircle, Zap, type LucideIcon } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -638,21 +638,30 @@ export default function HomePage() {
               tapFeedback,
             )}
           >
-            {pet.mood < 50 ? (
-              <motion.div
-                animate={{ y: [0, -5, 0] }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  repeatDelay: 0.5,
-                }}
-              >
-                <Heart className="h-5 w-5" strokeWidth={2} />
-              </motion.div>
-            ) : (
+            <motion.div
+              animate={
+                pet.mood < 50
+                  ? {
+                      y: [0, -6, 0],
+                      scale: [1, 1.18, 1],
+                      filter: [
+                        "brightness(1)",
+                        "brightness(0.8)",
+                        "brightness(1)",
+                      ],
+                    }
+                  : {}
+              }
+              transition={{
+                duration: 0.6,
+                ease: "easeInOut",
+                repeat: Infinity,
+                repeatDelay: 4,
+                delay: 0,
+              }}
+            >
               <Heart className="h-5 w-5" strokeWidth={2} />
-            )}
+            </motion.div>
             <span className="text-[11px] font-medium leading-[1.6]">ฟีด</span>
           </button>
           <button
@@ -663,21 +672,30 @@ export default function HomePage() {
               tapFeedback,
             )}
           >
-            {pet.energy < 50 ? (
-              <motion.div
-                animate={{ y: [0, -5, 0] }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  repeatDelay: 0.5,
-                }}
-              >
-                <Sparkles className="h-5 w-5" strokeWidth={2} />
-              </motion.div>
-            ) : (
-              <Sparkles className="h-5 w-5" strokeWidth={2} />
-            )}
+            <motion.div
+              animate={
+                pet.energy < 50
+                  ? {
+                      y: [0, -6, 0],
+                      scale: [1, 1.18, 1],
+                      filter: [
+                        "brightness(1)",
+                        "brightness(0.8)",
+                        "brightness(1)",
+                      ],
+                    }
+                  : {}
+              }
+              transition={{
+                duration: 0.6,
+                ease: "easeInOut",
+                repeat: Infinity,
+                repeatDelay: 4,
+                delay: 2,
+              }}
+            >
+              <Zap className="h-5 w-5" strokeWidth={2} />
+            </motion.div>
             <span className="text-[11px] font-medium leading-[1.6]">เล่น</span>
           </button>
           {authReady && isGuest ? (
@@ -690,7 +708,30 @@ export default function HomePage() {
               )}
             >
               <span className="flex items-center gap-1">
-                <MessageCircle className="h-5 w-5 shrink-0" strokeWidth={2} />
+                <motion.div
+                  animate={
+                    pet.hunger < 50
+                      ? {
+                          y: [0, -6, 0],
+                          scale: [1, 1.18, 1],
+                          filter: [
+                            "brightness(1)",
+                            "brightness(0.8)",
+                            "brightness(1)",
+                          ],
+                        }
+                      : {}
+                  }
+                  transition={{
+                    duration: 0.6,
+                    ease: "easeInOut",
+                    repeat: Infinity,
+                    repeatDelay: 4,
+                    delay: 3.5,
+                  }}
+                >
+                  <Coffee className="h-5 w-5 shrink-0" strokeWidth={2} />
+                </motion.div>
                 <span className="text-sm font-medium leading-[1.6]">
                   คุยกับมิโอมิ
                 </span>
@@ -708,7 +749,30 @@ export default function HomePage() {
               )}
             >
               <span className="flex items-center gap-1">
-                <MessageCircle className="h-5 w-5 shrink-0" strokeWidth={2} />
+                <motion.div
+                  animate={
+                    pet.hunger < 50
+                      ? {
+                          y: [0, -6, 0],
+                          scale: [1, 1.18, 1],
+                          filter: [
+                            "brightness(1)",
+                            "brightness(0.8)",
+                            "brightness(1)",
+                          ],
+                        }
+                      : {}
+                  }
+                  transition={{
+                    duration: 0.6,
+                    ease: "easeInOut",
+                    repeat: Infinity,
+                    repeatDelay: 4,
+                    delay: 3.5,
+                  }}
+                >
+                  <Coffee className="h-5 w-5 shrink-0" strokeWidth={2} />
+                </motion.div>
                 <span className="text-sm font-medium leading-[1.6]">
                   คุยกับมิโอมิ
                 </span>
