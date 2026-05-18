@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-lite",
+      model: "gemini-2.5-flash-lite",
       systemInstruction: MIOMI_SYSTEM_PROMPT,
     });
 
