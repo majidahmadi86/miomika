@@ -79,11 +79,11 @@ type PetStats = {
 };
 
 const DEFAULT_PET: PetStats = {
-  mood: 82,
-  energy: 65,
-  hunger: 45,
-  level: 3,
-  xp: 40,
+  mood: 45,
+  energy: 30,
+  hunger: 20,
+  level: 1,
+  xp: 0,
   lastUpdated: 0,
 };
 
@@ -416,7 +416,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (Date.now() - lastActivityRef.current >= 30000) {
+      if (Date.now() - lastActivityRef.current >= 60000) {
         setSleeping(true);
         setBubble(SLEEP_BUBBLE);
         setBubbleVisible(true);
@@ -636,6 +636,7 @@ export default function HomePage() {
             className={cn(
               "flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] text-[#8B1A35]",
               tapFeedback,
+              pet.mood < 50 && "animate-bounce",
             )}
           >
             <Heart className="h-5 w-5" strokeWidth={2} />
@@ -647,6 +648,7 @@ export default function HomePage() {
             className={cn(
               "flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] text-[#8B1A35]",
               tapFeedback,
+              pet.energy < 50 && "animate-bounce",
             )}
           >
             <Sparkles className="h-5 w-5" strokeWidth={2} />
