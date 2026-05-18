@@ -14,7 +14,6 @@ import {
   type MutableRefObject,
 } from "react";
 import { cn } from "@/lib/utils";
-import type { MiomiContentPayload } from "@/types";
 
 type OutputLang = "thai" | "english" | "both";
 
@@ -64,9 +63,9 @@ const FREE_TONES = ["Cute Thai", "Professional"] as const;
 const PAID_TONES = ["Gen-Z", "Korean", "Anime", "Luxury"] as const;
 
 const INITIAL_MIOMI_TH =
-  "หนูชื่อ Miomi ค่า วันนี้จะโพสต์เรื่องอะไรดีคะ? เล่าให้หนูฟังก่อนได้เลย พูดหรือพิมพ์ก็ได้นะคะ";
+  "สวัสดีค่า~ วันนี้อยากฝึก English เรื่องอะไรดีคะ? บอกหนูได้เลยนะคะ~";
 const INITIAL_MIOMI_EN =
-  "I'm Miomi~ What do you want to post today? Tell me first — voice or typing both work.";
+  "Hi~ What would you like to practice in English today? Just tell me~";
 
 const GUEST_EXCHANGE_LIMIT = 5;
 
@@ -77,6 +76,37 @@ const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
   });
+
+function threadToApiMessages(
+  msgs: ThreadMessage[],
+): { role: string; content: string }[] {
+  return msgs
+    .filter(
+      (m): m is Extract<ThreadMessage, { type: "miomi" | "user" }> =>
+        m.type === "miomi" || m.type === "user",
+    )
+    .map((m) =>
+      m.type === "user"
+        ? { role: "user", content: m.text }
+        : {
+            role: "assistant",
+            content: `${m.th}\n\n${m.en}`.trim(),
+          },
+    );
+}
+
+function parseMiomiResponse(content: string): { th: string; en: string } {
+  const trimmed = content.trim();
+  const parts = trimmed.split(/\n\n+/);
+  if (parts.length >= 2) {
+    return { th: parts[0]!.trim(), en: parts.slice(1).join("\n\n").trim() };
+  }
+  const lines = trimmed.split("\n");
+  if (lines.length >= 2) {
+    return { th: lines[0]!.trim(), en: lines.slice(1).join("\n").trim() };
+  }
+  return { th: trimmed, en: "" };
+}
 
 type SpeechRecLike = {
   lang: string;
@@ -294,185 +324,40 @@ export default function CreatePage() {
   );
 
   const fetchMiomi = useCallback(
-    async (topic: string, contentType: string) => {
+    async (conversationMessages: { role: string; content: string }[]) => {
       const res = await fetch("/api/miomi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          topic,
-          platform,
-          tone,
-          language: outputLang,
-          contentType,
+          messages: conversationMessages,
+          isGuest,
         }),
       });
-      const data = (await res.json()) as MiomiContentPayload & {
-        error?: string;
-      };
+      const data = (await res.json()) as { content?: string; error?: string };
       if (!res.ok) {
         throw new Error(
-          data?.error ?? "สร้างเนื้อหาไม่สำเร็จค่า ลองใหม่อีกครั้งนะคะ",
+          data?.error ?? "Miomi is resting~ please try again",
         );
       }
-      return data;
-    },
-    [platform, tone, outputLang],
-  );
-
-  const deliverMainPackage = useCallback(
-    async (data: MiomiContentPayload) => {
-      setIsSpeaking(true);
-      setStage("streaming_main");
-      const introDelay = 320;
-      const betweenDelay = 600;
-
-      const steps: {
-        th: string;
-        en: string;
-        card: Omit<Extract<ThreadMessage, { type: "card" }>, "id" | "type">;
-      }[] = [
-        {
-          th: "หนูจัด Hook ให้ก่อนนะคะ เขียนมาจากใจให้เลยค่า~",
-          en: "Here's a hook straight from the heart~",
-          card: {
-            cardType: "hook",
-            label: "HOOK",
-            th: data.hook_thai,
-            en: data.hook_english,
-          },
-        },
-        {
-          th: `แคปชั่นสำหรับ ${platform} ค่า~`,
-          en: `Here's a caption for ${platform}~`,
-          card: {
-            cardType: "caption",
-            label: "CAPTION",
-            th: data.caption_thai,
-            en: data.caption_english,
-          },
-        },
-        {
-          th: "แฮชแท็กที่เหมาะสมค่า~",
-          en: "Hashtags that fit the vibe~",
-          card: {
-            cardType: "hashtags",
-            label: "HASHTAGS",
-            th: data.hashtags_thai,
-            en: data.hashtags_english,
-          },
-        },
-        {
-          th: "CTA ที่ดึงดูดค่า~",
-          en: "A little CTA to pull them in~",
-          card: {
-            cardType: "cta",
-            label: "CTA",
-            th: data.cta,
-            en: "",
-          },
-        },
-      ];
-
-      for (let i = 0; i < steps.length; i++) {
-        const step = steps[i]!;
-        pushMiomi(step.th, step.en);
-        await sleep(introDelay);
-        pushCard(step.card);
-        if (i < steps.length - 1) await sleep(betweenDelay);
+      if (!data.content?.trim()) {
+        throw new Error("ไม่ได้รับคำตอบจาก Miomi ค่ะ ลองใหม่อีกครั้งนะคะ");
       }
-
-      setIsSpeaking(false);
-      setPostGiftMood(true);
-      pushMiomi(
-        "เสร็จแล้วค่า~ อยากให้ Miomi ช่วยอะไรเพิ่มอีกไหมคะ?",
-        "All done~ Want Miomi to help with anything else?",
-      );
-      setFollowupChipsVisible(true);
-      setStage("followup");
+      return data.content;
     },
-    [platform, pushCard, pushMiomi],
+    [isGuest],
   );
 
-  const deliverCommentVariants = useCallback(
-    async (data: MiomiContentPayload) => {
-      setIsSpeaking(true);
-      setStage("streaming_comments");
-      await sleep(400);
-
-      const variants: {
-        label: string;
-        th: string;
-        en: string;
-        cardType: CardType;
-      }[] = [
-        {
-          label: "ตัวเลือกที่ 1 · REPLY 1",
-          th:
-            data.reply_variant_1_thai?.trim() ||
-            data.comment_reply_thai ||
-            "ขอบคุณมากนะคะ ยินดีต้อนรับเสมอเลยค่า",
-          en: data.reply_variant_1_english?.trim() || "",
-          cardType: "comment_reply_1",
-        },
-        {
-          label: "ตัวเลือกที่ 2 · REPLY 2",
-          th:
-            data.reply_variant_2_thai?.trim() ||
-            data.comment_reply_thai ||
-            "ชอบที่มาคอมเมนต์แบบนี้มากเลยค่า",
-          en: data.reply_variant_2_english?.trim() || "",
-          cardType: "comment_reply_2",
-        },
-        {
-          label: "ตัวเลือกที่ 3 · REPLY 3",
-          th:
-            data.reply_variant_3_thai?.trim() ||
-            data.comment_reply_thai ||
-            "แวะมาคุยกันใหม่ได้เสมอนะคะ",
-          en: data.reply_variant_3_english?.trim() || "",
-          cardType: "comment_reply_3",
-        },
-      ];
-
-      pushMiomi(
-        "เลือกแนวที่ชอบได้เลยค่า กดคัดลอกไปใช้ได้ทันทีนะคะ",
-        "Pick a vibe — tap copy whenever you're ready~",
-      );
-      await sleep(500);
-
-      for (let i = 0; i < variants.length; i++) {
-        const v = variants[i]!;
-        pushCard({
-          cardType: v.cardType,
-          label: v.label,
-          th: v.th,
-          en: v.en,
-        });
-        if (i < variants.length - 1) await sleep(600);
-      }
-
-      setIsSpeaking(false);
-      setPostGiftMood(true);
-      pushMiomi(
-        "เสร็จแล้วค่า~ อยากให้ Miomi ช่วยอะไรเพิ่มอีกไหมคะ?",
-        "All done~ Want Miomi to help with anything else?",
-      );
-      setFollowupChipsVisible(true);
-      setStage("followup");
-    },
-    [pushCard, pushMiomi],
-  );
-
-  const runTopicPipeline = useCallback(
-    async (topic: string, opts?: { skipUserBubble?: boolean }) => {
+  const runConversationTurn = useCallback(
+    async (userText: string, opts?: { skipUserBubble?: boolean }) => {
       if (processingLockRef.current) return;
       processingLockRef.current = true;
-      const trimmed = topic.trim();
+      const trimmed = userText.trim();
       if (!trimmed) {
         processingLockRef.current = false;
         return;
       }
 
+      const history = threadToApiMessages(messages);
       if (!opts?.skipUserBubble) {
         pushUser(trimmed);
       }
@@ -480,16 +365,16 @@ export default function CreatePage() {
       setInputText("");
       setStage("processing_topic");
       setApiLoading(true);
-      pushMiomi(
-        "โอเคค่า~ กำลังทำให้เลยนะคะ รอแป๊บนึงค่า~",
-        "On it~ Give me just a moment~",
-      );
       pushTyping();
 
       try {
-        const data = await fetchMiomi(trimmed, "full_package");
+        const apiMessages = [...history, { role: "user", content: trimmed }];
+        const content = await fetchMiomi(apiMessages);
         removeTyping();
-        await deliverMainPackage(data);
+        const { th, en } = parseMiomiResponse(content);
+        pushMiomi(th, en);
+        setStage("awaiting_topic");
+        setFollowupChipsVisible(false);
       } catch (e) {
         removeTyping();
         pushMiomi(
@@ -503,55 +388,12 @@ export default function CreatePage() {
         processingLockRef.current = false;
       }
     },
-    [deliverMainPackage, fetchMiomi, pushMiomi, pushTyping, pushUser, removeTyping],
+    [fetchMiomi, messages, pushMiomi, pushTyping, pushUser, removeTyping],
   );
 
-  const runCommentPipeline = useCallback(
-    async (commentText: string) => {
-      if (processingLockRef.current) return;
-      processingLockRef.current = true;
-      const trimmed = commentText.trim();
-      if (!trimmed) {
-        processingLockRef.current = false;
-        return;
-      }
+  const runTopicPipeline = runConversationTurn;
 
-      pushUser(trimmed);
-      setInputText("");
-      setStage("processing_comment");
-      setApiLoading(true);
-      pushMiomi(
-        "โอเคค่า~ กำลังทำให้เลยนะคะ รอแป๊บนึงค่า~",
-        "On it~ Give me just a moment~",
-      );
-      pushTyping();
-
-      try {
-        const data = await fetchMiomi(trimmed, "comment_reply_pack");
-        removeTyping();
-        await deliverCommentVariants(data);
-      } catch (e) {
-        removeTyping();
-        pushMiomi(
-          e instanceof Error ? e.message : "มีบางอย่างผิดพลาดค่า ลองใหม่นะคะ",
-          "Something went wrong — want to try again?",
-        );
-        setStage("followup");
-        setFollowupChipsVisible(true);
-      } finally {
-        setApiLoading(false);
-        processingLockRef.current = false;
-      }
-    },
-    [
-      deliverCommentVariants,
-      fetchMiomi,
-      pushMiomi,
-      pushTyping,
-      pushUser,
-      removeTyping,
-    ],
-  );
+  const runCommentPipeline = runConversationTurn;
 
   const consumeGuestExchange = useCallback(() => {
     if (!isGuest) return;
