@@ -24,8 +24,12 @@ export const metadata: Metadata = {
   description: "Voice AI companion for Thai creators",
   manifest: "/manifest.json",
   icons: {
-    icon: "/miomi/icon-512.png",
+    icon: [
+      { url: "/miomi/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/miomi/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
     apple: "/miomi/icon-512.png",
+    shortcut: "/miomi/icon-192.png",
   },
   other: {
     "cache-control": "no-cache",
