@@ -636,10 +636,23 @@ export default function HomePage() {
             className={cn(
               "flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] text-[#8B1A35]",
               tapFeedback,
-              pet.mood < 50 && "animate-bounce",
             )}
           >
-            <Heart className="h-5 w-5" strokeWidth={2} />
+            {pet.mood < 50 ? (
+              <motion.div
+                animate={{ y: [0, -5, 0] }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  repeatDelay: 0.5,
+                }}
+              >
+                <Heart className="h-5 w-5" strokeWidth={2} />
+              </motion.div>
+            ) : (
+              <Heart className="h-5 w-5" strokeWidth={2} />
+            )}
             <span className="text-[11px] font-medium leading-[1.6]">ฟีด</span>
           </button>
           <button
@@ -648,10 +661,23 @@ export default function HomePage() {
             className={cn(
               "flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] text-[#8B1A35]",
               tapFeedback,
-              pet.energy < 50 && "animate-bounce",
             )}
           >
-            <Sparkles className="h-5 w-5" strokeWidth={2} />
+            {pet.energy < 50 ? (
+              <motion.div
+                animate={{ y: [0, -5, 0] }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  repeatDelay: 0.5,
+                }}
+              >
+                <Sparkles className="h-5 w-5" strokeWidth={2} />
+              </motion.div>
+            ) : (
+              <Sparkles className="h-5 w-5" strokeWidth={2} />
+            )}
             <span className="text-[11px] font-medium leading-[1.6]">เล่น</span>
           </button>
           {authReady && isGuest ? (
