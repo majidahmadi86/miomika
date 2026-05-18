@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { Coffee, Heart, MessageCircle, Zap, type LucideIcon } from "lucide-react";
+import { Coffee, Heart, Zap, type LucideIcon } from "lucide-react";
 import {
   useCallback,
   useEffect,
