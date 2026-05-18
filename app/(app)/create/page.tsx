@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronLeft, Copy, Gift, Mic, Send } from "lucide-react";
+import { ArrowUp, ChevronLeft, Copy, Gift, Mic } from "lucide-react";
+import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import {
   useCallback,
   useEffect,
@@ -66,6 +67,8 @@ const INITIAL_MIOMI_TH =
   "หนูชื่อ Miomi ค่า วันนี้จะโพสต์เรื่องอะไรดีคะ? เล่าให้หนูฟังก่อนได้เลย พูดหรือพิมพ์ก็ได้นะคะ";
 const INITIAL_MIOMI_EN =
   "I'm Miomi~ What do you want to post today? Tell me first — voice or typing both work.";
+
+const GUEST_EXCHANGE_LIMIT = 5;
 
 const tapFeedback =
   "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8B1A35]";
@@ -156,6 +159,7 @@ function TypingDots() {
 
 export default function CreatePage() {
   const reduceMotion = useReducedMotion();
+  const { isGuest, authReady } = useGuestExploration();
   const idRef = useRef(0);
   const genId = () => `${Date.now()}-${++idRef.current}`;
 
@@ -179,6 +183,9 @@ export default function CreatePage() {
   const [postGiftMood, setPostGiftMood] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const [toast, setToast] = useState(false);
+  const [guestExchangesRemaining, setGuestExchangesRemaining] = useState(
+    GUEST_EXCHANGE_LIMIT,
+  );
 
   const threadRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecLike | null>(null);
@@ -546,17 +553,34 @@ export default function CreatePage() {
     ],
   );
 
+  const consumeGuestExchange = useCallback(() => {
+    if (!isGuest) return;
+    setGuestExchangesRemaining((n) => Math.max(0, n - 1));
+  }, [isGuest]);
+
   const handleSend = useCallback(() => {
     const t = inputText.trim();
     if (!t || isRecording) return;
+    if (isGuest && guestExchangesRemaining <= 0) return;
     if (stage === "awaiting_topic") {
+      consumeGuestExchange();
       void runTopicPipeline(t);
       return;
     }
     if (stage === "awaiting_comment") {
+      consumeGuestExchange();
       void runCommentPipeline(t);
     }
-  }, [inputText, isRecording, runCommentPipeline, runTopicPipeline, stage]);
+  }, [
+    consumeGuestExchange,
+    guestExchangesRemaining,
+    inputText,
+    isGuest,
+    isRecording,
+    runCommentPipeline,
+    runTopicPipeline,
+    stage,
+  ]);
 
   const getOrCreateRecognition = useCallback((): SpeechRecLike | null => {
     const Ctor = getSpeechRecognitionCtor();
@@ -588,15 +612,24 @@ export default function CreatePage() {
         speechCommittedRef.current = "";
         if (finalText) {
           setInputText(finalText);
+          if (isGuest && guestExchangesRemaining <= 0) return;
           if (stageRef.current === "awaiting_topic") {
+            consumeGuestExchange();
             void runTopicPipeline(finalText);
           } else if (stageRef.current === "awaiting_comment") {
+            consumeGuestExchange();
             void runCommentPipeline(finalText);
           }
         }
       };
     },
-    [runCommentPipeline, runTopicPipeline],
+    [
+      consumeGuestExchange,
+      guestExchangesRemaining,
+      isGuest,
+      runCommentPipeline,
+      runTopicPipeline,
+    ],
   );
 
   const toggleMic = useCallback(() => {
@@ -700,9 +733,8 @@ export default function CreatePage() {
     stage === "followup";
 
   return (
-    <div className=" h-full max-h-full flex h-svh max-h-svh min-h-0 flex-col overflow-hidden">
-      <>
-      <div className="relative flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:max-h-none">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:max-h-none">
         <Link
           href="/home"
           className="absolute left-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-[#8B1A35] transition-transform active:scale-[0.97] md:hidden"
@@ -721,13 +753,20 @@ export default function CreatePage() {
               priority
             />
           </motion.div>
-          <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2 shadow-sm">
-            <p className="line-clamp-2 text-[13px] font-medium leading-[1.6] text-[#1A1A1A]">
-              {bubble.th}
-            </p>
-            <p className="mt-0.5 line-clamp-2 text-[11px] leading-[1.6] text-[#666666]">
-              {bubble.en}
-            </p>
+          <div className="min-w-0 flex-1">
+            {authReady && isGuest ? (
+              <span className="mb-1.5 inline-block rounded-full border border-[#8B1A35] bg-white px-2 py-0.5 text-[10px] font-medium text-[#8B1A35]">
+                เหลืออีก {guestExchangesRemaining} ครั้ง
+              </span>
+            ) : null}
+            <motion.div className="rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2 shadow-sm">
+              <p className="line-clamp-2 text-[13px] font-medium leading-[1.6] text-[#1A1A1A]">
+                {bubble.th}
+              </p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-[1.6] text-[#666666]">
+                {bubble.en}
+              </p>
+            </motion.div>
           </div>
         </div>
 
@@ -975,16 +1014,16 @@ export default function CreatePage() {
           ) : null}
         </div>
 
-        {/* ZONE 3 */}
-        <div className="flex h-16 shrink-0 items-center gap-2 border-t border-[#EAD0DB] bg-white px-3 py-2 md:shrink-0">
+        {/* Input bar — always visible */}
+        <div className="flex h-16 shrink-0 items-center gap-2 border-t border-[#E8E5DF] bg-white px-3">
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={onKeyDownInput}
             disabled={inputDisabled}
-            placeholder="พิมพ์หรือพูดกับมิโอมิ..."
-            title="Type or talk to Miomi"
+            placeholder="พูดหรือพิมพ์กับมิโอมิ..."
+            title="พูดหรือพิมพ์กับมิโอมิ"
             className="min-w-0 flex-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-3.5 py-2 text-sm text-[#1A1A1A] outline-none ring-0 placeholder:text-[#AAAAAA] focus:border-[#8B1A35] disabled:opacity-50"
           />
           <button
@@ -999,9 +1038,7 @@ export default function CreatePage() {
             className={cn(
               "relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full transition-transform",
               tapFeedback,
-              isRecording
-                ? "border-[#8B1A35] bg-[#8B1A35]"
-                : "bg-[#FBEAF0]",
+              isRecording ? "bg-[#8B1A35]" : "bg-[#FBEAF0]",
               (!speechSupported ||
                 apiLoading ||
                 isSpeaking ||
@@ -1011,10 +1048,10 @@ export default function CreatePage() {
             aria-pressed={isRecording}
             aria-label={isRecording ? "Stop recording" : "Voice input"}
           >
-            {isRecording ? (
+            {isRecording && !reduceMotion ? (
               <motion.span
-                className="pointer-events-none absolute inset-0 rounded-full bg-white/25"
-                animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
+                className="pointer-events-none absolute inset-0 rounded-full bg-[#8B1A35]"
+                animate={{ scale: [1, 1.35, 1], opacity: [0.55, 0.15, 0.55] }}
                 transition={{
                   duration: 1.1,
                   repeat: Infinity,
@@ -1033,15 +1070,24 @@ export default function CreatePage() {
           <button
             type="button"
             onClick={handleSend}
-            disabled={!inputText.trim() || inputDisabled || isRecording}
+            disabled={
+              !inputText.trim() ||
+              inputDisabled ||
+              isRecording ||
+              (isGuest && guestExchangesRemaining <= 0)
+            }
             className={cn(
               "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#8B1A35] text-white",
               tapFeedback,
-              (!inputText.trim() || inputDisabled || isRecording) && "opacity-50",
+              (!inputText.trim() ||
+                inputDisabled ||
+                isRecording ||
+                (isGuest && guestExchangesRemaining <= 0)) &&
+                "opacity-50",
             )}
             aria-label="Send"
           >
-            <Send className="h-[18px] w-[18px]" strokeWidth={2} />
+            <ArrowUp className="h-[18px] w-[18px]" strokeWidth={2.5} />
           </button>
         </div>
 
@@ -1058,7 +1104,6 @@ export default function CreatePage() {
           ) : null}
         </AnimatePresence>
       </div>
-    </>
     </div>
   );
 }
