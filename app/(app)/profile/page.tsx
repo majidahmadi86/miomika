@@ -5,13 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
+  BookOpen,
+  Brain,
   ChevronLeft,
   ChevronRight,
+  Gift,
   Globe,
   HelpCircle,
   LogOut,
   Palette,
   Shield,
+  Trophy,
   User,
   Zap,
 } from "lucide-react";
@@ -192,11 +196,78 @@ export default function ProfilePage() {
     <p className="mt-1 text-xs text-nav-muted">Loading profile</p>
   </div>
 ) : !authEmail && !profile.email ? (
-  <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-    <p className="text-[15px] font-medium text-[#1A1A1A]">อยากให้หนูจำคุณได้ไหมคะ~</p>
-    <p className="text-[12px] text-[#888888]">Sign up so Miomi can remember you</p>
-    <Link href="/signup" className="rounded-full bg-[#8B1A35] px-6 py-3 text-sm font-medium text-white">สมัครฟรี</Link>
-    <Link href="/login" className="text-[12px] text-[#8B1A35]">มีบัญชีแล้ว? เข้าสู่ระบบ</Link>
+  <div className="flex h-full flex-col overflow-hidden">
+    <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[#E8E5DF]">
+      <p className="text-[15px] font-medium text-[#1A1A18]">ฉัน</p>
+      <p className="text-[11px] text-[#888] ml-1">Me</p>
+    </div>
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5 flex flex-col gap-4">
+      <div className="bg-[#FAFAF9] border border-[#E8E5DF] rounded-2xl p-5 flex flex-col items-center gap-4 text-center">
+        <Image
+          src="/miomi/happy.png"
+          alt="Miomi"
+          width={88}
+          height={88}
+          className="object-contain"
+        />
+        <div>
+          <p className="text-[16px] font-medium text-[#1A1A18]">
+            อยากให้หนูจำชื่อคุณได้ไหมคะ~
+          </p>
+          <p className="text-[11px] text-[#888] mt-1">
+            Sign up so Miomi can remember you forever
+          </p>
+        </div>
+        <Link
+          href="/signup"
+          className="w-full bg-[#8B1A35] text-white rounded-full py-3 text-[13px] font-medium text-center block"
+        >
+          สมัครฟรี — ไม่มีค่าใช้จ่าย
+        </Link>
+        <Link href="/login" className="text-[12px] text-[#8B1A35]">
+          มีบัญชีแล้ว? เข้าสู่ระบบค่า →
+        </Link>
+      </div>
+
+      <div className="bg-white border border-[#E8E5DF] rounded-2xl p-4">
+        <p className="text-[10px] font-medium text-[#888] uppercase tracking-wider mb-3">
+          เมื่อสมัครแล้วคุณจะได้รับ
+        </p>
+        {[
+          { icon: "Brain", th: "มิโอมิจำชื่อและความชอบของคุณ", en: "Miomi remembers you across sessions" },
+          { icon: "BookOpen", th: "ติดตามคำศัพท์ที่เรียนได้", en: "Track vocabulary and progress" },
+          { icon: "Trophy", th: "ระบบ streak และ level up", en: "Streak and level progression" },
+          { icon: "Gift", th: "ระบบ referral และรางวัล", en: "Referral rewards system" },
+        ].map((item) => (
+          <div key={item.th} className="flex items-start gap-3 py-2.5 border-b border-[#F5F2EC] last:border-none">
+            <div className="w-8 h-8 rounded-lg bg-[#FBEAF0] flex items-center justify-center flex-shrink-0">
+              {item.icon === "Brain" && <Brain className="w-4 h-4 text-[#8B1A35]" />}
+              {item.icon === "BookOpen" && <BookOpen className="w-4 h-4 text-[#8B1A35]" />}
+              {item.icon === "Trophy" && <Trophy className="w-4 h-4 text-[#8B1A35]" />}
+              {item.icon === "Gift" && <Gift className="w-4 h-4 text-[#8B1A35]" />}
+            </div>
+            <div>
+              <p className="text-[12px] font-medium text-[#1A1A18]">{item.th}</p>
+              <p className="text-[10px] text-[#888] mt-0.5">{item.en}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-[#F7F3EC] border border-[#DDD6C8] rounded-2xl p-4 text-center">
+        <p className="text-[12px] font-medium text-[#9A8B73]">
+          แชร์ Miomika ให้เพื่อน
+        </p>
+        <p className="text-[10px] text-[#888] mt-1">Share Miomika with friends</p>
+        <button
+          type="button"
+          onClick={() => navigator.clipboard.writeText("https://miomika.com")}
+          className="mt-3 w-full border border-[#DDD6C8] bg-white rounded-full py-2.5 text-[11px] text-[#9A8B73] font-medium"
+        >
+          คัดลอกลิงก์ miomika.com
+        </button>
+      </div>
+    </div>
   </div>
 ) : (
           <div className="min-h-0 flex-1 overflow-y-auto py-4 px-4">
