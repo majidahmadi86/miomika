@@ -85,6 +85,25 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     const err = error as { message?: string; status?: number; code?: number };
+
+    // Parse status from message if not directly available
+    let errorStatus = err?.status;
+    if (!errorStatus && err?.message) {
+      try {
+        const parsed = JSON.parse(err.message) as { error?: { code?: number } };
+        errorStatus = parsed?.error?.code;
+      } catch { /* noop */ }
+    }
+
+    // If quota exceeded — failover gracefully, never show error
+    if (errorStatus === 429 || errorStatus === 503) {
+      const failover = getFailoverResponse();
+      return NextResponse.json(
+        { content: `${failover.th}\n\n${failover.en}`, wasFailover: true },
+        { status: 200 }
+      );
+    }
+
     console.error("Miomi API error:", JSON.stringify({
       message: err?.message,
       status: err?.status,
