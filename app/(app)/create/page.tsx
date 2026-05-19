@@ -464,7 +464,7 @@ export default function CreatePage() {
     (rec: SpeechRecLike) => {
       rec.continuous = false;  // change from true to false
       rec.interimResults = false;  // change from true to false  
-      rec.lang = "th-TH";  // keep as-is — Chrome handles English words in this mode
+      rec.lang = "en-US";  // keep as-is — Chrome handles English words in this mode
       rec.onresult = (event: unknown) => {
         const display = speechDisplayFromResultEvent(event, speechCommittedRef);
         transcriptLiveRef.current = display;
