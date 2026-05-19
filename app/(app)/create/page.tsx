@@ -69,9 +69,8 @@ const PLATFORMS = [
 const FREE_TONES = ["Cute Thai", "Professional"] as const;
 const PAID_TONES = ["Gen-Z", "Korean", "Anime", "Luxury"] as const;
 
-const _sessionOpening = getSessionOpening();
-const INITIAL_MIOMI_TH = _sessionOpening.th;
-const INITIAL_MIOMI_EN = _sessionOpening.en;
+const INITIAL_MIOMI_TH = "สวัสดีค่า~ วันนี้เป็นยังไงบ้างคะ? บอกหนูได้เลยนะคะ~";
+const INITIAL_MIOMI_EN = "Hi~ How are you doing today? Just tell me anything~";
 
 const GUEST_EXCHANGE_LIMIT = 5;
 
