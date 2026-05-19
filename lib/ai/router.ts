@@ -69,8 +69,16 @@ export async function POST(req: NextRequest) {
     if (!text) {
       throw new Error("Empty response from Gemini");
     }
-
-    return NextResponse.json({ content: text });
+    
+    // Strip all markdown Gemini insists on adding
+    const cleaned = text
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/#{1,6}\s/g, "")
+      .replace(/`(.*?)`/g, "$1")
+      .trim();
+    
+    return NextResponse.json({ content: cleaned });
 
   } catch (error: unknown) {
     const err = error as { message?: string; status?: number };
