@@ -1,7 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// app/api/miomi/route.ts
+import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 const MIOMI_SYSTEM_PROMPT = `You are Miomi (มิโอมิ), a warm and intelligent AI companion cat who teaches English to Thai people.
 
@@ -47,15 +48,11 @@ export async function POST(req: NextRequest) {
   try {
     const { messages, isGuest } = await req.json();
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "Invalid messages" }, { status: 400 });
     }
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
-      systemInstruction: MIOMI_SYSTEM_PROMPT,
-    });
-
+    // Build conversation history (all but last message)
     const history = messages.slice(0, -1).map((msg: { role: string; content: string }) => ({
       role: msg.role === "assistant" ? "model" : "user",
       parts: [{ text: msg.content }],
@@ -63,14 +60,37 @@ export async function POST(req: NextRequest) {
 
     const lastMessage = messages[messages.length - 1];
 
-    const chat = model.startChat({ history });
-    const result = await chat.sendMessage(lastMessage.content);
-    const text = result.response.text();
+    const chat = ai.chats.create({
+      model: "gemini-2.5-flash-lite",
+      config: {
+        systemInstruction: MIOMI_SYSTEM_PROMPT,
+        maxOutputTokens: 400,
+        temperature: 0.85,
+      },
+      history,
+    });
+
+    const response = await chat.sendMessage({
+      message: lastMessage.content,
+    });
+
+    const text = response.text;
+
+    if (!text) {
+      throw new Error("Empty response from Gemini");
+    }
 
     return NextResponse.json({ content: text });
 
-  } catch (error) {
-    console.error("Miomi API error:", error);
+  } catch (error: unknown) {
+    // Log the REAL error to Vercel logs
+    const err = error as { message?: string; status?: number; toString?: () => string };
+    console.error("Miomi API error:", {
+      message: err?.message,
+      status: err?.status,
+      full: err?.toString?.(),
+    });
+
     return NextResponse.json(
       { error: "Miomi is resting~ please try again" },
       { status: 500 }
