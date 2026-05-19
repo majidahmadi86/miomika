@@ -68,14 +68,15 @@ export async function POST(req: NextRequest) {
       const { match } = matchResult;
 
       // Build full response
-      const followUp = match.follow_up_question_th
-        ? `\n\n${match.follow_up_question_th}`
-        : "";
-      const followUpEn = match.follow_up_question_en
-        ? `\n\n${match.follow_up_question_en}`
-        : "";
+      const thPart = match.follow_up_question_th
+        ? `${match.response_th}\n${match.follow_up_question_th}`
+        : match.response_th;
 
-      const content = `${match.response_th}${followUp}\n\n${match.response_en}${followUpEn}`;
+      const enPart = match.follow_up_question_en
+        ? `${match.response_en}\n${match.follow_up_question_en}`
+        : match.response_en;
+
+      const content = `${thPart}\n\n${enPart}`;
 
       // Log the interaction (non-blocking)
       void logInteraction({
