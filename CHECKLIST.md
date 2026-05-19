@@ -350,6 +350,16 @@ Current goal: [state specific goal]
 
 ---
 
+- vocabulary_bank seeded: 179 words (greetings 10, food 15, work 10, family 15, travel 25, shopping 25, feelings 64, health 15)
+- phrases_bank seeded: 10 phrases (airport, taxi, hotel, restaurant, market, emergency, social media)
+- All 4 registers documented: formal, informal, slang, street
+- Gen-Z language included: 555, lol, omg, idk, เด้ง, ปัง, โคตร, ฟิน, ชิล, ไม่เป็นไร, สู้ๆ
+- Thai foreigner journey started: airport → taxi → hotel → restaurant → market phrases
+- Next: connect vocabulary_bank to matcher, build word card UI, welcome screen redesign
+
+---
+
+
 *Update this file at the end of every session.*
 *Never a wall. Always an invitation.*
 *The fuel economy IS the product mechanic.*
