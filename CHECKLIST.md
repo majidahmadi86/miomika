@@ -321,16 +321,35 @@ Current goal: [state specific goal]
 ```
 
 ---
-### Session 7 — May 19, 2026
-- Gemini SDK swapped from @google/generative-ai to @google/genai (fixed API errors)
-- lib/ai/library.ts built — static zero-cost responses
-- lib/ai/session.ts built — session state engine, level detection, exchange instructions
-- Dynamic prompt injection — Miomi gets specific instructions per exchange
-- Markdown stripped server-side from all Gemini responses
-- Failover system — users never see broken experience
-- Voice input functional, th-TH lang, continuous=false issue noted
-- Known issue: Miomi responses still too long, sounds generic not like herself
+### Session 7 — May 19, 2026 (Full day)
+- Gemini SDK fixed (@google/generative-ai → @google/genai)
+- AI router built: Groq primary, Gemini backup, library failover
+- Session state engine built (lib/ai/session.ts)
+- Static library built (lib/ai/library.ts)
+- Intent classifier + library matcher built (lib/ai/matcher.ts)
+- Dynamic prompt injection per exchange
+- Markdown stripped server-side
+- Voice language toggle added (EN/UT)
+- Supabase: 6 new tables created
+- 50 library seed entries inserted
+- 50 vocabulary seed words inserted
+- 10 phrases schema ready
+- Opus architecture session: complete content engine designed
+- Mirror Teaching pedagogy designed (original)
+- vocabulary_bank + phrases_bank schema created
+
+### Known issues end of Session 7:
+- Miomi responses still feel generic — needs prompt work
+- English translation sometimes missing below Thai
+- Voice mishearing Thai as broken English
+- UI still looks like ChatGPT — full redesign needed
+- phrases_bank seed not yet inserted
+- vocabulary_bank not yet connected to matcher
+- Welcome screen not built
+- Word card UI not built
+
 ---
+
 *Update this file at the end of every session.*
 *Never a wall. Always an invitation.*
 *The fuel economy IS the product mechanic.*
