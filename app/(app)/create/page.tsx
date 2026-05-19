@@ -14,6 +14,13 @@ import {
   type MutableRefObject,
 } from "react";
 import { cn } from "@/lib/utils";
+import {
+  createSessionState,
+  getExchangeInstruction,
+  updateSessionState,
+  getSessionOpening,
+  type SessionState,
+} from "@/lib/ai/session";
 
 type OutputLang = "thai" | "english" | "both";
 
@@ -62,10 +69,9 @@ const PLATFORMS = [
 const FREE_TONES = ["Cute Thai", "Professional"] as const;
 const PAID_TONES = ["Gen-Z", "Korean", "Anime", "Luxury"] as const;
 
-const INITIAL_MIOMI_TH =
-  "สวัสดีค่า~ วันนี้อยากฝึก English เรื่องอะไรดีคะ? บอกหนูได้เลยนะคะ~";
-const INITIAL_MIOMI_EN =
-  "Hi~ What would you like to practice in English today? Just tell me~";
+const _sessionOpening = getSessionOpening();
+const INITIAL_MIOMI_TH = _sessionOpening.th;
+const INITIAL_MIOMI_EN = _sessionOpening.en;
 
 const GUEST_EXCHANGE_LIMIT = 5;
 
@@ -216,7 +222,9 @@ export default function CreatePage() {
   const [guestExchangesRemaining, setGuestExchangesRemaining] = useState(
     GUEST_EXCHANGE_LIMIT,
   );
-
+  const [sessionState, setSessionState] = useState<SessionState>(() =>
+    createSessionState(true)
+  );
   const threadRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecLike | null>(null);
   const transcriptLiveRef = useRef("");
@@ -322,31 +330,6 @@ export default function CreatePage() {
     },
     [],
   );
-
-  const fetchMiomi = useCallback(
-    async (conversationMessages: { role: string; content: string }[]) => {
-      const res = await fetch("/api/miomi", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: conversationMessages,
-          isGuest,
-        }),
-      });
-      const data = (await res.json()) as { content?: string; error?: string };
-      if (!res.ok) {
-        throw new Error(
-          data?.error ?? "Miomi is resting~ please try again",
-        );
-      }
-      if (!data.content?.trim()) {
-        throw new Error("ไม่ได้รับคำตอบจาก Miomi ค่ะ ลองใหม่อีกครั้งนะคะ");
-      }
-      return data.content;
-    },
-    [isGuest],
-  );
-
   const runConversationTurn = useCallback(
     async (userText: string, opts?: { skipUserBubble?: boolean }) => {
       if (processingLockRef.current) return;
@@ -356,7 +339,10 @@ export default function CreatePage() {
         processingLockRef.current = false;
         return;
       }
-
+  
+      // Get instruction for this exact exchange
+      const instruction = getExchangeInstruction(sessionState, trimmed);
+  
       const history = threadToApiMessages(messages);
       if (!opts?.skipUserBubble) {
         pushUser(trimmed);
@@ -366,13 +352,51 @@ export default function CreatePage() {
       setStage("processing_topic");
       setApiLoading(true);
       pushTyping();
-
+  
       try {
         const apiMessages = [...history, { role: "user", content: trimmed }];
-        const content = await fetchMiomi(apiMessages);
+  
+        // Send session instruction with every API call
+        const res = await fetch("/api/miomi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: apiMessages,
+            isGuest,
+            sessionInstruction: instruction.promptInstruction,
+          }),
+        });
+  
+        const data = (await res.json()) as {
+          content?: string;
+          error?: string;
+          wasFailover?: boolean;
+        };
+  
+        const content = data.content ?? "";
         removeTyping();
         const { th, en } = parseMiomiResponse(content);
-        pushMiomi(th, en);
+  
+        // If there's a celebration, prepend it
+        const finalTh = instruction.shouldCelebrate && instruction.celebrationText
+          ? `${instruction.celebrationText}\n\n${th}`
+          : th;
+  
+        pushMiomi(finalTh, en);
+  
+        // If conversion window opened, show it after a short delay
+        if (instruction.shouldOpenConversionWindow && instruction.conversionMessage) {
+          window.setTimeout(() => {
+            pushMiomi(
+              instruction.conversionMessage!.th,
+              instruction.conversionMessage!.en
+            );
+          }, 1200);
+        }
+  
+        // Update session state for next exchange
+        setSessionState((prev) => updateSessionState(prev, trimmed, instruction));
+  
         setStage("awaiting_topic");
         setFollowupChipsVisible(false);
       } catch (e) {
@@ -388,7 +412,8 @@ export default function CreatePage() {
         processingLockRef.current = false;
       }
     },
-    [fetchMiomi, messages, pushMiomi, pushTyping, pushUser, removeTyping],
+    [fetchMiomi, isGuest, messages, pushMiomi, pushTyping,
+     pushUser, removeTyping, sessionState],
   );
 
   const runTopicPipeline = runConversationTurn;
