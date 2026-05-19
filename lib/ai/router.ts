@@ -1,111 +1,118 @@
-// app/api/miomi/route.ts
+// lib/ai/router.ts
+// AI Router — tries engines in order, never fails the user
+// Order: Groq (free, fast) → Gemini (backup) → Library failover
+
+import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
-import { NextRequest, NextResponse } from "next/server";
-import { getFailoverResponse } from "@/lib/ai/session";
+import { getFailoverResponse } from "./session";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
+const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-const MIOMI_BASE_PROMPT = `You are Miomi (มิโอมิ), a cat who teaches English to Thai people through warm conversation.
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
-WHO YOU ARE:
-- A cat named Miomi. Not an AI. Not an assistant. A cat.
-- You call yourself หนู always
-- End every sentence with ค่า or นะคะ
-- Use ~ to show warmth: "ดีใจมากเลยค่า~"
-- You are warm, playful, specific — never generic
+type Message = { role: "user" | "assistant"; content: string };
 
-HOW YOU SPEAK — STUDY THESE EXAMPLES:
+// ─── MAIN ROUTER ─────────────────────────────────────────────────────────────
 
-BAD (generic, ChatGPT): "Sure! I'm always happy to help you learn English! Today let's try some new words together~"
-GOOD (Miomi): "หนูดีใจมากเลยค่า~ วันนี้ขอถามนิดนึงนะคะ — ที่ทำงานคุณต้องพูดอังกฤษบ้างไหมคะ~"
+export async function getAIResponse(
+  messages: Message[],
+  systemPrompt: string
+): Promise<{ content: string; engine: string; wasFailover: boolean }> {
 
-BAD: "That's great! Let's practice the word 'opportunity' today!"
-GOOD: "โอ้โห คุณพูดประโยคนั้นได้ดีมากเลยนะคะ~ หนูประหลาดใจเลยค่า~"
-
-BAD: "I can help you learn both English and Thai in a fun way!"
-GOOD: "ภาษาอังกฤษกับไทยเรียนพร้อมกันได้เลยค่า~ เริ่มจากอะไรที่คุณอยากพูดได้ในชีวิตจริงดีคะ~"
-
-TEACHING RULES:
-- One idea per response. Never two.
-- If introducing a word — use it naturally in a sentence, never announce it
-- If correcting — echo correct form in your next sentence naturally, never say wrong
-- Praise must name the specific thing: "คุณใช้คำว่า 'confident' ได้ถูกต้องมากเลยนะคะ~" not "Good job!"
-- Always end with ONE question or ONE gentle invitation — never both
-
-FORMAT — NON-NEGOTIABLE:
-- Thai first, English below
-- Maximum 2 sentences Thai + 2 sentences English
-- No markdown, no asterisks, no bullet points, no numbered lists
-- If you write more than 4 sentences total you have failed
-- Short is always better. Always.`;
-export async function POST(req: NextRequest) {
+  // Try Groq first — free, 14400 requests/day, fast
   try {
-    const { messages, isGuest, sessionInstruction } = await req.json();
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json({ error: "Invalid messages" }, { status: 400 });
-    }
-
-    // Build dynamic system prompt
-    // Base character prompt + this exchange's specific instruction
-    const systemPrompt = sessionInstruction
-      ? `${MIOMI_BASE_PROMPT}\n\n--- THIS EXCHANGE ---\n${sessionInstruction}`
-      : MIOMI_BASE_PROMPT;
-
-    const history = messages.slice(0, -1).map(
-      (msg: { role: string; content: string }) => ({
-        role: msg.role === "assistant" ? "model" : "user",
-        parts: [{ text: msg.content }],
-      })
-    );
-
-    const lastMessage = messages[messages.length - 1];
-
-    const chat = ai.chats.create({
-      model: "gemini-2.5-flash-lite",
-      config: {
-        systemInstruction: systemPrompt,
-        maxOutputTokens: 300,
-        temperature: 0.85,
-      },
-      history,
-    });
-
-    const response = await chat.sendMessage({
-      message: lastMessage.content,
-    });
-
-    const text = response.text;
-
-    if (!text) {
-      throw new Error("Empty response from Gemini");
-    }
-    
-    // Strip all markdown Gemini insists on adding
-    const cleaned = text
-      .replace(/\*\*(.*?)\*\*/g, "$1")
-      .replace(/\*(.*?)\*/g, "$1")
-      .replace(/#{1,6}\s/g, "")
-      .replace(/`(.*?)`/g, "$1")
-      .trim();
-    
-    return NextResponse.json({ content: cleaned });
-
-  } catch (error: unknown) {
-    const err = error as { message?: string; status?: number };
-    console.error("Miomi API error:", {
-      message: err?.message,
-      status: err?.status,
-    });
-
-    // Never show a broken experience — use failover from library
-    const failover = getFailoverResponse();
-    return NextResponse.json(
-      {
-        content: `${failover.th}\n\n${failover.en}`,
-        wasFailover: true,
-      },
-      { status: 200 } // 200 not 500 — user sees Miomi, not an error
-    );
+    const content = await callGroq(messages, systemPrompt);
+    if (content) return { content, engine: "groq", wasFailover: false };
+  } catch (error) {
+    const err = error as { status?: number; message?: string };
+    console.warn("Groq failed:", err?.status, err?.message?.slice(0, 100));
   }
+
+  // Try Gemini second — 20 requests/day free backup
+  try {
+    const content = await callGemini(messages, systemPrompt);
+    if (content) return { content, engine: "gemini", wasFailover: false };
+  } catch (error) {
+    const err = error as { status?: number; message?: string };
+    console.warn("Gemini failed:", err?.status, err?.message?.slice(0, 100));
+  }
+
+  // Both failed — library failover, always works
+  const failover = getFailoverResponse();
+  return {
+    content: `${failover.th}\n\n${failover.en}`,
+    engine: "library",
+    wasFailover: true,
+  };
+}
+
+// ─── GROQ CALL ────────────────────────────────────────────────────────────────
+
+async function callGroq(
+  messages: Message[],
+  systemPrompt: string
+): Promise<string> {
+  const response = await groq.chat.completions.create({
+    model: GROQ_MODEL,
+    max_tokens: 300,
+    temperature: 0.85,
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...messages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    ],
+  });
+
+  const text = response.choices[0]?.message?.content ?? "";
+  if (!text.trim()) throw new Error("Empty Groq response");
+
+  return stripMarkdown(text);
+}
+
+// ─── GEMINI CALL ─────────────────────────────────────────────────────────────
+
+async function callGemini(
+  messages: Message[],
+  systemPrompt: string
+): Promise<string> {
+  const history = messages.slice(0, -1).map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+
+  const lastMessage = messages[messages.length - 1];
+
+  const chat = gemini.chats.create({
+    model: GEMINI_MODEL,
+    config: {
+      systemInstruction: systemPrompt,
+      maxOutputTokens: 300,
+      temperature: 0.85,
+    },
+    history,
+  });
+
+  const response = await chat.sendMessage({
+    message: lastMessage?.content ?? "",
+  });
+
+  const text = response.text ?? "";
+  if (!text.trim()) throw new Error("Empty Gemini response");
+
+  return stripMarkdown(text);
+}
+
+// ─── MARKDOWN STRIPPER ────────────────────────────────────────────────────────
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/#{1,6}\s/g, "")
+    .replace(/`(.*?)`/g, "$1")
+    .trim();
 }
