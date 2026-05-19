@@ -412,8 +412,8 @@ export default function CreatePage() {
         processingLockRef.current = false;
       }
     },
-    [fetchMiomi, isGuest, messages, pushMiomi, pushTyping,
-     pushUser, removeTyping, sessionState],
+    [isGuest, messages, pushMiomi, pushTyping,
+      pushUser, removeTyping, sessionState],
   );
 
   const runTopicPipeline = runConversationTurn;
