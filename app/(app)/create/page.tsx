@@ -218,6 +218,7 @@ export default function CreatePage() {
   const [postGiftMood, setPostGiftMood] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const [toast, setToast] = useState(false);
+  const [voiceLang, setVoiceLang] = useState<"th-TH" | "en-US">("en-US");
   const [guestExchangesRemaining, setGuestExchangesRemaining] = useState(
     GUEST_EXCHANGE_LIMIT,
   );
@@ -464,7 +465,7 @@ export default function CreatePage() {
     (rec: SpeechRecLike) => {
       rec.continuous = false;  // change from true to false
       rec.interimResults = false;  // change from true to false  
-      rec.lang = "en-US";  // keep as-is — Chrome handles English words in this mode
+      rec.lang = voiceLang;
       rec.onresult = (event: unknown) => {
         const display = speechDisplayFromResultEvent(event, speechCommittedRef);
         transcriptLiveRef.current = display;
@@ -497,6 +498,7 @@ export default function CreatePage() {
       isGuest,
       runCommentPipeline,
       runTopicPipeline,
+      voiceLang,
     ],
   );
 
@@ -894,6 +896,14 @@ export default function CreatePage() {
             title="พูดหรือพิมพ์กับมิโอมิ"
             className="min-w-0 flex-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-3.5 py-2 text-sm text-[#1A1A1A] outline-none ring-0 placeholder:text-[#AAAAAA] focus:border-[#8B1A35] disabled:opacity-50"
           />
+          <button
+            type="button"
+            onClick={() => setVoiceLang(v => v === "en-US" ? "th-TH" : "en-US")}
+            className="shrink-0 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2.5 py-1.5 text-[10px] font-semibold text-[#8B1A35]"
+            title="Switch voice language"
+          >
+            {voiceLang === "en-US" ? "EN" : "ไทย"}
+          </button>
           <button
             type="button"
             onClick={toggleMic}
