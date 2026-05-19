@@ -102,14 +102,23 @@ function threadToApiMessages(
 
 function parseMiomiResponse(content: string): { th: string; en: string } {
   const trimmed = content.trim();
+  
+  // Split on double newline — library format: Thai\n\nEnglish
   const parts = trimmed.split(/\n\n+/);
+  
   if (parts.length >= 2) {
-    return { th: parts[0]!.trim(), en: parts.slice(1).join("\n\n").trim() };
+    // First part is Thai, rest is English
+    const th = parts[0]!.trim();
+    const en = parts.slice(1).join("\n\n").trim();
+    return { th, en };
   }
-  const lines = trimmed.split("\n");
-  if (lines.length >= 2) {
-    return { th: lines[0]!.trim(), en: lines.slice(1).join("\n").trim() };
+  
+  // Single line — check if it contains Thai characters
+  const hasThai = /[\u0E00-\u0E7F]/.test(trimmed);
+  if (hasThai) {
+    return { th: trimmed, en: "" };
   }
+  
   return { th: trimmed, en: "" };
 }
 
