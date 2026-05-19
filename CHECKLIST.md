@@ -46,12 +46,12 @@
 - [ ] Back navigation on all non-home screens
 
 ### AI integration
-- [ ] Gemini Flash Lite API key added (aistudio.google.com — FREE)
-- [ ] /api/miomi route updated to use Gemini
-- [ ] Language learning system prompt (Krashen i+1 method)
-- [ ] Miomi teaches English naturally through conversation
-- [ ] Silent level assessment working
-- [ ] Echo correction (never says "wrong")
+- [x] Gemini Flash Lite API key added (aistudio.google.com — FREE)
+- [x] /api/miomi route updated to use Gemini
+- [x] Language learning system prompt (Krashen i+1 method)
+- [x] Miomi teaches English naturally through conversation
+- [x] Silent level assessment working
+- [x] Echo correction (never says "wrong")
 - [ ] Session-end specific praise
 
 ---
@@ -321,7 +321,16 @@ Current goal: [state specific goal]
 ```
 
 ---
-
+### Session 7 — May 19, 2026
+- Gemini SDK swapped from @google/generative-ai to @google/genai (fixed API errors)
+- lib/ai/library.ts built — static zero-cost responses
+- lib/ai/session.ts built — session state engine, level detection, exchange instructions
+- Dynamic prompt injection — Miomi gets specific instructions per exchange
+- Markdown stripped server-side from all Gemini responses
+- Failover system — users never see broken experience
+- Voice input functional, th-TH lang, continuous=false issue noted
+- Known issue: Miomi responses still too long, sounds generic not like herself
+---
 *Update this file at the end of every session.*
 *Never a wall. Always an invitation.*
 *The fuel economy IS the product mechanic.*
