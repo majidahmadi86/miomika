@@ -272,5 +272,54 @@ Today's priority: insert phrases_bank seed data, then generate vocabulary batche
 Never a wall. Always an invitation.
 No emojis. Lucide icons only. Miomi leads every screen."
 
+
+## HONEST INFRASTRUCTURE STATUS — End of May 19
+
+### Built and working in code:
+- lib/ai/session.ts — session state, level detection, exchange arc
+- lib/ai/library.ts — static responses, celebrations, failover
+- lib/ai/matcher.ts — intent classifier, library lookup, decision engine
+- lib/ai/router.ts — Groq → Gemini → library failover chain
+- app/api/miomi/route.ts — library first, AI second architecture
+- Supabase: 6 tables created, 179 vocabulary words, 10 phrases, 50 library entries
+
+### Designed but NOT yet coded:
+- vocabulary_bank → matcher connection (Miomi does not teach from vocab yet)
+- Self-improvement loop processor (queue exists, no cron job yet)
+- CEFR level tracking per user
+- Spiral recall system (spaced word reintroduction)
+- Word card UI component
+- Session summary card UI
+- Daily challenge system
+- Certificate generation
+- Curriculum path Level 1-20
+- Welcome screen redesign
+- Create screen full redesign
+
+### Teaching methodology confirmed:
+- Mirror Teaching (original Miomika pedagogy)
+- Supports all 5 Krashen hypotheses
+- CEFR A1-C2 framework embedded in vocabulary_bank
+- Face-saving approach for Thai learner psychology
+- 4 registers per word: formal, informal, slang, street
+- Spiral recall designed, not yet coded
+- Two user directions: Thai→English and Foreigner→Thai
+
+### Next session must build in this order:
+1. Connect vocabulary_bank to matcher and session engine
+2. Cron job to process promotions_queue (self-improvement loop)
+3. Word card UI in create/page.tsx
+4. Welcome screen redesign
+5. Create screen full redesign
+
+### Concerns never to forget:
+- Miomi still feels like ChatGPT — UI redesign critical
+- No learning visible to user yet — word cards needed urgently
+- Voice input still unreliable for Thai speakers
+- 555 idk omg เด้ง ปัง now in vocabulary_bank but not connected
+- Thai for foreigners journey needs dedicated curriculum
+- Cost model only works when library serves 80%+ of interactions
+- Library currently serves common greetings only — not teaching vocabulary yet
+
 *This handoff document covers May 19, 2026 session.*
 *Next priority: Gemini integration → Welcome screen → Google login → Voice fix*
