@@ -1,6 +1,7 @@
 // app/api/miomi/route.ts
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { getFailoverResponse } from "@/lib/ai/session";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
