@@ -83,17 +83,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ content: text });
 
   } catch (error: unknown) {
-    // Log the REAL error to Vercel logs
-    const err = error as { message?: string; status?: number; toString?: () => string };
-    console.error("Miomi API error:", {
+    const err = error as { message?: string; status?: number; code?: number };
+    console.error("Miomi API error:", JSON.stringify({
       message: err?.message,
       status: err?.status,
-      full: err?.toString?.(),
-    });
+      code: err?.code,
+    }));
 
+    const failover = getFailoverResponse();
     return NextResponse.json(
-      { error: "Miomi is resting~ please try again" },
-      { status: 500 }
+      {
+        content: `${failover.th}\n\n${failover.en}`,
+        wasFailover: true,
+      },
+      { status: 200 }
     );
   }
 }
