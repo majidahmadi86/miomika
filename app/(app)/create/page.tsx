@@ -438,7 +438,9 @@ export default function CreatePage() {
 
   const attachRecognitionHandlers = useCallback(
     (rec: SpeechRecLike) => {
-      rec.lang = "th-TH";
+      rec.continuous = false;  // change from true to false
+      rec.interimResults = false;  // change from true to false  
+      rec.lang = "th-TH";  // keep as-is — Chrome handles English words in this mode
       rec.onresult = (event: unknown) => {
         const display = speechDisplayFromResultEvent(event, speechCommittedRef);
         transcriptLiveRef.current = display;
