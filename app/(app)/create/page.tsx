@@ -750,30 +750,36 @@ export default function CreatePage() {
                 className="mb-2"
               >
                 {m.type === "user" ? (
-                  <div className="flex justify-end">
-                    <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-[#8B1A35] px-3 py-2">
-                      <p className="whitespace-pre-wrap text-sm font-medium leading-snug text-white">
+                  <div className="flex justify-end mb-1">
+                    <div className="max-w-[78%] rounded-3xl rounded-tr-sm bg-[#8B1A35] px-4 py-3 shadow-sm">
+                      <p className="whitespace-pre-wrap text-[14px] font-medium leading-[1.6] text-white tracking-tight">
                         {m.text}
                       </p>
                     </div>
                   </div>
                 ) : null}
                 {m.type === "miomi" ? (
-                  <div className="flex justify-start gap-2">
-                    <Image
-                      src="/miomi/head-idle.png"
-                      alt=""
-                      width={24}
-                      height={24}
-                      className="h-6 w-6 shrink-0 object-contain"
-                    />
-                    <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2">
-                      <p className="whitespace-pre-line text-[13px] font-medium leading-[1.6] text-[#1A1A1A]">
-                        {m.th}
-                      </p>
-                      <p className="mt-1 text-[11px] leading-[1.6] text-[#666666]">
-                        {m.en}
-                      </p>
+                  <div className="flex justify-start gap-2 mb-1">
+                    <div className="shrink-0 flex flex-col items-center">
+                      <Image
+                        src={headImage}
+                        alt="Miomi"
+                        width={36}
+                        height={36}
+                        className="h-9 w-9 object-contain"
+                      />
+                    </div>
+                    <div className="max-w-[82%] flex flex-col gap-0.5">
+                      <div className="rounded-3xl rounded-tl-sm bg-white border border-[#F0D6E0] shadow-sm px-4 py-3">
+                        <p className="whitespace-pre-line text-[14px] font-medium leading-[1.7] text-[#1A1A1A] tracking-tight">
+                          {m.th}
+                        </p>
+                        {m.en ? (
+                          <p className="mt-1.5 text-[11.5px] leading-[1.6] text-[#9B8B95] font-normal">
+                            {m.en}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -894,7 +900,7 @@ export default function CreatePage() {
         </div>
 
         {/* Input bar — always visible */}
-        <div className="flex h-16 shrink-0 items-center gap-2 border-t border-[#E8E5DF] bg-white px-3">
+        <div className="flex h-16 shrink-0 items-center gap-2 border-t border-[#F0E8EC] bg-white/95 backdrop-blur-sm px-3">
           <input
             type="text"
             value={inputText}
