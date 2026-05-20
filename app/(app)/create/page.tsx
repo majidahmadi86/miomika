@@ -80,6 +80,37 @@ const INITIAL_MIOMI_EN = "Hi~ How are you doing today? Just tell me anything~";
 
 const GUEST_EXCHANGE_LIMIT = 5;
 
+const MODE_SUGGESTIONS: Record<string, string[]> = {
+  learn: [
+    "สอนคำศัพท์ใหม่ให้หน่อยค่า",
+    "ช่วยแก้ไขภาษาของฉันได้ไหม",
+    "อยากคุยเรื่องอาหาร",
+    "อยากฝึกการทักทาย",
+    "เล่าให้ฟังเรื่องวันนี้",
+  ],
+  translate: [
+    "แปลเป็นภาษาอังกฤษ",
+    "แปลเป็นภาษาไทย",
+    "ช่วยอธิบายความหมายด้วย",
+    "มีคำที่เป็นทางการกว่านี้ไหม",
+    "ใช้ในชีวิตประจำวันได้ไหม",
+  ],
+  create: [
+    "โพสต์ Instagram เรื่องอาหาร",
+    "แคปชั่น TikTok สั้นๆ",
+    "ทำ Hook ที่น่าสนใจ",
+    "เพิ่ม Hashtag ให้หน่อย",
+    "ทำเวอร์ชั่นภาษาอังกฤษ",
+  ],
+  roleplay: [
+    "ซ้อมสั่งอาหารที่ร้าน",
+    "ฝึกเช็คอินโรงแรม",
+    "ซ้อมสัมภาษณ์งาน",
+    "ฝึกถามทาง",
+    "ซ้อมโทรศัพท์เป็นภาษาอังกฤษ",
+  ],
+};
+
 const tapFeedback =
   "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8B1A35]";
 
@@ -256,6 +287,7 @@ export default function CreatePage() {
     create: [{ id: `${Date.now()}-create`, type: "miomi", th: "อยากโพสต์เรื่องอะไรวันนี้คะ~?", en: "What do you want to post about today~?" }],
     roleplay: [{ id: `${Date.now()}-role`, type: "miomi", th: "อยากซ้อมสถานการณ์ไหนดีคะ~?", en: "Which scenario would you like to practice~?" }],
   });
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   const handleModeSwitch = useCallback((newMode: CreateMode) => {
     if (newMode === mode) return;
@@ -277,6 +309,8 @@ export default function CreatePage() {
     queueMicrotask(() => {
       setSpeechSupported(!!getSpeechRecognitionCtor());
     });
+    // Show initial suggestions for current mode
+    setSuggestions(MODE_SUGGESTIONS["learn"] ?? []);
   }, []);
 
   useEffect(() => {
@@ -436,6 +470,9 @@ export default function CreatePage() {
   
         pushMiomi(finalTh, en);
 
+        // Set contextual suggestions based on mode
+        setSuggestions(MODE_SUGGESTIONS[mode] ?? []);
+
         if (data.wordCard) {
           const wordCard = data.wordCard;
           setMessages(prev => [...prev, {
@@ -486,7 +523,7 @@ export default function CreatePage() {
         processingLockRef.current = false;
       }
     },
-    [isGuest, messages, pushMiomi, pushTyping,
+    [isGuest, messages, mode, pushMiomi, pushTyping,
       pushUser, removeTyping, sessionState],
   );
 
@@ -500,6 +537,7 @@ export default function CreatePage() {
   }, [isGuest]);
 
   const handleSend = useCallback(() => {
+    setSuggestions([]);
     const t = inputText.trim();
     if (!t || isRecording) return;
     if (isGuest && guestExchangesRemaining <= 0) return;
@@ -1328,6 +1366,49 @@ export default function CreatePage() {
         )}
       </div>
 
+      {suggestions.length > 0 && !inputText && (
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "6px 12px 0",
+            display: "flex",
+            gap: "6px",
+            overflowX: "auto",
+            msOverflowStyle: "none",
+            scrollbarWidth: "none",
+            background: "rgba(255,255,255,0.96)",
+          }}
+        >
+          {suggestions.slice(0, 4).map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                setInputText(s);
+                setSuggestions([]);
+              }}
+              style={{
+                flexShrink: 0,
+                height: "30px",
+                borderRadius: "999px",
+                border: "1px solid #EDE8E0",
+                background: "#FAFAF6",
+                padding: "0 12px",
+                fontFamily: "'Kanit', sans-serif",
+                fontSize: "12px",
+                fontWeight: 400,
+                color: "#9A8B73",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── ZONE C — Input bar (fixed bottom) ── */}
       <div
         style={{
@@ -1367,7 +1448,10 @@ export default function CreatePage() {
         <input
           type="text"
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={(e) => {
+            setInputText(e.target.value);
+            if (e.target.value.length > 0) setSuggestions([]);
+          }}
           onKeyDown={onKeyDownInput}
           disabled={inputDisabled}
           placeholder="พูดหรือพิมพ์กับมิโอมิ..."
