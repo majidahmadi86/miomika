@@ -14,7 +14,13 @@ import {
   type MutableRefObject,
 } from "react";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
+
+const AmbientBackground = dynamic(
+  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
+  { ssr: false },
+);
 import { WordCard } from "@/components/WordCard";
 import type { SessionVocabWord } from "@/lib/ai/vocabulary";
 import {
@@ -79,6 +85,40 @@ const INITIAL_MIOMI_TH = "สวัสดีค่า~ วันนี้เป�
 const INITIAL_MIOMI_EN = "Hi~ How are you doing today? Just tell me anything~";
 
 const GUEST_EXCHANGE_LIMIT = 5;
+
+const MODE_PALETTES: Record<string, { r: number; g: number; b: number }[]> = {
+  learn: [
+    { r: 249, g: 168, b: 212 },
+    { r: 255, g: 229, b: 180 },
+    { r: 255, g: 244, b: 224 },
+    { r: 201, g: 169, b: 110 },
+  ],
+  translate: [
+    { r: 125, g: 211, b: 192 },
+    { r: 197, g: 200, b: 224 },
+    { r: 184, g: 216, b: 232 },
+    { r: 224, g: 242, b: 240 },
+  ],
+  create: [
+    { r: 201, g: 169, b: 110 },
+    { r: 255, g: 138, b: 128 },
+    { r: 255, g: 107, b: 184 },
+    { r: 255, g: 229, b: 180 },
+  ],
+  roleplay: [
+    { r: 197, g: 200, b: 224 },
+    { r: 181, g: 229, b: 200 },
+    { r: 232, g: 199, b: 127 },
+    { r: 244, g: 241, b: 250 },
+  ],
+};
+
+const MODE_EXPRESSION_BIAS: Record<string, string> = {
+  learn: "/miomi/head-happy.png",
+  translate: "/miomi/head-thinking.png",
+  create: "/miomi/head-speaking.png",
+  roleplay: "/miomi/head-idle.png",
+};
 
 const MODE_SUGGESTIONS: Record<string, string[]> = {
   learn: [
@@ -292,6 +332,7 @@ export default function CreatePage() {
   const [lastUserActivity, setLastUserActivity] = useState(Date.now());
   const [showSummarySheet, setShowSummarySheet] = useState(false);
   const [showPullHandle, setShowPullHandle] = useState(false);
+  const [ambientPalette, setAmbientPalette] = useState(MODE_PALETTES["learn"]!);
 
   const handleModeSwitch = useCallback((newMode: CreateMode) => {
     if (newMode === mode) return;
@@ -303,7 +344,27 @@ export default function CreatePage() {
     setStage("awaiting_topic");
     setFollowupChipsVisible(false);
     setInputText("");
-  }, [mode, messages, modeThreads]);
+
+    // Animate palette transition over 800ms in 8 steps
+    const targetPalette = MODE_PALETTES[newMode] ?? MODE_PALETTES["learn"]!;
+    const steps = 8;
+    const stepDuration = 100;
+    for (let step = 1; step <= steps; step++) {
+      setTimeout(() => {
+        const t = step / steps;
+        setAmbientPalette(
+          targetPalette.map((target, i) => {
+            const current = ambientPalette[i] ?? target;
+            return {
+              r: Math.round(current.r + (target.r - current.r) * t),
+              g: Math.round(current.g + (target.g - current.g) * t),
+              b: Math.round(current.b + (target.b - current.b) * t),
+            };
+          })
+        );
+      }, step * stepDuration);
+    }
+  }, [mode, messages, modeThreads, ambientPalette]);
 
   useEffect(() => {
     stageRef.current = stage;
@@ -388,8 +449,10 @@ export default function CreatePage() {
         return "/miomi/head-thinking.png";
       case "happy":
         return "/miomi/head-happy.png";
+      case "idle":
+        return MODE_EXPRESSION_BIAS[mode] ?? "/miomi/head-idle.png";
       default:
-        return "/miomi/head-idle.png";
+        return MODE_EXPRESSION_BIAS[mode] ?? "/miomi/head-idle.png";
     }
   })();
 
@@ -785,6 +848,21 @@ export default function CreatePage() {
           overflow: "hidden",
         }}
       >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            overflow: "hidden",
+            zIndex: 0,
+            pointerEvents: "none",
+          }}
+        >
+          <AmbientBackground mode="ambient" />
+        </div>
+
         {/* Back button */}
         <Link
           href="/home"
@@ -1009,6 +1087,8 @@ export default function CreatePage() {
           padding: "16px 20px",
           background: "#FAFAF6",
           borderTop: "1px solid #F0ECE8",
+          position: "relative",
+          zIndex: 1,
         }}
       >
         {/* Gold progress bar */}
