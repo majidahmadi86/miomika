@@ -143,10 +143,8 @@ class Blob {
     this.t = Math.random() * 200;
 
     // Each blob sequences through 3 forms over its lifetime
-    const f = () => Math.floor(Math.random() * 3);
-    this.formSeq = [f(), f(), f()];
-    // Hollow stroke thickness varies per blob
-    this.strokeW = 3 + Math.random() * 8;
+    this.formSeq = [0, 0, 0];
+    this.strokeW = 0;
 
     this.repelVx = 0;
     this.repelVy = 0;
@@ -214,53 +212,21 @@ class Blob {
 
   draw(ctx: CanvasRenderingContext2D) {
     const pts = this.buildPts();
-    const form = this.getForm();
     const { r, g, b } = this.c;
-    const maxR = this.baseR * 1.35;
+    const maxR = this.baseR * 1.3;
 
     ctx.save();
     ctx.globalAlpha = this.alpha;
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
 
-    if (form === 0) {
-      // Filled organic blob — radial gradient: bright core, transparent edge
-      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, maxR);
-      grad.addColorStop(0,    `rgba(${r},${g},${b},1)`);
-      grad.addColorStop(0.45, `rgba(${r},${g},${b},0.55)`);
-      grad.addColorStop(1,    `rgba(${r},${g},${b},0)`);
-      ctx.fillStyle = grad;
-      drawOrganic(ctx, 0, 0, pts);
-      ctx.fill();
-
-    } else if (form === 1) {
-      // Hollow organic outline — glowing stroke, no fill
-      const lw = this.strokeW * (0.7 + 0.4 * Math.sin(this.t * 7));
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.85)`;
-      ctx.lineWidth = lw;
-      ctx.shadowColor = `rgba(${r},${g},${b},0.5)`;
-      ctx.shadowBlur = lw * 3.5;
-      drawOrganic(ctx, 0, 0, pts);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-    } else {
-      // Thick organic donut — inner path scaled, evenodd clip
-      const innerScale = 0.40 + 0.14 * Math.sin(this.t * 4.5);
-      const innerPts = pts.map((p) => ({ x: p.x * innerScale, y: p.y * innerScale }));
-      const grad = ctx.createRadialGradient(
-        0, 0, this.baseR * innerScale * 0.6,
-        0, 0, maxR * 0.9
-      );
-      grad.addColorStop(0,    `rgba(${r},${g},${b},0)`);
-      grad.addColorStop(0.25, `rgba(${r},${g},${b},0.8)`);
-      grad.addColorStop(0.65, `rgba(${r},${g},${b},0.4)`);
-      grad.addColorStop(1,    `rgba(${r},${g},${b},0)`);
-      ctx.fillStyle = grad;
-      drawOrganic(ctx, 0, 0, pts);
-      drawOrganic(ctx, 0, 0, innerPts);
-      ctx.fill("evenodd");
-    }
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, maxR);
+    grad.addColorStop(0,    `rgba(${r},${g},${b},1)`);
+    grad.addColorStop(0.45, `rgba(${r},${g},${b},0.55)`);
+    grad.addColorStop(1,    `rgba(${r},${g},${b},0)`);
+    ctx.fillStyle = grad;
+    drawOrganic(ctx, 0, 0, pts);
+    ctx.fill();
 
     ctx.restore();
   }
