@@ -25,7 +25,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
     const t3 = setTimeout(() => setPhase(3), 2900);
     const t4 = setTimeout(() => {
       onComplete();
-    }, 4800);
+    }, 4200);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
