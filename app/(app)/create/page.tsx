@@ -646,396 +646,544 @@ export default function CreatePage() {
     stage === "followup";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:max-h-none">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ background: "#FAFAF6" }}>
+
+      {/* ── ZONE A — Miomi stage (top ~42%) ── */}
+      <div
+        style={{
+          position: "relative",
+          flexShrink: 0,
+          height: "42%",
+          minHeight: "180px",
+          maxHeight: "280px",
+          background: "#FAFAF6",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          paddingBottom: "12px",
+          overflow: "hidden",
+        }}
+      >
+        {/* Back button */}
         <Link
           href="/home"
-          className="absolute left-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-[#8B1A35] transition-transform active:scale-[0.97] md:hidden"
+          style={{
+            position: "absolute",
+            top: "12px",
+            left: "12px",
+            zIndex: 10,
+            width: "32px",
+            height: "32px",
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.8)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid #EAD0DB",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
           aria-label="Back to home"
         >
-          <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+          <ChevronLeft style={{ width: "18px", height: "18px", color: "#9A8B73" }} strokeWidth={2} />
         </Link>
-        <div className="flex h-[100px] shrink-0 items-center gap-3 border-b border-[#EAD0DB] bg-white px-4 pl-12 md:hidden md:pl-4">
-          <motion.div className={cn("shrink-0", !reduceMotion && "miomi-breathe")}>
-            <Image
-              src={headImage}
-              alt="Miomi"
-              width={72}
-              height={72}
-              className="h-[72px] w-[72px] object-contain"
-              priority
-            />
-          </motion.div>
-          <div className="min-w-0 flex-1">
-            {authReady && isGuest ? (
-              <span className="mb-1.5 inline-block rounded-full border border-[#8B1A35] bg-white px-2 py-0.5 text-[10px] font-medium text-[#8B1A35]">
-                เหลืออีก {guestExchangesRemaining} ครั้ง
-              </span>
-            ) : null}
-            <motion.div className="rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2 shadow-sm">
-              <p className="line-clamp-2 text-[13px] font-medium leading-[1.6] text-[#1A1A1A]">
-                {bubble.th}
-              </p>
-              <p className="mt-0.5 line-clamp-2 text-[11px] leading-[1.6] text-[#666666]">
-                {bubble.en}
-              </p>
-            </motion.div>
-          </div>
-        </div>
 
-        <div className="hidden shrink-0 flex-col items-center border-b border-[#EAD0DB] bg-white px-6 py-5 md:flex">
-          <motion.div className={cn("shrink-0", !reduceMotion && "miomi-breathe")}>
-            <Image
-              src={headImage}
-              alt="Miomi"
-              width={120}
-              height={120}
-              className="h-[120px] w-[120px] object-contain"
-              priority
-            />
-          </motion.div>
-          <div className="mt-3 max-w-md rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] px-4 py-3 text-center shadow-sm">
-            <p className="text-base font-medium leading-[1.6] text-[#1A1A1A]">
-              {bubble.th}
-            </p>
-            <p className="mt-1 text-xs leading-[1.6] text-[#666666]">{bubble.en}</p>
+        {/* Guest exchange counter */}
+        {authReady && isGuest && (
+          <div
+            style={{
+              position: "absolute",
+              top: "12px",
+              right: "12px",
+              zIndex: 10,
+              background: "rgba(255,255,255,0.88)",
+              backdropFilter: "blur(8px)",
+              border: "1px solid #EAD0DB",
+              borderRadius: "999px",
+              padding: "3px 10px",
+              fontFamily: "'Kanit', sans-serif",
+              fontSize: "11px",
+              fontWeight: 500,
+              color: "#9A8B73",
+            }}
+          >
+            เหลืออีก {guestExchangesRemaining} ครั้ง
           </div>
-        </div>
+        )}
 
-        <div className="hidden shrink-0 bg-white px-3 py-1">
-          <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span className="shrink-0 self-center text-[9px] font-medium text-[#888888]">
-              แพลตฟอร์ม
-            </span>
-            {PLATFORMS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPlatform(p)}
-                className={pillClass(platform === p)}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-          <div className="mt-1 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span className="shrink-0 self-center text-[9px] font-medium text-[#888888]">
-              โทน
-            </span>
-            {FREE_TONES.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTone(t)}
-                className={pillClass(tone === t)}
-              >
-                {t}
-              </button>
-            ))}
-            {PAID_TONES.map((t) => (
-              <button
-                key={t}
-                type="button"
-                disabled
-                aria-disabled
-                className={paidTonePillClass()}
-              >
-                <span>{t}</span>
-                <span className="rounded border border-[#B8860B]/50 bg-[#fdf5e0] px-0.5 text-[7px] font-semibold leading-none text-[#B8860B]">
-                  Pro
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="mt-1 flex items-center gap-1.5 pb-0.5">
-            <span className="text-[9px] font-medium text-[#888888]">ภาษา</span>
-            {(["thai", "english", "both"] as const).map((lang) => (
-              <button
-                key={lang}
-                type="button"
-                onClick={() => setOutputLang(lang)}
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[9px] font-medium transition-colors",
-                  outputLang === lang
-                    ? "bg-[#8B1A35] text-white"
-                    : "border border-[#EAD0DB] bg-[#FAFAFA] text-neutral-700",
-                )}
-              >
-                {lang === "thai" ? "ไทย" : lang === "english" ? "EN" : "ทั้งคู่"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Scrollable thread only */}
+        {/* Soft glow behind Miomi */}
         <div
-          ref={threadRef}
-          className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+          style={{
+            position: "absolute",
+            width: "180px",
+            height: "180px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(249,168,212,0.20) 0%, transparent 65%)",
+            pointerEvents: "none",
+            bottom: "20px",
+          }}
+        />
+
+        {/* Miomi image — large, expressive */}
+        <motion.div
+          className={cn(!reduceMotion && "miomi-breathe")}
+          style={{ position: "relative", zIndex: 2 }}
         >
-          <AnimatePresence initial={false} mode="popLayout">
-            {messages.map((m) => (
-              <motion.div
-                key={m.id}
-                layout
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.22, ease: "easeOut" }}
-                className="mb-2"
-              >
-                {m.type === "user" ? (
-                  <div className="flex justify-end mb-1">
-                    <div className="max-w-[78%] rounded-3xl rounded-tr-sm bg-[#8B1A35] px-4 py-3 shadow-sm">
-                      <p className="whitespace-pre-wrap text-[14px] font-medium leading-[1.6] text-white tracking-tight">
-                        {m.text}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-                {m.type === "miomi" ? (
-                  <div className="flex justify-start gap-2 mb-1">
-                    <div className="shrink-0 flex flex-col items-center">
-                      <Image
-                        src={headImage}
-                        alt="Miomi"
-                        width={36}
-                        height={36}
-                        className="h-9 w-9 object-contain"
-                      />
-                    </div>
-                    <div className="max-w-[82%] flex flex-col gap-0.5">
-                      <div className="rounded-3xl rounded-tl-sm bg-white border border-[#F0D6E0] shadow-sm px-4 py-3">
-                        <p className="whitespace-pre-line text-[14px] font-medium leading-[1.7] text-[#1A1A1A] tracking-tight">
-                          {m.th}
-                        </p>
-                        {m.en ? (
-                          <p className="mt-1.5 text-[11.5px] leading-[1.6] text-[#9B8B95] font-normal">
-                            {m.en}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-                {m.type === "typing" ? (
-                  <div className="flex justify-start gap-2">
-                    <Image
-                      src="/miomi/head-thinking.png"
-                      alt=""
-                      width={24}
-                      height={24}
-                      className="h-6 w-6 shrink-0 object-contain"
-                    />
-                    <div className="rounded-2xl rounded-tl-sm border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2">
-                      <TypingDots />
-                    </div>
-                  </div>
-                ) : null}
-                {m.type === "card" ? (
+          <Image
+            src={headImage}
+            alt="Miomi"
+            width={140}
+            height={140}
+            style={{ width: "140px", height: "140px", objectFit: "contain" }}
+            priority
+          />
+        </motion.div>
+
+        {/* Speech subtitle — appears below Miomi, not in a bubble */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 2,
+            textAlign: "center",
+            padding: "0 24px",
+            marginTop: "6px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'Kanit', sans-serif",
+              fontSize: "14px",
+              fontWeight: 500,
+              color: "#1A1A18",
+              lineHeight: 1.5,
+              margin: 0,
+            }}
+          >
+            {bubble.th}
+          </p>
+          {bubble.en && (
+            <p
+              style={{
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "11px",
+                fontWeight: 500,
+                color: "#C4BDB5",
+                marginTop: "2px",
+                letterSpacing: "0.02em",
+              }}
+            >
+              {bubble.en}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ── ZONE B — Learning space (scrollable) ── */}
+      <div
+        ref={threadRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          padding: "12px 16px",
+          background: "#FFFFFF",
+          borderTop: "1px solid #F0ECE8",
+        }}
+      >
+        <AnimatePresence initial={false} mode="popLayout">
+          {messages.map((m) => (
+            <motion.div
+              key={m.id}
+              layout
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.20, ease: "easeOut" }}
+              style={{ marginBottom: "8px" }}
+            >
+              {/* User message — right aligned pill */}
+              {m.type === "user" && (
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <div
-                    className={cn(
-                      "w-full rounded-2xl border bg-white p-3",
-                      m.cardType === "hook"
-                        ? "border-[#EAD0DB] shadow-md shadow-[#8B1A35]/[0.07] ring-1 ring-[#8B1A35]/10"
-                        : "border-[#EAD0DB]",
-                    )}
+                    style={{
+                      maxWidth: "75%",
+                      background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                      borderRadius: "20px 20px 4px 20px",
+                      padding: "10px 16px",
+                      boxShadow: "0 2px 8px rgba(219,39,119,0.15)",
+                    }}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                        {m.cardType === "hook" ? (
-                          <Gift
-                            className="h-3.5 w-3.5 shrink-0 text-[#B8860B]"
-                            strokeWidth={2}
-                            aria-hidden
-                          />
-                        ) : null}
-                        <p className="text-[8px] font-semibold uppercase tracking-wide text-[#B8860B]">
-                          {m.label}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => copyThai(m.th)}
-                        className="shrink-0 rounded-lg p-1 text-[#8B1A35] transition-colors hover:bg-[#FBEAF0]"
-                        aria-label="Copy"
-                      >
-                        <Copy className="h-4 w-4" strokeWidth={2} />
-                      </button>
-                    </div>
-                    <p className="mt-2 text-[15px] font-medium leading-[1.6] text-[#1A1A1A]">
+                    <p
+                      style={{
+                        fontFamily: "'Kanit', sans-serif",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        color: "#FFFFFF",
+                        lineHeight: 1.6,
+                        margin: 0,
+                      }}
+                    >
+                      {m.text}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Miomi message — left aligned, minimal, no avatar */}
+              {m.type === "miomi" && (
+                <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                  <div
+                    style={{
+                      maxWidth: "82%",
+                      background: "#FAFAF6",
+                      border: "1px solid #EDE8E0",
+                      borderRadius: "4px 20px 20px 20px",
+                      padding: "10px 14px",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontFamily: "'Kanit', sans-serif",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        color: "#1A1A18",
+                        lineHeight: 1.65,
+                        margin: 0,
+                        whiteSpace: "pre-line",
+                      }}
+                    >
                       {m.th}
                     </p>
-                    {m.en ? (
-                      <p className="mt-1.5 text-xs leading-[1.6] text-[#666666]">
+                    {m.en && (
+                      <p
+                        style={{
+                          fontFamily: "'Quicksand', sans-serif",
+                          fontSize: "11.5px",
+                          color: "#9A8B73",
+                          marginTop: "4px",
+                          lineHeight: 1.55,
+                        }}
+                      >
                         {m.en}
                       </p>
-                    ) : null}
+                    )}
                   </div>
-                ) : null}
-                {m.type === "word_card" ? (
-                  <div style={{ display: "flex", justifyContent: "center", padding: "4px 16px" }}>
-                    <WordCard word={m.word} variant={m.variant} />
-                  </div>
-                ) : null}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {followupChipsVisible ? (
-            <div className="mt-1 flex flex-wrap gap-2 pb-2">
-              <button
-                type="button"
-                onClick={onChipComment}
-                className="rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-3 py-1.5 text-left text-[10px] font-medium text-neutral-800 transition-colors hover:bg-[#FBEAF0]"
-              >
-                <span className="block">ตอบคอมเมนต์</span>
-                <span className="block text-[9px] text-[#888888]">
-                  Comment replies
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={onChipRegenerate}
-                className="rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-3 py-1.5 text-left text-[10px] font-medium text-neutral-800 transition-colors hover:bg-[#FBEAF0]"
-              >
-                <span className="block">ทำใหม่อีกครั้ง</span>
-                <span className="block text-[9px] text-[#888888]">
-                  Make another version
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={onChipDone}
-                className="rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-3 py-1.5 text-left text-[10px] font-medium text-neutral-800 transition-colors hover:bg-[#FBEAF0]"
-              >
-                <span className="block">เสร็จแล้ว</span>
-                <span className="block text-[9px] text-[#888888]">
-                  I&apos;m done
-                </span>
-              </button>
-            </div>
-          ) : null}
-
-          {stage === "finished" ? (
-            <div className="pb-3 pt-1">
-              <Link
-                href="/home"
-                className="inline-flex w-full flex-col items-center justify-center rounded-full bg-[#8B1A35] py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-[#D4537E]"
-              >
-                กลับหน้าหลัก
-              </Link>
-              <p className="mt-1 text-center text-[9px] text-[#888888]">Go home</p>
-            </div>
-          ) : null}
-
-          {!speechSupported ? (
-            <p className="pb-2 text-center text-[10px] text-[#8B1A35]">
-              เบราว์เซอร์นี้ยังไม่รองรับการรู้จำเสียงค่า
-              <span className="mt-0.5 block text-[9px] text-[#888888]">
-                This browser does not support speech recognition
-              </span>
-            </p>
-          ) : null}
-        </div>
-
-        {/* Input bar — always visible */}
-        <div className="flex h-16 shrink-0 items-center gap-2 border-t border-[#F0E8EC] bg-white/95 backdrop-blur-sm px-3">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={onKeyDownInput}
-            disabled={inputDisabled}
-            placeholder="พูดหรือพิมพ์กับมิโอมิ..."
-            title="พูดหรือพิมพ์กับมิโอมิ"
-            className="min-w-0 flex-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-3.5 py-2 text-sm text-[#1A1A1A] outline-none ring-0 placeholder:text-[#AAAAAA] focus:border-[#8B1A35] disabled:opacity-50"
-          />
-          <button
-            type="button"
-            onClick={() => setVoiceLang(v => v === "en-US" ? "th-TH" : "en-US")}
-            className="shrink-0 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2.5 py-1.5 text-[10px] font-semibold text-[#8B1A35]"
-            title="Switch voice language"
-          >
-            {voiceLang === "en-US" ? "EN" : "ไทย"}
-          </button>
-          <button
-            type="button"
-            onClick={toggleMic}
-            disabled={
-              !speechSupported ||
-              apiLoading ||
-              isSpeaking ||
-              (stage !== "awaiting_topic" && stage !== "awaiting_comment")
-            }
-            className={cn(
-              "relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full transition-transform",
-              tapFeedback,
-              isRecording ? "bg-[#8B1A35]" : "bg-[#FBEAF0]",
-              (!speechSupported ||
-                apiLoading ||
-                isSpeaking ||
-                (stage !== "awaiting_topic" && stage !== "awaiting_comment")) &&
-                "cursor-not-allowed opacity-40",
-            )}
-            aria-pressed={isRecording}
-            aria-label={isRecording ? "Stop recording" : "Voice input"}
-          >
-            {isRecording && !reduceMotion ? (
-              <motion.span
-                className="pointer-events-none absolute inset-0 rounded-full bg-[#8B1A35]"
-                animate={{ scale: [1, 1.35, 1], opacity: [0.55, 0.15, 0.55] }}
-                transition={{
-                  duration: 1.1,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-            ) : null}
-            <Mic
-              className={cn(
-                "relative z-10 h-[18px] w-[18px]",
-                isRecording ? "text-white" : "text-[#8B1A35]",
+                </div>
               )}
-              strokeWidth={2}
-            />
-          </button>
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={
-              !inputText.trim() ||
-              inputDisabled ||
-              isRecording ||
-              (isGuest && guestExchangesRemaining <= 0)
-            }
-            className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#8B1A35] text-white",
-              tapFeedback,
-              (!inputText.trim() ||
-                inputDisabled ||
-                isRecording ||
-                (isGuest && guestExchangesRemaining <= 0)) &&
-                "opacity-50",
-            )}
-            aria-label="Send"
-          >
-            <ArrowUp className="h-[18px] w-[18px]" strokeWidth={2.5} />
-          </button>
-        </div>
 
-        <AnimatePresence>
-          {toast ? (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              className="pointer-events-none fixed bottom-20 left-1/2 z-[60] max-w-[min(90vw,320px)] -translate-x-1/2 rounded-full bg-[#8B1A35] px-4 py-2 text-center text-xs font-medium text-white shadow-lg"
-            >
-              คัดลอกแล้วค่า~
+              {/* Typing indicator */}
+              {m.type === "typing" && (
+                <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                  <div
+                    style={{
+                      background: "#FAFAF6",
+                      border: "1px solid #EDE8E0",
+                      borderRadius: "4px 20px 20px 20px",
+                      padding: "10px 14px",
+                    }}
+                  >
+                    <TypingDots />
+                  </div>
+                </div>
+              )}
+
+              {/* Word card */}
+              {m.type === "word_card" && (
+                <div style={{ display: "flex", justifyContent: "center", padding: "4px 0" }}>
+                  <WordCard word={m.word} variant={m.variant} />
+                </div>
+              )}
+
+              {/* Content card */}
+              {m.type === "card" && (
+                <div
+                  style={{
+                    width: "100%",
+                    background: "#FFFFFF",
+                    border: m.cardType === "hook" ? "1.5px solid #C9A96E" : "1px solid #EDE8E0",
+                    borderRadius: "16px",
+                    padding: "12px 14px",
+                    boxShadow: m.cardType === "hook" ? "0 2px 12px rgba(201,169,110,0.15)" : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      {m.cardType === "hook" && (
+                        <Gift style={{ width: "14px", height: "14px", color: "#C9A96E" }} strokeWidth={2} />
+                      )}
+                      <span
+                        style={{
+                          fontFamily: "'Quicksand', sans-serif",
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: "#C9A96E",
+                        }}
+                      >
+                        {m.label}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyThai(m.th)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: "4px",
+                        cursor: "pointer",
+                        borderRadius: "8px",
+                        color: "#9A8B73",
+                      }}
+                      aria-label="Copy"
+                    >
+                      <Copy style={{ width: "15px", height: "15px" }} strokeWidth={2} />
+                    </button>
+                  </div>
+                  <p
+                    style={{
+                      fontFamily: "'Kanit', sans-serif",
+                      fontSize: "15px",
+                      fontWeight: 500,
+                      color: "#1A1A18",
+                      lineHeight: 1.6,
+                      margin: 0,
+                    }}
+                  >
+                    {m.th}
+                  </p>
+                  {m.en && (
+                    <p
+                      style={{
+                        fontFamily: "'Quicksand', sans-serif",
+                        fontSize: "12px",
+                        color: "#9A8B73",
+                        marginTop: "6px",
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      {m.en}
+                    </p>
+                  )}
+                </div>
+              )}
             </motion.div>
-          ) : null}
+          ))}
         </AnimatePresence>
+
+        {/* Followup chips */}
+        {followupChipsVisible && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", paddingBottom: "8px" }}>
+            {[
+              { label: "ตอบคอมเมนต์", sub: "Comment replies", onClick: onChipComment },
+              { label: "ทำใหม่อีกครั้ง", sub: "Make another version", onClick: onChipRegenerate },
+              { label: "เสร็จแล้ว", sub: "I'm done", onClick: onChipDone },
+            ].map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={chip.onClick}
+                style={{
+                  background: "#FAFAF6",
+                  border: "1px solid #EDE8E0",
+                  borderRadius: "999px",
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ display: "block", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, color: "#1A1A18" }}>{chip.label}</span>
+                <span style={{ display: "block", fontFamily: "'Quicksand', sans-serif", fontSize: "9px", color: "#9A8B73" }}>{chip.sub}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Finished state */}
+        {stage === "finished" && (
+          <div style={{ paddingBottom: "12px", paddingTop: "4px" }}>
+            <Link
+              href="/home"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "48px",
+                borderRadius: "999px",
+                background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                fontFamily: "'Kanit', sans-serif",
+                fontSize: "15px",
+                fontWeight: 500,
+                color: "#FFFFFF",
+                textDecoration: "none",
+                boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)",
+              }}
+            >
+              กลับหน้าหลัก
+            </Link>
+            <p style={{ textAlign: "center", fontFamily: "'Quicksand', sans-serif", fontSize: "10px", color: "#C4BDB5", marginTop: "4px" }}>Go home</p>
+          </div>
+        )}
       </div>
+
+      {/* ── ZONE C — Input bar (fixed bottom) ── */}
+      <div
+        style={{
+          flexShrink: 0,
+          height: "64px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "0 12px",
+          background: "rgba(255,255,255,0.96)",
+          backdropFilter: "blur(12px)",
+          borderTop: "1px solid #F0ECE8",
+        }}
+      >
+        <input
+          type="text"
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          onKeyDown={onKeyDownInput}
+          disabled={inputDisabled}
+          placeholder="พูดหรือพิมพ์กับมิโอมิ..."
+          title="พูดหรือพิมพ์กับมิโอมิ"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            height: "40px",
+            borderRadius: "999px",
+            border: "1px solid #EDE8E0",
+            background: "#FAFAF6",
+            padding: "0 16px",
+            fontFamily: "'Kanit', sans-serif",
+            fontSize: "14px",
+            color: "#1A1A18",
+            outline: "none",
+          }}
+        />
+
+        {/* Voice language toggle */}
+        <button
+          type="button"
+          onClick={() => setVoiceLang(v => v === "en-US" ? "th-TH" : "en-US")}
+          style={{
+            flexShrink: 0,
+            height: "36px",
+            borderRadius: "999px",
+            border: "1px solid #EDE8E0",
+            background: "#FAFAF6",
+            padding: "0 10px",
+            fontFamily: "'Quicksand', sans-serif",
+            fontSize: "10px",
+            fontWeight: 700,
+            color: "#9A8B73",
+            cursor: "pointer",
+          }}
+        >
+          {voiceLang === "en-US" ? "EN" : "ไทย"}
+        </button>
+
+        {/* Mic button */}
+        <button
+          type="button"
+          onClick={toggleMic}
+          disabled={!speechSupported || apiLoading || isSpeaking || (stage !== "awaiting_topic" && stage !== "awaiting_comment")}
+          style={{
+            flexShrink: 0,
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            border: "none",
+            background: isRecording ? "#DB2777" : "#FBEAF0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            position: "relative",
+            overflow: "hidden",
+          }}
+          aria-pressed={isRecording}
+        >
+          {isRecording && !reduceMotion && (
+            <motion.span
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                background: "#DB2777",
+                pointerEvents: "none",
+              }}
+              animate={{ scale: [1, 1.35, 1], opacity: [0.55, 0.15, 0.55] }}
+              transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+            />
+          )}
+          <Mic
+            style={{
+              position: "relative",
+              zIndex: 1,
+              width: "18px",
+              height: "18px",
+              color: isRecording ? "#FFFFFF" : "#DB2777",
+            }}
+            strokeWidth={2}
+          />
+        </button>
+
+        {/* Send button */}
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={!inputText.trim() || inputDisabled || isRecording || (isGuest && guestExchangesRemaining <= 0)}
+          style={{
+            flexShrink: 0,
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            border: "none",
+            background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            opacity: (!inputText.trim() || inputDisabled || isRecording || (isGuest && guestExchangesRemaining <= 0)) ? 0.45 : 1,
+            boxShadow: "0 2px 8px rgba(219,39,119,0.25)",
+          }}
+          aria-label="Send"
+        >
+          <ArrowUp style={{ width: "18px", height: "18px", color: "#FFFFFF" }} strokeWidth={2.5} />
+        </button>
+      </div>
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            style={{
+              position: "fixed",
+              bottom: "80px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 60,
+              background: "#1A1A18",
+              color: "#FFFFFF",
+              borderRadius: "999px",
+              padding: "8px 20px",
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "12px",
+              fontWeight: 600,
+              pointerEvents: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            คัดลอกแล้วค่า~
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
