@@ -106,15 +106,26 @@ export function MiomiCharacter({
           className,
         )}
       >
-        <div key={animKey} className={cn("origin-bottom", animClass)}>
-          <Image
-            src={src}
-            alt="Miomi"
-            width={560}
-            height={560}
-            priority
-            className="pointer-events-none h-full max-h-full w-auto max-w-[min(92vw,100%)] select-none object-contain object-bottom"
-          />
+        <div
+          key={animKey}
+          className={cn("origin-bottom", animClass)}
+        >
+          <div
+            style={{
+              position: "relative",
+              transition: "opacity 0.35s ease-in-out",
+            }}
+          >
+            <Image
+              src={src}
+              alt="Miomi"
+              width={560}
+              height={560}
+              priority
+              className="pointer-events-none h-full max-h-full w-auto max-w-[min(92vw,100%)] select-none object-contain object-bottom"
+              style={{ transition: "opacity 0.35s ease-in-out" }}
+            />
+          </div>
         </div>
       </div>
     </>

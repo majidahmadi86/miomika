@@ -416,8 +416,8 @@ export default function HomePage() {
     if (reduceMotion || sleeping) return;
     const id = window.setInterval(() => {
       if (Date.now() < happyUntilRef.current) return;
-      setExpressionFlip(() => (Math.random() < 0.5 ? "idle" : "happy"));
-    }, 5000);
+      setExpressionFlip(() => (Math.random() < 0.15 ? "happy" : "idle"));
+    }, 8000);
     return () => clearInterval(id);
   }, [reduceMotion, sleeping]);
 
@@ -505,7 +505,7 @@ export default function HomePage() {
                 <motion.div
                   className={cn(
                     "origin-bottom",
-                    sleeping && "rotate-[14deg]",
+                    sleeping && "rotate-[6deg]",
                   )}
                 >
                   <motion.button
