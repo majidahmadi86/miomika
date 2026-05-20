@@ -442,6 +442,7 @@ export function AmbientBackground({ mode = "ambient", className }: AmbientBackgr
     let raf: number;
 
     function loop() {
+      if (!ctx) return;
       ctx.clearRect(0, 0, W, H);
 
       const { x: mx, y: my, inside } = mouseRef.current;
