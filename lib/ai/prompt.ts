@@ -175,15 +175,42 @@ CURRENT TASK: Warm greeting
 function buildLanguageDirective(context: PromptContext): string {
   const { primaryLanguage, learningDirection, voiceRatio, cefrLevel } = context;
 
+  const langRule = (() => {
+    if (learningDirection === "english_to_thai") {
+      return `CRITICAL LANGUAGE RULE: This user speaks English and is learning Thai.
+- YOU MUST respond primarily in ENGLISH (${voiceRatio.english}% English, ${voiceRatio.thai}% Thai)
+- Introduce Thai words with romanization: Thai script (romanization) = meaning
+- Example format: "สบาย (sabai) means comfortable or relaxed"
+- NEVER respond mostly in Thai to an English speaker — they cannot understand you`;
+    }
+    if (learningDirection === "thai_to_english") {
+      return `CRITICAL LANGUAGE RULE: This user speaks Thai and is learning English.
+- YOU MUST respond primarily in THAI (${voiceRatio.thai}% Thai, ${voiceRatio.english}% English)
+- Introduce English words with pronunciation hints
+- Example format: Thai explanation first, then English word in quotes
+- NEVER respond mostly in English to a Thai speaker — they cannot understand you`;
+    }
+    if (primaryLanguage === "english") {
+      return `CRITICAL LANGUAGE RULE: This user writes in English. Respond in English.
+- Use English as your primary language in this response
+- Thai only for cultural notes or when teaching Thai words`;
+    }
+    if (primaryLanguage === "genz_mixed") {
+      return `CRITICAL LANGUAGE RULE: This user uses Gen-Z mixed Thai/English.
+- Mirror their language mix exactly
+- If they wrote 70% English, respond 70% English
+- Match their energy and slang register`;
+    }
+    return `LANGUAGE RULE: User primary language is Thai. Respond primarily in Thai (${voiceRatio.thai}%) with English (${voiceRatio.english}%).`;
+  })();
+
   return `
-LANGUAGE DIRECTIVE:
-- User's primary language: ${primaryLanguage}
-- Learning direction: ${learningDirection}
-- User's level: ${cefrLevel}
-- Your response should be approximately ${voiceRatio.thai}% Thai, ${voiceRatio.english}% English
-- Match the user's register exactly (formal/casual/Gen-Z)
-- Gen-Z markers detected: mirror their energy if they use 555, ปัง, slay etc
-- When introducing a new word: give it in target language + romanization/IPA + native language explanation`.trim();
+${langRule}
+
+Learning direction: ${learningDirection}
+User level: ${cefrLevel}
+Match the user's register exactly (formal/casual/Gen-Z)
+When introducing a new word: target language first + romanization + native explanation`.trim();
 }
 
 // ─── CLARIFICATION PROMPTS ────────────────────────────────────────────────────
