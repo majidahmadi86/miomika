@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRef as useRefCallback } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { AppShell } from "@/components/layout/AppShell";
@@ -348,6 +349,92 @@ useEffect(() => {
     return () => { if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current); };
   }, []);
 
+  const triggerFuelParticle = useCallback((buttonEl: HTMLElement, color: string) => {
+    const buttonRect = buttonEl.getBoundingClientRect();
+    const startX = buttonRect.left + buttonRect.width / 2;
+    const startY = buttonRect.top + buttonRect.height / 2;
+
+    // Find Miomi center — roughly center-top of viewport
+    const targetX = window.innerWidth / 2;
+    const targetY = window.innerHeight * 0.38;
+
+    // Create particle element
+    const particle = document.createElement("div");
+    particle.style.cssText = `
+      position: fixed;
+      left: ${startX}px;
+      top: ${startY}px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: ${color};
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%) scale(1);
+      transition: none;
+      box-shadow: 0 0 8px ${color};
+    `;
+    document.body.appendChild(particle);
+
+    // Animate along bezier curve toward Miomi
+    const duration = 420;
+    const start = performance.now();
+    const dx = targetX - startX;
+    const dy = targetY - startY;
+    // Control point for arc (goes up and toward center)
+    const cpX = startX + dx * 0.3;
+    const cpY = startY + dy * 0.1 - 80;
+
+    function animate(now: number) {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+      // Quadratic bezier
+      const x = (1 - ease) * (1 - ease) * startX + 2 * (1 - ease) * ease * cpX + ease * ease * targetX;
+      const y = (1 - ease) * (1 - ease) * startY + 2 * (1 - ease) * ease * cpY + ease * ease * targetY;
+      const scale = 1 - ease * 0.4;
+
+      particle.style.left = `${x}px`;
+      particle.style.top = `${y}px`;
+      particle.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      particle.style.opacity = `${1 - ease * 0.3}`;
+
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // Burst at Miomi — create 5 small burst particles
+        particle.remove();
+        for (let i = 0; i < 5; i++) {
+          const burst = document.createElement("div");
+          const angle = (i / 5) * Math.PI * 2;
+          const distance = 20 + Math.random() * 20;
+          burst.style.cssText = `
+            position: fixed;
+            left: ${targetX}px;
+            top: ${targetY}px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: ${color};
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: all 0.4s ease-out;
+            opacity: 1;
+          `;
+          document.body.appendChild(burst);
+          requestAnimationFrame(() => {
+            burst.style.transform = `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0)`;
+            burst.style.opacity = "0";
+          });
+          setTimeout(() => burst.remove(), 400);
+        }
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }, []);
+
   const bubbleTh = bubble.th;
   const bubbleEn = bubble.en;
   const miomiExpression = sleeping ? "idle" : expressionFlip;
@@ -544,6 +631,10 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={handleFeedPress}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  triggerFuelParticle(e.currentTarget, "#D4537E");
+                }}
                 className={tapFeedback}
                 style={{ width: "48px", height: "48px", borderRadius: "50%", border: "1.5px solid #EAD0DB", background: "#FBEAF0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
               >
@@ -558,6 +649,10 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={handlePlayPress}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  triggerFuelParticle(e.currentTarget, "#C9A96E");
+                }}
                 className={tapFeedback}
                 style={{ width: "48px", height: "48px", borderRadius: "50%", border: "1.5px solid #EAD0DB", background: "#FBEAF0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
               >
