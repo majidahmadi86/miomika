@@ -14,7 +14,7 @@ import {
   type MutableRefObject,
 } from "react";
 import { cn } from "@/lib/utils";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import { WordCard } from "@/components/WordCard";
 import type { SessionVocabWord } from "@/lib/ai/vocabulary";
 import {
@@ -236,7 +236,7 @@ export default function CreatePage() {
     GUEST_EXCHANGE_LIMIT,
   );
   const [sessionState, setSessionState] = useState<SessionState>(() =>
-    createSessionState(true)
+    createSessionState(isGuest ?? true)
   );
   const threadRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecLike | null>(null);
@@ -354,10 +354,7 @@ export default function CreatePage() {
       }
   
       // Get instruction for this exact exchange
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      );
+      const supabase = createClient();
       const instruction = await getExchangeInstruction(
         sessionState,
         trimmed,
