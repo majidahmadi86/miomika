@@ -1,226 +1,356 @@
-// app/api/miomi/route.ts
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { getAIResponse } from "@/lib/ai/router";
 import { matchLibrary, logInteraction, type MatchContext } from "@/lib/ai/matcher";
+import { createClient } from "@/lib/supabase/client";
 import {
   createSessionState,
+  updateSessionWithLanguage,
+  updateSessionWithIntent,
+  updateSessionState,
   getExchangeInstruction,
+  getFailoverResponse,
+  type SessionState,
 } from "@/lib/ai/session";
+import {
+  classifyIntentAdvanced,
+  getIntentFamily,
+} from "@/lib/ai/intents";
+import {
+  detectPrimaryLanguage,
+  detectLearningDirection,
+  getVoiceRatio,
+} from "@/lib/ai/language";
+import {
+  detectArchetype,
+  buildPersonaPromptSection,
+  buildEmotionalModifier,
+} from "@/lib/ai/persona";
+import {
+  buildAdaptiveSystemPrompt,
+  buildClarificationPrompt,
+  detectSessionMode,
+  type PromptContext,
+} from "@/lib/ai/prompt";
+import { getWordForSession } from "@/lib/ai/vocabulary";
 
-const MIOMI_BASE_PROMPT = `You are Miomi (มิโอมิ), a cat who teaches English to Thai people through warm conversation.
+// ─── TYPES ────────────────────────────────────────────────────────────────────
 
-WHO YOU ARE:
-- A cat named Miomi. Not an AI. Not an assistant. A cat.
-- You call yourself หนู always
-- End every sentence with ค่า or นะคะ
-- Use ~ to show warmth: "ดีใจมากเลยค่า~"
-- You are warm, playful, specific — never generic
+type MiomiResponse = {
+  content: string;
+  wordCard: unknown | null;
+  phraseCard: unknown | null;
+  creatorAsset: unknown | null;
+  sessionContext: Partial<SessionState>;
+  servedVia: string;
+  wasFailover: boolean;
+  intent: string | null;
+  sessionMode: string;
+  needsClarification: boolean;
+};
 
-HOW YOU SPEAK — STUDY THESE EXAMPLES:
-
-BAD: "Sure! I am always happy to help you learn English!"
-GOOD: "หนูดีใจมากเลยค่า~ วันนี้ขอถามนิดนึงนะคะ — ที่ทำงานคุณต้องพูดอังกฤษบ้างไหมคะ~"
-
-BAD: "That is great! Let us practice the word opportunity today!"
-GOOD: "โอ้โห คุณพูดประโยคนั้นได้ดีมากเลยนะคะ~ หนูประหลาดใจเลยค่า~"
-
-TEACHING RULES:
-- One idea per response. Never two.
-- Echo correct form naturally — never say wrong
-- Praise must name the specific thing — never generic
-- Always end with ONE question or ONE gentle invitation
-
-FORMAT — NON-NEGOTIABLE:
-- Thai first, English below
-- Maximum 2 sentences Thai + 2 sentences English
-- No markdown, no asterisks, no bullet points
-- Short is always better. Always.`;
+// ─── MAIN ROUTE ───────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
     const {
       messages,
       isGuest,
-      sessionInstruction,
-      sessionContext,
       sessionId,
       userId,
+      sessionContext: clientSessionContext,
     } = await req.json();
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "Invalid messages" }, { status: 400 });
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
     const lastMessage = messages[messages.length - 1];
-    const userInput = lastMessage?.content ?? "";
+    const userInput: string = lastMessage?.content ?? "";
 
-    const session = createSessionState(!!isGuest, userId ?? null);
-    if (sessionId) {
-      session.sessionId = sessionId;
-    }
-    if (sessionContext) {
-      session.exchangeNumber = Math.max(
-        0,
-        (sessionContext.exchangeNumber ?? 1) - 1,
-      );
-      session.estimatedLevel =
-        sessionContext.estimatedLevel ?? session.estimatedLevel;
-      session.sessionArc = sessionContext.sessionArc ?? session.sessionArc;
-      session.currentTargetWord =
-        sessionContext.currentTargetWord ?? session.currentTargetWord;
-      session.emotionalMomentum =
-        sessionContext.emotionalMomentum ?? session.emotionalMomentum;
-      session.wordsIntroduced = sessionContext.wordsIntroduced ?? session.wordsIntroduced;
+    if (!userInput.trim()) {
+      return NextResponse.json({ error: "Empty message" }, { status: 400 });
     }
 
-    const instruction = await getExchangeInstruction(
-      session,
+    // ── STAGE 1: Reconstruct session state ───────────────────────────────────
+    let state: SessionState = createSessionState(!!isGuest, userId ?? null);
+    if (sessionId) state.sessionId = sessionId;
+    if (clientSessionContext) {
+      state = {
+        ...state,
+        ...clientSessionContext,
+        // Always trust client for these accumulated arrays
+        wordsIntroduced: clientSessionContext.wordsIntroduced ?? state.wordsIntroduced,
+        wordsUsedCorrectly: clientSessionContext.wordsUsedCorrectly ?? state.wordsUsedCorrectly,
+        phrasesIntroduced: clientSessionContext.phrasesIntroduced ?? state.phrasesIntroduced,
+        languageSignalsHistory: clientSessionContext.languageSignalsHistory ?? [],
+        intentFamilyDistribution: clientSessionContext.intentFamilyDistribution ?? {},
+        creatorOutputs: clientSessionContext.creatorOutputs ?? [],
+      };
+    }
+
+    // ── STAGE 2: Language detection ──────────────────────────────────────────
+    state = updateSessionWithLanguage(state, userInput);
+
+    // ── STAGE 3: Intent classification ───────────────────────────────────────
+    const intentResult = classifyIntentAdvanced(
       userInput,
-      supabase,
+      state.currentTargetWord?.word ?? null,
+      state.exchangeNumber
     );
 
-    // ─── STEP 1: TRY LIBRARY FIRST ──────────────────────────────────────────
-    // Zero cost. Fast. Gets smarter over time.
+    // ── STAGE 4: Update session mode ─────────────────────────────────────────
+    state = updateSessionWithIntent(state, userInput);
 
-    const context: MatchContext = {
-      estimatedLevel: sessionContext?.estimatedLevel ?? "elementary",
-      sessionArc: sessionContext?.sessionArc ?? "opening",
-      exchangeNumber: sessionContext?.exchangeNumber ?? 1,
-      currentTargetWord: sessionContext?.currentTargetWord ?? null,
-      emotionalMomentum: sessionContext?.emotionalMomentum ?? "neutral",
+    // ── STAGE 5: Handle clarification needed ─────────────────────────────────
+    if (intentResult.needsClarification) {
+      const clarification = buildClarificationPrompt(state.primaryLanguage);
+      return NextResponse.json({
+        content: clarification,
+        wordCard: null,
+        phraseCard: null,
+        creatorAsset: null,
+        sessionContext: buildSessionContext(state),
+        servedVia: "clarification",
+        wasFailover: false,
+        intent: "meta_clarification_needed",
+        sessionMode: state.sessionMode,
+        needsClarification: true,
+      } satisfies MiomiResponse);
+    }
+
+    // ── STAGE 6: Build prompt context ────────────────────────────────────────
+    const cefrMap: Record<string, string> = {
+      beginner: "A1", elementary: "A2", intermediate: "B1", upper: "B2",
+    };
+    const cefrLevel = cefrMap[state.estimatedLevel] ?? "A2";
+
+    // ── STAGE 7: Check library with new intent taxonomy ──────────────────────
+    const matchContext: MatchContext = {
+      estimatedLevel: state.estimatedLevel,
+      sessionArc: state.sessionArc,
+      exchangeNumber: state.exchangeNumber,
+      currentTargetWord: state.currentTargetWord?.word ?? null,
+      emotionalMomentum: state.emotionalMomentum,
     };
 
-    const matchResult = await matchLibrary(userInput, context);
+    const supabase = createClient();
+    const matchResult = await matchLibrary(userInput, matchContext);
 
-    // ─── STEP 2: SERVE FROM LIBRARY ─────────────────────────────────────────
+    // ── STAGE 8: Get word to introduce ───────────────────────────────────────
+    const shouldIntroduceWord =
+      (state.exchangeNumber === 2 || state.exchangeNumber === 5) &&
+      state.sessionMode === "learning" &&
+      intentResult.family !== "creating";
+
+    let wordToIntroduce = null;
+    if (shouldIntroduceWord) {
+      wordToIntroduce = await getWordForSession(
+        state.estimatedLevel,
+        state.wordsIntroduced,
+        supabase
+      );
+    }
+
+    // ── STAGE 9: Build adaptive prompt ───────────────────────────────────────
+    const promptContext: PromptContext = {
+      primaryLanguage: state.primaryLanguage,
+      learningDirection: state.learningDirection,
+      cefrLevel,
+      voiceRatio: state.voiceRatioTarget,
+      archetype: state.detectedArchetype,
+      archetypeConfidence: state.archetypeConfidence,
+      intent: intentResult.primary.intent,
+      intentFamily: intentResult.family,
+      exchangeNumber: state.exchangeNumber,
+      sessionArc: state.sessionArc,
+      wordsIntroduced: state.wordsIntroduced,
+      currentTargetWord: state.currentTargetWord?.word ?? null,
+      emotionalMomentum: state.emotionalMomentum,
+      isGuest: !!isGuest,
+      wordToIntroduce: wordToIntroduce?.word ?? null,
+      wordToIntroduceThai: wordToIntroduce?.thai ?? null,
+      shouldCelebrate: false,
+      celebrationText: null,
+    };
+
+    const adaptivePrompt = buildAdaptiveSystemPrompt(promptContext);
+
+    // ── STAGE 10: Serve from library or AI ───────────────────────────────────
+    let content: string;
+    let servedVia: string;
+    let wasFailover = false;
+
     if (matchResult.type === "library") {
       const { match } = matchResult;
-
-      // Build full response
       const thPart = match.follow_up_question_th
         ? `${match.response_th}\n${match.follow_up_question_th}`
         : match.response_th;
-
       const enPart = match.follow_up_question_en
         ? `${match.response_en}\n${match.follow_up_question_en}`
         : match.response_en;
+      content = `${thPart}\n\n${enPart}`;
+      servedVia = `library_${match.matched_via}`;
 
-      const content = `${thPart}\n\n${enPart}`;
-
-      // Log the interaction (non-blocking)
+      void updateTimesServed(match.id);
       void logInteraction({
-        sessionId: sessionId ?? "guest",
-        exchangeNumber: context.exchangeNumber,
+        sessionId: state.sessionId,
+        exchangeNumber: state.exchangeNumber,
         userId: userId ?? null,
         userInput,
         servedResponse: content,
-        servedVia: `library_${match.matched_via}`,
+        servedVia,
         libraryEntryId: match.id,
         matchConfidence: match.match_confidence,
         aiCostUsd: 0,
       });
-
-      // Update times_served (non-blocking)
-      void updateTimesServed(match.id);
-
-      console.log(
-        `Library hit: ${match.matched_via} | confidence: ${match.match_confidence.toFixed(2)} | intent: matched`
+    } else {
+      // AI call with adaptive prompt
+      const formattedMessages = messages.map(
+        (m: { role: string; content: string }) => ({
+          role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+          content: m.content,
+        })
       );
 
-      return NextResponse.json({
-        content,
-        servedVia: "library",
-        wasFailover: false,
-        libraryEntryId: match.id,
-        uiAction: match.ui_action,
-        uiPayload: match.ui_payload,
-        embeddedWord: match.embedded_word,
-        embeddedWordThai: match.embedded_word_thai,
-        wordCard: instruction.wordToIntroduce ?? null,
+      const result = await getAIResponse(formattedMessages, adaptivePrompt);
+      content = result.content;
+      servedVia = `ai_${result.engine}`;
+      wasFailover = result.wasFailover;
+
+      void logInteraction({
+        sessionId: state.sessionId,
+        exchangeNumber: state.exchangeNumber,
+        userId: userId ?? null,
+        userInput,
+        servedResponse: content,
+        servedVia,
+        libraryEntryId: null,
+        matchConfidence: null,
+        aiCostUsd: result.engine === "groq" ? 0 : 0.0008,
       });
     }
 
-    // ─── STEP 3: CALL AI ────────────────────────────────────────────────────
-    // Library missed — need real intelligence
+    // ── STAGE 11: Extract teaching artifacts ─────────────────────────────────
+    const wordCard = wordToIntroduce ?? null;
 
-    const systemPrompt = sessionInstruction
-      ? `${MIOMI_BASE_PROMPT}\n\n--- THIS EXCHANGE ---\n${sessionInstruction}`
-      : MIOMI_BASE_PROMPT;
+    // Creator asset — if intent is creator family, save the output
+    const creatorAsset = intentResult.family === "creating"
+      ? {
+          text: content,
+          platform: detectPlatform(userInput),
+          vocabularyUsed: wordToIntroduce ? [wordToIntroduce.word] : [],
+          createdAt: new Date().toISOString(),
+        }
+      : null;
 
-    const formattedMessages = messages.map(
-      (m: { role: string; content: string }) => ({
-        role: (m.role === "assistant" ? "assistant" : "user") as
-          | "user"
-          | "assistant",
-        content: m.content,
-      })
-    );
+    // ── STAGE 12: Update state and return ────────────────────────────────────
+    if (wordToIntroduce) {
+      state = {
+        ...state,
+        wordsIntroduced: [...state.wordsIntroduced, wordToIntroduce.word],
+        currentTargetWord: wordToIntroduce,
+      };
+    }
 
-    const { content, engine, wasFailover } = await getAIResponse(
-      formattedMessages,
-      systemPrompt
-    );
+    if (creatorAsset) {
+      state = {
+        ...state,
+        creatorOutputs: [...state.creatorOutputs, creatorAsset],
+        lastCreatorOutput: content,
+      };
+    }
 
-    // Log AI interaction (non-blocking)
-    void logInteraction({
-      sessionId: sessionId ?? "guest",
-      exchangeNumber: context.exchangeNumber,
-      userId: userId ?? null,
-      userInput,
-      servedResponse: content,
-      servedVia: `ai_${engine}`,
-      libraryEntryId: null,
-      matchConfidence: null,
-      aiCostUsd: engine === "groq" ? 0 : 0.0008,
-    });
-
-    console.log(
-      `AI response: ${engine} | failover: ${wasFailover} | reason: ${matchResult.reason}`
-    );
+    state = {
+      ...state,
+      exchangeNumber: state.exchangeNumber + 1,
+      lastUserSignal: userInput.slice(0, 100),
+    };
 
     return NextResponse.json({
       content,
-      servedVia: `ai_${engine}`,
+      wordCard,
+      phraseCard: null,
+      creatorAsset,
+      sessionContext: buildSessionContext(state),
+      servedVia,
       wasFailover,
-      wordCard: instruction.wordToIntroduce ?? null,
-    });
+      intent: intentResult.primary.intent,
+      sessionMode: state.sessionMode,
+      needsClarification: false,
+    } satisfies MiomiResponse);
 
   } catch (error: unknown) {
     const err = error as { message?: string };
     console.error("Route error:", err?.message);
-
+    const failover = getFailoverResponse();
     return NextResponse.json(
       {
-        content:
-          "ขอโทษนะคะ~ หนูสะดุดนิดนึงค่า~ ลองใหม่ได้เลยนะคะ~\n\nSo sorry~ Try again~",
+        content: `${failover.th}\n\n${failover.en}`,
+        wordCard: null,
+        phraseCard: null,
+        creatorAsset: null,
+        sessionContext: {},
+        servedVia: "failover",
         wasFailover: true,
-      },
+        intent: null,
+        sessionMode: "learning",
+        needsClarification: false,
+      } satisfies MiomiResponse,
       { status: 200 }
     );
   }
 }
 
-// ─── HELPER ───────────────────────────────────────────────────────────────────
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+function buildSessionContext(state: SessionState): Partial<SessionState> {
+  return {
+    exchangeNumber: state.exchangeNumber,
+    estimatedLevel: state.estimatedLevel,
+    levelConfidence: state.levelConfidence,
+    sessionArc: state.sessionArc,
+    currentTargetWord: state.currentTargetWord,
+    emotionalMomentum: state.emotionalMomentum,
+    wordsIntroduced: state.wordsIntroduced,
+    wordsUsedCorrectly: state.wordsUsedCorrectly,
+    sessionId: state.sessionId,
+    primaryLanguage: state.primaryLanguage,
+    learningDirection: state.learningDirection,
+    voiceRatioTarget: state.voiceRatioTarget,
+    detectedArchetype: state.detectedArchetype,
+    archetypeConfidence: state.archetypeConfidence,
+    sessionMode: state.sessionMode,
+    intentFamilyDistribution: state.intentFamilyDistribution,
+    languageSignalsHistory: state.languageSignalsHistory.slice(-5),
+    phrasesIntroduced: state.phrasesIntroduced,
+    creatorOutputs: state.creatorOutputs.slice(-3),
+    lastCreatorOutput: state.lastCreatorOutput,
+    genzMarkerCount: state.genzMarkerCount,
+    formalityScore: state.formalityScore,
+    hasStatedGoal: state.hasStatedGoal,
+    statedGoal: state.statedGoal,
+    lastIntent: state.lastIntent,
+    lastIntentFamily: state.lastIntentFamily,
+  };
+}
+
+function detectPlatform(message: string): string {
+  const lower = message.toLowerCase();
+  if (/(tiktok|ติ๊กต็อก)/.test(lower)) return "TikTok";
+  if (/(instagram|ig|อินสตา)/.test(lower)) return "Instagram";
+  if (/(facebook|fb|เฟสบุ๊ค)/.test(lower)) return "Facebook";
+  if (/(youtube|ยูทูบ)/.test(lower)) return "YouTube";
+  if (/(line|ไลน์)/.test(lower)) return "LINE";
+  return "general";
+}
 
 async function updateTimesServed(entryId: string) {
   try {
-    const { createClient } = await import("@/lib/supabase/server");
-    const supabase = await createClient();
+    const { createClient: createServerClient } = await import("@/lib/supabase/server");
+    const supabase = await createServerClient();
     await supabase
       .from("library_entries")
-      .update({
-        times_served: supabase.rpc("increment_library_signal", {
-          entry_id: entryId,
-          signal_column: "times_served",
-        }),
-        last_served_at: new Date().toISOString(),
-      })
+      .update({ last_served_at: new Date().toISOString() })
       .eq("id", entryId);
   } catch (err) {
     console.error("Update times served error:", err);
