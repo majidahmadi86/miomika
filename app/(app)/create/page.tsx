@@ -62,6 +62,8 @@ type ThreadMessage =
     }
   | { id: string; type: "word_card"; variant: "intro" | "celebration"; word: SessionVocabWord; timestamp: Date };
 
+type CreateMode = "learn" | "translate" | "create" | "roleplay";
+
 const PLATFORMS = [
   "Instagram",
   "TikTok",
@@ -240,6 +242,7 @@ export default function CreatePage() {
       en: INITIAL_MIOMI_EN,
     },
   ]);
+  // messages is now synced to modeThreads["learn"] — mode switching updates this
   const [platform, setPlatform] = useState("Instagram");
   const [tone, setTone] = useState("Cute Thai");
   const [outputLang, setOutputLang] = useState<OutputLang>("thai");
@@ -266,6 +269,26 @@ export default function CreatePage() {
   const lastTopicRef = useRef("");
   const stageRef = useRef<ConversationStage>("awaiting_topic");
   const processingLockRef = useRef(false);
+
+  const [mode, setMode] = useState<CreateMode>("learn");
+  const [modeThreads, setModeThreads] = useState<Record<CreateMode, ThreadMessage[]>>({
+    learn: [{ id: `${Date.now()}-init`, type: "miomi", th: INITIAL_MIOMI_TH, en: INITIAL_MIOMI_EN }],
+    translate: [{ id: `${Date.now()}-trans`, type: "miomi", th: "อยากแปลอะไรคะ~ พิมพ์มาเลยค่า", en: "What would you like to translate? Just type it~" }],
+    create: [{ id: `${Date.now()}-create`, type: "miomi", th: "อยากโพสต์เรื่องอะไรวันนี้คะ~?", en: "What do you want to post about today~?" }],
+    roleplay: [{ id: `${Date.now()}-role`, type: "miomi", th: "อยากซ้อมสถานการณ์ไหนดีคะ~?", en: "Which scenario would you like to practice~?" }],
+  });
+
+  const handleModeSwitch = useCallback((newMode: CreateMode) => {
+    if (newMode === mode) return;
+    // Save current thread
+    setModeThreads(prev => ({ ...prev, [mode]: messages }));
+    // Load new thread
+    setMessages(modeThreads[newMode]);
+    setMode(newMode);
+    setStage("awaiting_topic");
+    setFollowupChipsVisible(false);
+    setInputText("");
+  }, [mode, messages, modeThreads]);
 
   useEffect(() => {
     stageRef.current = stage;
@@ -820,6 +843,83 @@ export default function CreatePage() {
         </div>
       </div>
 
+      <div
+        style={{
+          flexShrink: 0,
+          height: "44px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "0 16px",
+          overflowX: "auto",
+          background: "transparent",
+          msOverflowStyle: "none",
+          scrollbarWidth: "none",
+        }}
+      >
+        {([
+          { key: "learn", th: "เรียน", en: "Learn", icon: "MessageCircle", free: true },
+          { key: "translate", th: "แปลภาษา", en: "Translate", icon: "Languages", free: true },
+          { key: "create", th: "สร้างคอนเทนต์", en: "Create", icon: "Sparkles", free: false },
+          { key: "roleplay", th: "บทบาท", en: "Roleplay", icon: "Drama", free: false },
+        ] as const).map((m) => {
+          const active = mode === m.key;
+          const locked = !m.free && !(authReady && !isGuest);
+          return (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => locked ? null : handleModeSwitch(m.key)}
+              style={{
+                flexShrink: 0,
+                height: "36px",
+                borderRadius: "18px",
+                border: active ? "none" : "1px solid #E8E5DF",
+                background: active
+                  ? "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)"
+                  : "#FFFFFF",
+                padding: "0 12px",
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                cursor: locked ? "default" : "pointer",
+                boxShadow: active ? "0 4px 12px rgba(219,39,119,0.20)" : "none",
+                opacity: locked ? 0.7 : 1,
+                transition: "all 0.24s ease",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'Kanit', sans-serif",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: active ? "#FFFFFF" : "#1A1A18",
+                  lineHeight: 1,
+                }}
+              >
+                {m.th}
+              </span>
+              {locked && (
+                <span
+                  style={{
+                    fontFamily: "'Quicksand', sans-serif",
+                    fontSize: "9px",
+                    fontWeight: 600,
+                    color: "#C9A96E",
+                    background: "rgba(201,169,110,0.12)",
+                    borderRadius: "4px",
+                    padding: "1px 4px",
+                    marginLeft: "2px",
+                  }}
+                >
+                  Pro
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {/* ── ZONE B — Learning space (scrollable) ── */}
       <div
         ref={threadRef}
@@ -1187,6 +1287,28 @@ export default function CreatePage() {
           borderTop: "1px solid #F0ECE8",
         }}
       >
+        {mode === "translate" && (
+          <button
+            type="button"
+            onClick={() => {}}
+            style={{
+              flexShrink: 0,
+              height: "36px",
+              borderRadius: "999px",
+              border: "1px solid #EDE8E0",
+              background: "#FAFAF6",
+              padding: "0 10px",
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "10px",
+              fontWeight: 700,
+              color: "#9A8B73",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            ไทย → EN
+          </button>
+        )}
         <input
           type="text"
           value={inputText}
