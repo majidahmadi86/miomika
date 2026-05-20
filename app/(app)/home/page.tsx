@@ -214,11 +214,8 @@ export default function HomePage() {
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     const seen = localStorage.getItem("miomika-welcomed-v1");
-    if (!seen) {
-      localStorage.setItem("miomika-welcomed-v1", "1");
-      return true;
-    }
-    return false;
+    if (seen) return false;
+    return true;
   });
   const tapCycleIndexRef = useRef(0);
 
