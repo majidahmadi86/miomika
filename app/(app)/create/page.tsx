@@ -288,6 +288,10 @@ export default function CreatePage() {
     roleplay: [{ id: `${Date.now()}-role`, type: "miomi", th: "อยากซ้อมสถานการณ์ไหนดีคะ~?", en: "Which scenario would you like to practice~?" }],
   });
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [sessionStartTime] = useState(() => Date.now());
+  const [lastUserActivity, setLastUserActivity] = useState(Date.now());
+  const [showSummarySheet, setShowSummarySheet] = useState(false);
+  const [showPullHandle, setShowPullHandle] = useState(false);
 
   const handleModeSwitch = useCallback((newMode: CreateMode) => {
     if (newMode === mode) return;
@@ -324,6 +328,17 @@ export default function CreatePage() {
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    const userMessages = messages.filter(m => m.type === "user").length;
+    if (userMessages < 8) { setShowPullHandle(false); return; }
+    const id = window.setInterval(() => {
+      if (Date.now() - lastUserActivity > 30000) {
+        setShowPullHandle(true);
+      }
+    }, 5000);
+    return () => clearInterval(id);
+  }, [messages, lastUserActivity]);
 
   const showCopyToast = useCallback(() => {
     setToast(true);
@@ -537,6 +552,7 @@ export default function CreatePage() {
   }, [isGuest]);
 
   const handleSend = useCallback(() => {
+    setLastUserActivity(Date.now());
     setSuggestions([]);
     const t = inputText.trim();
     if (!t || isRecording) return;
@@ -735,6 +751,19 @@ export default function CreatePage() {
       )
     );
   }, []);
+
+  const sessionData = {
+    wordsLearned: sessionState.wordsIntroduced,
+    wordsMastered: sessionState.wordsUsedCorrectly,
+    durationMin: Math.round((Date.now() - sessionStartTime) / 60000),
+    exchangeCount: messages.filter(m => m.type === "user").length,
+    xpEarned: sessionState.wordsUsedCorrectly.length * 10 + messages.filter(m => m.type === "user").length * 5,
+    level: 1,
+    xpToNext: 100,
+    praise: sessionState.wordsUsedCorrectly.length > 0
+      ? `คุณใช้คำว่า '${sessionState.wordsUsedCorrectly[0]}' ได้ถูกต้องมากเลยนะคะ~`
+      : "วันนี้คุยกับมิโอมิได้ดีมากเลยค่า~",
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ background: "#FAFAF6" }}>
@@ -1310,6 +1339,33 @@ export default function CreatePage() {
           </p>
         )}
 
+        {showPullHandle && !showSummarySheet && (
+          <motion.button
+            type="button"
+            onClick={() => setShowSummarySheet(true)}
+            animate={{ y: [0, -2, 0] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              height: "36px",
+              background: "rgba(201,169,110,0.10)",
+              border: "1px solid rgba(201,169,110,0.25)",
+              borderRadius: "999px",
+              margin: "8px 0",
+              cursor: "pointer",
+              fontFamily: "'Kanit', sans-serif",
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "#C9A96E",
+            }}
+          >
+            ดูสรุปวันนี้กับมิโอมิ~ ↑
+          </motion.button>
+        )}
+
         {/* Followup chips */}
         {followupChipsVisible && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", paddingBottom: "8px" }}>
@@ -1591,6 +1647,139 @@ export default function CreatePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {showSummarySheet && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(26,26,24,0.3)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "flex-end",
+          }}
+          onClick={() => setShowSummarySheet(false)}
+        >
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxHeight: "80vh",
+              background: "#FFFFFF",
+              borderRadius: "24px 24px 0 0",
+              boxShadow: "0 -8px 32px rgba(26,26,24,0.12)",
+              overflowY: "auto",
+              paddingBottom: "32px",
+            }}
+          >
+            {/* Drag handle */}
+            <div style={{ display: "flex", justifyContent: "center", paddingTop: "12px" }}>
+              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E8E5DF" }} />
+            </div>
+
+            {/* Miomi */}
+            <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }}>
+              <Image src="/miomi/happy.png" alt="Miomi" width={120} height={120} style={{ objectFit: "contain" }} />
+            </div>
+
+            {/* Praise */}
+            <div style={{ textAlign: "center", padding: "12px 24px 0" }}>
+              <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "16px", fontWeight: 500, color: "#1A1A18", margin: 0 }}>
+                {sessionData.praise}
+              </p>
+              <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "12px", color: "#9A8B73", marginTop: "4px" }}>
+                Great work today~
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: "1px", background: "#E8E5DF", margin: "16px 24px" }} />
+
+            {/* Words learned */}
+            <div style={{ padding: "0 24px" }}>
+              <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 600, color: "#9A8B73", letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 8px" }}>
+                ✦ เรียนรู้ใหม่ · {sessionData.wordsLearned.length} คำ
+              </p>
+              {sessionData.wordsLearned.length === 0 ? (
+                <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", color: "#C4BDB5" }}>ยังไม่มีคำศัพท์ใหม่วันนี้ค่า~</p>
+              ) : (
+                sessionData.wordsLearned.map((w, i) => (
+                  <p key={i} style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", color: "#1A1A18", margin: "4px 0" }}>{w}</p>
+                ))
+              )}
+
+              <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 600, color: "#9A8B73", letterSpacing: "0.08em", textTransform: "uppercase", margin: "16px 0 8px" }}>
+                ✓ ใช้ถูกแล้ว · {sessionData.wordsMastered.length} คำ
+              </p>
+              {sessionData.wordsMastered.length === 0 ? (
+                <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", color: "#C4BDB5" }}>ลองใช้คำศัพท์ในการสนทนาด้วยนะคะ~</p>
+              ) : (
+                sessionData.wordsMastered.map((w, i) => (
+                  <p key={i} style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", color: "#1A1A18", margin: "4px 0" }}>{w}</p>
+                ))
+              )}
+            </div>
+
+            {/* Stats */}
+            <div style={{ display: "flex", justifyContent: "center", gap: "20px", padding: "16px 24px", borderTop: "1px solid #E8E5DF", borderBottom: "1px solid #E8E5DF", margin: "16px 0" }}>
+              <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", color: "#9A8B73" }}>
+                ⏱ {sessionData.durationMin} นาที
+              </span>
+              <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", color: "#9A8B73" }}>
+                💬 {sessionData.exchangeCount} แลกเปลี่ยน
+              </span>
+              <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", color: "#C9A96E", fontWeight: 600 }}>
+                +{sessionData.xpEarned} XP
+              </span>
+            </div>
+
+            {/* CTAs */}
+            <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <button
+                type="button"
+                onClick={() => setShowSummarySheet(false)}
+                style={{
+                  height: "48px",
+                  borderRadius: "999px",
+                  background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "'Kanit', sans-serif",
+                  fontSize: "15px",
+                  fontWeight: 500,
+                  color: "#FFFFFF",
+                  boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)",
+                }}
+              >
+                บันทึก & แชร์
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSummarySheet(false)}
+                style={{
+                  height: "36px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "'Kanit', sans-serif",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  color: "#9A8B73",
+                }}
+              >
+                คุยต่อกับมิโอมิ
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }
