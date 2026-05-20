@@ -392,13 +392,15 @@ export function AmbientBackground({ mode = "ambient", className }: AmbientBackgr
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const parent = canvas.parentElement;
-    if (!parent) return;
-
     let W = window.innerWidth;
     let H = window.innerHeight;
     canvas.width = W;
     canvas.height = H;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+
+    const parent = canvas.parentElement;
+    if (!parent) return;
 
     // Resize handler
     const ro = new ResizeObserver(() => {

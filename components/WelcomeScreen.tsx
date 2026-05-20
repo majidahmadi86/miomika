@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { AmbientBackground } from "@/components/AmbientBackground";
+import dynamic from "next/dynamic";
+const AmbientBackground = dynamic(
+  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
+  { ssr: false }
+);
 
 type WelcomeScreenProps = {
   onComplete: () => void;
