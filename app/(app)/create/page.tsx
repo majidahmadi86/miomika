@@ -207,27 +207,6 @@ function TypingDots() {
   );
 }
 
-function renderMiomiTh(text: string) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((segment, i) => {
-    const bold = segment.match(/^\*\*(.+)\*\*$/);
-    if (bold) {
-      return (
-        <span
-          key={i}
-          style={{
-            background: "rgba(249,168,212,0.15)",
-            borderRadius: "4px",
-            padding: "1px 4px",
-          }}
-        >
-          {bold[1]}
-        </span>
-      );
-    }
-    return <span key={i}>{segment}</span>;
-  });
-}
-
 export default function CreatePage() {
   const reduceMotion = useReducedMotion();
   const { isGuest, authReady } = useGuestExploration();
@@ -466,6 +445,17 @@ export default function CreatePage() {
             word: wordCard,
             timestamp: new Date(),
           }]);
+          if (instruction.shouldCelebrate && instruction.celebrationText && data.wordCard) {
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                id: crypto.randomUUID(),
+                type: "word_card" as const,
+                variant: "celebration" as const,
+                word: data.wordCard!,
+                timestamp: new Date(),
+              }]);
+            }, 800);
+          }
         }
 
         // If conversion window opened, show it after a short delay
@@ -685,6 +675,28 @@ export default function CreatePage() {
     stage === "streaming_comments" ||
     stage === "finished" ||
     stage === "followup";
+
+  const renderMiomiTh = useCallback((text: string) => {
+    const parts = text.split(/\*\*(.+?)\*\*/g);
+    return parts.map((part, i) =>
+      i % 2 === 1 ? (
+        <span
+          key={i}
+          style={{
+            background: "rgba(249,168,212,0.18)",
+            borderRadius: "4px",
+            padding: "1px 5px",
+            fontWeight: 600,
+            color: "#DB2777",
+          }}
+        >
+          {part}
+        </span>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    );
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ background: "#FAFAF6" }}>
@@ -1049,6 +1061,44 @@ export default function CreatePage() {
                         {m.en}
                       </p>
                     )}
+                    {mode === "translate" && m.en && (
+                      <div
+                        style={{
+                          marginTop: "10px",
+                          padding: "8px 12px",
+                          background: "rgba(125,211,192,0.10)",
+                          borderRadius: "8px",
+                          borderLeft: "2px solid #7DD3C0",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: "'Quicksand', sans-serif",
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            color: "#7DD3C0",
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                            display: "block",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          Translation
+                        </span>
+                        <p
+                          style={{
+                            fontFamily: "'Quicksand', sans-serif",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            color: "#1A1A18",
+                            margin: 0,
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          {m.en}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <div
                     style={{
@@ -1112,15 +1162,20 @@ export default function CreatePage() {
 
               {/* Word card — document flow */}
               {m.type === "word_card" && (
-                <div
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
                   style={{
                     margin: "12px 0",
-                    borderLeft: "3px solid #C9A96E",
+                    borderLeft: m.variant === "celebration"
+                      ? "3px solid #DB2777"
+                      : "3px solid #C9A96E",
                     paddingLeft: "12px",
                   }}
                 >
                   <WordCard word={m.word} variant={m.variant} />
-                </div>
+                </motion.div>
               )}
 
               {/* Content card */}
