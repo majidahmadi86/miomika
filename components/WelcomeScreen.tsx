@@ -147,7 +147,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
         <span
           style={{
             fontFamily: "'Quicksand', sans-serif",
-            fontSize: "15px",
+            fontSize: "18px",
             fontWeight: 700,
             color: "#F9A8D4",
             letterSpacing: "0.18em",
@@ -158,7 +158,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
         <span
           style={{
             fontFamily: "'Quicksand', sans-serif",
-            fontSize: "11px",
+            fontSize: "13px",
             fontWeight: 600,
             color: "#D4C4B8",
             letterSpacing: "0.24em",
