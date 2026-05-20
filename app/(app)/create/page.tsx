@@ -671,9 +671,9 @@ export default function CreatePage() {
         style={{
           position: "relative",
           flexShrink: 0,
-          height: "42%",
-          minHeight: "180px",
-          maxHeight: "280px",
+          height: "144px",
+          minHeight: "144px",
+          maxHeight: "144px",
           background: "#FAFAF6",
           display: "flex",
           flexDirection: "column",
@@ -706,35 +706,59 @@ export default function CreatePage() {
           <ChevronLeft style={{ width: "18px", height: "18px", color: "#9A8B73" }} strokeWidth={2} />
         </Link>
 
-        {/* Guest exchange counter */}
-        {authReady && isGuest && (
-          <div
-            style={{
-              position: "absolute",
-              top: "12px",
-              right: "12px",
-              zIndex: 10,
-              background: "rgba(255,255,255,0.88)",
-              backdropFilter: "blur(8px)",
-              border: "1px solid #EAD0DB",
-              borderRadius: "999px",
-              padding: "3px 10px",
-              fontFamily: "'Kanit', sans-serif",
-              fontSize: "11px",
-              fontWeight: 500,
-              color: "#9A8B73",
-            }}
-          >
-            เหลืออีก {guestExchangesRemaining} ครั้ง
-          </div>
-        )}
+        <div
+          style={{
+            position: "absolute",
+            top: "12px",
+            right: "12px",
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          {authReady && isGuest ? (
+            <span
+              style={{
+                background: "rgba(255,255,255,0.88)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid #EDE8E0",
+                borderRadius: "999px",
+                padding: "3px 10px",
+                fontFamily: "'Kanit', sans-serif",
+                fontSize: "11px",
+                fontWeight: 500,
+                color: "#9A8B73",
+              }}
+            >
+              เหลืออีก {guestExchangesRemaining} ครั้ง
+            </span>
+          ) : (
+            <span
+              style={{
+                background: "rgba(255,255,255,0.88)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid #EDE8E0",
+                borderRadius: "999px",
+                padding: "3px 10px",
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "#C9A96E",
+                letterSpacing: "0.02em",
+              }}
+            >
+              ✦ {sessionState.wordsIntroduced.length} คำ
+            </span>
+          )}
+        </div>
 
         {/* Soft glow behind Miomi */}
         <div
           style={{
             position: "absolute",
-            width: "180px",
-            height: "180px",
+            width: "120px",
+            height: "120px",
             borderRadius: "50%",
             background: "radial-gradient(circle, rgba(249,168,212,0.20) 0%, transparent 65%)",
             pointerEvents: "none",
@@ -750,9 +774,9 @@ export default function CreatePage() {
           <Image
             src={headImage}
             alt="Miomi"
-            width={140}
-            height={140}
-            style={{ width: "140px", height: "140px", objectFit: "contain" }}
+            width={96}
+            height={96}
+            style={{ width: "96px", height: "96px", objectFit: "contain" }}
             priority
           />
         </motion.div>
@@ -763,14 +787,14 @@ export default function CreatePage() {
             position: "relative",
             zIndex: 2,
             textAlign: "center",
-            padding: "0 24px",
-            marginTop: "6px",
+            padding: "0 32px",
+            marginTop: "4px",
           }}
         >
           <p
             style={{
               fontFamily: "'Kanit', sans-serif",
-              fontSize: "14px",
+              fontSize: "13px",
               fontWeight: 500,
               color: "#1A1A18",
               lineHeight: 1.5,
@@ -783,7 +807,7 @@ export default function CreatePage() {
             <p
               style={{
                 fontFamily: "'Quicksand', sans-serif",
-                fontSize: "11px",
+                fontSize: "10px",
                 fontWeight: 500,
                 color: "#C4BDB5",
                 marginTop: "2px",
