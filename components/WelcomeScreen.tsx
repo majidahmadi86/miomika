@@ -1,58 +1,25 @@
-// components/WelcomeScreen.tsx
-// Shows ONCE on first visit. localStorage flag: "miomika-welcomed-v1"
-// Duration: 3 seconds then auto-transitions.
-// Pure white. Miomi. One sentence. That is all.
-//
-// Usage in app/(app)/home/page.tsx:
-//   import { WelcomeScreen } from "@/components/WelcomeScreen";
-//   const [showWelcome, setShowWelcome] = useState(false);
-//
-//   useEffect(() => {
-//     if (!localStorage.getItem("miomika-welcomed-v1")) {
-//       setShowWelcome(true);
-//     }
-//   }, []);
-//
-//   if (showWelcome) {
-//     return <WelcomeScreen onComplete={() => setShowWelcome(false)} />;
-//   }
-
 "use client";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { AmbientBackground } from "@/components/AmbientBackground";
 
 type WelcomeScreenProps = {
   onComplete: () => void;
 };
 
 export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
-  // Phase controls the animation sequence
-  // 0 = invisible (mount frame)
-  // 1 = Miomi appears
-  // 2 = text fades in
-  // 3 = everything fades out
   const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
 
   useEffect(() => {
-    // Frame 0 → 1: Miomi appears (80ms after mount)
     const t1 = setTimeout(() => setPhase(1), 80);
-    // Frame 1 → 2: Text fades in (900ms after mount)
-    const t2 = setTimeout(() => setPhase(2), 900);
-    // Frame 2 → 3: Begin fade out (2800ms after mount)
-    const t3 = setTimeout(() => setPhase(3), 2800);
-    // Complete: call onComplete (3300ms after mount — after fade finishes)
+    const t2 = setTimeout(() => setPhase(2), 950);
+    const t3 = setTimeout(() => setPhase(3), 2900);
     const t4 = setTimeout(() => {
       localStorage.setItem("miomika-welcomed-v1", "1");
       onComplete();
-    }, 3300);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
-    };
+    }, 3500);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, [onComplete]);
 
   return (
@@ -60,87 +27,133 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "#FFFFFF",
+        background: "#FAFAF6",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 9999,
         opacity: phase === 3 ? 0 : 1,
-        transition: phase === 3 ? "opacity 0.5s ease" : "none",
-        pointerEvents: "none",
+        transition: phase === 3 ? "opacity 0.6s ease" : "none",
+        pointerEvents: phase === 3 ? "none" : "auto",
+        overflow: "hidden",
       }}
     >
-      {/* Warm glow behind Miomi */}
+      <AmbientBackground mode="ambient" />
+
       <div
         style={{
           position: "absolute",
-          width: "260px",
-          height: "260px",
+          width: "280px",
+          height: "280px",
           borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(249,168,212,0.22) 0%, rgba(255,255,255,0) 70%)",
-          transform: "translateY(-20px)",
+          background: "radial-gradient(circle, rgba(249,168,212,0.28) 0%, transparent 65%)",
           opacity: phase >= 1 ? 1 : 0,
-          transition: "opacity 1.2s ease",
+          transition: "opacity 1.4s ease",
+          zIndex: 2,
+          pointerEvents: "none",
         }}
       />
 
-      {/* Miomi image */}
       <div
         style={{
           position: "relative",
+          zIndex: 3,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
           opacity: phase >= 1 ? 1 : 0,
-          transform: phase >= 1 ? "scale(1) translateY(0px)" : "scale(0.88) translateY(16px)",
-          transition: "opacity 0.9s ease, transform 0.9s cubic-bezier(0.34,1.56,0.64,1)",
+          transform: phase >= 1
+            ? "scale(1) translateY(0px)"
+            : "scale(0.86) translateY(20px)",
+          transition: "opacity 1.0s ease, transform 1.0s cubic-bezier(0.34,1.56,0.64,1)",
         }}
       >
         <Image
           src="/miomi/happy.png"
           alt="Miomi"
-          width={200}
-          height={200}
+          width={210}
+          height={210}
           priority
           style={{ objectFit: "contain" }}
         />
       </div>
 
-      {/* Text block */}
       <div
         style={{
-          marginTop: "24px",
+          position: "relative",
+          zIndex: 3,
+          marginTop: "28px",
           textAlign: "center",
           opacity: phase >= 2 ? 1 : 0,
-          transform: phase >= 2 ? "translateY(0px)" : "translateY(8px)",
-          transition: "opacity 0.7s ease, transform 0.7s ease",
+          transform: phase >= 2 ? "translateY(0px)" : "translateY(10px)",
+          transition: "opacity 0.8s ease, transform 0.8s ease",
+          pointerEvents: "none",
         }}
       >
-        {/* Thai — primary */}
         <p
           style={{
-            fontSize: "18px",
-            fontWeight: 600,
+            fontFamily: "'Kanit', sans-serif",
+            fontSize: "20px",
+            fontWeight: 500,
             color: "#1A1A18",
-            letterSpacing: "0.01em",
+            letterSpacing: "0.02em",
+            lineHeight: 1.55,
             margin: 0,
-            lineHeight: 1.5,
           }}
         >
-          ยินดีต้อนรับนะคะ~ หนูรอคุณอยู่ค่า
+          ยินดีต้อนรับนะคะ~
+          <br />
+          หนูรอคุณอยู่ค่า
         </p>
-
-        {/* English — secondary */}
         <p
           style={{
-            fontSize: "13px",
-            color: "#9CA3AF",
-            marginTop: "6px",
-            letterSpacing: "0.02em",
-            margin: "6px 0 0",
+            fontFamily: "'Quicksand', sans-serif",
+            fontSize: "11px",
+            fontWeight: 600,
+            color: "#C4BDB5",
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            marginTop: "8px",
+            margin: "8px 0 0",
           }}
         >
-          Welcome~ I&apos;ve been waiting for you
+          Welcome · I&apos;ve been waiting
         </p>
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          bottom: "28px",
+          zIndex: 3,
+          opacity: phase >= 2 ? 1 : 0,
+          transition: "opacity 1s ease 0.3s",
+          pointerEvents: "none",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'Quicksand', sans-serif",
+            fontSize: "15px",
+            fontWeight: 700,
+            color: "#F9A8D4",
+            letterSpacing: "0.18em",
+          }}
+        >
+          miomi
+        </span>
+        <span
+          style={{
+            fontFamily: "'Quicksand', sans-serif",
+            fontSize: "11px",
+            fontWeight: 600,
+            color: "#D4C4B8",
+            letterSpacing: "0.24em",
+          }}
+        >
+          ka
+        </span>
       </div>
     </div>
   );

@@ -1,6 +1,21 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Kanit, Quicksand } from "next/font/google";
 import "./globals.css";
+
+const kanit = Kanit({
+  subsets: ["thai", "latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-kanit",
+  display: "swap",
+});
+
+const quicksand = Quicksand({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-quicksand",
+  display: "swap",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,7 +59,7 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${geistSans.variable} ${geistMono.variable} overflow-hidden bg-white antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
+      className={`${kanit.variable} ${quicksand.variable} ${geistSans.variable} ${geistMono.variable} overflow-hidden bg-white antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
     >
       <head>
         <link rel="icon" type="image/png" href="/miomi/icon-512.png" />
