@@ -18,8 +18,7 @@ import {
 } from "@/components/guest/GuestExplorationContext";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { cn } from "@/lib/utils";
-import { useMotionValue, animate, motion } from "framer-motion";
-import { useRef, useState, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 
 const navItems = [
   { href: "/home", Icon: Home, thai: "หน้าหลัก", english: "Home" },
@@ -69,124 +68,110 @@ function SwipeNavigator({
   children: React.ReactNode;
   pathname: string;
 }) {
-  const router = usePathname();
   const activeIndex = SCREENS.indexOf(pathname);
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
-  const isDragHorizontalRef = useRef<boolean | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const offsetX = useMotionValue(0);
+  const startXRef = useRef<number | null>(null);
+  const startYRef = useRef<number | null>(null);
+  const intentRef = useRef<"horizontal" | "vertical" | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const navigateTo = useCallback(
-    (index: number) => {
-      const clamped = Math.max(0, Math.min(SCREENS.length - 1, index));
-      const target = SCREENS[clamped];
-      if (target && target !== pathname) {
-        void import("next/navigation").then(({ useRouter }) => {});
-        window.location.href = target;
+  const goTo = useCallback((index: number) => {
+    const clamped = Math.max(0, Math.min(SCREENS.length - 1, index));
+    const target = SCREENS[clamped];
+    if (target && target !== pathname) {
+      window.location.href = target;
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    let startX = 0;
+    let startY = 0;
+    let intent: "horizontal" | "vertical" | null = null;
+    let active = false;
+
+    const onTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+      startX = touch.clientX;
+      startY = touch.clientY;
+      intent = null;
+      active = true;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!active) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+
+      if (intent === null) {
+        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+        intent = Math.abs(dx) > Math.abs(dy) * 1.1
+          ? "horizontal"
+          : "vertical";
       }
-      animate(offsetX, 0, { type: "spring", stiffness: 320, damping: 32 });
-    },
-    [pathname, offsetX]
-  );
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    dragStartRef.current = { x: e.clientX, y: e.clientY };
-    isDragHorizontalRef.current = null;
-    setDragging(false);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, []);
-
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!dragStartRef.current) return;
-      const dx = e.clientX - dragStartRef.current.x;
-      const dy = e.clientY - dragStartRef.current.y;
-  
-      if (isDragHorizontalRef.current === null) {
-        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-        const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
-        isDragHorizontalRef.current = isHorizontal;
-        if (!isHorizontal) {
-          dragStartRef.current = null;
+      if (intent === "horizontal") {
+        const target = e.target as HTMLElement;
+        if (target.closest("[data-horizontal-scroll-zone]")) {
+          intent = "vertical";
           return;
         }
+        e.preventDefault();
+        e.stopImmediatePropagation();
       }
-  
-      if (!isDragHorizontalRef.current) return;
-  
-      const target = e.target as HTMLElement;
-      if (target.closest("[data-horizontal-scroll-zone]")) {
-        dragStartRef.current = null;
-        isDragHorizontalRef.current = null;
-        return;
-      }
-  
-      e.preventDefault();
-      e.stopPropagation();
-      setDragging(true);
-  
-      const vw = window.innerWidth;
-      let drag = dx;
-      if (
-        (activeIndex === 0 && dx > 0) ||
-        (activeIndex === SCREENS.length - 1 && dx < 0)
-      ) {
-        drag = dx * 0.15;
-      }
-  
-      const maxDrag = vw * 0.75;
-      const clamped = Math.max(-maxDrag, Math.min(maxDrag, drag));
-      offsetX.set(clamped);
-    },
-    [activeIndex, offsetX]
-  );
+    };
 
-  const handlePointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (!dragStartRef.current || !isDragHorizontalRef.current || !dragging) {
-        dragStartRef.current = null;
-        isDragHorizontalRef.current = null;
-        setDragging(false);
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!active || intent !== "horizontal") {
+        active = false;
+        intent = null;
         return;
       }
 
-      const dx = e.clientX - dragStartRef.current.x;
-      const vw = window.innerWidth;
-      const threshold = vw * 0.28;
+      const touch = e.changedTouches[0];
+      if (!touch) return;
 
-      dragStartRef.current = null;
-      isDragHorizontalRef.current = null;
-      setDragging(false);
+      const dx = touch.clientX - startX;
+      const vw = window.innerWidth;
+      const threshold = vw * 0.25;
+
+      active = false;
+      intent = null;
 
       if (Math.abs(dx) > threshold) {
         const direction = dx < 0 ? 1 : -1;
-        navigateTo(activeIndex + direction);
-      } else {
-        animate(offsetX, 0, { type: "spring", stiffness: 320, damping: 32 });
+        goTo(activeIndex + direction);
       }
-    },
-    [activeIndex, dragging, navigateTo, offsetX]
-  );
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [activeIndex, goTo]);
 
   return (
     <div
+      ref={containerRef}
       className="flex-1 min-h-0 overflow-hidden"
-      style={{ touchAction: "pan-y", overscrollBehaviorX: "none" }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      style={{ touchAction: "pan-y" }}
     >
-      <motion.div
-        className="mx-auto h-full w-full max-w-[680px]"
-        style={{ x: offsetX }}
-      >
+      <div className="mx-auto h-full w-full max-w-[680px]">
         {children}
-      </motion.div>
+      </div>
     </div>
   );
 }
-
 function AppLayoutInner({
   children,
 }: Readonly<{
