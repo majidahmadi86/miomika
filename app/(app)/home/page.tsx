@@ -565,242 +565,426 @@ export default function HomePage() {
             </motion.div>
           </motion.div>
 
-          <div className="pointer-events-none absolute inset-x-4 bottom-4 z-20 flex flex-col items-center gap-1.5">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <StatPill
-                icon={Heart}
-                percent={pet.mood}
-                iconClass="text-[#D4537E]"
-                ariaLabel={`Mood ${Math.round(pet.mood)} percent`}
+          <div className="pointer-events-none absolute inset-x-4 bottom-3 z-20">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "rgba(255,255,255,0.88)",
+                backdropFilter: "blur(8px)",
+                borderRadius: "20px",
+                padding: "8px 14px",
+                border: "1px solid rgba(232,229,223,0.8)",
+              }}
+            >
+              {/* Heart fuel bar */}
+              <Heart
+                style={{ width: "14px", height: "14px", color: "#D4537E", flexShrink: 0 }}
+                strokeWidth={2}
               />
-              <StatPill
-                icon={Zap}
-                percent={pet.energy}
-                iconClass="text-[#B8860B]"
-                ariaLabel={`Energy ${Math.round(pet.energy)} percent`}
-              />
-              <StatPill
-                icon={Coffee}
-                percent={pet.hunger}
-                iconClass="text-[#639922]"
-                ariaLabel={`Hunger ${Math.round(pet.hunger)} percent`}
-              />
-            </div>
-            <div className="h-[3px] w-full max-w-[200px] overflow-hidden rounded-full bg-[#F0E0E8]">
               <div
-                key={`xp-${pet.xp}-${xpTick}`}
-                className="miomi-xp-tick h-full rounded-full bg-[#B8860B] transition-all duration-500 ease-out"
-                style={{ width: `${pet.xp}%` }}
+                style={{
+                  flex: 1,
+                  height: "6px",
+                  background: "#F0E0E8",
+                  borderRadius: "999px",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${pet.mood}%`,
+                    background: "#D4537E",
+                    borderRadius: "999px",
+                    transition: "width 0.5s ease-out",
+                  }}
+                />
+              </div>
+
+              {/* Zap fuel bar */}
+              <Zap
+                style={{ width: "14px", height: "14px", color: "#C9A96E", flexShrink: 0, marginLeft: "6px" }}
+                strokeWidth={2}
               />
+              <div
+                style={{
+                  flex: 1,
+                  height: "6px",
+                  background: "#F0E0E8",
+                  borderRadius: "999px",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${pet.energy}%`,
+                    background: "#C9A96E",
+                    borderRadius: "999px",
+                    transition: "width 0.5s ease-out",
+                  }}
+                />
+              </div>
+
+              {/* Brain fuel bar */}
+              <Coffee
+                style={{ width: "14px", height: "14px", color: "#7DD3C0", flexShrink: 0, marginLeft: "6px" }}
+                strokeWidth={2}
+              />
+              <div
+                style={{
+                  flex: 1,
+                  height: "6px",
+                  background: "#F0E0E8",
+                  borderRadius: "999px",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${pet.hunger}%`,
+                    background: "#7DD3C0",
+                    borderRadius: "999px",
+                    transition: "width 0.5s ease-out",
+                  }}
+                />
+              </div>
+
+              {/* Level + XP */}
+              <div
+                style={{
+                  marginLeft: "8px",
+                  flexShrink: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "2px",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "'Quicksand', sans-serif",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "#C9A96E",
+                    lineHeight: 1,
+                  }}
+                >
+                  Lv.{pet.level}
+                </span>
+                <div
+                  style={{
+                    width: "32px",
+                    height: "3px",
+                    background: "#F0E0E8",
+                    borderRadius: "999px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    key={`xp-${pet.xp}-${xpTick}`}
+                    className="miomi-xp-tick"
+                    style={{
+                      height: "100%",
+                      width: `${pet.xp}%`,
+                      background: "#C9A96E",
+                      borderRadius: "999px",
+                      transition: "width 0.5s ease-out",
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          <p className="pointer-events-none absolute bottom-4 right-4 z-20 text-[10px] font-medium text-[#B8860B]">
-            Lv.{pet.level}
-          </p>
         </div>
 
-        <section className="flex h-[88px] max-h-[88px] shrink-0 flex-col justify-center overflow-hidden border-l-4 border-[#C9A96E] bg-[#FDF8EE] px-4 py-2">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-[#B8860B]">
-            MIOMI&apos;S PICK · วันนี้
-          </p>
-          <p className="mt-0.5 truncate text-[15px] font-medium leading-[1.6] text-[#1A1A1A]">
-            {DAILY_CHALLENGE.phrase} — {DAILY_CHALLENGE.th}
-          </p>
-          {meaningExpanded ? (
-            <p className="mt-0.5 text-xs leading-[1.6] text-[#666666]">
-              {DAILY_CHALLENGE.meaning}
-            </p>
-          ) : null}
-          <div className="mt-2 flex gap-2">
-            {authReady && isGuest ? (
-              <button
-                type="button"
-                onClick={handleGuestCreatePress}
-                className={cn(
-                  "inline-flex h-7 items-center rounded-full bg-[#8B1A35] px-3 text-[10px] font-medium text-white",
-                  tapFeedback,
-                )}
+        <button
+          type="button"
+          onClick={() => setMeaningExpanded((v) => !v)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            height: meaningExpanded ? "auto" : "44px",
+            minHeight: "44px",
+            flexShrink: 0,
+            background: "#FDF8EE",
+            borderLeft: "3px solid #C9A96E",
+            padding: meaningExpanded ? "10px 16px" : "0 16px",
+            textAlign: "left",
+            cursor: "pointer",
+            transition: "height 0.25s ease",
+            width: "100%",
+            borderTop: "none",
+            borderRight: "none",
+            borderBottom: "none",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span
+                style={{
+                  fontFamily: "'Quicksand', sans-serif",
+                  fontSize: "9px",
+                  fontWeight: 700,
+                  letterSpacing: "0.10em",
+                  color: "#C9A96E",
+                  textTransform: "uppercase",
+                  flexShrink: 0,
+                }}
               >
-                ฝึกเลย
-              </button>
-            ) : (
-              <Link
-                href="/create"
-                className={cn(
-                  "inline-flex h-7 items-center rounded-full bg-[#8B1A35] px-3 text-[10px] font-medium text-white",
-                  tapFeedback,
-                )}
+                ✦ MIOMI&apos;S PICK
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Kanit', sans-serif",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  color: "#1A1A18",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
               >
-                ฝึกเลย
-              </Link>
+                {DAILY_CHALLENGE.phrase}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Kanit', sans-serif",
+                  fontSize: "12px",
+                  color: "#9A8B73",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  flexShrink: 1,
+                }}
+              >
+                — {DAILY_CHALLENGE.th}
+              </span>
+            </div>
+            {meaningExpanded && (
+              <div style={{ marginTop: "8px" }}>
+                <p
+                  style={{
+                    fontFamily: "'Kanit', sans-serif",
+                    fontSize: "12px",
+                    color: "#6B7280",
+                    lineHeight: 1.6,
+                    marginBottom: "10px",
+                  }}
+                >
+                  {DAILY_CHALLENGE.meaning}
+                </p>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {authReady && isGuest ? (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleGuestCreatePress(); }}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        height: "28px",
+                        borderRadius: "999px",
+                        background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                        color: "#FFFFFF",
+                        fontFamily: "'Kanit', sans-serif",
+                        fontSize: "11px",
+                        fontWeight: 500,
+                        padding: "0 12px",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ฝึกเลย
+                    </button>
+                  ) : (
+                    <Link
+                      href="/create"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        height: "28px",
+                        borderRadius: "999px",
+                        background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                        color: "#FFFFFF",
+                        fontFamily: "'Kanit', sans-serif",
+                        fontSize: "11px",
+                        fontWeight: 500,
+                        padding: "0 12px",
+                        textDecoration: "none",
+                      }}
+                    >
+                      ฝึกเลย
+                    </Link>
+                  )}
+                </div>
+              </div>
             )}
-            <button
-              type="button"
-              onClick={() => setMeaningExpanded((v) => !v)}
-              className={cn(
-                "inline-flex h-7 items-center rounded-full border border-[#EAD0DB] bg-white px-3 text-[10px] font-medium text-[#8B1A35]",
-                tapFeedback,
-              )}
-            >
-              ดูความหมาย
-            </button>
           </div>
-        </section>
+          <span
+            style={{
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "10px",
+              color: "#C9A96E",
+              flexShrink: 0,
+              transition: "transform 0.25s ease",
+              transform: meaningExpanded ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          >
+            ▾
+          </span>
+        </button>
 
-        <motion.div className="grid h-[88px] max-h-[88px] shrink-0 grid-cols-[30%_30%_40%] gap-2 overflow-hidden px-4 py-2">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "48px 48px 1fr",
+            gap: "10px",
+            padding: "10px 16px 12px",
+            flexShrink: 0,
+            alignItems: "center",
+          }}
+        >
+          {/* Heart fuel button — icon only */}
           <button
             type="button"
             onClick={handleFeedPress}
-            className={cn(
-              "flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] text-[#8B1A35]",
-              tapFeedback,
-            )}
+            className={tapFeedback}
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              border: "1.5px solid #EAD0DB",
+              background: "#FBEAF0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
           >
             <motion.div
-              animate={
-                pet.mood < 50
-                  ? {
-                      y: [0, -6, 0],
-                      scale: [1, 1.18, 1],
-                      filter: [
-                        "brightness(1)",
-                        "brightness(0.8)",
-                        "brightness(1)",
-                      ],
-                    }
-                  : {}
-              }
-              transition={{
-                duration: 0.6,
-                ease: "easeInOut",
-                repeat: Infinity,
-                repeatDelay: 4,
-                delay: 0,
-              }}
+              animate={pet.mood < 50 ? { y: [0,-5,0], scale: [1,1.2,1] } : {}}
+              transition={{ duration: 0.6, ease: "easeInOut", repeat: Infinity, repeatDelay: 4, delay: 0 }}
             >
-              <Heart className="h-5 w-5" strokeWidth={2} />
+              <Heart style={{ width: "20px", height: "20px", color: "#D4537E" }} strokeWidth={2} />
             </motion.div>
-            <span className="text-[11px] font-medium leading-[1.6]">ฟีด</span>
           </button>
+
+          {/* Zap fuel button — icon only */}
           <button
             type="button"
             onClick={handlePlayPress}
-            className={cn(
-              "flex flex-col items-center justify-center gap-1 rounded-2xl border border-[#EAD0DB] bg-[#FBEAF0] text-[#8B1A35]",
-              tapFeedback,
-            )}
+            className={tapFeedback}
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              border: "1.5px solid #EAD0DB",
+              background: "#FBEAF0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
           >
             <motion.div
-              animate={
-                pet.energy < 50
-                  ? {
-                      y: [0, -6, 0],
-                      scale: [1, 1.18, 1],
-                      filter: [
-                        "brightness(1)",
-                        "brightness(0.8)",
-                        "brightness(1)",
-                      ],
-                    }
-                  : {}
-              }
-              transition={{
-                duration: 0.6,
-                ease: "easeInOut",
-                repeat: Infinity,
-                repeatDelay: 4,
-                delay: 2,
-              }}
+              animate={pet.energy < 50 ? { y: [0,-5,0], scale: [1,1.2,1] } : {}}
+              transition={{ duration: 0.6, ease: "easeInOut", repeat: Infinity, repeatDelay: 4, delay: 2 }}
             >
-              <Zap className="h-5 w-5" strokeWidth={2} />
+              <Zap style={{ width: "20px", height: "20px", color: "#C9A96E" }} strokeWidth={2} />
             </motion.div>
-            <span className="text-[11px] font-medium leading-[1.6]">เล่น</span>
           </button>
+
+          {/* Primary CTA — Talk to Miomi */}
           {authReady && isGuest ? (
             <button
               type="button"
               onClick={handleGuestCreatePress}
-              className={cn(
-                "flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#8B1A35] px-2 text-white",
-                tapFeedback,
-              )}
+              className={tapFeedback}
+              style={{
+                height: "52px",
+                borderRadius: "999px",
+                background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "1px",
+                boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)",
+              }}
             >
-              <span className="flex items-center gap-1">
-                <motion.div
-                  animate={
-                    pet.hunger < 50
-                      ? {
-                          y: [0, -6, 0],
-                          scale: [1, 1.18, 1],
-                          filter: [
-                            "brightness(1)",
-                            "brightness(0.8)",
-                            "brightness(1)",
-                          ],
-                        }
-                      : {}
-                  }
-                  transition={{
-                    duration: 0.6,
-                    ease: "easeInOut",
-                    repeat: Infinity,
-                    repeatDelay: 4,
-                    delay: 3.5,
-                  }}
-                >
-                  <Coffee className="h-5 w-5 shrink-0" strokeWidth={2} />
-                </motion.div>
-                <span className="text-sm font-medium leading-[1.6]">
-                  คุยกับมิโอมิ
-                </span>
+              <span
+                style={{
+                  fontFamily: "'Kanit', sans-serif",
+                  fontSize: "15px",
+                  fontWeight: 500,
+                  color: "#FFFFFF",
+                  lineHeight: 1.3,
+                }}
+              >
+                คุยกับมิโอมิ
               </span>
-              <span className="text-[11px] leading-[1.6] text-white/85">
+              <span
+                style={{
+                  fontFamily: "'Quicksand', sans-serif",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.80)",
+                  letterSpacing: "0.06em",
+                }}
+              >
                 Talk to Miomi
               </span>
             </button>
           ) : (
             <Link
               href="/create"
-              className={cn(
-                "flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#8B1A35] px-2 text-white",
-                tapFeedback,
-              )}
+              style={{
+                height: "52px",
+                borderRadius: "999px",
+                background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                textDecoration: "none",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "1px",
+                boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)",
+              }}
             >
-              <span className="flex items-center gap-1">
-                <motion.div
-                  animate={
-                    pet.hunger < 50
-                      ? {
-                          y: [0, -6, 0],
-                          scale: [1, 1.18, 1],
-                          filter: [
-                            "brightness(1)",
-                            "brightness(0.8)",
-                            "brightness(1)",
-                          ],
-                        }
-                      : {}
-                  }
-                  transition={{
-                    duration: 0.6,
-                    ease: "easeInOut",
-                    repeat: Infinity,
-                    repeatDelay: 4,
-                    delay: 3.5,
-                  }}
-                >
-                  <Coffee className="h-5 w-5 shrink-0" strokeWidth={2} />
-                </motion.div>
-                <span className="text-sm font-medium leading-[1.6]">
-                  คุยกับมิโอมิ
-                </span>
+              <span
+                style={{
+                  fontFamily: "'Kanit', sans-serif",
+                  fontSize: "15px",
+                  fontWeight: 500,
+                  color: "#FFFFFF",
+                  lineHeight: 1.3,
+                }}
+              >
+                คุยกับมิโอมิ
               </span>
-              <span className="text-[11px] leading-[1.6] text-white/85">
+              <span
+                style={{
+                  fontFamily: "'Quicksand', sans-serif",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.80)",
+                  letterSpacing: "0.06em",
+                }}
+              >
                 Talk to Miomi
               </span>
             </Link>
           )}
-        </motion.div>
+        </div>
       </div>
 
       <div className="hidden flex-col gap-4 md:flex">
