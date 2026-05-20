@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAIResponse } from "@/lib/ai/router";
 import { matchLibrary, logInteraction, type MatchContext } from "@/lib/ai/matcher";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/server";
 import {
   createSessionState,
   updateSessionWithLanguage,
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
       emotionalMomentum: state.emotionalMomentum,
     };
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const matchResult = await matchLibrary(userInput, matchContext);
 
     // ── STAGE 8: Get word to introduce ───────────────────────────────────────
