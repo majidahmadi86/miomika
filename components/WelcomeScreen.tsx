@@ -21,7 +21,12 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
     const t3 = setTimeout(() => setPhase(3), 4200);
     const t4 = setTimeout(() => {
       localStorage.setItem("miomika-welcomed-v1", "1");
-      onComplete();
+      // Small delay ensures localStorage write completes before onComplete
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          onComplete();
+        });
+      });
     }, 4800);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, [onComplete]);

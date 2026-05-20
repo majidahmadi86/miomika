@@ -77,10 +77,25 @@ function SwipeNavigator({
   const goTo = useCallback((index: number) => {
     const clamped = Math.max(0, Math.min(SCREENS.length - 1, index));
     const target = SCREENS[clamped];
-    if (target && target !== pathname) {
+    if (!target || target === pathname) return;
+    
+    const container = containerRef.current;
+    if (!container) {
       window.location.href = target;
+      return;
     }
-  }, [pathname]);
+
+    const vw = window.innerWidth;
+    const direction = index > activeIndex ? -1 : 1;
+    
+    container.style.transition = "transform 0.32s cubic-bezier(0.4,0,0.2,1)";
+    container.style.transform = `translateX(${direction * vw * 0.4}px)`;
+    container.style.opacity = "0.6";
+    
+    setTimeout(() => {
+      window.location.href = target;
+    }, 280);
+  }, [pathname, activeIndex]);
 
   useEffect(() => {
     const el = containerRef.current;
