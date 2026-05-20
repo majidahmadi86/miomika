@@ -256,10 +256,13 @@ useEffect(() => {
     markActivity(); wakeFromSleep();
     const firstGuest = showGuestSignupIfFirst();
     setFeedAnimKey((k) => k + 1);
-    if (!firstGuest) { setBubble(FEED_BUBBLE); setBubbleVisible(true); }
-    happyUntilRef.current = Date.now() + 2000;
-    setExpressionFlip("happy");
-    scheduleHappyEnd();
+    // Delay reaction to sync with particle arrival at Miomi (420ms)
+    window.setTimeout(() => {
+      if (!firstGuest) { setBubble(FEED_BUBBLE); setBubbleVisible(true); }
+      happyUntilRef.current = Date.now() + 2000;
+      setExpressionFlip("happy");
+      scheduleHappyEnd();
+    }, 400);
     setPet((prev) => {
       const withHunger = { ...prev, hunger: clampStat(prev.hunger + 15) };
       const { stats, leveledUp } = addXp(withHunger, 10);
@@ -273,7 +276,13 @@ useEffect(() => {
     markActivity(); wakeFromSleep();
     const firstGuest = showGuestSignupIfFirst();
     setPlayAnimKey((k) => k + 1);
-    if (!firstGuest) { setBubble(PLAY_BUBBLE); setBubbleVisible(true); }
+    // Delay reaction to sync with particle arrival at Miomi (420ms)
+    window.setTimeout(() => {
+      if (!firstGuest) { setBubble(PLAY_BUBBLE); setBubbleVisible(true); }
+      happyUntilRef.current = Date.now() + 2000;
+      setExpressionFlip("happy");
+      scheduleHappyEnd();
+    }, 400);
     setPet((prev) => {
       const withEnergy = { ...prev, energy: clampStat(prev.energy + 15) };
       const { stats, leveledUp } = addXp(withEnergy, 10);
