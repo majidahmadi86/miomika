@@ -18,6 +18,8 @@ import {
 } from "@/components/guest/GuestExplorationContext";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { cn } from "@/lib/utils";
+import { useMotionValue, animate, motion } from "framer-motion";
+import { useRef, useState, useCallback } from "react";
 
 const navItems = [
   { href: "/home", Icon: Home, thai: "หน้าหลัก", english: "Home" },
@@ -55,6 +57,122 @@ export default function AppLayout({
     <GuestExplorationProvider>
       <AppLayoutInner>{children}</AppLayoutInner>
     </GuestExplorationProvider>
+  );
+}
+
+const SCREENS = ["/home", "/dashboard", "/create", "/invite", "/profile"];
+
+function SwipeNavigator({
+  children,
+  pathname,
+}: {
+  children: React.ReactNode;
+  pathname: string;
+}) {
+  const router = usePathname();
+  const activeIndex = SCREENS.indexOf(pathname);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDragHorizontalRef = useRef<boolean | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const offsetX = useMotionValue(0);
+
+  const navigateTo = useCallback(
+    (index: number) => {
+      const clamped = Math.max(0, Math.min(SCREENS.length - 1, index));
+      const target = SCREENS[clamped];
+      if (target && target !== pathname) {
+        void import("next/navigation").then(({ useRouter }) => {});
+        window.location.href = target;
+      }
+      animate(offsetX, 0, { type: "spring", stiffness: 320, damping: 32 });
+    },
+    [pathname, offsetX]
+  );
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    isDragHorizontalRef.current = null;
+    setDragging(false);
+  }, []);
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragStartRef.current) return;
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+
+      if (isDragHorizontalRef.current === null) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        isDragHorizontalRef.current = Math.abs(dx) > Math.abs(dy) * 1.6;
+      }
+
+      if (!isDragHorizontalRef.current) return;
+
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-horizontal-scroll-zone]")) return;
+
+      e.preventDefault();
+      setDragging(true);
+
+      const vw = window.innerWidth;
+      let drag = dx;
+      if (
+        (activeIndex === 0 && dx > 0) ||
+        (activeIndex === SCREENS.length - 1 && dx < 0)
+      ) {
+        drag = dx * 0.2;
+      }
+
+      const maxDrag = vw * 0.6;
+      const clamped = Math.max(-maxDrag, Math.min(maxDrag, drag));
+      offsetX.set(clamped);
+    },
+    [activeIndex, offsetX]
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragStartRef.current || !isDragHorizontalRef.current || !dragging) {
+        dragStartRef.current = null;
+        isDragHorizontalRef.current = null;
+        setDragging(false);
+        return;
+      }
+
+      const dx = e.clientX - dragStartRef.current.x;
+      const vw = window.innerWidth;
+      const threshold = vw * 0.28;
+
+      dragStartRef.current = null;
+      isDragHorizontalRef.current = null;
+      setDragging(false);
+
+      if (Math.abs(dx) > threshold) {
+        const direction = dx < 0 ? 1 : -1;
+        navigateTo(activeIndex + direction);
+      } else {
+        animate(offsetX, 0, { type: "spring", stiffness: 320, damping: 32 });
+      }
+    },
+    [activeIndex, dragging, navigateTo, offsetX]
+  );
+
+  return (
+    <div
+      className="flex-1 min-h-0 overflow-hidden"
+      style={{ touchAction: dragging ? "none" : "pan-y" }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
+      <motion.div
+        className="mx-auto h-full w-full max-w-[680px]"
+        style={{ x: offsetX }}
+      >
+        {children}
+      </motion.div>
+    </div>
   );
 }
 
@@ -196,12 +314,12 @@ function AppLayoutInner({
       </aside>
 
       <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-white md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
- <div className="flex-1 min-h-0 overflow-hidden">
-    <div className="mx-auto h-full w-full max-w-[680px]">{children}</div>
-  </div>
-  <BottomNav />
-  <InstallPrompt />
-</div>
+        <SwipeNavigator pathname={pathname}>
+          {children}
+        </SwipeNavigator>
+        <BottomNav />
+        <InstallPrompt />
+      </div>
 
       <aside className="hidden h-screen w-72 shrink-0 flex-col border-l border-[#EAD0DB] bg-white md:flex">
         <div className="flex flex-1 flex-col overflow-y-auto px-4 py-6">
