@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, TrendingUp, MessageCircle, Gift, User } from "lucide-react";
+import { Home, TrendingUp, Sparkles, Gift, User, Sparkle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { href: "/home",      labelTh: "หน้าหลัก",  labelEn: "Home",   icon: Home,          primary: false },
   { href: "/dashboard", labelTh: "แดชบอร์ด",  labelEn: "Growth", icon: TrendingUp,    primary: false },
-  { href: "/create",    labelTh: "เรียน",      labelEn: "Learn",  icon: MessageCircle, primary: true  },
+  { href: "/create", labelTh: "เรียน", labelEn: "Learn", icon: Sparkles, primary: true },
   { href: "/invite",    labelTh: "ชวนเพื่อน",  labelEn: "Invite", icon: Gift,          primary: false },
   { href: "/profile",   labelTh: "ฉัน",        labelEn: "Me",     icon: User,          primary: false },
 ] as const;
