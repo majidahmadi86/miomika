@@ -16,19 +16,22 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
   const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
 
   useEffect(() => {
+    // Write flag immediately on mount — before any animation
+    // This prevents any re-render race condition
+    localStorage.setItem("miomika-welcomed-v1", "1");
+  
     const t1 = setTimeout(() => setPhase(1), 80);
     const t2 = setTimeout(() => setPhase(2), 950);
-    const t3 = setTimeout(() => setPhase(3), 4200);
+    const t3 = setTimeout(() => setPhase(3), 2900);
     const t4 = setTimeout(() => {
-      localStorage.setItem("miomika-welcomed-v1", "1");
-      // Small delay ensures localStorage write completes before onComplete
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          onComplete();
-        });
-      });
+      onComplete();
     }, 4800);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
   }, [onComplete]);
 
   return (
