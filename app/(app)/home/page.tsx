@@ -174,6 +174,7 @@ useEffect(() => {
   const seen = localStorage.getItem("miomika-welcomed-v1");
   if (!seen) {
     _welcomeShown = true;
+    localStorage.setItem("miomika-welcomed-v1", "1");
     setShowWelcome(true);
   }
 }, []);
@@ -355,7 +356,6 @@ useEffect(() => {
       {showWelcome && (
         <WelcomeScreen
           onComplete={() => {
-            _welcomeShown = true;
             setShowWelcome(false);
           }}
         />
