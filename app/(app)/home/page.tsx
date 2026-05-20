@@ -283,8 +283,9 @@ useEffect(() => {
   }, [markActivity, wakeFromSleep, triggerLevelUpCelebration, showGuestSignupIfFirst]);
 
   const handleGuestCreatePress = useCallback(() => {
-    if (!showGuestSignupIfFirst()) openSoftSignupPrompt();
-  }, [showGuestSignupIfFirst, openSoftSignupPrompt]);
+    showGuestSignupIfFirst();
+    window.location.href = "/create";
+  }, [showGuestSignupIfFirst]);
 
   const handleStagePointerDown = useCallback(() => {
     markActivity();
