@@ -12,6 +12,7 @@ import {
   useState,
 } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { cn } from "@/lib/utils";
@@ -205,6 +206,7 @@ export default function HomePage() {
   const [petReady, setPetReady] = useState(false);
   const [guestSignupMoment, setGuestSignupMoment] = useState(false);
   const [meaningExpanded, setMeaningExpanded] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
   const tapCycleIndexRef = useRef(0);
 
   const lastActivityRef = useRef(0);
@@ -432,12 +434,22 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (!localStorage.getItem("miomika-welcomed-v1")) {
+        setShowWelcome(true);
+      }
+    }
+  }, []);
+
   const bubbleTh = bubble.th;
   const bubbleEn = bubble.en;
 
   const miomiExpression = sleeping ? "idle" : expressionFlip;
 
   return (
+    <>
+    {showWelcome && <WelcomeScreen onComplete={() => setShowWelcome(false)} />}
     <AppShell>
       <div className="flex h-full max-h-full flex-col overflow-hidden">
       <style>{`
@@ -849,5 +861,6 @@ export default function HomePage() {
       </div>
       </div>
     </AppShell>
+    </>
   );
 }

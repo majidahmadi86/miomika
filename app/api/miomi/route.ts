@@ -1,7 +1,12 @@
 // app/api/miomi/route.ts
+import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { getAIResponse } from "@/lib/ai/router";
 import { matchLibrary, logInteraction, type MatchContext } from "@/lib/ai/matcher";
+import {
+  createSessionState,
+  getExchangeInstruction,
+} from "@/lib/ai/session";
 
 const MIOMI_BASE_PROMPT = `You are Miomi (มิโอมิ), a cat who teaches English to Thai people through warm conversation.
 
@@ -47,8 +52,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid messages" }, { status: 400 });
     }
 
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
     const lastMessage = messages[messages.length - 1];
     const userInput = lastMessage?.content ?? "";
+
+    const session = createSessionState(!!isGuest, userId ?? null);
+    if (sessionId) {
+      session.sessionId = sessionId;
+    }
+    if (sessionContext) {
+      session.exchangeNumber = Math.max(
+        0,
+        (sessionContext.exchangeNumber ?? 1) - 1,
+      );
+      session.estimatedLevel =
+        sessionContext.estimatedLevel ?? session.estimatedLevel;
+      session.sessionArc = sessionContext.sessionArc ?? session.sessionArc;
+      session.currentTargetWord =
+        sessionContext.currentTargetWord ?? session.currentTargetWord;
+      session.emotionalMomentum =
+        sessionContext.emotionalMomentum ?? session.emotionalMomentum;
+      session.wordsIntroduced = sessionContext.wordsIntroduced ?? session.wordsIntroduced;
+    }
+
+    const instruction = await getExchangeInstruction(
+      session,
+      userInput,
+      supabase,
+    );
 
     // ─── STEP 1: TRY LIBRARY FIRST ──────────────────────────────────────────
     // Zero cost. Fast. Gets smarter over time.
@@ -107,6 +142,7 @@ export async function POST(req: NextRequest) {
         uiPayload: match.ui_payload,
         embeddedWord: match.embedded_word,
         embeddedWordThai: match.embedded_word_thai,
+        wordCard: instruction.wordToIntroduce ?? null,
       });
     }
 
@@ -152,6 +188,7 @@ export async function POST(req: NextRequest) {
       content,
       servedVia: `ai_${engine}`,
       wasFailover,
+      wordCard: instruction.wordToIntroduce ?? null,
     });
 
   } catch (error: unknown) {

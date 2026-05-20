@@ -14,6 +14,9 @@ import {
   type MutableRefObject,
 } from "react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@supabase/supabase-js";
+import { WordCard } from "@/components/WordCard";
+import type { SessionVocabWord } from "@/lib/ai/vocabulary";
 import {
   createSessionState,
   getExchangeInstruction,
@@ -56,7 +59,8 @@ type ThreadMessage =
       label: string;
       th: string;
       en: string;
-    };
+    }
+  | { id: string; type: "word_card"; variant: "intro" | "celebration"; word: SessionVocabWord; timestamp: Date };
 
 const PLATFORMS = [
   "Instagram",
@@ -350,7 +354,15 @@ export default function CreatePage() {
       }
   
       // Get instruction for this exact exchange
-      const instruction = getExchangeInstruction(sessionState, trimmed);
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      );
+      const instruction = await getExchangeInstruction(
+        sessionState,
+        trimmed,
+        supabase,
+      );
   
       const history = threadToApiMessages(messages);
       if (!opts?.skipUserBubble) {
@@ -373,6 +385,16 @@ export default function CreatePage() {
             messages: apiMessages,
             isGuest,
             sessionInstruction: instruction.promptInstruction,
+            sessionContext: {
+              exchangeNumber: sessionState.exchangeNumber,
+              estimatedLevel: sessionState.estimatedLevel,
+              sessionArc: sessionState.sessionArc,
+              currentTargetWord: sessionState.currentTargetWord,
+              emotionalMomentum: sessionState.emotionalMomentum,
+              wordsIntroduced: sessionState.wordsIntroduced,
+            },
+            sessionId: sessionState.sessionId,
+            userId: sessionState.userId ?? null,
           }),
         });
   
@@ -380,6 +402,7 @@ export default function CreatePage() {
           content?: string;
           error?: string;
           wasFailover?: boolean;
+          wordCard?: SessionVocabWord | null;
         };
   
         const content = data.content ?? "";
@@ -392,7 +415,18 @@ export default function CreatePage() {
           : th;
   
         pushMiomi(finalTh, en);
-  
+
+        if (data.wordCard) {
+          const wordCard = data.wordCard;
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            type: "word_card" as const,
+            variant: "intro" as const,
+            word: wordCard,
+            timestamp: new Date(),
+          }]);
+        }
+
         // If conversion window opened, show it after a short delay
         if (instruction.shouldOpenConversionWindow && instruction.conversionMessage) {
           window.setTimeout(() => {
@@ -836,6 +870,11 @@ export default function CreatePage() {
                         {m.en}
                       </p>
                     ) : null}
+                  </div>
+                ) : null}
+                {m.type === "word_card" ? (
+                  <div style={{ display: "flex", justifyContent: "center", padding: "4px 16px" }}>
+                    <WordCard word={m.word} variant={m.variant} />
                   </div>
                 ) : null}
               </motion.div>
