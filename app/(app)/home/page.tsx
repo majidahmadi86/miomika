@@ -211,7 +211,15 @@ export default function HomePage() {
   const [petReady, setPetReady] = useState(false);
   const [guestSignupMoment, setGuestSignupMoment] = useState(false);
   const [meaningExpanded, setMeaningExpanded] = useState(false);
-  const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
+  const [showWelcome, setShowWelcome] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const seen = localStorage.getItem("miomika-welcomed-v1");
+    if (!seen) {
+      localStorage.setItem("miomika-welcomed-v1", "1");
+      return true;
+    }
+    return false;
+  });
   const tapCycleIndexRef = useRef(0);
 
   const lastActivityRef = useRef(0);
@@ -439,12 +447,7 @@ export default function HomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    const alreadySeen = localStorage.getItem("miomika-welcomed-v1");
-    if (!alreadySeen) {
-      setShowWelcome(true);
-    }
-  }, []);
+  
 
   const bubbleTh = bubble.th;
   const bubbleEn = bubble.en;
@@ -453,7 +456,7 @@ export default function HomePage() {
 
   return (
     <>
-    {showWelcome === true && <WelcomeScreen onComplete={() => setShowWelcome(false)} />}
+    {showWelcome && <WelcomeScreen onComplete={() => setShowWelcome(false)} />}
     <AppShell>
       <div className="flex h-full max-h-full flex-col overflow-hidden">
       <style>{`

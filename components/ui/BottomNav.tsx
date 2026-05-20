@@ -31,26 +31,26 @@ export function BottomNav() {
     >
       {/* SVG notch mask — cuts hole above center pill */}
       <svg
-        aria-hidden
-        style={{
-          position: "absolute",
-          top: "-22px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: "76px",
-          height: "22px",
-          overflow: "visible",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-        viewBox="0 0 76 22"
-        fill="none"
-      >
-        <path
-          d="M0 22 Q0 0 38 0 Q76 0 76 22 Z"
-          fill="#FFFFFF"
-        />
-      </svg>
+  aria-hidden
+  style={{
+    position: "absolute",
+    top: "-28px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "88px",
+    height: "30px",
+    overflow: "visible",
+    pointerEvents: "none",
+    zIndex: 0,
+  }}
+  viewBox="0 0 88 30"
+  fill="none"
+>
+  <path
+    d="M0 30 C0 30 8 30 14 22 C20 14 28 4 44 4 C60 4 68 14 74 22 C80 30 88 30 88 30 Z"
+    fill="#FFFFFF"
+  />
+</svg>
 
       <ul
         style={{
