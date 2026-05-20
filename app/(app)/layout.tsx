@@ -93,6 +93,7 @@ function SwipeNavigator({
     dragStartRef.current = { x: e.clientX, y: e.clientY };
     isDragHorizontalRef.current = null;
     setDragging(false);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
   const handlePointerMove = useCallback(
@@ -100,30 +101,40 @@ function SwipeNavigator({
       if (!dragStartRef.current) return;
       const dx = e.clientX - dragStartRef.current.x;
       const dy = e.clientY - dragStartRef.current.y;
-
+  
       if (isDragHorizontalRef.current === null) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-        isDragHorizontalRef.current = Math.abs(dx) > Math.abs(dy) * 1.6;
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
+        isDragHorizontalRef.current = isHorizontal;
+        if (!isHorizontal) {
+          dragStartRef.current = null;
+          return;
+        }
       }
-
+  
       if (!isDragHorizontalRef.current) return;
-
+  
       const target = e.target as HTMLElement;
-      if (target.closest("[data-horizontal-scroll-zone]")) return;
-
+      if (target.closest("[data-horizontal-scroll-zone]")) {
+        dragStartRef.current = null;
+        isDragHorizontalRef.current = null;
+        return;
+      }
+  
       e.preventDefault();
+      e.stopPropagation();
       setDragging(true);
-
+  
       const vw = window.innerWidth;
       let drag = dx;
       if (
         (activeIndex === 0 && dx > 0) ||
         (activeIndex === SCREENS.length - 1 && dx < 0)
       ) {
-        drag = dx * 0.2;
+        drag = dx * 0.15;
       }
-
-      const maxDrag = vw * 0.6;
+  
+      const maxDrag = vw * 0.75;
       const clamped = Math.max(-maxDrag, Math.min(maxDrag, drag));
       offsetX.set(clamped);
     },
@@ -160,7 +171,7 @@ function SwipeNavigator({
   return (
     <div
       className="flex-1 min-h-0 overflow-hidden"
-      style={{ touchAction: dragging ? "none" : "pan-y" }}
+      style={{ touchAction: "pan-y", overscrollBehaviorX: "none" }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
