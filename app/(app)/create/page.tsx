@@ -331,6 +331,7 @@ export default function CreatePage() {
   const [sessionStartTime] = useState(() => Date.now());
   const [lastUserActivity, setLastUserActivity] = useState(Date.now());
   const [showSummarySheet, setShowSummarySheet] = useState(false);
+  const [showConversionSheet, setShowConversionSheet] = useState(false);
   const [showPullHandle, setShowPullHandle] = useState(false);
   const [ambientPalette, setAmbientPalette] = useState(MODE_PALETTES["learn"]!);
 
@@ -611,7 +612,22 @@ export default function CreatePage() {
 
   const consumeGuestExchange = useCallback(() => {
     if (!isGuest) return;
-    setGuestExchangesRemaining((n) => Math.max(0, n - 1));
+    setGuestExchangesRemaining((n) => {
+      const next = Math.max(0, n - 1);
+      if (next === 0) {
+        // Trigger Miomi's warm conversion invitation after response
+        window.setTimeout(() => {
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            type: "miomi" as const,
+            th: "หนูชอบคุยกับคุณมากเลยค่า~ อยากให้หนูจำคุณและความก้าวหน้าของคุณได้ไหมคะ? สมัครฟรีได้เลยนะคะ ไม่มีค่าใช้จ่ายค่า~",
+            en: "I love talking with you~ Want me to remember you and your progress? Sign up free — no cost at all~",
+          }]);
+          setShowConversionSheet(true);
+        }, 1200);
+      }
+      return next;
+    });
   }, [isGuest]);
 
   const handleSend = useCallback(() => {
@@ -792,6 +808,8 @@ export default function CreatePage() {
     stage === "streaming_comments" ||
     stage === "finished" ||
     stage === "followup";
+
+  const guestLimitReached = isGuest && guestExchangesRemaining <= 0;
 
   const renderMiomiTh = useCallback((text: string) => {
     const parts = text.split(/\*\*(.+?)\*\*/g);
@@ -1678,7 +1696,7 @@ export default function CreatePage() {
         <button
           type="button"
           onClick={handleSend}
-          disabled={!inputText.trim() || inputDisabled || isRecording || (isGuest && guestExchangesRemaining <= 0)}
+          disabled={!inputText.trim() || inputDisabled || isRecording || guestLimitReached}
           style={{
             flexShrink: 0,
             width: "40px",
@@ -1857,6 +1875,113 @@ export default function CreatePage() {
                 คุยต่อกับมิโอมิ
               </button>
             </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {showConversionSheet && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(26,26,24,0.4)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "flex-end",
+          }}
+          onClick={() => setShowConversionSheet(false)}
+        >
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              background: "#FFFFFF",
+              borderRadius: "24px 24px 0 0",
+              padding: "24px 24px 40px",
+              boxShadow: "0 -8px 32px rgba(26,26,24,0.12)",
+            }}
+          >
+            {/* Handle */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E8E5DF" }} />
+            </div>
+
+            {/* Miomi */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "16px" }}>
+              <Image src="/miomi/happy.png" alt="Miomi" width={120} height={120} style={{ objectFit: "contain" }} />
+            </div>
+
+            {/* Message */}
+            <div style={{ textAlign: "center", marginBottom: "24px" }}>
+              <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "18px", fontWeight: 500, color: "#1A1A18", margin: "0 0 6px" }}>
+                หนูอยากจำคุณได้ค่า~
+              </p>
+              <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", color: "#9A8B73", margin: 0 }}>
+                Sign up free — I'll remember everything we learned together~
+              </p>
+            </div>
+
+            {/* Benefits */}
+            <div style={{ background: "#FAFAF6", borderRadius: "12px", padding: "12px 16px", marginBottom: "20px" }}>
+              {[
+                { th: "หนูจำชื่อและความก้าวหน้าของคุณได้", en: "I remember your name and progress" },
+                { th: "คำศัพท์ที่เรียนไม่หายไปไหน", en: "Your vocabulary stays saved" },
+                { th: "ชวนเพื่อนได้รับสิทธิ์พิเศษ", en: "Invite friends for bonus rewards" },
+              ].map((b, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: i < 2 ? "8px" : 0 }}>
+                  <span style={{ color: "#F9A8D4", fontSize: "14px", marginTop: "1px" }}>✦</span>
+                  <div>
+                    <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", fontWeight: 500, color: "#1A1A18", margin: 0 }}>{b.th}</p>
+                    <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", color: "#9A8B73", margin: 0 }}>{b.en}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* CTAs */}
+            <Link
+              href="/signup"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "52px",
+                borderRadius: "999px",
+                background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                fontFamily: "'Kanit', sans-serif",
+                fontSize: "16px",
+                fontWeight: 500,
+                color: "#FFFFFF",
+                textDecoration: "none",
+                boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)",
+                marginBottom: "12px",
+              }}
+            >
+              สมัครฟรีเลยค่า~
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowConversionSheet(false)}
+              style={{
+                display: "block",
+                width: "100%",
+                background: "none",
+                border: "none",
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "13px",
+                color: "#C4BDB5",
+                cursor: "pointer",
+                padding: "8px",
+              }}
+            >
+              ไว้ทีหลังนะคะ~ · Maybe later
+            </button>
           </motion.div>
         </motion.div>
       )}
