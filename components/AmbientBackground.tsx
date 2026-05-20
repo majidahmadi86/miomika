@@ -395,15 +395,15 @@ export function AmbientBackground({ mode = "ambient", className }: AmbientBackgr
     const parent = canvas.parentElement;
     if (!parent) return;
 
-    let W = parent.offsetWidth || window.innerWidth;
-    let H = parent.offsetHeight || window.innerHeight;
+    let W = window.innerWidth;
+    let H = window.innerHeight;
     canvas.width = W;
     canvas.height = H;
 
     // Resize handler
     const ro = new ResizeObserver(() => {
-      W = parent.offsetWidth;
-      H = parent.offsetHeight;
+      W = window.innerWidth;
+      H = window.innerHeight;
       canvas.width = W;
       canvas.height = H;
     });
