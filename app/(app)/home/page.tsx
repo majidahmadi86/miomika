@@ -167,14 +167,16 @@ export default function HomePage() {
   // useState lazy initializer runs once synchronously on first mount.
   // _welcomeShown module variable prevents re-triggering on remounts.
   // WelcomeScreen writes the localStorage flag on its own mount.
-  const [showWelcome, setShowWelcome] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    if (_welcomeShown) return false;
-    const seen = localStorage.getItem("miomika-welcomed-v1");
-    if (seen) return false;
+  const [showWelcome, setShowWelcome] = useState(false);
+
+useEffect(() => {
+  if (_welcomeShown) return;
+  const seen = localStorage.getItem("miomika-welcomed-v1");
+  if (!seen) {
     _welcomeShown = true;
-    return true;
-  });
+    setShowWelcome(true);
+  }
+}, []);
 
   const tapCycleIndexRef = useRef(0);
   const lastActivityRef = useRef(0);

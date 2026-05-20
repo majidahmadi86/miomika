@@ -18,8 +18,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
   useEffect(() => {
     // Write flag immediately on mount — before any animation
     // This prevents any re-render race condition
-    localStorage.setItem("miomika-welcomed-v1", "1");
-  
+    
     const t1 = setTimeout(() => setPhase(1), 80);
     const t2 = setTimeout(() => setPhase(2), 950);
     const t3 = setTimeout(() => setPhase(3), 2900);
