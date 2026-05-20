@@ -7,6 +7,10 @@
 // getExchangeInstruction() is now async for the same reason.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PrimaryLanguage, LearningDirection, LanguageSignals } from "./language";
+import type { UserArchetype } from "./persona";
+import type { Intent, IntentFamily } from "./intents";
+import type { SessionMode } from "./prompt";
 import {
   CELEBRATIONS,
   CONVERSION,
@@ -40,6 +44,40 @@ export type SessionState = {
   currentTargetWord: SessionVocabWord | null;
   sessionId: string;
   userId: string | null;
+
+  // Language intelligence (new)
+  primaryLanguage: PrimaryLanguage;
+  primaryLanguageConfidence: number;
+  learningDirection: LearningDirection;
+  learningDirectionConfidence: number;
+  languageSignalsHistory: LanguageSignals[];
+  voiceRatioTarget: { thai: number; english: number };
+
+  // Persona (new)
+  detectedArchetype: UserArchetype;
+  archetypeConfidence: number;
+  intentFamilyDistribution: Partial<Record<IntentFamily, number>>;
+  formalityScore: number;
+  genzMarkerCount: number;
+  topicSignals: string[];
+  hasStatedGoal: boolean;
+  statedGoal: string | null;
+
+  // Session mode (new)
+  sessionMode: SessionMode;
+  sessionModeConfidence: number;
+
+  // Creator tracking (new)
+  creatorOutputs: Array<{ text: string; platform: string; vocabularyUsed: string[] }>;
+  lastCreatorOutput: string | null;
+
+  // Phrase tracking (new)
+  phrasesIntroduced: string[];
+  phrasesUsedCorrectly: string[];
+
+  // Last intent (new)
+  lastIntent: Intent | null;
+  lastIntentFamily: IntentFamily | null;
 };
 
 // ─── INITIAL STATE ────────────────────────────────────────────────────────────
@@ -63,6 +101,40 @@ export function createSessionState(
     currentTargetWord: null,
     sessionId: crypto.randomUUID(),
     userId,
+
+    // Language intelligence defaults
+    primaryLanguage: "thai" as PrimaryLanguage,
+    primaryLanguageConfidence: 0.0,
+    learningDirection: "unknown" as LearningDirection,
+    learningDirectionConfidence: 0.0,
+    languageSignalsHistory: [],
+    voiceRatioTarget: { thai: 70, english: 30 },
+
+    // Persona defaults
+    detectedArchetype: "thai_learner_casual" as UserArchetype,
+    archetypeConfidence: 0.0,
+    intentFamilyDistribution: {},
+    formalityScore: 0.5,
+    genzMarkerCount: 0,
+    topicSignals: [],
+    hasStatedGoal: false,
+    statedGoal: null,
+
+    // Session mode defaults
+    sessionMode: "learning" as SessionMode,
+    sessionModeConfidence: 0.0,
+
+    // Creator tracking defaults
+    creatorOutputs: [],
+    lastCreatorOutput: null,
+
+    // Phrase tracking defaults
+    phrasesIntroduced: [],
+    phrasesUsedCorrectly: [],
+
+    // Last intent defaults
+    lastIntent: null,
+    lastIntentFamily: null,
   };
 }
 
@@ -375,6 +447,120 @@ export function getFailoverResponse(): { th: string; en: string } {
     FAILOVER_RESPONSES[Math.floor(Math.random() * FAILOVER_RESPONSES.length)] ??
     FAILOVER_RESPONSES[0]!
   );
+}
+
+// ─── ENGINE UPGRADE: LANGUAGE + INTENT ────────────────────────────────────────
+
+import { detectLanguageSignals, detectPrimaryLanguage, detectLearningDirection, getVoiceRatio } from "./language";
+import { detectArchetype } from "./persona";
+import { detectSessionMode } from "./prompt";
+import { classifyIntentAdvanced, getIntentFamily } from "./intents";
+
+export function updateSessionWithLanguage(
+  state: SessionState,
+  message: string
+): SessionState {
+  const { primary, confidence, signals } = detectPrimaryLanguage(
+    message,
+    state.languageSignalsHistory
+  );
+
+  const history = [...state.languageSignalsHistory, signals].slice(-10);
+
+  const recentMessages = [state.lastUserSignal, message].filter(Boolean);
+  const explicitStatement = state.hasStatedGoal ? state.statedGoal : null;
+  const { direction, confidence: dirConfidence } = detectLearningDirection(
+    primary,
+    recentMessages,
+    explicitStatement
+  );
+
+  // Map CEFR level
+  const cefrMap: Record<string, string> = {
+    beginner: "A1",
+    elementary: "A2",
+    intermediate: "B1",
+    upper: "B2",
+  };
+  const cefrLevel = cefrMap[state.estimatedLevel] ?? "A2";
+  const voiceRatio = getVoiceRatio(direction, cefrLevel);
+
+  return {
+    ...state,
+    primaryLanguage: primary,
+    primaryLanguageConfidence: confidence,
+    learningDirection: direction,
+    learningDirectionConfidence: dirConfidence,
+    languageSignalsHistory: history,
+    voiceRatioTarget: voiceRatio,
+  };
+}
+
+export function updateSessionWithIntent(
+  state: SessionState,
+  message: string
+): SessionState {
+  const result = classifyIntentAdvanced(
+    message,
+    state.currentTargetWord?.word ?? null,
+    state.exchangeNumber
+  );
+
+  const family = result.family;
+
+  // Update intent family distribution
+  const dist = { ...state.intentFamilyDistribution };
+  const currentCount = (dist[family] ?? 0);
+  const totalExchanges = state.exchangeNumber + 1;
+  dist[family] = (currentCount * (totalExchanges - 1) + 1) / totalExchanges;
+
+  // Detect Gen-Z markers
+  const { genzMarkers } = detectLanguageSignals(message);
+  const newGenzCount = state.genzMarkerCount + genzMarkers.length;
+
+  // Formality score (simple heuristic)
+  const formalSignals = /(ครับ|ค่ะ|กรุณา|please|sir|madam|formally|professional)/i.test(message);
+  const casualSignals = /(555|ปัง|เด้ง|lol|haha|นะ~|จ้า|จ๊า)/i.test(message);
+  const formalityDelta = formalSignals ? 0.1 : casualSignals ? -0.1 : 0;
+  const newFormality = Math.max(0, Math.min(1, state.formalityScore + formalityDelta));
+
+  // Goal detection
+  const hasGoal = /(เป้าหมาย|goal|i want to learn|อยากเรียน|อยากเก่ง)/i.test(message);
+
+  // Update archetype
+  const archetypeSignals = {
+    primaryLanguage: state.primaryLanguage,
+    learningDirection: state.learningDirection,
+    intentFamilyDistribution: dist,
+    genzMarkerCount: newGenzCount,
+    formalityScore: newFormality,
+    topicSignals: state.topicSignals,
+    hasStatedGoal: state.hasStatedGoal || hasGoal,
+    statedGoal: hasGoal ? message.slice(0, 100) : state.statedGoal,
+  };
+
+  const { archetype, confidence: archetypeConf } = detectArchetype(
+    archetypeSignals,
+    state.detectedArchetype,
+    state.archetypeConfidence
+  );
+
+  // Update session mode
+  const newMode = detectSessionMode(family, state.sessionMode, state.exchangeNumber);
+
+  return {
+    ...state,
+    lastIntent: result.primary.intent,
+    lastIntentFamily: family,
+    intentFamilyDistribution: dist,
+    genzMarkerCount: newGenzCount,
+    formalityScore: newFormality,
+    hasStatedGoal: archetypeSignals.hasStatedGoal,
+    statedGoal: archetypeSignals.statedGoal,
+    detectedArchetype: archetype,
+    archetypeConfidence: archetypeConf,
+    sessionMode: newMode,
+  };
 }
 
 // ─── RE-EXPORT LEGACY TYPE ────────────────────────────────────────────────────
