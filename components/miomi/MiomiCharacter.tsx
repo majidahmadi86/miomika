@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 export type MiomiExpression = "idle" | "happy" | "thinking" | "speaking";
@@ -16,12 +15,6 @@ type MiomiCharacterProps = {
   className?: string;
 };
 
-function getSrc(expression: MiomiExpression, sleeping: boolean, levelUpAnimKey: number): string {
-  if (sleeping) return "/miomi/idle.png";
-  if (levelUpAnimKey > 0) return "/miomi/happy.png";
-  return `/miomi/${expression}.png`;
-}
-
 export function MiomiCharacter({
   expression = "idle",
   sleeping = false,
@@ -31,38 +24,13 @@ export function MiomiCharacter({
   breathe = true,
   className,
 }: MiomiCharacterProps) {
-  const targetSrc = getSrc(expression, sleeping, levelUpAnimKey);
+  const isFullBody = sleeping || levelUpAnimKey > 0;
 
-  const [displayedSrc, setDisplayedSrc] = useState(targetSrc);
-  const [nextSrc, setNextSrc] = useState<string | null>(null);
-  const [fading, setFading] = useState(false);
-  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (targetSrc === displayedSrc) return;
-
-    // Cancel any in-progress fade
-    if (fadeTimer.current) clearTimeout(fadeTimer.current);
-
-    // Load next image behind current
-    setNextSrc(targetSrc);
-    setFading(false);
-
-    // Small delay so next image has time to load before we start fading
-    const loadDelay = setTimeout(() => {
-      setFading(true);
-      fadeTimer.current = setTimeout(() => {
-        setDisplayedSrc(targetSrc);
-        setNextSrc(null);
-        setFading(false);
-      }, 500);
-    }, 60);
-
-    return () => {
-      clearTimeout(loadDelay);
-      if (fadeTimer.current) clearTimeout(fadeTimer.current);
-    };
-  }, [targetSrc, displayedSrc]);
+  const src = sleeping
+    ? "/miomi/idle.png"
+    : levelUpAnimKey > 0
+      ? "/miomi/happy.png"
+      : `/miomi/${expression}.png`;
 
   const animClass =
     levelUpAnimKey > 0
@@ -80,8 +48,6 @@ export function MiomiCharacter({
       : playAnimKey
         ? `play-${playAnimKey}`
         : "idle";
-
-  const imageClass = "pointer-events-none h-full max-h-full w-auto max-w-[min(92vw,100%)] select-none object-contain object-bottom";
 
   return (
     <>
@@ -111,17 +77,23 @@ export function MiomiCharacter({
         }
         @keyframes miomi-float {
           0%, 100% { transform: translateY(0); }
-          50%       { transform: translateY(-5px); }
+          50%       { transform: translateY(-6px); }
         }
-        .miomi-anim-feed    { animation: miomi-feed-bounce 0.45s cubic-bezier(0.34,1.56,0.64,1); }
-        .miomi-anim-play    { animation: miomi-play-wiggle 0.55s ease-in-out; }
-        .miomi-anim-level-up { animation: miomi-level-up-bounce 0.7s cubic-bezier(0.34,1.56,0.64,1); }
+        .miomi-anim-feed {
+          animation: miomi-feed-bounce 0.45s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        .miomi-anim-play {
+          animation: miomi-play-wiggle 0.55s ease-in-out;
+        }
+        .miomi-anim-level-up {
+          animation: miomi-level-up-bounce 0.7s cubic-bezier(0.34,1.56,0.64,1);
+        }
         .miomi-breathe {
           animation: miomi-breathe 3.2s ease-in-out infinite;
           transform-origin: bottom center;
         }
         .miomi-float {
-          animation: miomi-float 3.8s ease-in-out infinite;
+          animation: miomi-float 3.6s ease-in-out infinite;
           transform-origin: bottom center;
         }
       `}</style>
@@ -136,43 +108,24 @@ export function MiomiCharacter({
       >
         <div
           key={animKey}
-          className={cn("relative origin-bottom", animClass)}
-          style={{ display: "inline-block" }}
+          className={cn("origin-bottom", animClass)}
         >
-          {/* Layer 1 — currently displayed image */}
-          <Image
-            src={displayedSrc}
-            alt="Miomi"
-            width={560}
-            height={560}
-            priority
-            className={imageClass}
+          <div
             style={{
-              opacity: fading ? 0 : 1,
-              transition: "opacity 0.5s ease-in-out",
               position: "relative",
-              zIndex: 1,
+              transition: "opacity 0.35s ease-in-out",
             }}
-          />
-
-          {/* Layer 2 — next image, fades in behind then becomes layer 1 */}
-          {nextSrc && (
+          >
             <Image
-              src={nextSrc}
+              src={src}
               alt="Miomi"
               width={560}
               height={560}
               priority
-              className={imageClass}
-              style={{
-                opacity: fading ? 1 : 0,
-                transition: "opacity 0.5s ease-in-out",
-                position: "absolute",
-                inset: 0,
-                zIndex: 2,
-              }}
+              className="pointer-events-none h-full max-h-full w-auto max-w-[min(92vw,100%)] select-none object-contain object-bottom"
+              style={{ transition: "opacity 0.35s ease-in-out" }}
             />
-          )}
+          </div>
         </div>
       </div>
     </>
