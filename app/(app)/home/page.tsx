@@ -16,6 +16,11 @@ import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
+const AmbientBackground = dynamic(
+  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
+  { ssr: false }
+);
 
 const WELCOME_BUBBLE = {
   th: "สวัสดีค่า~ วันนี้อยากพูด English เก่งขึ้นไหมคะ?",
@@ -168,7 +173,7 @@ function StatPill({
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 rounded-full border border-[#EAD0DB] bg-white px-3 py-1.5 text-[11px] font-medium text-[#1A1A1A] shadow-sm",
+        "flex items-center gap-1.5 rounded-full border border-[#EAD0DB] bg-white/90 px-3 py-1.5 text-[11px] font-medium text-[#1A1A1A] shadow-sm backdrop-blur-sm",
         tapFeedback,
       )}
       role="img"
@@ -476,9 +481,11 @@ export default function HomePage() {
       <div className="flex h-full flex-col overflow-hidden bg-white md:hidden">
         {/* Miomi stage — flex-1, white canvas */}
         <div
-          className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+          style={{ background: "#FAFAF6" }}
           onPointerDown={handleStagePointerDown}
         >
+          <AmbientBackground mode="ambient" />
           <motion.div className="absolute inset-0 bottom-12 z-10 flex min-h-0 items-end justify-center px-2">
             <motion.div
               className="flex h-full max-h-full items-end justify-center"
@@ -524,7 +531,7 @@ export default function HomePage() {
 
           <motion.div className="pointer-events-none absolute right-4 top-4 z-30 max-w-[65%]">
             <motion.div
-              className="pointer-events-auto rounded-2xl border border-[#EAD0DB] bg-white px-3 py-2.5 shadow-sm"
+              className="pointer-events-auto rounded-2xl border border-[#EAD0DB] bg-white/92 px-3 py-2.5 shadow-sm backdrop-blur-sm"
               initial={false}
               animate={{
                 opacity: bubbleVisible ? 1 : 0,
@@ -580,7 +587,7 @@ export default function HomePage() {
                 ariaLabel={`Hunger ${Math.round(pet.hunger)} percent`}
               />
             </div>
-            <div className="h-px w-full max-w-[200px] overflow-hidden rounded-full bg-[#F0E0E8]">
+            <div className="h-[3px] w-full max-w-[200px] overflow-hidden rounded-full bg-[#F0E0E8]">
               <div
                 key={`xp-${pet.xp}-${xpTick}`}
                 className="miomi-xp-tick h-full rounded-full bg-[#B8860B] transition-all duration-500 ease-out"
@@ -593,7 +600,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <section className="flex h-[88px] max-h-[88px] shrink-0 flex-col justify-center overflow-hidden border-l-4 border-[#B8860B] bg-[#FDF5E0] px-4 py-2">
+        <section className="flex h-[88px] max-h-[88px] shrink-0 flex-col justify-center overflow-hidden border-l-4 border-[#C9A96E] bg-[#FDF8EE] px-4 py-2">
           <p className="text-[10px] font-medium uppercase tracking-wide text-[#B8860B]">
             MIOMI&apos;S PICK · วันนี้
           </p>
