@@ -205,6 +205,27 @@ function TypingDots() {
   );
 }
 
+function renderMiomiTh(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((segment, i) => {
+    const bold = segment.match(/^\*\*(.+)\*\*$/);
+    if (bold) {
+      return (
+        <span
+          key={i}
+          style={{
+            background: "rgba(249,168,212,0.15)",
+            borderRadius: "4px",
+            padding: "1px 4px",
+          }}
+        >
+          {bold[1]}
+        </span>
+      );
+    }
+    return <span key={i}>{segment}</span>;
+  });
+}
+
 export default function CreatePage() {
   const reduceMotion = useReducedMotion();
   const { isGuest, authReady } = useGuestExploration();
@@ -782,13 +803,39 @@ export default function CreatePage() {
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
-          padding: "12px 16px",
-          background: "#FFFFFF",
+          padding: "16px 20px",
+          background: "#FAFAF6",
           borderTop: "1px solid #F0ECE8",
         }}
       >
+        {/* Gold progress bar */}
+        <div
+          style={{
+            width: "100%",
+            height: "2px",
+            background: "rgba(201,169,110,0.12)",
+            flexShrink: 0,
+            margin: 0,
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${Math.min((messages.filter((msg) => msg.type === "user").length / 8) * 100, 100)}%`,
+              background: "linear-gradient(90deg, #C9A96E 0%, #E8C77F 100%)",
+              transition: "width 400ms ease-out",
+            }}
+          />
+        </div>
+
         <AnimatePresence initial={false} mode="popLayout">
-          {messages.map((m) => (
+          {messages.map((m, msgIndex) => {
+            const userExchangeNum =
+              m.type === "user"
+                ? messages.slice(0, msgIndex + 1).filter((msg) => msg.type === "user").length
+                : 0;
+
+            return (
             <motion.div
               key={m.id}
               layout
@@ -798,14 +845,15 @@ export default function CreatePage() {
               transition={{ duration: 0.20, ease: "easeOut" }}
               style={{ marginBottom: "8px" }}
             >
-              {/* User message — right aligned pill */}
+              {/* User message — learning-document row */}
               {m.type === "user" && (
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ width: "100%", background: "transparent", overflow: "hidden" }}>
                   <div
                     style={{
                       maxWidth: "75%",
+                      float: "right",
                       background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
-                      borderRadius: "20px 20px 4px 20px",
+                      borderRadius: "20px 4px 20px 20px",
                       padding: "10px 16px",
                       boxShadow: "0 2px 8px rgba(219,39,119,0.15)",
                     }}
@@ -823,70 +871,130 @@ export default function CreatePage() {
                       {m.text}
                     </p>
                   </div>
+                  <p
+                    style={{
+                      clear: "both",
+                      textAlign: "right",
+                      marginTop: "3px",
+                      marginBottom: 0,
+                      fontFamily: "'Quicksand', sans-serif",
+                      fontSize: "10px",
+                      fontWeight: 500,
+                      color: "#C4BDB5",
+                    }}
+                  >
+                    แลกเปลี่ยนที่ {userExchangeNum}
+                  </p>
                 </div>
               )}
 
-              {/* Miomi message — left aligned, minimal, no avatar */}
+              {/* Miomi message — naked text, left accent */}
               {m.type === "miomi" && (
-                <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <div style={{ width: "100%" }}>
                   <div
                     style={{
-                      maxWidth: "82%",
-                      background: "#FAFAF6",
-                      border: "1px solid #EDE8E0",
-                      borderRadius: "4px 20px 20px 20px",
-                      padding: "10px 14px",
+                      borderLeft: "2px solid rgba(249,168,212,0.4)",
+                      paddingLeft: "12px",
                     }}
                   >
                     <p
                       style={{
                         fontFamily: "'Kanit', sans-serif",
-                        fontSize: "14px",
+                        fontSize: "15px",
                         fontWeight: 500,
                         color: "#1A1A18",
-                        lineHeight: 1.65,
+                        lineHeight: 1.7,
                         margin: 0,
                         whiteSpace: "pre-line",
                       }}
                     >
-                      {m.th}
+                      {renderMiomiTh(m.th)}
                     </p>
                     {m.en && (
                       <p
                         style={{
                           fontFamily: "'Quicksand', sans-serif",
-                          fontSize: "11.5px",
+                          fontSize: "12px",
+                          fontWeight: 500,
                           color: "#9A8B73",
                           marginTop: "4px",
                           lineHeight: 1.55,
+                          marginBottom: 0,
                         }}
                       >
                         {m.en}
                       </p>
                     )}
                   </div>
-                </div>
-              )}
-
-              {/* Typing indicator */}
-              {m.type === "typing" && (
-                <div style={{ display: "flex", justifyContent: "flex-start" }}>
                   <div
                     style={{
-                      background: "#FAFAF6",
-                      border: "1px solid #EDE8E0",
-                      borderRadius: "4px 20px 20px 20px",
-                      padding: "10px 14px",
+                      width: "100%",
+                      height: "1px",
+                      background: "rgba(232,229,223,0.5)",
+                      margin: "8px 0",
                     }}
-                  >
-                    <TypingDots />
-                  </div>
+                  />
                 </div>
               )}
 
-              {/* Word card */}
+              {/* Typing indicator — learning-document style */}
+              {m.type === "typing" && (
+                <div
+                  style={{
+                    width: "100%",
+                    borderLeft: "2px solid rgba(249,168,212,0.4)",
+                    paddingLeft: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    {(["#F9A8D4", "#C9A96E", "#F9A8D4"] as const).map((color, i) => (
+                      <motion.span
+                        key={i}
+                        style={{
+                          width: "6px",
+                          height: "6px",
+                          borderRadius: "50%",
+                          background: color,
+                          display: "block",
+                        }}
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{
+                          duration: 0.9,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                          delay: i * 0.15,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.8, duration: 0.4 }}
+                    style={{
+                      fontFamily: "'Kanit', sans-serif",
+                      fontSize: "12px",
+                      fontWeight: 400,
+                      color: "#9A8B73",
+                    }}
+                  >
+                    มิโอมิกำลังคิด...
+                  </motion.span>
+                </div>
+              )}
+
+              {/* Word card — document flow */}
               {m.type === "word_card" && (
-                <div style={{ display: "flex", justifyContent: "center", padding: "4px 0" }}>
+                <div
+                  style={{
+                    margin: "12px 0",
+                    borderLeft: "3px solid #C9A96E",
+                    paddingLeft: "12px",
+                  }}
+                >
                   <WordCard word={m.word} variant={m.variant} />
                 </div>
               )}
@@ -965,8 +1073,25 @@ export default function CreatePage() {
                 </div>
               )}
             </motion.div>
-          ))}
+            );
+          })}
         </AnimatePresence>
+
+        {messages.filter((msg) => msg.type === "user").length > 0 && (
+          <p
+            style={{
+              textAlign: "center",
+              margin: "8px 0",
+              fontFamily: "'Kanit', sans-serif",
+              fontSize: "11px",
+              fontWeight: 500,
+              color: "#C4BDB5",
+            }}
+          >
+            แลกเปลี่ยน {messages.filter((msg) => msg.type === "user").length} ครั้งแล้วค่า~ · Exchange{" "}
+            {messages.filter((msg) => msg.type === "user").length} of 8
+          </p>
+        )}
 
         {/* Followup chips */}
         {followupChipsVisible && (
