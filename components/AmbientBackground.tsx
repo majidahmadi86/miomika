@@ -14,14 +14,18 @@ interface AmbientBackgroundProps {
 // ─── PALETTE ─────────────────────────────────────────────────────────────────
 
 const PAL = [
-  { r: 249, g: 168, b: 212 }, // pink
-  { r: 251, g: 207, b: 232 }, // blush
-  { r: 201, g: 169, b: 110 }, // gold
-  { r: 196, g: 181, b: 253 }, // lavender
-  { r: 252, g: 165, b: 165 }, // coral
-  { r: 167, g: 243, b: 208 }, // mint
-  { r: 253, g: 186, b: 116 }, // peach
-  { r: 244, g: 114, b: 182 }, // hot pink
+  { r: 249, g: 168, b: 212 }, // pink — soft
+  { r: 251, g: 207, b: 232 }, // blush — soft
+  { r: 201, g: 169, b: 110 }, // gold — soft
+  { r: 196, g: 181, b: 253 }, // lavender — soft
+  { r: 252, g: 165, b: 165 }, // coral — soft
+  { r: 167, g: 243, b: 208 }, // mint — soft
+  { r: 253, g: 186, b: 116 }, // peach — soft
+  { r: 244, g: 114, b: 182 }, // hot pink — soft
+  { r: 236, g: 72,  b: 153 }, // sharp pink
+  { r: 217, g: 70,  b: 239 }, // sharp violet
+  { r: 251, g: 146, b: 60  }, // sharp orange
+  { r: 52,  g: 211, b: 153 }, // sharp mint
 ];
 
 const rc = () => PAL[Math.floor(Math.random() * PAL.length)]!;
