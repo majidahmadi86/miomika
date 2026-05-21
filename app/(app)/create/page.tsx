@@ -22,6 +22,7 @@ const AmbientBackground = dynamic(
   { ssr: false },
 );
 import { WordCard } from "@/components/WordCard";
+import { CaptionCard } from "@/components/create/CaptionCard";
 import type { SessionVocabWord } from "@/lib/ai/vocabulary";
 import {
   createSessionState,
@@ -66,7 +67,14 @@ type ThreadMessage =
       th: string;
       en: string;
     }
-  | { id: string; type: "word_card"; variant: "intro" | "celebration"; word: SessionVocabWord; timestamp: Date };
+  | { id: string; type: "word_card"; variant: "intro" | "celebration"; word: SessionVocabWord; timestamp: Date }
+  | {
+      id: string;
+      type: "caption_card";
+      platform: "Instagram" | "TikTok" | "Facebook" | "YouTube" | "LINE OA" | "general";
+      caption: { body: string; hashtags?: string[]; hook?: string };
+      timestamp: Date;
+    };
 
 const PLATFORMS = [
   "Instagram",
@@ -592,6 +600,31 @@ export default function CreatePage() {
               }]);
             }, 800);
           }
+        }
+
+        // Handle creator asset — extract caption from content
+        const creatorAssetFromResponse = (data as { creatorAsset?: { text: string; platform: string } }).creatorAsset;
+        if (creatorAssetFromResponse && creatorAssetFromResponse.text) {
+          const platformRaw = creatorAssetFromResponse.platform as string;
+          const validPlatforms = ["Instagram", "TikTok", "Facebook", "YouTube", "LINE OA"];
+          const platform = validPlatforms.includes(platformRaw)
+            ? (platformRaw as "Instagram" | "TikTok" | "Facebook" | "YouTube" | "LINE OA")
+            : "general" as const;
+
+          // Extract hashtags from content
+          const hashtagMatches = creatorAssetFromResponse.text.match(/#\w+/g) ?? [];
+          const bodyText = creatorAssetFromResponse.text.replace(/#\w+/g, "").trim();
+
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            type: "caption_card" as const,
+            platform,
+            caption: {
+              body: bodyText,
+              hashtags: hashtagMatches,
+            },
+            timestamp: new Date(),
+          }]);
         }
 
         // If conversion window opened, show it after a short delay
@@ -1284,6 +1317,32 @@ export default function CreatePage() {
                 >
                   <WordCard word={m.word} variant={m.variant} />
                 </motion.div>
+              )}
+
+              {m.type === "caption_card" && (
+                <CaptionCard
+                  platform={m.platform}
+                  caption={m.caption}
+                  onCopy={() => {
+                    const text = [
+                      m.caption.hook,
+                      m.caption.body,
+                      m.caption.hashtags?.join(" "),
+                    ].filter(Boolean).join("\n\n");
+                    void navigator.clipboard.writeText(text);
+                    showCopyToast();
+                  }}
+                  onRegenerate={() => {
+                    const lastUserMsg = messages.filter(m => m.type === "user").pop();
+                    if (lastUserMsg && lastUserMsg.type === "user") {
+                      void runConversationTurn(lastUserMsg.text, { skipUserBubble: true });
+                    }
+                  }}
+                  onSave={() => {
+                    // Phase 2: save to dashboard
+                    showCopyToast();
+                  }}
+                />
               )}
 
               {/* Content card */}
