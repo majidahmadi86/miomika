@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAIResponse } from "@/lib/ai/router";
-import { matchLibrary, logInteraction, type MatchContext } from "@/lib/ai/matcher";
+import {
+  matchLibraryFromDB,
+  logInteraction,
+  type MatchContext,
+} from "@/lib/library/supabase-matcher";
 import { createClient } from "@/lib/supabase/server";
 import {
   createSessionState,
@@ -134,7 +138,7 @@ export async function POST(req: NextRequest) {
     };
 
     const supabase = await createClient();
-    const matchResult = await matchLibrary(userInput, matchContext);
+    const matchResult = await matchLibraryFromDB(userInput, matchContext);
 
     // ── STAGE 8: Get word to introduce ───────────────────────────────────────
     const shouldIntroduceWord =

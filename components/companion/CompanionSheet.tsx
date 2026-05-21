@@ -1,28 +1,29 @@
 "use client";
 
 /**
- * CompanionSurface — mobile bottom sheet + desktop right panel.
- * MIOMIKA.md §2.5 (Tap behavior mobile/desktop).
+ * CompanionSheet — MOBILE-only bottom sheet (max-width 767px).
  *
- * Phase 1 scope: the surface itself, with a warm Miomi greeting and a
- * "Continue in deep-focus mode" CTA that promotes the conversation to /talk.
- * Full conversation wiring (mic + text → engine → message stream) lives in
- * Phase 3 — for now the sheet announces its presence and bridges to /talk
- * where the existing engine already runs.
+ * Gated by useIsMobile so it never renders on desktop. The desktop variant
+ * lives in CompanionPanel.tsx. Both are mutually exclusive — see
+ * MIOMIKA.md §8 Phase 2 (Companion sheet vs panel viewport bug).
  */
 
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { Maximize2, X } from "lucide-react";
-import { useCompanion } from "@/components/companion/CompanionStateContext";
+import { useCompanionStore } from "@/lib/companion/store";
+import { useIsMobile } from "@/lib/hooks/use-media-query";
+import { useUILanguage } from "@/lib/i18n/client";
+import { tr } from "@/lib/i18n/strings";
 
-export function CompanionSurface() {
-  const { isOpen, close } = useCompanion();
+export function CompanionSheet() {
+  const isMobile = useIsMobile();
+  const isOpen = useCompanionStore((s) => s.isOpen);
+  const close = useCompanionStore((s) => s.close);
+  const lang = useUILanguage();
   const startYRef = useRef<number | null>(null);
-  const dragRef = useRef<HTMLDivElement | null>(null);
 
-  // Esc closes on desktop; tap-outside via backdrop click.
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -32,9 +33,8 @@ export function CompanionSurface() {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, close]);
 
-  if (!isOpen) return null;
+  if (!isMobile || !isOpen) return null;
 
-  // Swipe-to-dismiss on mobile (touch only).
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
     startYRef.current = t ? t.clientY : null;
@@ -49,10 +49,16 @@ export function CompanionSurface() {
 
   return (
     <>
-      {/* Backdrop — opacity 0.4, taps dismiss (§2.5) */}
+      <style>{`
+        @keyframes miomi-sheet-rise {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
+        }
+      `}</style>
+
       <button
         type="button"
-        aria-label="ปิด"
+        aria-label={tr("companion_dismiss", lang)}
         onClick={close}
         style={{
           position: "fixed",
@@ -65,9 +71,7 @@ export function CompanionSurface() {
         }}
       />
 
-      {/* MOBILE bottom sheet — 64svh, slides up 320ms */}
       <div
-        ref={dragRef}
         role="dialog"
         aria-modal="true"
         aria-label="Miomi"
@@ -87,59 +91,21 @@ export function CompanionSurface() {
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
           display: "flex",
           flexDirection: "column",
-          animation: "miomi-companion-rise 320ms cubic-bezier(0.4,0,0.2,1)",
+          animation: "miomi-sheet-rise 320ms cubic-bezier(0.4,0,0.2,1)",
         }}
-        className="md:hidden"
       >
-        <style>{`
-          @keyframes miomi-companion-rise {
-            from { transform: translateY(100%); }
-            to   { transform: translateY(0); }
-          }
-          @keyframes miomi-companion-slide-in {
-            from { transform: translateX(100%); }
-            to   { transform: translateX(0); }
-          }
-        `}</style>
-
-        {/* Drag handle */}
         <div style={{ display: "flex", justifyContent: "center", paddingTop: "10px" }}>
           <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E8E5DF" }} />
         </div>
-
-        <CompanionInner onClose={close} />
-      </div>
-
-      {/* DESKTOP right side panel — 380px, slides in from right */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Miomi"
-        className="hidden md:flex"
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 80,
-          width: "380px",
-          background: "#FFFFFF",
-          borderLeft: "1px solid #EDE8E0",
-          boxShadow: "-12px 0 32px rgba(26,26,24,0.08)",
-          flexDirection: "column",
-          animation: "miomi-companion-slide-in 320ms cubic-bezier(0.4,0,0.2,1)",
-        }}
-      >
-        <CompanionInner onClose={close} />
+        <CompanionInner onClose={close} lang={lang} />
       </div>
     </>
   );
 }
 
-function CompanionInner({ onClose }: { onClose: () => void }) {
+function CompanionInner({ onClose, lang }: { onClose: () => void; lang: "th" | "en" }) {
   return (
     <>
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -164,7 +130,7 @@ function CompanionInner({ onClose }: { onClose: () => void }) {
           <Link
             href="/talk"
             onClick={onClose}
-            aria-label="ขยายเต็มจอ — Open in deep-focus"
+            aria-label={tr("companion_open_fullscreen", lang)}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -176,12 +142,12 @@ function CompanionInner({ onClose }: { onClose: () => void }) {
               textDecoration: "none",
             }}
           >
-            <Maximize2 style={{ width: "16px", height: "16px" }} strokeWidth={2} aria-hidden />
+            <Maximize2 style={{ width: "16px", height: "16px" }} strokeWidth={1.75} aria-hidden />
           </Link>
           <button
             type="button"
             onClick={onClose}
-            aria-label="ปิด"
+            aria-label={tr("companion_dismiss", lang)}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -195,21 +161,14 @@ function CompanionInner({ onClose }: { onClose: () => void }) {
               cursor: "pointer",
             }}
           >
-            <X style={{ width: "18px", height: "18px" }} strokeWidth={2} aria-hidden />
+            <X style={{ width: "18px", height: "18px" }} strokeWidth={1.75} aria-hidden />
           </button>
         </div>
       </div>
 
-      {/* Stage — 96px head per §2.5 */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          paddingTop: "8px",
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "center", paddingTop: "8px" }}>
         <Image
-          src="/miomi/head-happy.png"
+          src="/characters/miomi/companion/companion-happy.png"
           alt="Miomi"
           width={96}
           height={96}
@@ -218,7 +177,6 @@ function CompanionInner({ onClose }: { onClose: () => void }) {
         />
       </div>
 
-      {/* Greeting */}
       <div style={{ textAlign: "center", padding: "12px 24px 0" }}>
         <p
           style={{
@@ -230,7 +188,7 @@ function CompanionInner({ onClose }: { onClose: () => void }) {
             lineHeight: 1.5,
           }}
         >
-          อยู่ตรงนี้กับคุณค่า~
+          {lang === "th" ? "อยู่ตรงนี้กับคุณค่า~" : "I'm right here with you~"}
         </p>
         <p
           style={{
@@ -240,11 +198,12 @@ function CompanionInner({ onClose }: { onClose: () => void }) {
             marginTop: "4px",
           }}
         >
-          I&apos;m here with you — what should we do today?
+          {lang === "th"
+            ? "อยากให้หนูช่วยอะไรคะ?"
+            : "What should we do today?"}
         </p>
       </div>
 
-      {/* Conversation canvas placeholder. Phase 3 wires real messages here. */}
       <div
         style={{
           flex: 1,
@@ -275,23 +234,13 @@ function CompanionInner({ onClose }: { onClose: () => void }) {
               lineHeight: 1.55,
             }}
           >
-            อยากเรียนคำใหม่ หรืออยากให้หนูช่วยอะไรคะ?
-          </p>
-          <p
-            style={{
-              margin: "4px 0 0",
-              fontFamily: "'Quicksand', sans-serif",
-              fontSize: "11px",
-              color: "#9A8B73",
-              lineHeight: 1.5,
-            }}
-          >
-            Want to learn a new word — or something else?
+            {lang === "th"
+              ? "อยากเรียนคำใหม่ หรืออยากให้หนูช่วยอะไรคะ?"
+              : "Want to learn a new word — or something else?"}
           </p>
         </div>
       </div>
 
-      {/* Promote to /talk — full mic/voice experience lives there */}
       <div style={{ padding: "8px 16px 16px" }}>
         <Link
           href="/talk"
@@ -311,7 +260,7 @@ function CompanionInner({ onClose }: { onClose: () => void }) {
             boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)",
           }}
         >
-          คุยแบบเต็มจอ · Open in deep-focus mode
+          {tr("companion_open_in_talk", lang)}
         </Link>
       </div>
     </>

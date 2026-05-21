@@ -3,6 +3,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Mic, Volume2, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  getSpeechRecognitionConstructor,
+  speechRecognitionStatus,
+  unsupportedCopy,
+  type SpeechRecognitionEventLike,
+  type SpeechRecognitionLike,
+} from "@/lib/talk/speech-support";
+import { useUILanguage } from "@/lib/i18n/client";
 
 export type MicState = "idle" | "listening" | "processing" | "speaking";
 
@@ -14,21 +22,6 @@ interface MicButtonProps {
   disabled?: boolean;
 }
 
-type SpeechRecognitionEvent = {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-};
-
-type SpeechRecognitionResultList = {
-  length: number;
-  [index: number]: SpeechRecognitionResult;
-};
-
-type SpeechRecognitionResult = {
-  isFinal: boolean;
-  [index: number]: { transcript: string; confidence: number };
-};
-
 export function MicButton({
   state,
   language = "auto",
@@ -36,22 +29,17 @@ export function MicButton({
   onStateChange,
   disabled = false,
 }: MicButtonProps) {
-  const [speechSupported, setSpeechSupported] = useState(true);
+  const [supportStatus] = useState(() => speechRecognitionStatus());
   const [amplitude, setAmplitude] = useState(0);
   const [liveTranscript, setLiveTranscript] = useState("");
-  const recognitionRef = useRef<unknown>(null);
+  const [unsupportedTooltipOpen, setUnsupportedTooltipOpen] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const isListeningRef = useRef(false);
-
-  useEffect(() => {
-    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
-    if (!w.SpeechRecognition && !w.webkitSpeechRecognition) {
-      setSpeechSupported(false);
-    }
-  }, []);
+  const uiLang = useUILanguage();
 
   const stopAmplitude = useCallback(() => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -60,12 +48,14 @@ export function MicButton({
       audioContextRef.current = null;
     }
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
     setAmplitude(0);
   }, []);
 
+  // Amplitude meter — independent of recognition. Failure to acquire mic
+  // here is non-fatal: SpeechRecognition has its own permission flow on iOS.
   const startAmplitude = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -87,33 +77,19 @@ export function MicButton({
       };
       tick();
     } catch {
-      // Amplitude unavailable — fallback animation handled by CSS
+      // Amplitude unavailable — recognition still works
     }
   }, []);
 
+  // CRITICAL: This must be callable SYNCHRONOUSLY inside a user gesture
+  // handler. iOS Safari loses the gesture context if we await anything
+  // before SpeechRecognition.start().
   const startListening = useCallback(() => {
     if (disabled || isListeningRef.current) return;
-    const SpeechRecognition =
-      (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown })
-        .SpeechRecognition ??
-      (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown })
-        .webkitSpeechRecognition;
+    const Ctor = getSpeechRecognitionConstructor();
+    if (!Ctor) return;
 
-    if (!SpeechRecognition) return;
-
-    const recognition = new (SpeechRecognition as new () => {
-      lang: string;
-      continuous: boolean;
-      interimResults: boolean;
-      maxAlternatives: number;
-      onstart: (() => void) | null;
-      onresult: ((e: SpeechRecognitionEvent) => void) | null;
-      onerror: (() => void) | null;
-      onend: (() => void) | null;
-      start: () => void;
-      stop: () => void;
-    })();
-
+    const recognition: SpeechRecognitionLike = new Ctor();
     recognition.lang = language === "auto" ? "th-TH" : language;
     recognition.continuous = false;
     recognition.interimResults = true;
@@ -122,10 +98,11 @@ export function MicButton({
     recognition.onstart = () => {
       isListeningRef.current = true;
       onStateChange("listening");
+      // Amplitude meter fires off the gesture path; safe to await here.
       void startAmplitude();
     };
 
-    recognition.onresult = (e: SpeechRecognitionEvent) => {
+    recognition.onresult = (e: SpeechRecognitionEventLike) => {
       let interim = "";
       let final = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -154,77 +131,113 @@ export function MicButton({
       isListeningRef.current = false;
       stopAmplitude();
       setLiveTranscript("");
-      // Always reset to idle regardless of current state
       setTimeout(() => onStateChange("idle"), 100);
     };
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [disabled, language, onStateChange, onTranscript, startAmplitude, state, stopAmplitude]);
+  }, [disabled, language, onStateChange, onTranscript, startAmplitude, stopAmplitude]);
 
   const stopListening = useCallback(() => {
     if (!isListeningRef.current) return;
-    const rec = recognitionRef.current as { stop: () => void } | null;
-    rec?.stop();
+    recognitionRef.current?.stop();
     stopAmplitude();
     isListeningRef.current = false;
   }, [stopAmplitude]);
 
-  const handlePress = useCallback(async () => {
-    if (disabled) return;
-    if (state === "speaking") { onStateChange("idle"); return; }
-    if (state === "listening") { stopListening(); return; }
-    if (state === "idle") {
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        setLiveTranscript("ไม่ได้รับอนุญาตใช้ไมค์ค่า~");
-        setTimeout(() => setLiveTranscript(""), 2000);
+  // Synchronous pointer-down handler. Calls startListening() immediately
+  // inside the gesture so iOS Safari accepts the recognition.start() call.
+  // Block A2 of Phase 2.
+  const handlePress = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      if (disabled) return;
+      if (state === "speaking") {
+        onStateChange("idle");
         return;
       }
-      startListening();
-    }
-  }, [disabled, onStateChange, startListening, state, stopListening]);
+      if (state === "listening") {
+        stopListening();
+        return;
+      }
+      if (state === "idle") {
+        startListening();
+      }
+    },
+    [disabled, onStateChange, startListening, state, stopListening],
+  );
 
   useEffect(() => {
-    return () => { stopAmplitude(); };
+    return () => {
+      stopAmplitude();
+    };
   }, [stopAmplitude]);
 
   const ringScale = 1 + amplitude * 0.08;
 
-  if (!speechSupported) {
+  if (!supportStatus.supported) {
+    const copy = unsupportedCopy(supportStatus.reason, uiLang);
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-        <div style={{
-          width: "80px", height: "80px", borderRadius: "50%",
-          border: "2px dashed #EDE8E0", background: "#FAFAF6",
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          gap: "4px",
-        }}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-            stroke="#C4BDB5" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <button
+          type="button"
+          onClick={() => setUnsupportedTooltipOpen((v) => !v)}
+          aria-label={copy.primary}
+          style={{
+            width: "80px",
+            height: "80px",
+            borderRadius: "50%",
+            border: "2px dashed #EDE8E0",
+            background: "#FAFAF6",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "4px",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#C4BDB5"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
             <line x1="1" y1="1" x2="23" y2="23" />
             <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
             <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
             <line x1="12" x2="12" y1="19" y2="22" />
           </svg>
-        </div>
-        <div style={{ textAlign: "center", maxWidth: "200px" }}>
-          <p style={{
-            fontFamily: "'Kanit', sans-serif",
-            fontSize: "11px", color: "#9A8B73",
-            margin: "0 0 2px",
-          }}>
-            เปิดใน Chrome เพื่อใช้เสียงค่า~
+        </button>
+        <div style={{ textAlign: "center", maxWidth: "220px" }}>
+          <p
+            style={{
+              fontFamily: uiLang === "th" ? "'Kanit', sans-serif" : "'Quicksand', sans-serif",
+              fontSize: "11px",
+              color: "#9A8B73",
+              margin: "0 0 2px",
+            }}
+          >
+            {copy.primary}
           </p>
-          <p style={{
-            fontFamily: "'Quicksand', sans-serif",
-            fontSize: "10px", color: "#C4BDB5",
-            margin: 0,
-          }}>
-            Open in Chrome to use voice
-          </p>
+          {unsupportedTooltipOpen ? (
+            <p
+              style={{
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "10px",
+                color: "#C4BDB5",
+                margin: 0,
+              }}
+            >
+              {copy.secondary}
+            </p>
+          ) : null}
         </div>
       </div>
     );
@@ -232,7 +245,6 @@ export function MicButton({
 
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-      {/* Live transcript pill */}
       <AnimatePresence>
         {liveTranscript && state === "listening" && (
           <motion.div
@@ -265,7 +277,6 @@ export function MicButton({
         )}
       </AnimatePresence>
 
-      {/* Outer ring — amplitude responder */}
       <motion.div
         animate={{
           scale: state === "listening" ? ringScale : 1,
@@ -283,31 +294,33 @@ export function MicButton({
         }}
       />
 
-      {/* Main mic button */}
       <motion.button
         type="button"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          void handlePress();
-        }}
+        onPointerDown={handlePress}
         animate={state === "idle" ? { scale: [1, 1.02, 1] } : {}}
         transition={state === "idle" ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : {}}
         style={{
           width: "80px",
           height: "80px",
           borderRadius: "50%",
-          border: state === "idle" ? "2px solid #E8E5DF"
-            : state === "processing" ? "2px solid #C9A96E"
-            : state === "speaking" ? "2px solid #F9A8D4"
-            : "none",
-          background: state === "listening"
-            ? "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)"
-            : state === "processing"
-            ? "#FFF8F2"
-            : "#FFFFFF",
-          boxShadow: state === "listening"
-            ? "0 8px 32px rgba(219,39,119,0.35)"
-            : "0 4px 16px rgba(26,26,24,0.06)",
+          border:
+            state === "idle"
+              ? "2px solid #E8E5DF"
+              : state === "processing"
+                ? "2px solid #C9A96E"
+                : state === "speaking"
+                  ? "2px solid #F9A8D4"
+                  : "none",
+          background:
+            state === "listening"
+              ? "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)"
+              : state === "processing"
+                ? "#FFF8F2"
+                : "#FFFFFF",
+          boxShadow:
+            state === "listening"
+              ? "0 8px 32px rgba(219,39,119,0.35)"
+              : "0 4px 16px rgba(26,26,24,0.06)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -318,26 +331,26 @@ export function MicButton({
           overflow: "hidden",
           opacity: disabled ? 0.4 : 1,
           flexShrink: 0,
+          touchAction: "manipulation",
         }}
       >
-        {/* Icon */}
         {state === "processing" ? (
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-          >
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}>
             <Loader2 style={{ width: "24px", height: "24px", color: "#9A8B73" }} />
           </motion.div>
         ) : state === "speaking" ? (
           <Volume2 style={{ width: "32px", height: "32px", color: "#DB2777" }} strokeWidth={1.75} />
         ) : (
           <Mic
-            style={{ width: "32px", height: "32px", color: state === "listening" ? "#FFFFFF" : "#DB2777" }}
+            style={{
+              width: "32px",
+              height: "32px",
+              color: state === "listening" ? "#FFFFFF" : "#DB2777",
+            }}
             strokeWidth={state === "listening" ? 2.0 : 1.75}
           />
         )}
 
-        {/* Waveform bars during listening */}
         {state === "listening" && (
           <div style={{ display: "flex", gap: "3px", position: "absolute", bottom: "12px" }}>
             {[0, 1, 2].map((i) => (
@@ -345,12 +358,7 @@ export function MicButton({
                 key={i}
                 animate={{ height: [8, 8 + amplitude * 16, 8] }}
                 transition={{ duration: 0.3, repeat: Infinity, delay: i * 0.1 }}
-                style={{
-                  width: "4px",
-                  background: "#FFFFFF",
-                  borderRadius: "2px",
-                  minHeight: "8px",
-                }}
+                style={{ width: "4px", background: "#FFFFFF", borderRadius: "2px", minHeight: "8px" }}
               />
             ))}
           </div>

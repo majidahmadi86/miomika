@@ -45,6 +45,8 @@ export default function TalkPage() {
     }
   }, [canvasItems]);
 
+  // TODO(phase-3): refactor miomiState to derive synchronously from micState.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (micState === "listening") setMiomiState("listening");
     else if (micState === "processing") setMiomiState("thinking");
@@ -52,12 +54,14 @@ export default function TalkPage() {
     else setMiomiState("idle");
   }, [micState]);
 
+  // TODO(phase-3): replace with useUILanguage from lib/i18n/client.ts.
   useEffect(() => {
     const lang = navigator.language || "th";
     if (lang.startsWith("en")) {
       setUiLang("en");
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     const opener = getSessionOpener({
@@ -73,6 +77,8 @@ export default function TalkPage() {
       ? "พูดหรือพิมพ์อะไรก็ได้ค่า~"
       : opener.speech_en;
 
+    // TODO(phase-3): move opener selection out of effect (compute synchronously).
+    /* eslint-disable react-hooks/set-state-in-effect */
     setSubtitleTh(uiLang === "en" ? "Hi~ I'm Miomi!" : "สวัสดีค่า~");
     setCanvasItems([{
       id: crypto.randomUUID(),
@@ -81,6 +87,7 @@ export default function TalkPage() {
       textEn: openerEn,
     }]);
     window.setTimeout(() => setMiomiState("idle"), 1000);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [uiLang]);
 
   const processUserInput = useCallback(async (text: string) => {

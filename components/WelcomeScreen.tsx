@@ -1,37 +1,106 @@
 "use client";
 
+/**
+ * WelcomeScreen — self-gating splash. Renders nothing during SSR, decides
+ * client-side whether to show based on profile state + localStorage flag.
+ *
+ * Block A1 of Phase 2 (MIOMIKA.md §8). The `mounted` state eliminates the
+ * Phase-1 hydration mismatch that caused the welcome screen to double-show
+ * on mobile.
+ *
+ * On dismiss:
+ *   - localStorage flag set immediately (survives reloads)
+ *   - server action markWelcomeShown() writes users.welcome_shown_at for
+ *     authenticated users
+ *   - module-level guard prevents re-display within the SPA session
+ *
+ * The animation timeline (fade-in → text → fade-out) is preserved from
+ * Phase 1 — only the gating logic changed.
+ */
+
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
+import { useProfile } from "@/lib/auth/use-profile";
+import { useUILanguage } from "@/lib/i18n/client";
+import { useHasMounted } from "@/lib/hooks/use-media-query";
+import {
+  shouldShowWelcome,
+  markWelcomeShownLocal,
+} from "@/lib/welcome/show-welcome";
+import { markWelcomeShown } from "@/lib/welcome/actions";
+
 const AmbientBackground = dynamic(
   () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
-  { ssr: false }
+  { ssr: false },
 );
 
+let _welcomeShownInSession = false;
+
 type WelcomeScreenProps = {
-  onComplete: () => void;
+  /** Optional: called after the welcome animation completes. */
+  onComplete?: () => void;
 };
 
 export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
+  const mounted = useHasMounted();
+  const [shouldShow, setShouldShow] = useState(false);
   const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
 
+  const { profile, authReady } = useProfile();
+  const lang = useUILanguage();
+
+  // Decide whether to show. Runs only after profile resolves so we don't
+  // flash welcome to a returning Pro user. useHasMounted gates the mount
+  // boundary via useSyncExternalStore (no setState-in-effect).
+  //
+  // The _welcomeShownInSession module guard is a one-way flip: once set, the
+  // effect always early-returns. setShouldShow is therefore called at most
+  // once per session — no need to clear it on re-renders.
   useEffect(() => {
-    // Write flag immediately on mount — before any animation
-    // This prevents any re-render race condition
-    
+    if (typeof window === "undefined") return;
+    if (_welcomeShownInSession) return;
+    if (!authReady) return;
+
+    const decision = shouldShowWelcome(profile, window.localStorage);
+    _welcomeShownInSession = true;
+    // The lint rule flags setState-in-effect as cascading, but this is the
+    // canonical "react to async profile data" pattern — useSyncExternalStore
+    // isn't applicable because profile resolution itself owns a useEffect.
+    // setShouldShow fires at most once per session via the module guard above.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (decision) setShouldShow(true);
+  }, [profile, authReady]);
+
+  useEffect(() => {
+    if (!shouldShow) return;
+
     const t1 = setTimeout(() => setPhase(1), 80);
     const t2 = setTimeout(() => setPhase(2), 950);
     const t3 = setTimeout(() => setPhase(3), 2900);
     const t4 = setTimeout(() => {
-      onComplete();
+      markWelcomeShownLocal();
+      void markWelcomeShown();
+      setShouldShow(false);
+      onComplete?.();
     }, 4200);
+
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       clearTimeout(t4);
     };
-  }, [onComplete]);
+  }, [shouldShow, onComplete]);
+
+  // SSR + first paint: render nothing. Eliminates the hydration mismatch
+  // that caused the Phase-1 double-show bug.
+  if (!mounted || !shouldShow) return null;
+
+  const heading =
+    lang === "th"
+      ? ["ยินดีต้อนรับนะคะ~", "หนูรอคุณอยู่ค่า"]
+      : ["Welcome~", "I've been waiting for you"];
 
   return (
     <div
@@ -74,9 +143,10 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
           flexDirection: "column",
           alignItems: "center",
           opacity: phase >= 1 ? 1 : 0,
-          transform: phase >= 1
-            ? "scale(1) translateY(0px)"
-            : "scale(0.86) translateY(20px)",
+          transform:
+            phase >= 1
+              ? "scale(1) translateY(0px)"
+              : "scale(0.86) translateY(20px)",
           transition: "opacity 1.0s ease, transform 1.0s cubic-bezier(0.34,1.56,0.64,1)",
         }}
       >
@@ -104,7 +174,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
       >
         <p
           style={{
-            fontFamily: "'Kanit', sans-serif",
+            fontFamily: lang === "th" ? "'Kanit', sans-serif" : "'Quicksand', sans-serif",
             fontSize: "20px",
             fontWeight: 500,
             color: "#1A1A18",
@@ -113,9 +183,9 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
             margin: 0,
           }}
         >
-          ยินดีต้อนรับนะคะ~
+          {heading[0]}
           <br />
-          หนูรอคุณอยู่ค่า
+          {heading[1]}
         </p>
         <p
           style={{
@@ -125,11 +195,10 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
             color: "#C4BDB5",
             letterSpacing: "0.12em",
             textTransform: "uppercase",
-            marginTop: "8px",
             margin: "8px 0 0",
           }}
         >
-          Welcome · I&apos;ve been waiting
+          Welcome &middot; I&apos;ve been waiting
         </p>
       </div>
 

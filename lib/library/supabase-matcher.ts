@@ -1,10 +1,20 @@
-// lib/ai/matcher.ts
-// Intent classifier + library matcher
-// Runs BEFORE any AI call. Zero cost.
+/**
+ * Supabase-backed library matcher. The route handler at /api/miomi uses this
+ * to look up `library_entries` rows and decide whether to serve from the
+ * library (zero AI cost) or fall through to an AI call.
+ *
+ * This file used to live at `lib/ai/matcher.ts`. Phase-2 §F1 consolidation
+ * moved it to `lib/library/` next to its sibling, the in-code template
+ * matcher (lib/library/matcher.ts). The intent classifier helpers that lived
+ * here are now replaced by `lib/ai/intents.ts` (`classifyIntentAdvanced`).
+ *
+ * Exported `matchLibrary` (DB-backed) is renamed to `matchLibraryFromDB` to
+ * disambiguate from the template `matchLibrary` in lib/library/matcher.ts.
+ *
+ * MIOMIKA.md §6.2.
+ */
 
 import { createClient } from "@/lib/supabase/server";
-
-// ─── TYPES ────────────────────────────────────────────────────────────────────
 
 export type Intent =
   | "greeting"
@@ -40,8 +50,6 @@ export type MatchResult =
   | { type: "library"; match: LibraryMatch }
   | { type: "ai"; reason: string; intent: Intent };
 
-// ─── SESSION CONTEXT ─────────────────────────────────────────────────────────
-
 export type MatchContext = {
   estimatedLevel: string;
   sessionArc: string;
@@ -50,19 +58,19 @@ export type MatchContext = {
   emotionalMomentum: string;
 };
 
-// ─── INTENT CLASSIFIER ───────────────────────────────────────────────────────
-// Zero cost. Pure pattern matching.
-// Handles ~80% of inputs correctly.
+// ─── LEGACY INTENT CLASSIFIER ────────────────────────────────────────────────
+//
+// Kept as a side-helper for callers that haven't migrated to the new
+// classifyIntentAdvanced in lib/ai/intents.ts. New code should NOT use this.
 
 export function classifyIntent(
   userInput: string,
-  context: MatchContext
+  context: MatchContext,
 ): Intent {
   const raw = userInput.trim();
   const lower = raw.toLowerCase();
   const words = lower.split(/\s+/);
 
-  // Check target word first — highest priority
   if (
     context.currentTargetWord &&
     lower.includes(context.currentTargetWord.toLowerCase())
@@ -70,92 +78,78 @@ export function classifyIntent(
     return "using_target_word";
   }
 
-  // Greetings
   if (
     /^(hi|hello|hey|good morning|good evening|good afternoon|good night|สวัสดี|หวัดดี|ดีจ้า|ดีครับ|ดีค่ะ)/.test(
-      lower
+      lower,
     )
   ) {
     return "greeting";
   }
 
-  // Confusion signals
   if (
     /^(what\?|huh|ห๊ะ|อะไรนะ|ไม่เข้าใจ|เข้าใจไม่ได้|don'?t understand|cant understand|confused)/.test(
-      lower
+      lower,
     ) ||
     lower === "?"
   ) {
     return "confusion";
   }
 
-  // Definition questions
   if (/(what.*mean|แปลว่าอะไร|แปลว่า|meaning of|definition of|คืออะไร)/.test(lower)) {
     return "asking_definition";
   }
 
-  // Help requests
   if (
     /(help me|ช่วย|teach me|สอน|can you teach|อยากเรียน|want to learn|อยากเก่ง|how do i|how can i)/.test(
-      lower
+      lower,
     )
   ) {
     return "asking_help";
   }
 
-  // Questions
   if (
     lower.endsWith("?") ||
     /^(what|where|when|why|how|who|which|is|are|do|does|can|could|would|should)/.test(
-      lower
+      lower,
     )
   ) {
     return "asking_question";
   }
 
-  // Positive emotions
   if (
     /(i'?m happy|i am happy|i feel good|great|wonderful|amazing|love it|ดีใจ|มีความสุข|ชอบมาก|สนุก|ตื่นเต้น|excited)/.test(
-      lower
+      lower,
     )
   ) {
     return "expressing_emotion_positive";
   }
 
-  // Negative emotions
   if (
     /(i'?m (sad|tired|scared|stressed|worried|bored)|i feel (bad|down)|เหนื่อย|เครียด|กลัว|เศร้า|ไม่สบาย|หงุดหงิด)/.test(
-      lower
+      lower,
     )
   ) {
     return "expressing_emotion_negative";
   }
 
-  // Agreement / short positive
   if (/^(yes|yeah|yep|ok|okay|sure|alright|ครับ|ค่ะ|ได้|โอเค|ใช่|เข้าใจ|i understand|i see|got it)/.test(lower)) {
     return "agreement";
   }
 
-  // Off-topic signals
   if (
     /(your name|how old|are you (a|an|real|ai|bot|robot|human)|who made you|ใครสร้าง|ชื่ออะไร|อายุเท่าไหร่)/.test(
-      lower
+      lower,
     )
   ) {
     return "off_topic";
   }
 
-  // Too short to classify reliably
   if (words.length <= 1 && !/[ก-๙]/.test(raw)) {
     return "unclear";
   }
 
   return "making_statement";
 }
-
-// ─── NORMALIZE INPUT ─────────────────────────────────────────────────────────
-// Strips punctuation, lowercases, trims
-// Used for pattern matching against library
 
 function normalizeInput(input: string): string {
   return input
@@ -165,37 +159,28 @@ function normalizeInput(input: string): string {
     .trim();
 }
 
-// ─── SIMILARITY SCORE ────────────────────────────────────────────────────────
-// Simple token overlap similarity — no API needed
-// Good enough for library matching without vector embeddings
-// We will add vector embeddings in Phase 2
-
 function tokenSimilarity(a: string, b: string): number {
   const tokensA = new Set(a.split(/\s+/).filter((t) => t.length > 1));
   const tokensB = new Set(b.split(/\s+/).filter((t) => t.length > 1));
-
   if (tokensA.size === 0 || tokensB.size === 0) return 0;
 
   let overlap = 0;
   for (const token of tokensA) {
     if (tokensB.has(token)) overlap++;
   }
-
-  // Jaccard similarity
   const union = new Set([...tokensA, ...tokensB]).size;
   return overlap / union;
 }
 
-// ─── MAIN MATCHER ─────────────────────────────────────────────────────────────
+// ─── MAIN MATCHER ────────────────────────────────────────────────────────────
 
-export async function matchLibrary(
+export async function matchLibraryFromDB(
   userInput: string,
-  context: MatchContext
+  context: MatchContext,
 ): Promise<MatchResult> {
   const intent = classifyIntent(userInput, context);
   const normalized = normalizeInput(userInput);
 
-  // Skip library for unclear inputs — go straight to AI
   if (intent === "unclear" && context.exchangeNumber > 2) {
     return { type: "ai", reason: "unclear_input", intent };
   }
@@ -203,15 +188,13 @@ export async function matchLibrary(
   try {
     const supabase = await createClient();
 
-    // Fetch candidates filtered by intent + level + arc
-    // No vector search yet — pure SQL filter + client-side similarity
     const { data: candidates, error } = await supabase
       .from("library_entries")
       .select(
         `id, user_input_pattern, response_th, response_en,
          follow_up_question_th, follow_up_question_en,
          response_type, embedded_word, embedded_word_thai,
-         ui_action, ui_payload, quality_score, source`
+         ui_action, ui_payload, quality_score, source`,
       )
       .eq("status", "active")
       .eq("intent_category", intent)
@@ -225,14 +208,12 @@ export async function matchLibrary(
       return { type: "ai", reason: "no_candidates", intent };
     }
 
-    // Score each candidate by token similarity + quality
     const scored = candidates
       .map((entry) => {
         const patternSimilarity = tokenSimilarity(
           normalized,
-          normalizeInput(entry.user_input_pattern)
+          normalizeInput(entry.user_input_pattern),
         );
-        // 60% similarity + 40% quality
         const combined = patternSimilarity * 0.6 + entry.quality_score * 0.4;
         return { entry, patternSimilarity, combined };
       })
@@ -243,7 +224,6 @@ export async function matchLibrary(
       return { type: "ai", reason: "no_candidates", intent };
     }
 
-    // High confidence — serve from library
     if (top.patternSimilarity > 0.6 && top.entry.quality_score > 0.4) {
       return {
         type: "library",
@@ -256,7 +236,6 @@ export async function matchLibrary(
       };
     }
 
-    // Medium confidence — serve if quality is high enough
     if (top.combined > 0.5 && top.entry.quality_score > 0.5) {
       return {
         type: "library",
@@ -269,21 +248,14 @@ export async function matchLibrary(
       };
     }
 
-    // Low confidence — call AI
-    return {
-      type: "ai",
-      reason: "low_confidence",
-      intent,
-    };
+    return { type: "ai", reason: "low_confidence", intent };
   } catch (err) {
     console.error("Matcher error:", err);
-    // On any error — fall through to AI
     return { type: "ai", reason: "matcher_error", intent };
   }
 }
 
-// ─── LOG INTERACTION ──────────────────────────────────────────────────────────
-// Called after every exchange — feeds the self-improvement loop
+// ─── INTERACTION LOG ─────────────────────────────────────────────────────────
 
 export async function logInteraction(params: {
   sessionId: string;
@@ -310,31 +282,22 @@ export async function logInteraction(params: {
       ai_cost_usd: params.aiCostUsd,
     });
   } catch (err) {
-    // Never block the user experience for logging errors
     console.error("Log interaction error:", err);
   }
 }
 
-// ─── UPDATE LIBRARY QUALITY ───────────────────────────────────────────────────
-// Called when we observe the user's NEXT message after a library serve
-// This is how the library learns what works
-
 export async function updateLibraryQuality(
   entryId: string,
-  signal: "continued" | "engaged_positively" | "flagged"
+  signal: "continued" | "engaged_positively" | "flagged",
 ) {
   try {
     const supabase = await createClient();
-
     const columnMap = {
       continued: "times_continued",
       engaged_positively: "times_user_engaged_positively",
       flagged: "times_flagged",
     };
-
     const column = columnMap[signal];
-
-    // Increment the signal counter
     await supabase.rpc("increment_library_signal", {
       entry_id: entryId,
       signal_column: column,
@@ -343,8 +306,6 @@ export async function updateLibraryQuality(
     console.error("Update library quality error:", err);
   }
 }
-
-// ─── HELPER ───────────────────────────────────────────────────────────────────
 
 function getAdjacentLevel(level: string): string {
   const levels = ["beginner", "elementary", "intermediate", "upper"];

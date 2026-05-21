@@ -76,6 +76,9 @@ export function MiomiLive({ state, size = 180 }: MiomiLiveProps) {
     };
   }, [state]);
 
+  // TODO(phase-3): refactor MiomiLive state to useReducer / derived state.
+  /* eslint-disable react-hooks/set-state-in-effect */
+
   // Gold particles for thinking state
   useEffect(() => {
     if (state !== "thinking") {
@@ -113,6 +116,7 @@ export function MiomiLive({ state, size = 180 }: MiomiLiveProps) {
       setRightEarAngle(0);
     }
   }, [state]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Head tilt per state
   const headTilt = state === "thinking" ? -8

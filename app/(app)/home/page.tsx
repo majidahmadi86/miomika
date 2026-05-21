@@ -10,17 +10,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRef as useRefCallback } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import { useCompanionStore } from "@/lib/companion/store";
 import dynamic from "next/dynamic";
-
-// Module-level guard — persists across all renders and remounts for this browser session
-let _welcomeShown = false;
 
 const AmbientBackground = dynamic(
   () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
@@ -164,56 +160,9 @@ export default function HomePage() {
   const [guestSignupMoment, setGuestSignupMoment] = useState(false);
   const [meaningExpanded, setMeaningExpanded] = useState(false);
 
-  // ─── WELCOME SCREEN — single-show contract (Phase 1, bug #1 + #8) ─────────
-  // Three guards, in order:
-  //   1. _welcomeShown module-level boolean — survives React re-renders/remounts
-  //      within the same browser session. First gate against the race in #1.
-  //   2. localStorage flag "miomika-welcomed-v1" — survives reloads.
-  //   3. Authenticated returner: skip entirely when the Supabase session reports
-  //      a non-guest user we've seen recently. (bug #8)
-  const [showWelcome, setShowWelcome] = useState(false);
-
-  useEffect(() => {
-    if (_welcomeShown) return;
-    if (typeof window === "undefined") return;
-
-    // Guard #2: localStorage.
-    let seen: string | null = null;
-    try {
-      seen = localStorage.getItem("miomika-welcomed-v1");
-    } catch {
-      seen = null;
-    }
-    if (seen) {
-      _welcomeShown = true;
-      return;
-    }
-
-    // Guard #3: skip for any authenticated user. Returning Pro/Free users have
-    // already met Miomi server-side — onboarding is the right surface for them.
-    // For true first-time guests (no auth), we always show.
-    let cancelled = false;
-    const supabase = createClient();
-    void supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      const hasSession = Boolean(data.session?.user);
-      // Atomically claim the slot before painting WelcomeScreen so a second
-      // render can never re-enter this block.
-      _welcomeShown = true;
-      try {
-        localStorage.setItem("miomika-welcomed-v1", "1");
-      } catch {
-        /* private mode / quota — guard #1 still protects this session */
-      }
-      if (!hasSession) {
-        setShowWelcome(true);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Welcome screen self-gates via the WelcomeScreen component (Phase 2,
+  // Block A1 — hydration-safe mounted guard + shouldShowWelcome decision).
+  const openCompanion = useCompanionStore((s) => s.open);
 
   const tapCycleIndexRef = useRef(0);
   const lastActivityRef = useRef(0);
@@ -331,6 +280,14 @@ export default function HomePage() {
     showGuestSignupIfFirst();
     window.location.href = "/create";
   }, [showGuestSignupIfFirst]);
+
+  // Home "Talk to Miomi" CTA opens the ambient companion sheet rather than
+  // routing to /talk. /talk is reachable from the Fullscreen button inside
+  // the sheet OR the Learn tab in the bottom nav. Phase-2 §8 Block A5.
+  const handleTalkCTA = useCallback(() => {
+    markActivity();
+    openCompanion();
+  }, [markActivity, openCompanion]);
 
   const handleStagePointerDown = useCallback(() => {
     markActivity();
@@ -485,13 +442,7 @@ export default function HomePage() {
 
   return (
     <>
-      {showWelcome && (
-        <WelcomeScreen
-          onComplete={() => {
-            setShowWelcome(false);
-          }}
-        />
-      )}
+      <WelcomeScreen />
       <AppShell>
         <div className="flex h-full max-h-full flex-col overflow-hidden">
           <style>{`
@@ -708,25 +659,15 @@ export default function HomePage() {
                 </motion.div>
               </button>
 
-              {authReady && isGuest ? (
-                <button
-                  type="button"
-                  onClick={handleGuestCreatePress}
-                  className={tapFeedback}
-                  style={{ height: "52px", borderRadius: "999px", background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)" }}
-                >
-                  <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "15px", fontWeight: 500, color: "#FFFFFF", lineHeight: 1.3 }}>คุยกับมิโอมิ</span>
-                  <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.80)", letterSpacing: "0.06em" }}>Talk to Miomi</span>
-                </button>
-              ) : (
-                <Link
-                  href="/create"
-                  style={{ height: "52px", borderRadius: "999px", background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)", textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)" }}
-                >
-                  <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "15px", fontWeight: 500, color: "#FFFFFF", lineHeight: 1.3 }}>คุยกับมิโอมิ</span>
-                  <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.80)", letterSpacing: "0.06em" }}>Talk to Miomi</span>
-                </Link>
-              )}
+              <button
+                type="button"
+                onClick={handleTalkCTA}
+                className={tapFeedback}
+                style={{ height: "52px", borderRadius: "999px", background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)" }}
+              >
+                <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "15px", fontWeight: 500, color: "#FFFFFF", lineHeight: 1.3 }}>คุยกับมิโอมิ</span>
+                <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.80)", letterSpacing: "0.06em" }}>Talk to Miomi</span>
+              </button>
             </div>
           </div>
 

@@ -1,31 +1,31 @@
 "use client";
 
 /**
- * AmbientCompanion — mounts the floating button + sheet/panel on every
- * authenticated route except /talk (where Miomi is already the canvas).
+ * AmbientCompanion — mounts the floating button + sheet + panel on every
+ * authenticated route except /talk. With the Zustand-backed store, the
+ * provider is now a no-op shim kept for API compatibility.
  *
- * Single import point so the (app) layout stays clean.
+ * Sheet and Panel each gate themselves on viewport (mobile vs desktop) so
+ * they're mutually exclusive — see MIOMIKA.md §8 Phase 2 (Block A3).
  */
 
 import { usePathname } from "next/navigation";
 import { CompanionButton } from "@/components/companion/CompanionButton";
-import { CompanionSurface } from "@/components/companion/CompanionSurface";
-import {
-  CompanionProvider,
-} from "@/components/companion/CompanionStateContext";
+import { CompanionSheet } from "@/components/companion/CompanionSheet";
+import { CompanionPanel } from "@/components/companion/CompanionPanel";
 
 const HIDDEN_ROUTES = new Set<string>(["/talk"]);
 
 export function AmbientCompanion() {
   const pathname = usePathname();
   if (HIDDEN_ROUTES.has(pathname)) {
-    // /talk is already Miomi-the-canvas — no floating companion needed.
     return null;
   }
   return (
-    <CompanionProvider>
+    <>
       <CompanionButton />
-      <CompanionSurface />
-    </CompanionProvider>
+      <CompanionSheet />
+      <CompanionPanel />
+    </>
   );
 }

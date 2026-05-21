@@ -17,6 +17,8 @@ import {
   useGuestExploration,
 } from "@/components/guest/GuestExplorationContext";
 import { AmbientCompanion } from "@/components/companion/AmbientCompanion";
+import { GuidanceHost } from "@/components/guidance/GuidanceHost";
+import { DesktopHoldBanner } from "@/components/layout/DesktopHoldBanner";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { cn } from "@/lib/utils";
 import { useRef, useCallback, useEffect } from "react";
@@ -327,12 +329,14 @@ function AppLayoutInner({
       </aside>
 
       <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-white md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
+        <DesktopHoldBanner />
         <SwipeNavigator pathname={pathname}>
           {children}
         </SwipeNavigator>
         {!hiddenNav && <BottomNav />}
         <InstallPrompt />
         <AmbientCompanion />
+        <GuidanceHost />
       </div>
 
       <aside className="hidden h-screen w-72 shrink-0 flex-col border-l border-[#EAD0DB] bg-white md:flex">
