@@ -351,6 +351,33 @@ export default function CreatePage() {
     return () => clearInterval(id);
   }, [messages, lastUserActivity]);
 
+  useEffect(() => {
+    // Fetch engine-driven opener
+    const fetchOpener = async () => {
+      try {
+        const res = await fetch("/api/miomi/session-init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: sessionState.userId ?? null }),
+        });
+        if (!res.ok) return;
+        const opener = await res.json() as { th: string; en: string };
+        if (opener.th && opener.en) {
+          setMessages([{
+            id: `${Date.now()}-init`,
+            type: "miomi" as const,
+            th: opener.th,
+            en: opener.en,
+          }]);
+        }
+      } catch {
+        // Silently fail — fallback message already showing
+      }
+    };
+    void fetchOpener();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount only
+
   const showCopyToast = useCallback(() => {
     setToast(true);
     window.setTimeout(() => setToast(false), 2000);
