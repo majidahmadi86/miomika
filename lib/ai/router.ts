@@ -6,8 +6,26 @@ import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
 import { getFailoverResponse } from "./session";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
-const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+// Lazy clients — constructing at module load fails Next 16's page-data
+// collection step when env vars are absent (build-time).
+let _groq: Groq | null = null;
+let _gemini: GoogleGenAI | null = null;
+
+function getGroq(): Groq | null {
+  if (_groq) return _groq;
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
+  _groq = new Groq({ apiKey: key });
+  return _groq;
+}
+
+function getGemini(): GoogleGenAI | null {
+  if (_gemini) return _gemini;
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  _gemini = new GoogleGenAI({ apiKey: key });
+  return _gemini;
+}
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -54,6 +72,8 @@ async function callGroq(
   messages: Message[],
   systemPrompt: string
 ): Promise<string> {
+  const groq = getGroq();
+  if (!groq) throw new Error("GROQ_API_KEY missing — Groq disabled");
   const response = await groq.chat.completions.create({
     model: GROQ_MODEL,
     max_tokens: 300,
@@ -86,6 +106,8 @@ async function callGemini(
 
   const lastMessage = messages[messages.length - 1];
 
+  const gemini = getGemini();
+  if (!gemini) throw new Error("GEMINI_API_KEY missing — Gemini disabled");
   const chat = gemini.chats.create({
     model: GEMINI_MODEL,
     config: {

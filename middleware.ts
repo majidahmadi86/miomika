@@ -18,8 +18,15 @@ function isAuthRequiredPath(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  const { response, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
+
+  // Let the OAuth callback handler run untouched — it manages its own
+  // cookie writes via the redirect response.
+  if (pathname.startsWith("/auth/callback")) {
+    return NextResponse.next({ request });
+  }
+
+  const { response, user } = await updateSession(request);
 
   if (pathname.startsWith("/api")) {
     return response;

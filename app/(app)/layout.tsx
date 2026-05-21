@@ -16,6 +16,7 @@ import {
   GuestExplorationProvider,
   useGuestExploration,
 } from "@/components/guest/GuestExplorationContext";
+import { AmbientCompanion } from "@/components/companion/AmbientCompanion";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { cn } from "@/lib/utils";
 import { useRef, useCallback, useEffect } from "react";
@@ -331,6 +332,7 @@ function AppLayoutInner({
         </SwipeNavigator>
         {!hiddenNav && <BottomNav />}
         <InstallPrompt />
+        <AmbientCompanion />
       </div>
 
       <aside className="hidden h-screen w-72 shrink-0 flex-col border-l border-[#EAD0DB] bg-white md:flex">

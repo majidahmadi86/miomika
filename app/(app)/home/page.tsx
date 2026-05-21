@@ -1,5 +1,4 @@
-﻿// @ts-ignore
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -17,6 +16,7 @@ import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 import dynamic from "next/dynamic";
 
 // Module-level guard — persists across all renders and remounts for this browser session
@@ -164,21 +164,56 @@ export default function HomePage() {
   const [guestSignupMoment, setGuestSignupMoment] = useState(false);
   const [meaningExpanded, setMeaningExpanded] = useState(false);
 
-  // ─── WELCOME SCREEN — definitive fix ─────────────────────────────────────
-  // useState lazy initializer runs once synchronously on first mount.
-  // _welcomeShown module variable prevents re-triggering on remounts.
-  // WelcomeScreen writes the localStorage flag on its own mount.
+  // ─── WELCOME SCREEN — single-show contract (Phase 1, bug #1 + #8) ─────────
+  // Three guards, in order:
+  //   1. _welcomeShown module-level boolean — survives React re-renders/remounts
+  //      within the same browser session. First gate against the race in #1.
+  //   2. localStorage flag "miomika-welcomed-v1" — survives reloads.
+  //   3. Authenticated returner: skip entirely when the Supabase session reports
+  //      a non-guest user we've seen recently. (bug #8)
   const [showWelcome, setShowWelcome] = useState(false);
 
-useEffect(() => {
-  if (_welcomeShown) return;
-  const seen = localStorage.getItem("miomika-welcomed-v1");
-  if (!seen) {
-    _welcomeShown = true;
-    localStorage.setItem("miomika-welcomed-v1", "1");
-    setShowWelcome(true);
-  }
-}, []);
+  useEffect(() => {
+    if (_welcomeShown) return;
+    if (typeof window === "undefined") return;
+
+    // Guard #2: localStorage.
+    let seen: string | null = null;
+    try {
+      seen = localStorage.getItem("miomika-welcomed-v1");
+    } catch {
+      seen = null;
+    }
+    if (seen) {
+      _welcomeShown = true;
+      return;
+    }
+
+    // Guard #3: skip for any authenticated user. Returning Pro/Free users have
+    // already met Miomi server-side — onboarding is the right surface for them.
+    // For true first-time guests (no auth), we always show.
+    let cancelled = false;
+    const supabase = createClient();
+    void supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      const hasSession = Boolean(data.session?.user);
+      // Atomically claim the slot before painting WelcomeScreen so a second
+      // render can never re-enter this block.
+      _welcomeShown = true;
+      try {
+        localStorage.setItem("miomika-welcomed-v1", "1");
+      } catch {
+        /* private mode / quota — guard #1 still protects this session */
+      }
+      if (!hasSession) {
+        setShowWelcome(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const tapCycleIndexRef = useRef(0);
   const lastActivityRef = useRef(0);

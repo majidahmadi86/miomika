@@ -56,14 +56,37 @@ const LANGUAGE_OPTIONS: {
   { id: "both", th: "ทั้งไทยและอังกฤษ", en: "Both (Thai + English)" },
 ];
 
+// Journey stage (MIOMIKA.md §2.6) — drives curriculum focus and pricing emphasis.
+type JourneyStage =
+  | "tourist"
+  | "student"
+  | "worker"
+  | "resident"
+  | "unspecified";
+
+const JOURNEY_OPTIONS: {
+  id: JourneyStage;
+  th: string;
+  en: string;
+  desc: string;
+}[] = [
+  { id: "tourist",  th: "มาเที่ยว",   en: "I'm visiting",       desc: "survival phrases, taxi, market" },
+  { id: "student",  th: "มาเรียน",    en: "I'm studying",       desc: "academic, exam prep, classroom" },
+  { id: "worker",   th: "มาทำงาน",    en: "I work here",        desc: "professional, email, meetings" },
+  { id: "resident", th: "อยู่ที่นี่",  en: "I live here",        desc: "cultural fluency, idioms, family" },
+  { id: "unspecified", th: "ยังไม่รู้", en: "Not sure yet",     desc: "general everyday Thai" },
+];
+
+const TOTAL_STEPS = 7;
+
 function ProgressBar({ step }: { step: number }) {
-  const filled = step >= 7 ? 6 : step;
+  const filled = step >= TOTAL_STEPS + 1 ? TOTAL_STEPS : step;
   return (
     <div
-      className="grid h-[2px] w-full shrink-0 grid-cols-6 gap-px bg-rose-border"
+      className="grid h-[2px] w-full shrink-0 grid-cols-7 gap-px bg-rose-border"
       aria-hidden
     >
-      {Array.from({ length: 6 }, (_, i) => (
+      {Array.from({ length: TOTAL_STEPS }, (_, i) => (
         <div
           key={i}
           className={cn(
@@ -103,6 +126,7 @@ function BilingualPrimaryButton({
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [journeyStage, setJourneyStage] = useState<JourneyStage | null>(null);
   const [catName, setCatName] = useState("");
   const [personality, setPersonality] = useState<PersonalityId | null>(null);
   const [creatorTypes, setCreatorTypes] = useState<string[]>([]);
@@ -127,7 +151,7 @@ export default function OnboardingPage() {
   }
 
   useEffect(() => {
-    if (step !== 7) return;
+    if (step !== TOTAL_STEPS + 1) return;
 
     let cancelled = false;
 
@@ -147,7 +171,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      if (!personality || !language) {
+      if (!personality || !language || !journeyStage) {
         setSaveError("ข้อมูลไม่ครบค่า กรุณากลับไปเลือกใหม่");
         setSaveState("error");
         return;
@@ -157,11 +181,13 @@ export default function OnboardingPage() {
         {
           id: user.id,
           email: user.email,
+          journey_stage: journeyStage,
           cat_name: catName.trim(),
           personality,
           creator_type: creatorTypes.join(", "),
           language,
           platforms: platforms.join(", "),
+          last_seen_at: new Date().toISOString(),
         },
         { onConflict: "id" },
       );
@@ -189,6 +215,7 @@ export default function OnboardingPage() {
     step,
     saveRetry,
     catName,
+    journeyStage,
     personality,
     creatorTypes,
     platforms,
@@ -196,7 +223,7 @@ export default function OnboardingPage() {
     router,
   ]);
 
-  const showBack = step > 1 && step < 7;
+  const showBack = step > 1 && step < TOTAL_STEPS + 1;
   const nameOk = catName.trim().length > 0;
 
   return (
@@ -278,6 +305,73 @@ export default function OnboardingPage() {
                 className="flex flex-1 flex-col"
               >
                 <div className="flex flex-1 flex-col items-center pt-2">
+                  <div className="w-[130px] shrink-0">
+                    <Image
+                      src="/miomi/thinking.png"
+                      alt="Miomi"
+                      width={130}
+                      height={130}
+                      className="mx-auto h-auto w-[130px] object-contain"
+                    />
+                  </div>
+                  <h1 className="mt-5 text-center text-xl font-semibold text-neutral-900">
+                    คุณมาอยู่ที่ไทยเพราะอะไรคะ?
+                  </h1>
+                  <p className="mt-1 text-center text-sm text-neutral-500">
+                    What brings you to Thailand?
+                  </p>
+                  <p className="mt-2 text-center text-[11px] leading-relaxed text-neutral-400">
+                    เลือกเพื่อให้หนูสอนคำที่เหมาะกับคุณค่า
+                  </p>
+                  <div className="mt-6 grid w-full gap-2.5">
+                    {JOURNEY_OPTIONS.map((opt) => {
+                      const selected = journeyStage === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setJourneyStage(opt.id)}
+                          className={cn(
+                            "rounded-xl border-2 p-3 text-left transition-colors",
+                            selected
+                              ? "border-rose-accent bg-white"
+                              : "border-rose-border bg-white hover:border-rose-mid/50",
+                          )}
+                        >
+                          <p className="text-base font-semibold text-neutral-900">
+                            {opt.th}
+                          </p>
+                          <p className="text-sm text-neutral-500">{opt.en}</p>
+                          <p className="mt-1 text-[10px] text-neutral-400">
+                            {opt.desc}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="mt-6">
+                  <BilingualPrimaryButton
+                    th="ถัดไป"
+                    en="Next"
+                    disabled={!journeyStage}
+                    onClick={() => setStep(3)}
+                  />
+                </div>
+              </motion.div>
+            ) : null}
+
+            {step === 3 ? (
+              <motion.div
+                key={3}
+                variants={slideVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={slideTransition}
+                className="flex flex-1 flex-col"
+              >
+                <div className="flex flex-1 flex-col items-center pt-2">
                   <div className="miomi-login-float w-[150px] shrink-0">
                     <Image
                       src="/miomi/happy.png"
@@ -310,15 +404,15 @@ export default function OnboardingPage() {
                     th="ตกลงค่า"
                     en="Perfect!"
                     disabled={!nameOk}
-                    onClick={() => setStep(3)}
+                    onClick={() => setStep(4)}
                   />
                 </div>
               </motion.div>
             ) : null}
 
-            {step === 3 ? (
+            {step === 4 ? (
               <motion.div
-                key={3}
+                key={4}
                 variants={slideVariants}
                 initial="initial"
                 animate="animate"
@@ -374,15 +468,15 @@ export default function OnboardingPage() {
                     th="ถัดไป"
                     en="Next"
                     disabled={!personality}
-                    onClick={() => setStep(4)}
+                    onClick={() => setStep(5)}
                   />
                 </div>
               </motion.div>
             ) : null}
 
-            {step === 4 ? (
+            {step === 5 ? (
               <motion.div
-                key={4}
+                key={5}
                 variants={slideVariants}
                 initial="initial"
                 animate="animate"
@@ -434,15 +528,15 @@ export default function OnboardingPage() {
                     th="ถัดไป"
                     en="Next"
                     disabled={creatorTypes.length === 0}
-                    onClick={() => setStep(5)}
+                    onClick={() => setStep(6)}
                   />
                 </div>
               </motion.div>
             ) : null}
 
-            {step === 5 ? (
+            {step === 6 ? (
               <motion.div
-                key={5}
+                key={6}
                 variants={slideVariants}
                 initial="initial"
                 animate="animate"
@@ -494,15 +588,15 @@ export default function OnboardingPage() {
                     th="ถัดไป"
                     en="Next"
                     disabled={platforms.length === 0}
-                    onClick={() => setStep(6)}
+                    onClick={() => setStep(7)}
                   />
                 </div>
               </motion.div>
             ) : null}
 
-            {step === 6 ? (
+            {step === 7 ? (
               <motion.div
-                key={6}
+                key={7}
                 variants={slideVariants}
                 initial="initial"
                 animate="animate"
@@ -557,15 +651,15 @@ export default function OnboardingPage() {
                     th="เสร็จแล้วค่า"
                     en="All set"
                     disabled={!language}
-                    onClick={() => setStep(7)}
+                    onClick={() => setStep(8)}
                   />
                 </div>
               </motion.div>
             ) : null}
 
-            {step === 7 ? (
+            {step === 8 ? (
               <motion.div
-                key={7}
+                key={8}
                 variants={slideVariants}
                 initial="initial"
                 animate="animate"

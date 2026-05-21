@@ -236,12 +236,12 @@ export function WordCardV3({ word, direction, onPronunciationCheck }: WordCardV3
           >
             {word.example_en && (
               <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", fontStyle: "italic", color: "#1A1A18", margin: "0 0 4px" }}>
-                "{word.example_en}"
+                &ldquo;{word.example_en}&rdquo;
               </p>
             )}
             {word.example_th && (
               <p style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "13px", fontStyle: "italic", color: "#9A8B73", margin: 0 }}>
-                "{word.example_th}"
+                &ldquo;{word.example_th}&rdquo;
               </p>
             )}
           </motion.div>
