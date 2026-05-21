@@ -5,8 +5,7 @@ import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
-
-type MicState = "idle" | "listening" | "processing" | "speaking";
+import { MicButton, type MicState } from "@/components/talk/MicButton";
 
 const GUEST_EXCHANGE_LIMIT = 5;
 
@@ -14,6 +13,7 @@ export default function TalkPage() {
   const { isGuest, authReady } = useGuestExploration();
   const [guestExchangesRemaining] = useState(GUEST_EXCHANGE_LIMIT);
   const [micState, setMicState] = useState<MicState>("idle");
+  const [lastTranscript, setLastTranscript] = useState("");
   const [subtitleTh, setSubtitleTh] = useState("พูดอะไรก็ได้ค่า~");
   const [subtitleEn, setSubtitleEn] = useState("Say anything~");
   const [canvasItems, setCanvasItems] = useState<{ id: string; type: string }[]>([]);
@@ -228,48 +228,14 @@ export default function TalkPage() {
           paddingBottom: "env(safe-area-inset-bottom, 8px)",
         }}
       >
-        {/* Mic button — 80px */}
-        <button
-          type="button"
-          onClick={() => setMicState(prev => prev === "idle" ? "listening" : "idle")}
-          style={{
-            width: "80px",
-            height: "80px",
-            borderRadius: "50%",
-            border: micState === "idle" ? "2px solid #E8E5DF" : "none",
-            background: micState === "listening"
-              ? "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)"
-              : micState === "processing"
-              ? "#FFF8F2"
-              : micState === "speaking"
-              ? "#FFFFFF"
-              : "#FFFFFF",
-            boxShadow: micState === "listening"
-              ? "0 8px 32px rgba(219,39,119,0.35), 0 0 0 6px rgba(249,168,212,0.20)"
-              : "0 4px 16px rgba(26,26,24,0.06)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            flexShrink: 0,
+        <MicButton
+          state={micState}
+          language="auto"
+          onTranscript={(text, isFinal) => {
+            if (isFinal) setLastTranscript(text);
           }}
-        >
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={micState === "listening" ? "#FFFFFF" : "#DB2777"}
-            strokeWidth={micState === "listening" ? "2" : "1.75"}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" x2="12" y1="19" y2="22" />
-          </svg>
-        </button>
+          onStateChange={setMicState}
+        />
 
         {/* Secondary controls */}
         <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
