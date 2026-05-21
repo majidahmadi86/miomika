@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { MicButton, type MicState } from "@/components/talk/MicButton";
@@ -270,7 +271,9 @@ export default function TalkPage() {
                 padding: "3px 10px",
               }}
             >
-              เหลืออีก {Math.max(0, GUEST_LIMIT - guestExchanges)} ครั้ง
+              {uiLang === "en"
+                ? `${Math.max(0, GUEST_LIMIT - guestExchanges)} left`
+                : `เหลืออีก ${Math.max(0, GUEST_LIMIT - guestExchanges)} ครั้ง`}
             </span>
           ) : (
             <span
@@ -455,7 +458,7 @@ export default function TalkPage() {
                       }}
                     >
                       <p style={{
-                        fontFamily: "'Kanit', sans-serif",
+                        fontFamily: uiLang === "en" ? "'Sarabun', sans-serif" : "'Kanit', sans-serif",
                         fontSize: "15px",
                         fontWeight: 500,
                         color: "#1A1A18",
@@ -467,7 +470,7 @@ export default function TalkPage() {
                       </p>
                       {((uiLang === "en" && item.textTh) || (uiLang === "th" && item.textEn)) && (
                         <p style={{
-                          fontFamily: "'Quicksand', sans-serif",
+                          fontFamily: uiLang === "en" ? "'Sarabun', sans-serif" : "'Quicksand', sans-serif",
                           fontSize: "12px",
                           color: "#9A8B73",
                           marginTop: "4px",
@@ -573,81 +576,183 @@ export default function TalkPage() {
       </div>
 
       {showGuestSheet && (
-        <div
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(26,26,24,0.4)",
-            zIndex: 100,
+            background: "rgba(26,26,24,0.5)",
+            zIndex: 200,
             display: "flex",
             alignItems: "flex-end",
           }}
-          onClick={() => setShowGuestSheet(false)}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
             style={{
               width: "100%",
               background: "#FFFFFF",
-              borderRadius: "24px 24px 0 0",
-              padding: "24px 24px 40px",
-              boxShadow: "0 -8px 32px rgba(26,26,24,0.12)",
+              borderRadius: "28px 28px 0 0",
+              paddingBottom: "env(safe-area-inset-bottom, 24px)",
+              boxShadow: "0 -8px 40px rgba(26,26,24,0.15)",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "center", paddingTop: "14px", marginBottom: "8px" }}>
               <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E8E5DF" }} />
             </div>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
-              <Image src="/miomi/head-happy.png" alt="Miomi" width={100} height={100} style={{ objectFit: "contain" }} />
+
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "16px" }}>
+              <Image
+                src="/miomi/head-happy.png"
+                alt="Miomi"
+                width={130}
+                height={130}
+                style={{ objectFit: "contain" }}
+              />
             </div>
-            <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "18px", fontWeight: 500, color: "#1A1A18", textAlign: "center", margin: "0 0 6px" }}>
-              หนูอยากจำคุณได้ค่า~
-            </p>
-            <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", color: "#9A8B73", textAlign: "center", margin: "0 0 20px" }}>
-              Sign up free — I&apos;ll remember everything we learned~
-            </p>
-            <div style={{ background: "#FAFAF6", borderRadius: "12px", padding: "12px 16px", marginBottom: "20px" }}>
+
+            <div style={{ textAlign: "center", padding: "0 28px", marginBottom: "20px" }}>
+              <p style={{
+                fontFamily: "'Kanit', sans-serif",
+                fontSize: "22px",
+                fontWeight: 600,
+                color: "#1A1A18",
+                margin: "0 0 8px",
+                lineHeight: 1.3,
+              }}>
+                {uiLang === "en"
+                  ? "I want to remember you~"
+                  : "หนูอยากจำคุณได้ค่า~"}
+              </p>
+              <p style={{
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "14px",
+                color: "#9A8B73",
+                margin: 0,
+                lineHeight: 1.5,
+              }}>
+                {uiLang === "en"
+                  ? "Sign up free — I'll remember everything we learned together"
+                  : "สมัครฟรีได้เลยค่า — หนูจะจำทุกอย่างที่เราเรียนด้วยกัน"}
+              </p>
+            </div>
+
+            <div style={{
+              background: "#FAFAF6",
+              borderRadius: "16px",
+              padding: "16px 20px",
+              margin: "0 24px 24px",
+            }}>
               {[
-                { th: "หนูจำชื่อและความก้าวหน้าของคุณได้", en: "I remember your name and progress" },
-                { th: "คำศัพท์ที่เรียนสะสมไว้ไม่หายไป", en: "Your vocabulary stays saved" },
-                { th: "คุยกับหนูได้ไม่จำกัด", en: "Chat with me unlimited" },
+                {
+                  th: "หนูจำชื่อและความก้าวหน้าของคุณได้",
+                  en: "I remember your name and progress",
+                },
+                {
+                  th: "คำศัพท์ที่เรียนสะสมไว้ไม่หายไป",
+                  en: "Your vocabulary stays saved forever",
+                },
+                {
+                  th: "คุยกับหนูได้ไม่จำกัด ฟรี",
+                  en: "Chat with me unlimited, free",
+                },
               ].map((b, i) => (
-                <div key={i} style={{ display: "flex", gap: "8px", marginBottom: i < 2 ? "8px" : 0 }}>
-                  <span style={{ color: "#F9A8D4", fontSize: "14px" }}>✦</span>
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "10px",
+                    marginBottom: i < 2 ? "12px" : 0,
+                  }}
+                >
+                  <span style={{
+                    color: "#F9A8D4",
+                    fontSize: "16px",
+                    lineHeight: 1,
+                    marginTop: "2px",
+                    flexShrink: 0,
+                  }}>
+                    ✦
+                  </span>
                   <div>
-                    <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", fontWeight: 500, color: "#1A1A18", margin: 0 }}>{b.th}</p>
-                    <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", color: "#9A8B73", margin: 0 }}>{b.en}</p>
+                    <p style={{
+                      fontFamily: "'Kanit', sans-serif",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      color: "#1A1A18",
+                      margin: "0 0 2px",
+                    }}>
+                      {uiLang === "en" ? b.en : b.th}
+                    </p>
+                    <p style={{
+                      fontFamily: "'Quicksand', sans-serif",
+                      fontSize: "12px",
+                      color: "#9A8B73",
+                      margin: 0,
+                    }}>
+                      {uiLang === "en" ? b.th : b.en}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
-            <Link
-              href="/signup"
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: "100%", height: "52px", borderRadius: "999px",
-                background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
-                fontFamily: "'Kanit', sans-serif", fontSize: "16px",
-                fontWeight: 500, color: "#FFFFFF", textDecoration: "none",
-                boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)",
-                marginBottom: "12px",
-              }}
-            >
-              สมัครฟรีเลยค่า~
-            </Link>
-            <button
-              type="button"
-              onClick={() => setShowGuestSheet(false)}
-              style={{
-                display: "block", width: "100%", background: "none",
-                border: "none", fontFamily: "'Quicksand', sans-serif",
-                fontSize: "13px", color: "#C4BDB5", cursor: "pointer", padding: "8px",
-              }}
-            >
-              ไว้ทีหลังนะคะ~ · Maybe later
-            </button>
-          </div>
-        </div>
+
+            <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <Link
+                href="/signup"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "56px",
+                  borderRadius: "999px",
+                  background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                  fontFamily: "'Kanit', sans-serif",
+                  fontSize: "18px",
+                  fontWeight: 500,
+                  color: "#FFFFFF",
+                  textDecoration: "none",
+                  boxShadow: "0 6px 20px -4px rgba(219,39,119,0.45)",
+                }}
+              >
+                {uiLang === "en" ? "Sign up free~" : "สมัครฟรีเลยค่า~"}
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setShowGuestSheet(false)}
+                style={{
+                  height: "48px",
+                  borderRadius: "999px",
+                  background: "none",
+                  border: "1.5px solid #EDE8E0",
+                  fontFamily: "'Quicksand', sans-serif",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#9A8B73",
+                  cursor: "pointer",
+                }}
+              >
+                {uiLang === "en" ? "Maybe later~" : "ไว้ทีหลังนะคะ~"}
+              </button>
+            </div>
+
+            <p style={{
+              textAlign: "center",
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "11px",
+              color: "#C4BDB5",
+              marginTop: "12px",
+              paddingBottom: "8px",
+            }}>
+              {uiLang === "en" ? "No credit card · No ads · Free forever" : "ไม่ต้องใช้บัตรเครดิต · ไม่มีโฆษณา · ฟรีตลอด"}
+            </p>
+          </motion.div>
+        </motion.div>
       )}
     </div>
   );
