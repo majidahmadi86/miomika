@@ -193,6 +193,7 @@ function AppLayoutInner({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
+  const hiddenNav = pathname === "/talk";
   const { isGuest, authReady } = useGuestExploration();
 
   return (
@@ -328,7 +329,7 @@ function AppLayoutInner({
         <SwipeNavigator pathname={pathname}>
           {children}
         </SwipeNavigator>
-        <BottomNav />
+        {!hiddenNav && <BottomNav />}
         <InstallPrompt />
       </div>
 

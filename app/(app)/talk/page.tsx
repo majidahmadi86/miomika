@@ -11,7 +11,6 @@ import { matchLibrary } from "@/lib/library/matcher";
 import { resolveWordCard } from "@/lib/library/resolver";
 import { getSessionOpener } from "@/lib/library/sessionOpener";
 import { getCorrectReaction } from "@/lib/library/reactions";
-import { speakText } from "@/lib/talk/speech";
 
 const GUEST_EXCHANGE_LIMIT = 5;
 
@@ -31,7 +30,6 @@ export default function TalkPage() {
   }>>([]);
   const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [showTextSheet, setShowTextSheet] = useState(false);
   const [textInput, setInputText] = useState("");
 
   useEffect(() => {
@@ -58,17 +56,14 @@ export default function TalkPage() {
     });
     setSubtitleTh(opener.speech_th);
     setSubtitleEn(opener.speech_en);
-    setMiomiState("speaking");
-    speakText(opener.speech_th, "th-TH").then(() => {
-      setMiomiState("idle");
-    });
+    // No TTS for Miomi speech — subtitle only
+    window.setTimeout(() => setMiomiState("idle"), 1000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const processUserInput = useCallback(async (text: string) => {
     if (!text.trim()) return;
     setInputText("");
-    setShowTextSheet(false);
 
     // Add user echo
     setCanvasItems(prev => [...prev, {
@@ -84,7 +79,6 @@ export default function TalkPage() {
       setSubtitleTh(template.response.speech_th);
       setSubtitleEn(template.response.speech_en);
       setMiomiState(template.miomi_state_during as MiomiState);
-      void speakText(template.response.speech_th, "th-TH");
 
       if (template.follow_up?.type === "word_card" && template.follow_up.payload_resolver) {
         const word = await resolveWordCard(
@@ -197,10 +191,10 @@ export default function TalkPage() {
         </div>
       </div>
 
-      {/* MIOMI STAGE — 220px */}
+      {/* MIOMI STAGE — 200px */}
       <div
         style={{
-          height: "220px",
+          height: "200px",
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
@@ -225,13 +219,13 @@ export default function TalkPage() {
           }}
         />
 
-        {/* Miomi head — 180px */}
-        <MiomiLive state={miomiState} size={180} />
+        {/* Miomi head — 160px */}
+        <MiomiLive state={miomiState} size={160} />
 
         {/* Subtitle */}
         <div
           style={{
-            marginTop: "8px",
+            marginTop: "4px",
             textAlign: "center",
             padding: "0 24px",
             maxWidth: "320px",
@@ -300,7 +294,7 @@ export default function TalkPage() {
                     setSubtitleTh(reaction.speech_th);
                     setSubtitleEn(reaction.speech_en);
                     setMiomiState("reacting");
-                    void speakText(reaction.speech_th, "th-TH").then(() => setMiomiState("idle"));
+                    window.setTimeout(() => setMiomiState("idle"), 1200);
                   }}
                 />
               ) : item.type === "user_echo" && item.text ? (
@@ -345,10 +339,11 @@ export default function TalkPage() {
         )}
       </div>
 
-      {/* MIC ZONE — 120px */}
+      {/* MIC ZONE */}
       <div
         style={{
-          height: "120px",
+          height: "auto",
+          minHeight: "120px",
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
@@ -357,7 +352,8 @@ export default function TalkPage() {
           gap: "12px",
           background: "#FAFAF6",
           borderTop: "1px solid rgba(232,229,223,0.6)",
-          paddingBottom: "env(safe-area-inset-bottom, 8px)",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 8px) + 8px)",
+          paddingTop: "12px",
         }}
       >
         <MicButton
@@ -371,136 +367,62 @@ export default function TalkPage() {
           onStateChange={setMicState}
         />
 
-        {/* Secondary controls */}
-        <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-          <button
-            type="button"
-            onClick={() => setShowTextSheet(true)}
-            style={{
-              height: "32px",
-              background: "transparent",
-              border: "none",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              cursor: "pointer",
-              padding: "0 10px",
+        <div style={{
+          display: "flex",
+          gap: "8px",
+          alignItems: "center",
+          width: "100%",
+          padding: "0 20px",
+        }}>
+          <input
+            type="text"
+            value={textInput}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && textInput.trim()) {
+                void processUserInput(textInput);
+              }
             }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9A8B73" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="4 7 4 4 20 4 20 7" />
-              <line x1="9" x2="15" y1="20" y2="20" />
-              <line x1="12" x2="12" y1="4" y2="20" />
-            </svg>
-            <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", color: "#9A8B73" }}>text ↗</span>
-          </button>
-          <button
-            type="button"
+            placeholder="พิมพ์ที่นี่ค่า~"
             style={{
-              height: "32px",
-              background: "transparent",
-              border: "none",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              cursor: "pointer",
-              padding: "0 10px",
+              flex: 1,
+              height: "36px",
+              borderRadius: "999px",
+              border: "1px solid #EDE8E0",
+              background: "rgba(255,255,255,0.9)",
+              padding: "0 14px",
+              fontFamily: "'Kanit', sans-serif",
+              fontSize: "13px",
+              color: "#1A1A18",
+              outline: "none",
             }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9A8B73" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <rect width="20" height="16" x="2" y="4" rx="2" ry="2" />
-              <path d="M6 8h.001" />
-              <path d="M10 8h.001" />
-              <path d="M14 8h.001" />
-              <path d="M18 8h.001" />
-              <path d="M8 12h.001" />
-              <path d="M12 12h.001" />
-              <path d="M16 12h.001" />
-              <path d="M7 16h10" />
-            </svg>
-            <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", color: "#9A8B73" }}>keyboard ↗</span>
-          </button>
-        </div>
-      </div>
-
-      {showTextSheet && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "flex-end",
-          }}
-          onClick={() => setShowTextSheet(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#FFFFFF",
-              borderRadius: "16px 16px 0 0",
-              padding: "12px 16px 32px",
-              borderTop: "1px solid #E8E5DF",
-              boxShadow: "0 -4px 24px rgba(26,26,24,0.10)",
-              display: "flex",
-              gap: "8px",
-              alignItems: "center",
-            }}
-          >
-            <input
-              autoFocus
-              type="text"
-              value={textInput}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && textInput.trim()) {
-                  void processUserInput(textInput);
-                }
-              }}
-              placeholder="พิมพ์อะไรก็ได้ค่า~"
-              style={{
-                flex: 1,
-                height: "44px",
-                borderRadius: "999px",
-                border: "1px solid #EDE8E0",
-                background: "#FAFAF6",
-                padding: "0 16px",
-                fontFamily: "'Kanit', sans-serif",
-                fontSize: "14px",
-                color: "#1A1A18",
-                outline: "none",
-              }}
-            />
+          />
+          {textInput.trim() && (
             <button
               type="button"
-              onClick={() => { if (textInput.trim()) void processUserInput(textInput); }}
+              onClick={() => void processUserInput(textInput)}
               style={{
-                width: "44px",
-                height: "44px",
+                width: "36px",
+                height: "36px",
                 borderRadius: "50%",
-                background: textInput.trim()
-                  ? "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)"
-                  : "#F5F0EB",
+                background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
                 border: "none",
-                cursor: textInput.trim() ? "pointer" : "default",
+                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
-                transition: "background 0.2s ease",
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                stroke={textInput.trim() ? "#FFFFFF" : "#C4BDB5"}
-                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="19" x2="12" y2="5" />
                 <polyline points="5 12 12 5 19 12" />
               </svg>
             </button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
