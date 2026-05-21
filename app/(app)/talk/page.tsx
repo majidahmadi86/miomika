@@ -119,17 +119,62 @@ export default function TalkPage() {
         window.setTimeout(() => setMiomiState("idle"), 2000);
       }
     } else {
+      // No library match — call AI
       setSubtitleTh("กำลังคิดให้ค่า...");
       setMiomiState("thinking");
-      setCanvasItems(prev => [...prev, {
-        id: crypto.randomUUID(),
-        type: "miomi_message" as const,
-        textTh: "หนูเข้าใจค่า~ กำลังคิดให้นะคะ",
-        textEn: "I understand~ let me think...",
-      }]);
-      window.setTimeout(() => setMiomiState("idle"), 2000);
+
+      try {
+        const res = await fetch("/api/miomi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: text.trim() }],
+            isGuest: true,
+            sessionInstruction: "You are Miomi, a warm kawaii cat language teacher. Respond warmly in Thai first, then English below. Keep response under 60 words total. Never break character. Always end with one question.",
+            sessionContext: {
+              exchangeNumber: canvasItems.filter(i => i.type === "user_echo").length,
+              estimatedLevel: "elementary",
+              sessionArc: "opening",
+              currentTargetWord: null,
+              emotionalMomentum: "neutral",
+              wordsIntroduced: wordsIntroduced,
+            },
+            sessionId: crypto.randomUUID(),
+            userId: null,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json() as { content?: string };
+          const content = data.content ?? "";
+          const parts = content.split(/\n\n+/);
+          const textTh = parts[0]?.trim() ?? content;
+          const textEn = parts[1]?.trim() ?? "";
+
+          setSubtitleTh("หนูตอบแล้วค่า~");
+          setMiomiState("speaking");
+          setCanvasItems(prev => [...prev, {
+            id: crypto.randomUUID(),
+            type: "miomi_message" as const,
+            textTh,
+            textEn,
+          }]);
+          window.setTimeout(() => setMiomiState("idle"), 2000);
+        } else {
+          throw new Error("API failed");
+        }
+      } catch {
+        setSubtitleTh("หนูขอโทษค่า~");
+        setMiomiState("idle");
+        setCanvasItems(prev => [...prev, {
+          id: crypto.randomUUID(),
+          type: "miomi_message" as const,
+          textTh: "หนูขอโทษค่า~ มีบางอย่างผิดพลาด ลองพูดใหม่นะคะ",
+          textEn: "Sorry~ something went wrong. Please try again.",
+        }]);
+      }
     }
-  }, [wordsIntroduced]);
+  }, [wordsIntroduced, canvasItems]);
 
   return (
     <div
@@ -139,7 +184,6 @@ export default function TalkPage() {
         display: "flex",
         flexDirection: "column",
         background: "#FAFAF6",
-        overflow: "hidden",
         paddingTop: "env(safe-area-inset-top, 0px)",
       }}
     >
@@ -155,6 +199,7 @@ export default function TalkPage() {
           background: "#FFFFFF",
           borderBottom: "1px solid #E8E5DF",
           zIndex: 10,
+          position: "relative",
         }}
       >
         <Link
@@ -220,6 +265,7 @@ export default function TalkPage() {
           paddingTop: "8px",
           position: "relative",
           overflow: "visible",
+          zIndex: 2,
         }}
       >
         {/* Soft ambient glow behind Miomi */}

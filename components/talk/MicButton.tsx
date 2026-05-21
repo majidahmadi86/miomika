@@ -146,7 +146,8 @@ export function MicButton({
       isListeningRef.current = false;
       stopAmplitude();
       setLiveTranscript("");
-      if (state === "listening") onStateChange("idle");
+      // Always return to idle on end — don't check state
+      onStateChange("idle");
     };
 
     recognitionRef.current = recognition;

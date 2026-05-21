@@ -26,6 +26,71 @@ export type LibraryResponse = {
 };
 
 export const LIBRARY_TEMPLATES: LibraryResponse[] = [
+  {
+    id: "greeting",
+    intent: "social_greeting",
+    user_archetype: "any",
+    trigger_patterns: [
+      /^(hi|hello|hey|sup|yo|สวัสดี|หวัดดี|ดี|เฮ้|ฮัลโหล)[\s!~]*$/i,
+      /^(good morning|good afternoon|good evening|good night)[\s!~]*$/i,
+      /^(อรุณสวัสดิ์|ราตรีสวัสดิ์|สบายดี)[\s!~]*$/,
+    ],
+    response: {
+      speech_th: "สวัสดีค่า~ ดีใจที่ได้คุยด้วยเลยนะคะ วันนี้อยากเรียนภาษาอะไรดีคะ?",
+      speech_en: "Hi~ So happy to talk with you. What language would you like to learn today?",
+    },
+    follow_up: {
+      type: "none",
+      payload_resolver: "dynamic",
+    },
+    miomi_state_during: "speaking",
+    cost: 0,
+  },
+  {
+    id: "who_are_you",
+    intent: "meta_off_topic",
+    user_archetype: "any",
+    trigger_patterns: [
+      /who are you/i,
+      /what are you/i,
+      /คุณคือใคร/,
+      /หนูคือใคร/,
+      /ชื่ออะไร/,
+    ],
+    response: {
+      speech_th: "หนูชื่อมิโอมิค่า~ เป็นแมวที่จะช่วยสอนภาษาให้คุณค่า อยากเรียน English หรือ Thai ดีคะ?",
+      speech_en: "I'm Miomi~ a cat who teaches you language! Want to learn English or Thai?",
+    },
+    follow_up: {
+      type: "none",
+      payload_resolver: "dynamic",
+    },
+    miomi_state_during: "speaking",
+    cost: 0,
+  },
+  {
+    id: "how_can_you_help",
+    intent: "asking_help",
+    user_archetype: "any",
+    trigger_patterns: [
+      /how can you help/i,
+      /what can you do/i,
+      /help me/i,
+      /ช่วยอะไรได้บ้าง/,
+      /ทำอะไรได้/,
+    ],
+    response: {
+      speech_th: "หนูช่วยได้เยอะเลยค่า~ สอนภาษาอังกฤษหรือไทย แปลภาษา เขียนแคปชั่น และอื่นๆ อีกเยอะค่า บอกหนูได้เลยว่าอยากเริ่มจากอะไร?",
+      speech_en: "I can help a lot~ teach English or Thai, translate, write captions, and more. What would you like to start with?",
+    },
+    follow_up: {
+      type: "none",
+      payload_resolver: "dynamic",
+    },
+    miomi_state_during: "speaking",
+    cost: 0,
+  },
+
   // 1. TEACH_ME_ENGLISH
   {
     id: "teach_me_english",
