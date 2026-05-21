@@ -205,47 +205,6 @@ export function MiomiLive({ state, size = 180 }: MiomiLiveProps) {
           transformOrigin: "center bottom",
         }}
       >
-        {/* Ear overlays */}
-        {/* Left ear */}
-        <motion.div
-          animate={{ rotate: leftEarAngle }}
-          transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
-          style={{
-            position: "absolute",
-            top: "8%",
-            left: "18%",
-            width: "20px",
-            height: "28px",
-            transformOrigin: "bottom center",
-            zIndex: 2,
-            pointerEvents: "none",
-          }}
-        >
-          <svg width="20" height="28" viewBox="0 0 20 28" fill="none">
-            <path d="M10 28 L0 0 L20 0 Z" fill="rgba(249,168,212,0.6)" />
-          </svg>
-        </motion.div>
-
-        {/* Right ear */}
-        <motion.div
-          animate={{ rotate: rightEarAngle }}
-          transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
-          style={{
-            position: "absolute",
-            top: "8%",
-            right: "18%",
-            width: "20px",
-            height: "28px",
-            transformOrigin: "bottom center",
-            zIndex: 2,
-            pointerEvents: "none",
-          }}
-        >
-          <svg width="20" height="28" viewBox="0 0 20 28" fill="none">
-            <path d="M10 28 L0 0 L20 0 Z" fill="rgba(249,168,212,0.6)" />
-          </svg>
-        </motion.div>
-
         {/* Expression image with crossfade */}
         <AnimatePresence mode="sync">
           <motion.div
