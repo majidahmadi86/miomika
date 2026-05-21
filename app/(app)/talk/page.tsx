@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { MicButton, type MicState } from "@/components/talk/MicButton";
 import { MiomiLive, type MiomiState } from "@/components/talk/MiomiLive";
@@ -30,6 +30,18 @@ export default function TalkPage() {
     text?: string;
   }>>([]);
   const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [showTextSheet, setShowTextSheet] = useState(false);
+  const [textInput, setInputText] = useState("");
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      canvasRef.current.scrollTo({
+        top: canvasRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [canvasItems]);
 
   useEffect(() => {
     if (micState === "listening") setMiomiState("listening");
@@ -52,6 +64,62 @@ export default function TalkPage() {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const processUserInput = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+    setInputText("");
+    setShowTextSheet(false);
+
+    // Add user echo
+    setCanvasItems(prev => [...prev, {
+      id: crypto.randomUUID(),
+      type: "user_echo" as const,
+      text: text.trim(),
+    }]);
+
+    // Library-first routing
+    const template = matchLibrary(text.trim(), { wordsIntroduced });
+
+    if (template) {
+      setSubtitleTh(template.response.speech_th);
+      setSubtitleEn(template.response.speech_en);
+      setMiomiState(template.miomi_state_during as MiomiState);
+      void speakText(template.response.speech_th, "th-TH");
+
+      if (template.follow_up?.type === "word_card" && template.follow_up.payload_resolver) {
+        const word = await resolveWordCard(
+          template.follow_up.payload_resolver,
+          (template.follow_up.payload_params ?? {}) as Record<string, unknown>,
+          text.trim(),
+          wordsIntroduced
+        );
+
+        if (word) {
+          setWordsIntroduced(prev => [...prev, word.word_en]);
+          window.setTimeout(() => {
+            setMiomiState("teaching");
+            window.setTimeout(() => {
+              setCanvasItems(prev => [...prev, {
+                id: crypto.randomUUID(),
+                type: "word_card" as const,
+                word,
+              }]);
+              setMiomiState("idle");
+            }, 600);
+          }, 1200);
+        } else {
+          window.setTimeout(() => setMiomiState("idle"), 2000);
+        }
+      } else {
+        window.setTimeout(() => setMiomiState("idle"), 2000);
+      }
+    } else {
+      setSubtitleTh("หนูเข้าใจค่า~ กำลังคิดให้นะคะ");
+      setSubtitleEn("I understand~ let me think...");
+      setMiomiState("thinking");
+      window.setTimeout(() => setMiomiState("idle"), 2000);
+    }
+  }, [wordsIntroduced]);
 
   return (
     <div
@@ -199,6 +267,7 @@ export default function TalkPage() {
 
       {/* CONVERSATION CANVAS — flex-1 */}
       <div
+        ref={canvasRef}
         style={{
           flex: 1,
           minHeight: 0,
@@ -297,58 +366,7 @@ export default function TalkPage() {
           onTranscript={async (text, isFinal) => {
             if (!isFinal) return;
             setLastTranscript(text);
-
-            // Add user echo to canvas
-            setCanvasItems(prev => [...prev, {
-              id: crypto.randomUUID(),
-              type: "user_echo" as const,
-              text,
-            }]);
-
-            // Library-first routing
-            const template = matchLibrary(text, { wordsIntroduced });
-
-            if (template) {
-              // Set subtitle and speak
-              setSubtitleTh(template.response.speech_th);
-              setSubtitleEn(template.response.speech_en);
-              setMiomiState(template.miomi_state_during as MiomiState);
-
-              void speakText(template.response.speech_th, "th-TH");
-
-              // Resolve follow-up word card
-              if (template.follow_up?.type === "word_card" && template.follow_up.payload_resolver) {
-                const word = await resolveWordCard(
-                  template.follow_up.payload_resolver,
-                  (template.follow_up.payload_params ?? {}) as Record<string, unknown>,
-                  text,
-                  wordsIntroduced
-                );
-
-                if (word) {
-                  setWordsIntroduced(prev => [...prev, word.word_en]);
-                  window.setTimeout(() => {
-                    setMiomiState("teaching");
-                    window.setTimeout(() => {
-                      setCanvasItems(prev => [...prev, {
-                        id: crypto.randomUUID(),
-                        type: "word_card" as const,
-                        word,
-                      }]);
-                      setMiomiState("idle");
-                    }, 600);
-                  }, 1200);
-                }
-              } else {
-                window.setTimeout(() => setMiomiState("idle"), 2000);
-              }
-            } else {
-              // AI fallback — for now just acknowledge
-              setSubtitleTh("หนูเข้าใจค่า~ กำลังคิดให้นะคะ");
-              setSubtitleEn("I understand~ let me think...");
-              setMiomiState("thinking");
-              window.setTimeout(() => setMiomiState("idle"), 2000);
-            }
+            await processUserInput(text);
           }}
           onStateChange={setMicState}
         />
@@ -357,6 +375,7 @@ export default function TalkPage() {
         <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
           <button
             type="button"
+            onClick={() => setShowTextSheet(true)}
             style={{
               height: "32px",
               background: "transparent",
@@ -403,6 +422,85 @@ export default function TalkPage() {
           </button>
         </div>
       </div>
+
+      {showTextSheet && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "flex-end",
+          }}
+          onClick={() => setShowTextSheet(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#FFFFFF",
+              borderRadius: "16px 16px 0 0",
+              padding: "12px 16px 32px",
+              borderTop: "1px solid #E8E5DF",
+              boxShadow: "0 -4px 24px rgba(26,26,24,0.10)",
+              display: "flex",
+              gap: "8px",
+              alignItems: "center",
+            }}
+          >
+            <input
+              autoFocus
+              type="text"
+              value={textInput}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && textInput.trim()) {
+                  void processUserInput(textInput);
+                }
+              }}
+              placeholder="พิมพ์อะไรก็ได้ค่า~"
+              style={{
+                flex: 1,
+                height: "44px",
+                borderRadius: "999px",
+                border: "1px solid #EDE8E0",
+                background: "#FAFAF6",
+                padding: "0 16px",
+                fontFamily: "'Kanit', sans-serif",
+                fontSize: "14px",
+                color: "#1A1A18",
+                outline: "none",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => { if (textInput.trim()) void processUserInput(textInput); }}
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                background: textInput.trim()
+                  ? "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)"
+                  : "#F5F0EB",
+                border: "none",
+                cursor: textInput.trim() ? "pointer" : "default",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                transition: "background 0.2s ease",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke={textInput.trim() ? "#FFFFFF" : "#C4BDB5"}
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5" />
+                <polyline points="5 12 12 5 19 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
