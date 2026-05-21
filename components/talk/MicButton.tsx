@@ -154,8 +154,8 @@ export function MicButton({
       isListeningRef.current = false;
       stopAmplitude();
       setLiveTranscript("");
-      // Always return to idle on end — don't check state
-      onStateChange("idle");
+      // Always reset to idle regardless of current state
+      setTimeout(() => onStateChange("idle"), 100);
     };
 
     recognitionRef.current = recognition;
@@ -170,11 +170,20 @@ export function MicButton({
     isListeningRef.current = false;
   }, [stopAmplitude]);
 
-  const handlePress = useCallback(() => {
+  const handlePress = useCallback(async () => {
     if (disabled) return;
     if (state === "speaking") { onStateChange("idle"); return; }
     if (state === "listening") { stopListening(); return; }
-    if (state === "idle") { startListening(); }
+    if (state === "idle") {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        setLiveTranscript("ไม่ได้รับอนุญาตใช้ไมค์ค่า~");
+        setTimeout(() => setLiveTranscript(""), 2000);
+        return;
+      }
+      startListening();
+    }
   }, [disabled, onStateChange, startListening, state, stopListening]);
 
   useEffect(() => {
@@ -185,14 +194,15 @@ export function MicButton({
 
   if (!speechSupported) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
         <div style={{
           width: "80px", height: "80px", borderRadius: "50%",
-          border: "2px solid #E8E5DF", background: "#FAFAF6",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          opacity: 0.5,
+          border: "2px dashed #EDE8E0", background: "#FAFAF6",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          gap: "4px",
         }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
             stroke="#C4BDB5" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <line x1="1" y1="1" x2="23" y2="23" />
             <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
@@ -200,13 +210,22 @@ export function MicButton({
             <line x1="12" x2="12" y1="19" y2="22" />
           </svg>
         </div>
-        <p style={{
-          fontFamily: "'Quicksand', sans-serif",
-          fontSize: "10px", color: "#C4BDB5",
-          textAlign: "center", maxWidth: "120px",
-        }}>
-          Voice not supported in this browser
-        </p>
+        <div style={{ textAlign: "center", maxWidth: "200px" }}>
+          <p style={{
+            fontFamily: "'Kanit', sans-serif",
+            fontSize: "11px", color: "#9A8B73",
+            margin: "0 0 2px",
+          }}>
+            เปิดใน Chrome เพื่อใช้เสียงค่า~
+          </p>
+          <p style={{
+            fontFamily: "'Quicksand', sans-serif",
+            fontSize: "10px", color: "#C4BDB5",
+            margin: 0,
+          }}>
+            Open in Chrome to use voice
+          </p>
+        </div>
       </div>
     );
   }
@@ -269,7 +288,7 @@ export function MicButton({
         type="button"
         onPointerDown={(e) => {
           e.preventDefault();
-          handlePress();
+          void handlePress();
         }}
         animate={state === "idle" ? { scale: [1, 1.02, 1] } : {}}
         transition={state === "idle" ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : {}}
