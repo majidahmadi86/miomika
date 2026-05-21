@@ -23,6 +23,7 @@ const AmbientBackground = dynamic(
 );
 import { WordCard } from "@/components/WordCard";
 import { CaptionCard } from "@/components/create/CaptionCard";
+import { MiomiInvitationCard } from "@/components/conversion/MiomiInvitationCard";
 import type { SessionVocabWord } from "@/lib/ai/vocabulary";
 import {
   createSessionState,
@@ -73,6 +74,12 @@ type ThreadMessage =
       type: "caption_card";
       platform: "Instagram" | "TikTok" | "Facebook" | "YouTube" | "LINE OA" | "general";
       caption: { body: string; hashtags?: string[]; hook?: string };
+      timestamp: Date;
+    }
+  | {
+      id: string;
+      type: "pro_invitation";
+      variant: "pro" | "pro_yearly";
       timestamp: Date;
     };
 
@@ -627,6 +634,19 @@ export default function CreatePage() {
           }]);
         }
 
+        // Handle Pro invitation signal from engine
+        const proInvitation = (data as { pro_invitation?: boolean }).pro_invitation;
+        if (proInvitation && !isGuest) {
+          window.setTimeout(() => {
+            setMessages(prev => [...prev, {
+              id: crypto.randomUUID(),
+              type: "pro_invitation" as const,
+              variant: "pro" as const,
+              timestamp: new Date(),
+            }]);
+          }, 1200);
+        }
+
         // If conversion window opened, show it after a short delay
         if (instruction.shouldOpenConversionWindow && instruction.conversionMessage) {
           window.setTimeout(() => {
@@ -1074,6 +1094,7 @@ export default function CreatePage() {
       {/* ── ZONE B — Learning space (scrollable) ── */}
       <div
         ref={threadRef}
+        data-thread=""
         style={{
           flex: 1,
           minHeight: 0,
@@ -1341,6 +1362,27 @@ export default function CreatePage() {
                   onSave={() => {
                     // Phase 2: save to dashboard
                     showCopyToast();
+                  }}
+                />
+              )}
+
+              {m.type === "pro_invitation" && (
+                <MiomiInvitationCard
+                  variant={m.variant}
+                  benefits={[
+                    { th: "พูดทุกอย่างให้ฟัง", en: "Say everything aloud" },
+                    { th: "จำคุณได้นานขึ้น", en: "Remember you longer" },
+                    { th: "สร้างคอนเทนต์ไม่จำกัด", en: "Unlimited content creation" },
+                  ]}
+                  price={{ thb: 299, period: "month" }}
+                  onPrimaryAction={() => {
+                    window.location.href = "/upgrade";
+                  }}
+                  onSecondaryAction={() => {
+                    // Dismiss — card stays in thread per spec
+                    // Just scroll past it
+                    const thread = document.querySelector('[data-thread]');
+                    if (thread) thread.scrollTop = thread.scrollHeight;
                   }}
                 />
               )}
