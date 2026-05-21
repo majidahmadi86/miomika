@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { MicButton, type MicState } from "@/components/talk/MicButton";
+import { MiomiLive, type MiomiState } from "@/components/talk/MiomiLive";
 
 const GUEST_EXCHANGE_LIMIT = 5;
 
@@ -13,10 +13,18 @@ export default function TalkPage() {
   const { isGuest, authReady } = useGuestExploration();
   const [guestExchangesRemaining] = useState(GUEST_EXCHANGE_LIMIT);
   const [micState, setMicState] = useState<MicState>("idle");
+  const [miomiState, setMiomiState] = useState<MiomiState>("idle");
   const [lastTranscript, setLastTranscript] = useState("");
   const [subtitleTh, setSubtitleTh] = useState("พูดอะไรก็ได้ค่า~");
   const [subtitleEn, setSubtitleEn] = useState("Say anything~");
   const [canvasItems, setCanvasItems] = useState<{ id: string; type: string }[]>([]);
+
+  useEffect(() => {
+    if (micState === "listening") setMiomiState("listening");
+    else if (micState === "processing") setMiomiState("thinking");
+    else if (micState === "speaking") setMiomiState("speaking");
+    else setMiomiState("idle");
+  }, [micState]);
 
   return (
     <div
@@ -123,20 +131,7 @@ export default function TalkPage() {
         />
 
         {/* Miomi head — 180px */}
-        <Image
-          src="/miomi/head-idle.png"
-          alt="Miomi"
-          width={180}
-          height={180}
-          priority
-          style={{
-            width: "180px",
-            height: "180px",
-            objectFit: "contain",
-            position: "relative",
-            zIndex: 1,
-          }}
-        />
+        <MiomiLive state={miomiState} size={180} />
 
         {/* Subtitle */}
         <div
