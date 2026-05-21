@@ -166,7 +166,9 @@ export default function TalkPage() {
           body: JSON.stringify({
             messages: [{ role: "user", content: text.trim() }],
             isGuest: true,
-            sessionInstruction: "You are Miomi, a warm kawaii cat language teacher. Respond warmly in Thai first, then English below. Keep response under 60 words total. Never break character. Always end with one question.",
+            sessionInstruction: uiLang === "en"
+              ? "You are Miomi, a warm kawaii cat language teacher. The user is an English speaker learning Thai. ALWAYS respond in English. Keep Thai words in quotes with pronunciation. Under 60 words. Always end with one question."
+              : "You are Miomi, a warm kawaii cat language teacher. Respond in Thai first, then English below. Under 60 words. Always end with one question.",
             sessionContext: {
               exchangeNumber: canvasItems.filter(i => i.type === "user_echo").length,
               estimatedLevel: "elementary",
@@ -210,7 +212,7 @@ export default function TalkPage() {
         }]);
       }
     }
-  }, [wordsIntroduced, canvasItems, isGuest, guestExchanges, GUEST_LIMIT]);
+  }, [wordsIntroduced, canvasItems, isGuest, guestExchanges, GUEST_LIMIT, uiLang]);
 
   return (
     <div
@@ -461,9 +463,9 @@ export default function TalkPage() {
                         margin: 0,
                         whiteSpace: "pre-line",
                       }}>
-                        {item.textTh}
+                        {uiLang === "en" && item.textEn ? item.textEn : item.textTh}
                       </p>
-                      {item.textEn && (
+                      {((uiLang === "en" && item.textTh) || (uiLang === "th" && item.textEn)) && (
                         <p style={{
                           fontFamily: "'Quicksand', sans-serif",
                           fontSize: "12px",
@@ -472,7 +474,7 @@ export default function TalkPage() {
                           lineHeight: 1.5,
                           margin: "4px 0 0",
                         }}>
-                          {item.textEn}
+                          {uiLang === "en" ? item.textTh : item.textEn}
                         </p>
                       )}
                     </div>

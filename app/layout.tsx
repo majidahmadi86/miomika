@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Kanit, Quicksand } from "next/font/google";
+import { Kanit, Quicksand, Sarabun } from "next/font/google";
 import "./globals.css";
 
 const kanit = Kanit({
@@ -14,6 +14,13 @@ const quicksand = Quicksand({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
   variable: "--font-quicksand",
+  display: "swap",
+});
+
+const sarabun = Sarabun({
+  subsets: ["thai", "latin"],
+  weight: ["400", "500"],
+  variable: "--font-sarabun",
   display: "swap",
 });
 
@@ -59,12 +66,12 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${kanit.variable} ${quicksand.variable} ${geistSans.variable} ${geistMono.variable} overflow-hidden bg-white antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
+      className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} ${geistSans.variable} ${geistMono.variable} overflow-hidden bg-white antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
     >
       <head>
         <link rel="icon" type="image/png" href="/miomi/icon-512.png" />
       </head>
-      <body className="overflow-hidden bg-white text-[var(--miomika-foreground)] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
+      <body className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} overflow-hidden bg-white text-[var(--miomika-foreground)] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible`}>
         <div className="relative miomika-app-height min-h-0 w-full overflow-hidden bg-white md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
           {children}
         </div>

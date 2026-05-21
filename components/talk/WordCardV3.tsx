@@ -191,7 +191,7 @@ export function WordCardV3({ word, direction, onPronunciationCheck }: WordCardV3
           animate={{ opacity: 1 }}
           transition={{ duration: 0.20, delay: 0.56 }}
           style={{
-            fontFamily: isThaiLearner ? "'Kanit', sans-serif" : "'Quicksand', sans-serif",
+            fontFamily: isThaiLearner ? "'Sarabun', 'Kanit', sans-serif" : "'Quicksand', sans-serif",
             fontSize: "16px", fontWeight: 500,
             color: "#1A1A18", margin: "0 0 14px",
           }}
@@ -211,7 +211,7 @@ export function WordCardV3({ word, direction, onPronunciationCheck }: WordCardV3
             style={{ marginBottom: "14px" }}
           >
             {word.miomi_note_th && (
-              <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18", lineHeight: 1.5, margin: "0 0 4px" }}>
+              <p style={{ fontFamily: "'Sarabun', 'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18", lineHeight: 1.5, margin: "0 0 4px" }}>
                 {word.miomi_note_th}
               </p>
             )}
@@ -240,7 +240,7 @@ export function WordCardV3({ word, direction, onPronunciationCheck }: WordCardV3
               </p>
             )}
             {word.example_th && (
-              <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", fontStyle: "italic", color: "#9A8B73", margin: 0 }}>
+              <p style={{ fontFamily: "'Sarabun', 'Kanit', sans-serif", fontSize: "13px", fontStyle: "italic", color: "#9A8B73", margin: 0 }}>
                 "{word.example_th}"
               </p>
             )}
