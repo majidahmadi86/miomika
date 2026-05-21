@@ -307,6 +307,14 @@ export default function CreatePage() {
   const [lastUserActivity, setLastUserActivity] = useState(Date.now());
   const [showSummarySheet, setShowSummarySheet] = useState(false);
   const [showConversionSheet, setShowConversionSheet] = useState(false);
+  const [conversionTriggerType, setConversionTriggerType] = useState<"quality" | "exchange_cap" | "self_referential">("quality");
+  const [masteredWordThisSession, setMasteredWordThisSession] = useState(false);
+  const [creatorArtifactCompleted, setCreatorArtifactCompleted] = useState(false);
+  const [topicBackAndForthCount, setTopicBackAndForthCount] = useState(0);
+  const [lastTopic, setLastTopic] = useState<string | null>(null);
+  const [selfReferentialDetected, setSelfReferentialDetected] = useState(false);
+  const [conversionFired, setConversionFired] = useState(false);
+  const [conversionAttempts, setConversionAttempts] = useState(0);
   const [showPullHandle, setShowPullHandle] = useState(false);
   const [ambientPalette] = useState(MODE_PALETTES["learn"]!);
 
@@ -484,6 +492,65 @@ export default function CreatePage() {
     },
     [],
   );
+
+  const getConversionTriggerType = useCallback((): "quality" | "exchange_cap" | "self_referential" | null => {
+    if (!isGuest || conversionFired) return null;
+    const exchangeCount = messages.filter(m => m.type === "user").length;
+
+    // Self-referential check — highest priority warm trigger
+    if (selfReferentialDetected && exchangeCount >= 2) return "self_referential";
+
+    // Quality signal — peak emotional moment
+    if ((masteredWordThisSession || creatorArtifactCompleted || topicBackAndForthCount >= 3) && exchangeCount >= 3) {
+      return "quality";
+    }
+
+    // Hard cap fallback
+    if (exchangeCount >= 5) return "exchange_cap";
+
+    return null;
+  }, [isGuest, conversionFired, messages, selfReferentialDetected,
+      masteredWordThisSession, creatorArtifactCompleted, topicBackAndForthCount]);
+
+  const fireGuestConversion = useCallback((triggerType: "quality" | "exchange_cap" | "self_referential") => {
+    if (conversionFired && triggerType !== "exchange_cap") return;
+    setConversionFired(true);
+    setConversionAttempts(prev => prev + 1);
+
+    const messages_map = {
+      quality: {
+        th: "ขอบคุณค่า~ คุยกับคุณสนุกมากเลยนะคะ\nหนูชอบจำเรื่องเล็กๆ แบบนี้ไว้ค่า ถ้าอยากให้หนูจำคุณได้ ลองเปิดบัญชีดูนะคะ~",
+        en: "I really enjoyed this~\nI love remembering little things. If you want me to remember you, create a quick account~",
+      },
+      exchange_cap: {
+        th: "เราคุยกันมาเยอะแล้วนะคะ~ หนูอยากจำคุณไว้จริงๆ ค่า\nถ้าเปิดบัญชี หนูจะจำได้ทั้งหมดเลยค่า — ฟรีนะคะ",
+        en: "We've talked a lot now~ I really want to remember you.\nIf you make an account, I'll remember everything — free.",
+      },
+      self_referential: {
+        th: "ดีใจที่ได้รู้จักคุณค่า~\nขอจดชื่อคุณไว้ได้ไหมคะ? หนูจะได้เรียกถูกทุกครั้งที่เจอกันค่า",
+        en: "So nice to meet you~\nCan I save your name? So I get it right every time we meet~",
+      },
+    };
+
+    const copy = messages_map[triggerType];
+
+    // Miomi speaks first
+    window.setTimeout(() => {
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        type: "miomi" as const,
+        th: copy.th,
+        en: copy.en,
+      }]);
+
+      // Sheet rises 1200ms after her words
+      window.setTimeout(() => {
+        setShowConversionSheet(true);
+        setConversionTriggerType(triggerType);
+      }, 1200);
+    }, 750);
+  }, [conversionFired]);
+
   const runConversationTurn = useCallback(
     async (userText: string, opts?: { skipUserBubble?: boolean }) => {
       if (processingLockRef.current) return;
@@ -647,6 +714,39 @@ export default function CreatePage() {
           }, 1200);
         }
 
+        // Track self-referential signals
+        const selfRefPattern = /(ฉัน|ผม|หนู|ชื่อ|my name|i am|i'm|myself)/i;
+        if (selfRefPattern.test(trimmed)) {
+          setSelfReferentialDetected(true);
+        }
+
+        // Track topic continuity for back-and-forth detection
+        const currentTopic = (data as { sessionContext?: { lastIntent?: string } }).sessionContext?.lastIntent ?? null;
+        setLastTopic(prev => {
+          if (prev && currentTopic && prev === currentTopic) {
+            setTopicBackAndForthCount(c => c + 1);
+          }
+          return currentTopic;
+        });
+
+        // Track creator artifact completion
+        if ((data as { creatorAsset?: unknown }).creatorAsset) {
+          setCreatorArtifactCompleted(true);
+        }
+
+        // Track word mastery
+        if (((data as { sessionContext?: { wordsUsedCorrectly?: string[] } }).sessionContext?.wordsUsedCorrectly?.length ?? 0) > 0) {
+          setMasteredWordThisSession(true);
+        }
+
+        // Check conversion trigger AFTER processing (only for guests)
+        if (isGuest) {
+          const triggerType = getConversionTriggerType();
+          if (triggerType) {
+            fireGuestConversion(triggerType);
+          }
+        }
+
         // If conversion window opened, show it after a short delay
         if (instruction.shouldOpenConversionWindow && instruction.conversionMessage) {
           window.setTimeout(() => {
@@ -676,7 +776,7 @@ export default function CreatePage() {
       }
     },
     [isGuest, messages, pushMiomi, pushTyping,
-      pushUser, removeTyping, sessionState],
+      pushUser, removeTyping, sessionState, getConversionTriggerType, fireGuestConversion],
   );
 
   const runTopicPipeline = runConversationTurn;
@@ -685,22 +785,7 @@ export default function CreatePage() {
 
   const consumeGuestExchange = useCallback(() => {
     if (!isGuest) return;
-    setGuestExchangesRemaining((n) => {
-      const next = Math.max(0, n - 1);
-      if (next === 0) {
-        // Trigger Miomi's warm conversion invitation after response
-        window.setTimeout(() => {
-          setMessages(prev => [...prev, {
-            id: crypto.randomUUID(),
-            type: "miomi" as const,
-            th: "หนูชอบคุยกับคุณมากเลยค่า~ อยากให้หนูจำคุณและความก้าวหน้าของคุณได้ไหมคะ? สมัครฟรีได้เลยนะคะ ไม่มีค่าใช้จ่ายค่า~",
-            en: "I love talking with you~ Want me to remember you and your progress? Sign up free — no cost at all~",
-          }]);
-          setShowConversionSheet(true);
-        }, 1200);
-      }
-      return next;
-    });
+    setGuestExchangesRemaining((n) => Math.max(0, n - 1));
   }, [isGuest]);
 
   const handleSend = useCallback(() => {
@@ -2009,23 +2094,55 @@ export default function CreatePage() {
             >
               สมัครฟรีเลยค่า~
             </Link>
-            <button
-              type="button"
-              onClick={() => setShowConversionSheet(false)}
-              style={{
-                display: "block",
-                width: "100%",
-                background: "none",
-                border: "none",
-                fontFamily: "'Quicksand', sans-serif",
-                fontSize: "13px",
-                color: "#C4BDB5",
-                cursor: "pointer",
-                padding: "8px",
-              }}
-            >
-              ไว้ทีหลังนะคะ~ · Maybe later
-            </button>
+            {conversionTriggerType === "exchange_cap" ? (
+              <Link
+                href="/home"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "center",
+                  background: "none",
+                  border: "none",
+                  fontFamily: "'Quicksand', sans-serif",
+                  fontSize: "13px",
+                  color: "#C4BDB5",
+                  cursor: "pointer",
+                  padding: "8px",
+                  textDecoration: "none",
+                }}
+              >
+                กลับหน้าหลัก
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConversionSheet(false);
+                  setConversionFired(false);
+                  window.setTimeout(() => {
+                    setMessages(prev => [...prev, {
+                      id: crypto.randomUUID(),
+                      type: "miomi" as const,
+                      th: "โอเคค่า~ คุยกันต่อเลยนะคะ\nหนูจะถามอีกทีตอนเหมาะๆ ค่า ✨",
+                      en: "Okay~ let's keep talking.\nI'll ask again at a good moment ✨",
+                    }]);
+                  }, 400);
+                }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  background: "none",
+                  border: "none",
+                  fontFamily: "'Quicksand', sans-serif",
+                  fontSize: "13px",
+                  color: "#C4BDB5",
+                  cursor: "pointer",
+                  padding: "8px",
+                }}
+              >
+                ไว้ทีหลังนะคะ~ · Maybe later
+              </button>
+            )}
           </motion.div>
         </motion.div>
       )}
