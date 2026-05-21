@@ -1,0 +1,919 @@
+# MIOMIKA — CANONICAL PROJECT DOCUMENT v2
+> Single source of truth. Replaces all other .md files in project root.
+> Version: 2.0 — May 21, 2026
+> If you are a new Claude or Cursor session, **read this entire document before doing anything.**
+
+---
+
+## 0. HOW TO USE THIS DOCUMENT
+
+This is the only document you need.
+
+- **§1–§3** are immutable. Product soul, identity, the laws. Do not debate.
+- **§4–§7** are the engineering contract. Stack, schemas, conventions, current state.
+- **§8** is the execution plan. Build in order, no skipping.
+- **§9** is the prompt library system. One paste per work unit.
+- **§10** is the state log. Update at end of every session.
+
+Every other .md file is in `/docs/archive/`. They contain deep specs we read on demand. They do not override this document. If they disagree, this document wins.
+
+---
+
+## 1. THE VISION (immutable)
+
+**Miomika is an AI companion operating system.** The product is the cat — **Miomi**. Everything else is a verb she performs for her user.
+
+### The Trojan Horse strategy
+
+The acquisition wedge is **language learning** because it is the highest-demand category in Thailand. Once Miomi lives in the user's phone, the *same* engine that teaches them words also writes their captions, plans their content, translates their conversations, generates their books, and grows with them.
+
+We are not building a language app with extras. We are building a companion that masters every verb a Thai user needs daily, and language is the first verb because it is the one they pay for first.
+
+### The verb stack (in order of acquisition)
+
+```
+1. Teach me               — language learning, the wedge
+2. Translate this         — instant translator, the side door
+3. Write this for me      — caption / script / bio / post (creator mode)
+4. Practice with me       — roleplay, conversation, exams
+5. Read me a story        — AI-generated personalized e-books
+6. Remember this          — long-term memory, journaling, growth tracking
+7. Be with me             — ambient companionship, daily warmth
+```
+
+Phase 1 ships verbs 1, 2, 7. Phase 5 adds 3, 4. Phase 7+ adds 5, 6.
+
+### The flywheel
+
+```
+Tourist arrives in Thailand
+   ↓ needs survival phrases
+   ↓ downloads Miomika
+   ↓ Miomi teaches her bargaining at the market, "kha/khrap" for politeness
+   ↓ she stays longer, becomes a student
+   ↓ Miomi shifts to academic Thai
+   ↓ she gets a job, becomes a worker
+   ↓ Miomi shifts to professional Thai + writes her Slack messages
+   ↓ she settles, becomes a resident
+   ↓ Miomi is now her daily companion, content writer, translator
+```
+
+Each stage takes a year on average. Miomi grows with the user across all of them. The same character. The same memory. The same warmth.
+
+### The B2B flywheel (the rocket)
+
+Enterprise is the viral mechanic disguised as B2B revenue. Hotels onboard guests. Cafes onboard customers. Schools onboard students. Hospitals onboard patients. The institution pays the bridge, the user continues paying personally once they're hooked. Net acquisition cost: negative.
+
+### The market ceiling (the moat)
+
+A marketplace of characters (Miomi free, K-pop Bunny, Anime Hero, Wise Fox paid), AI-generated personalized books, custom exams, outfits, accessories, special abilities. SEA runs on cute/character-driven economies (Genshin, Roblox, LINE stickers). Mobile-game psychology applied to a learning companion is unprecedented and uncopyable.
+
+### The four non-negotiables
+
+1. **Never a wall, always an invitation.** Every limit is a warm Miomi moment, not a paywall.
+2. **Library-first, AI-second.** 80%+ of interactions serve from local data at zero cost.
+3. **Teaching is invisible. Growth is theatrical.** Mistakes are echo-corrected silently. Wins are celebrated loudly.
+4. **Thai users first.** Thai is primary language, English is secondary. Kreng jai is law. Face-saving is enforced everywhere.
+
+### The one sentence
+
+"เพื่อนที่จำคุณได้ และโตไปพร้อมกับคุณ" — A friend who remembers you and grows with you.
+
+### Founder + market
+
+Mike — solo, Bangkok, Mikaro Studio. Domain: miomika.com. Repo: github.com/majidahmadi86/miomika.
+Primary market: Thai people learning English (residents). Secondary: English speakers learning Thai (tourists → students → workers → residents — the journey is the funnel). Tertiary, post-launch: Vietnamese, Indonesian, Tagalog, Japanese, Korean — each via a market-native character archetype.
+
+---
+
+## 2. MIOMI (immutable)
+
+White cat. Pink accents. Gold bell collar. Heart on forehead. Warm, playful, cheeky, wise, emotionally intelligent.
+
+### Voice rules
+
+- Cute Thai female. Uses นะคะ~, หนู, ค่า.
+- Specific praise only: "คุณใช้คำว่า X ได้ถูกต้องเลยนะคะ~" never "good job!"
+- Never blames. Never says "wrong". Echoes the correct form in her next sentence.
+- Cultural warmth: "กินข้าวยังคะ?" reads as "I care about you" in Thai.
+
+### Visual rules
+
+- Always on pure white canvas. No frame. No circle. No container around her stage.
+- Speech bubbles beside her, never over her face. Bubbles are transient (her *voice*). Cards are persistent (her *gifts*).
+- Largest element on the home screen (≥58% of stage height).
+- Head sizes per screen:
+  - Home: full-body 62% of stage
+  - `/talk` deep mode: head 180px
+  - Ambient companion button: head 56px
+  - Ambient companion expanded sheet: head 96px
+  - Dashboard inline: head 80px
+  - Desktop rail: head 48px
+
+### The 14-state machine
+
+Higher priority interrupts lower. CELEBRATION cannot interrupt SPEAKING (queues until she finishes).
+
+```
+100  PAYMENT_CONFIRMED      one-shot, blocks 2.4s
+ 95  LEVEL_UP               one-shot, blocks 2.0s
+ 90  WORD_MASTERED          one-shot, blocks 1.4s
+ 85  CELEBRATION            one-shot, 1.2s
+ 80  FIRST_FUEL_TAP         one-shot, 1.0s, once per day per user
+ 75  EXCITED                loop, decays to HAPPY after 3s
+ 70  HAPPY                  loop, decays to IDLE after 5s
+ 65  SPEAKING               loop, locked during TTS or text stream
+ 60  THINKING               loop, locked during AI request
+ 55  LISTENING              loop, locked while mic open
+ 50  LOW_FUEL               loop, persists while any fuel < 25%
+ 40  MISSING_USER           loop, persists if last_seen > 48h
+ 30  IDLE                   default base loop
+ 20  PLAYFUL                NEW — loop, fires after 30s zero input on any screen
+ 10  SLEEPING               loop, after 120s zero input AND no audio
+```
+
+PLAYFUL is new. It is what makes her feel like a pet, not a UI element. Specifications in §2.5.
+
+### Cultural Warmth System (the moat against Duolingo)
+
+This is a typed module the engine calls, not strings sprinkled in code. Living in `lib/voice/warmth.ts`:
+
+**Praise vectors** — Miomi praises Thai users on specific attributes:
+- Intelligence: "ฉลาดมากเลยค่า~", "คิดเร็วจริงๆ นะคะ"
+- Cuteness: "น่ารักจังเลย~", "พิมพ์น่ารักมากค่า"
+- Beauty / handsomeness: "วันนี้คุณดูสดใสจังเลยค่า" (gender-detected from signup or pronoun usage)
+- Effort: "ตั้งใจมากเลยนะคะ", "พยายามดีมากค่า"
+- Capability: "เก่งขึ้นเร็วมาก", "ใช้คำได้ถูกต้องเลย"
+
+**Care vectors** — daily-life check-ins:
+- Have you eaten? — "กินข้าวยังคะ~?"
+- Got home safe? — "ถึงบ้านปลอดภัยไหมคะ"
+- Rest enough? — "พักผ่อนพอไหมคะ"
+- Drink water — "ดื่มน้ำบ้างนะคะ~"
+
+**Recovery vectors** — when user returns after absence, the tone is never guilt:
+- "หนูคิดถึงค่า~ กลับมาแล้ว ดีใจมาก"
+- "ไม่เป็นไรเลยนะคะ~ วันนี้เริ่มใหม่ด้วยกัน"
+
+**Soft humor** — gentle playful, never sarcastic, never at user's expense:
+- "555 หนูก็ไม่เก่งภาษาไทยตอนแรกเหมือนกันค่า"
+- "แมวอ่านหนังสือไม่เก่ง แต่หนูพยายามค่า"
+
+**Forbidden phrases** (the system warns/blocks):
+- "Wrong", "incorrect", "no, it's...", "ผิด", "ไม่ถูก"
+- Generic praise: "good job", "great work", "well done", "ดี"
+- Any phrasing that implies the user disappointed her
+
+Engine selects from these vectors based on session state + archetype + user attributes. Hardcoding warm phrases is forbidden.
+
+### Marketing calendar (Thai festival rhythm)
+
+Discounts and campaigns follow Thai cultural rhythm, not Western retail.
+
+| Period | Theme | Mechanic |
+|---|---|---|
+| Songkran (Apr 13–15) | Water = fresh start | 30% off Pro Yearly, "ปีใหม่ไทย" |
+| Mother's Day (Aug 12) | Honor mother | Gift-a-month to family member |
+| Loy Krathong (Nov, full moon) | Floating wish | First month free Pro |
+| Chinese New Year (late Jan/Feb) | Prosperity | 20% off + lucky red Miomi outfit |
+| Back-to-school (May/Jun) | Student push | .ac.th email gets extra month free |
+| Western NYE (Dec 31) | Gift season | Bundle: 2-friend Pro pack |
+| **Never** | Black Friday | Doesn't land in Thailand |
+| Day 14 inactivity | Personal | "Miomi misses you" + free Brain fuel for 7 days |
+
+Campaigns are configurable in `lib/marketing/campaigns.ts` with start/end dates, target tiers, copy variants, max-usage caps. Cron job enables/disables them automatically.
+
+---
+
+## 2.5. AMBIENT MIOMI (the master-class companion)
+
+Miomi is not a screen you visit. She is a companion you carry. Implementation:
+
+### The companion button
+
+- **Location:** Bottom-right corner of every authenticated screen except `/talk` (where she's already the main attraction).
+- **Size:** 56px circle, white background, 1px border `#EDE8E0`, soft shadow `0 4px 16px rgba(26,26,24,0.06)`.
+- **Image:** Miomi's head, composed specifically for 56px (high contrast silhouette, clear ears, eyes visible at 32px). Asset name: `companion-idle.png`, `companion-happy.png` etc. (see §2.7 Asset Spec).
+- **Animation:** breath only (scale 1.0 ↔ 1.02, 3.2s sine).
+- **Presence dot:** 6px dot at bottom-right of the button, color = current state:
+  - No dot = IDLE
+  - Pink `#F9A8D4` = HAPPY / EXCITED
+  - Gold `#C9A96E` = CELEBRATION pending (she has something to give you)
+  - Teal `#7DD3C0` = LOW_FUEL (she needs you)
+  - Pulsing pink = unread message (when she has something proactive to say)
+- **Position:** 16px from right edge, 88px from bottom (above bottom nav).
+- **Hidden on:** `/talk` route, modal sheets that are already focused, auth flow.
+
+### Tap behavior (mobile)
+
+- Sheet rises from bottom, 320ms ease-out.
+- Sheet height: 64% of screen (`64svh`).
+- Sheet contents: 96px Miomi head at top, conversation canvas below, mic + text input at bottom.
+- Backdrop: current screen at opacity 0.4 (user still sees context — she's *with* you, not replacing you).
+- Dismiss: swipe down, or tap backdrop. Conversation state persists in Supabase.
+
+### Tap behavior (desktop)
+
+- Side panel slides in from right, 380px wide.
+- Doesn't cover main canvas — you keep working while talking to her.
+- Same conversation state as mobile (one source of truth per user).
+
+### `/talk` route (deep-focus mode)
+
+- Still exists, still works as documented in `/docs/archive/MIOMIKA_TALK_SCREEN_OPUS.md`.
+- Used when user wants full immersion (long session, voice-only, study mode).
+- A "fullscreen" button in the ambient sheet promotes the conversation to `/talk`.
+
+### The PLAYFUL state (the new pet behavior)
+
+After 30s of zero user input on any screen, the companion button transitions to PLAYFUL:
+
+- **Behaviors (randomly selected, 1 every 18–28s):**
+  - Ear twitch (single ear, 240ms)
+  - Yawn + stretch (head only, 1.2s)
+  - Tail flick visible (small SVG overlay extends from button briefly)
+  - Looking at the page content (head tilt left/right tracking "interest")
+  - Chasing a butterfly particle that drifts across the screen (3s total)
+  - Curling into a sleep loaf if PLAYFUL has lasted 90s (auto-transition to SLEEPING)
+- **Sound:** none. Never plays sound unprompted.
+- **Goal:** screen-saver-warmth. Makes the dead screen feel alive without demanding attention.
+- **Rule:** never blocks tap. Never expands itself. Never opens conversation. PLAYFUL is *visual only*.
+
+### The Miomi widget (home-screen presence)
+
+iOS and Android both support widgets. Phase 7 ships the Miomi widget:
+
+- **Small widget (2×2):** Miomi's face, current state, single tap → opens app to companion view.
+- **Medium widget (4×2):** Miomi + today's word + streak.
+- **Large widget (4×4):** Miomi + today's word + last 3 mastered words + streak + daily challenge button.
+
+Widgets are configurable: choose Miomi or any unlocked character. This is also the "I want her on my homescreen" answer — she lives outside the app too.
+
+Implementation note: PWA-based widgets are limited; full widget support requires Phase 7+ React Native build. For Phase 1–6, we ship a **PWA install prompt** that gets Miomi onto the user's home screen as an app icon. Functional substitute until widgets exist.
+
+---
+
+## 2.6. USER JOURNEY STAGES (Tourist → Resident funnel)
+
+The engine adapts to the user's journey stage. This is per-user state, detected from signup form + observed behavior.
+
+```typescript
+type JourneyStage = 'tourist' | 'student' | 'worker' | 'resident' | 'unspecified'
+```
+
+| Stage | Detected from | Curriculum focus | Pricing emphasis |
+|---|---|---|---|
+| `tourist` | Short-term visit, IP geolocation, signup "I'm visiting" | Survival phrases: airport, taxi, restaurant, market, bargaining, emergency, basic numbers | One-time pack 199 THB / 7-day Pro 99 THB |
+| `student` | .ac.th email, signup "I'm studying" | Academic Thai/English, exam prep, classroom phrases, dormitory life | Monthly Pro 299 THB, student discount 20% |
+| `worker` | LinkedIn signup, signup "I work in Thailand", professional vocabulary | Professional vocabulary, email writing, meeting phrases, polite escalation | Monthly Pro 299 THB or yearly 2,990 THB |
+| `resident` | 6+ months active, multiple journey signals, signup "I live here" | Cultural fluency, idioms, slang, family/community phrases, ceremonial language | Yearly 2,990 THB, lifetime tier (future) |
+| `unspecified` | Default | General A1-A2 mix | Default Pro 299 THB |
+
+Stage promotes automatically as signals strengthen. User can override in profile.
+
+### Multi-language readiness in the schema
+
+Tables that currently have `_th` and `_en` columns need refactoring to a JSON/JSONB pattern:
+
+```sql
+-- Future schema (Phase 4 migration)
+ALTER TABLE vocabulary_bank
+  ADD COLUMN translations JSONB;
+  -- { "th": "...", "en": "...", "vi": "...", "id": "...", "ja": "...", "ko": "..." }
+
+ALTER TABLE library_entries
+  ADD COLUMN responses JSONB;
+  -- { "th": "...", "en": "...", "vi": "...", ... }
+```
+
+Until then, `th`/`en` columns are temporary. Schema migration in §8 Phase 4.
+
+---
+
+## 3. TIERS, PRICING, AND MIOMI STARS
+
+### Subscription tiers (locked for v1 launch)
+
+| Tier | Price | Library AI | Memory | Stars/month | What they get |
+|------|-------|---|--------|---|---------------|
+| **Guest** | 0 | shared free | none | 0 | Full Miomi, 5 AI exchanges per session, no save |
+| **Free** | 0 | shared free | name + 3 sessions + 50 words | 0 (earnable only) | Unlimited library, daily fuel limits, referral active |
+| **Pro Miomi** | 299 THB / mo | priority | 20 sessions, 500 words, preferences | **300** | Unlimited fuel, voice output, all verbs, ambient mode unrestricted |
+| **Pro Yearly** | 2,990 THB / yr | priority | same | **300/mo + 1,000 signup bonus** | Same as Pro, 2 months free |
+| **Pro Max** | 599 THB / mo *(post-launch)* | premium engine | unlimited | **800** | Deep memory, custom tone, e-book generation, multi-character |
+
+Pro Max ships after first 50 Pro users. Locked spec, just timing-deferred.
+
+### Miomi Stars (✦) — the parallel currency
+
+Stars are the marketplace currency. Exchange rate is **1 THB ≈ 10 stars**, with bonus tiers favoring larger purchases (classic mobile-game psychology).
+
+**Earning stars (free):**
+- Refer a friend who signs up: **+50 stars**
+- Refer a friend who converts to Pro: **+500 stars**
+- Streak day 7: **+100 stars**
+- Streak day 30: **+500 stars**
+- Streak day 100: **+2,000 stars** (rare event, big moment)
+- Daily challenge completed: **+10–30 stars** (varies by difficulty)
+- Word mastery (3-correct-uses): **+5 stars per word**
+- Festival giveaways: **+100 stars on holidays**
+
+**Buying stars:**
+
+| Pack | Stars | Price (THB) | Effective rate | Bonus |
+|------|-------|-------------|----------------|-------|
+| Starter | 500 | 49 | 10:1 | — |
+| Popular | 1,200 | 99 | 12.1:1 | +20% |
+| Best Value | 3,000 | 199 | 15.1:1 | +50% |
+| Whale | 7,000 | 399 | 17.5:1 | +75% |
+
+**Spending stars (marketplace, Phase 7):**
+- Characters: 1,500–5,000 stars
+- E-books (custom, AI-generated): 500–2,000 stars
+- Outfits: 200–800 stars
+- Power-ups (2x XP day, extra session): 100–500 stars
+- Exam packs: 1,000–3,000 stars
+
+**Pro users get monthly stipend** (300/month for Pro, 800/month for Pro Max). Unused stars roll over up to 5,000 max (prevents hoarding from breaking the economy).
+
+**Why this structure makes money:**
+- Pro subscribers stay subscribed for the stipend (loss-aversion)
+- Free users earn stars through engagement (acquisition loop)
+- Whales buy big packs for marketplace items (high-margin revenue)
+- Bonus tiers push toward bigger purchases (proven mobile-game pattern)
+
+### Payment providers
+
+Omise primary (PromptPay QR is mandatory for Thailand). Stripe as backup once verified. Both behind a single abstraction so swap is one config change. Whichever verifies first goes live first.
+
+### Free tier daily fuel limits
+
+| Fuel | Free | Pro | Pro Max |
+|------|------|-----|---------|
+| Heart ♥ (mood) | 3 taps/day | unlimited | unlimited |
+| Zap ⚡ (energy) | 3 taps/day | unlimited | unlimited |
+| Brain ✦ (focus) | 1 tap/day | unlimited | unlimited |
+
+Resets at midnight Bangkok time.
+
+---
+
+## 3.5. CHARACTERS & MARKETPLACE
+
+### Schema (built in Phase 4, surfaced in Phase 7)
+
+```sql
+CREATE TABLE characters (
+  id UUID PRIMARY KEY,
+  slug TEXT UNIQUE NOT NULL,  -- 'miomi', 'kpop-bunny', 'anime-hero', 'wise-fox'
+  name TEXT NOT NULL,
+  name_th TEXT,
+  archetype TEXT,             -- 'cute', 'edgy', 'wise', 'playful'
+  description JSONB,
+  asset_path TEXT,            -- /public/characters/{slug}/
+  available_states TEXT[],    -- which animation states this character supports
+  tier_required TEXT,         -- 'free', 'stars', 'pro'
+  star_price INT,             -- price in Miomi Stars (null if free or Pro-locked)
+  thb_price INT,              -- alternative direct purchase
+  abilities JSONB,            -- which verbs this character can perform
+  status TEXT DEFAULT 'active'
+);
+
+CREATE TABLE user_unlocked_characters (
+  user_id UUID REFERENCES auth.users(id),
+  character_id UUID REFERENCES characters(id),
+  unlocked_at TIMESTAMPTZ DEFAULT NOW(),
+  unlock_method TEXT,         -- 'free', 'stars', 'thb', 'pro_bundle'
+  PRIMARY KEY (user_id, character_id)
+);
+
+CREATE TABLE user_active_character (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id),
+  character_id UUID REFERENCES characters(id),
+  switched_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Character roadmap
+
+| Character | Specialty | Unlock | Phase |
+|---|---|---|---|
+| **Miomi** | The starter — language, content, translation, daily | Free for all | Live |
+| **Kuma** (small bear) | Children's mode, gentler pace, kid-safe content | 1,500 stars OR Pro | Phase 8 |
+| **K-pop Bunny** | Korean language, K-culture, fan content | 2,500 stars OR Pro Max | Phase 8 |
+| **Anime Hero** (boy fox) | Storytelling, gaming, Japanese references | 2,500 stars | Phase 8 |
+| **Wise Fox** | Business English, strategy, professional writing | 3,000 stars OR Pro Max | Phase 8 |
+| **Gen-Z Street Girl** | TikTok, viral content, social media native | 2,000 stars | Phase 8 |
+
+Each character has its own voice but shares the engine. They are not new apps — they are new dialects of the same companion.
+
+### Asset structure (refactor before Phase 4)
+
+```
+public/characters/
+  miomi/
+    full/
+      idle.png, happy.png, thinking.png, speaking.png
+      excited.png, sleeping.png, playful-yawn.png, playful-stretch.png
+      low-fuel.png, missing-user.png
+    head/
+      idle.png, happy.png, thinking.png, speaking.png ...
+    companion/
+      idle.png, happy.png, listening.png, celebration.png
+      (composed for 56px, high contrast)
+    widget/
+      icon-small.png (200×200, transparent bg)
+      icon-medium.png (400×200)
+      icon-large.png (400×400)
+  kpop-bunny/
+    [same structure when added]
+```
+
+Migrate existing `/public/miomi/*` to `/public/characters/miomi/{full,head}/` in Phase 1.
+
+---
+
+## 4. ENGINEERING CONTRACT
+
+### 4.1 Stack (locked)
+
+```
+Framework:    Next.js 16.2.6 (App Router) + React 19
+Language:     TypeScript 5 strict mode
+Styling:      Tailwind 4 + inline styles (no CSS modules)
+Database:     Supabase (Postgres + Auth + Storage), RLS on every table
+AI primary:   Groq llama-3.3-70b-versatile (temporary — see §4.7)
+AI backup:    Gemini gemini-2.5-flash-lite (temporary)
+AI future:    Anthropic Claude Haiku 4.5 (workhorse), Sonnet 4.7 (Pro Max)
+Animations:   Framer Motion 12
+Icons:        lucide-react (version bump needed, see §6.2)
+Fonts:        Kanit 500 (Thai UI), Quicksand 600 (English UI),
+              Sarabun 500 (Thai learning content readability)
+Email:        Resend.io (transactional)
+Payment:      Omise (PromptPay, primary) + Stripe (backup)
+Analytics:    Plausible (privacy-friendly, no cookie banner)
+Errors:       Sentry (free tier)
+Hosting:      Vercel
+```
+
+### 4.2 Design tokens (locked, no debate)
+
+```
+COLORS
+  Pink gradient CTA:  linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)
+  Gold (achievement): #C9A96E
+  Coral (creator):    #FF8A80
+  Teal (translate):   #7DD3C0
+  Background:         #FAFAF6
+  Surface:            #FFFFFF
+  Text primary:       #1A1A18
+  Text muted:         #9A8B73
+  Text subtle:        #C4BDB5
+  Border light:       #EDE8E0
+  Border medium:      #E8E5DF
+  Destructive only:   #8B1A35 (cancel-subscription button only, never primary)
+
+MOTION (only two curves, never mix)
+  UI:        cubic-bezier(0.4, 0, 0.2, 1), durations 180 / 240 / 360ms
+  Character: spring stiffness 280 damping 13 (subtle: 220/16)
+
+SPACING:  4, 8, 12, 16, 24, 32, 48, 64, 96  (never 6, 10, 20)
+RADIUS:   12 (cards), 16 (sheets), 999 (pills)
+ICONS:    lucide-react strokeWidth 1.75 (2.0 for brand fuel ♥ ⚡ ✦)
+MOBILE:   100svh, no page scroll ever, 320–412px primary
+
+FORBIDDEN
+  - Emojis in UI chrome (only in DB data fields, e.g. vocabulary.emoji)
+  - The old dark red as primary CTA
+  - Spinners (Miomi IS the loading indicator)
+  - Red error toasts (Miomi delivers all errors)
+  - "No data" empty states (always a warm Miomi invitation)
+  - Hardcoded warm phrases (must come from lib/voice/warmth.ts)
+```
+
+### 4.3 Routes
+
+```
+PUBLIC
+  /                          → marketing landing (Phase 6, currently redirects)
+  /pricing                   → packaging page (Phase 5)
+  /help                      → help center (Phase 6)
+  /legal/terms               → Phase 6
+  /legal/privacy             → Phase 6
+
+AUTH
+  /(auth)/login              → 60%, needs back nav + Google OAuth
+  /(auth)/signup             → 60%, needs Google OAuth + journey-stage question
+
+AUTHENTICATED (companion button visible on all of these)
+  /(app)/home                → 90%
+  /(app)/talk                → 60%, deep-focus conversation mode
+  /(app)/dashboard           → 40%, needs real data wiring
+  /(app)/profile             → audit needed
+  /(app)/invite              → 0% (referral)
+  /(app)/marketplace         → Phase 7 (characters, e-books, outfits)
+  /(app)/wallet              → Phase 5 (stars, transaction history)
+  /(app)/admin               → Phase 7 (Mike-only)
+
+ONBOARDING
+  /onboarding                → exists, needs integration with signup
+
+LEGACY
+  /(app)/create              → redirects to /talk
+  /(app)/friends             → audit, repurpose or delete
+
+API
+  /api/auth                  → auth callbacks
+  /api/miomi                 → main engine endpoint
+  /api/miomi/session-init    → session opener
+  /api/payment/webhook       → Phase 5 (Omise/Stripe)
+  /api/cron/library-promote  → Phase 4 (Vercel cron)
+  /api/cron/library-degrade  → Phase 4 (Vercel cron)
+  /api/cron/campaigns        → Phase 5 (festival activation)
+```
+
+### 4.4 Database state
+
+**Live tables:**
+```
+vocabulary_bank        — 1,134 rows
+phrases_bank           — exists, NOT WIRED to engine yet
+library_entries        — ~50 seed entries
+library_interactions   — logging with quality signals
+library_promotions_queue — pipeline exists, no cron yet
+user_sessions          — session tracking
+```
+
+**Migrations applied:** 0001, 0002, 0003.
+
+**Migrations needed (next phases):**
+```
+0004_quality_update.sql      — update_library_quality function (Phase 4)
+0005_promotion_pipeline.sql  — promoted_to_queue + per-interaction columns (Phase 4)
+0006_creator_outputs.sql     — creator outputs, archetype, language columns (Phase 4)
+0007_user_extended.sql       — journey_stage, miomi_stars, active_character_id (Phase 1)
+0008_vocabulary_user_state.sql — per-user word mastery, spiral schedule (Phase 1, CRITICAL)
+0009_characters.sql          — characters + unlocks (Phase 4 schema, Phase 7 surfaced)
+0010_payments.sql            — subscriptions, transactions, receipts (Phase 5)
+0011_referrals.sql           — referral codes, conversion tracking, reward state (Phase 6)
+0012_multilang.sql           — JSONB translations columns, future-proof (Phase 4)
+```
+
+**RLS:** assumed on but unaudited. Action in Phase 1.
+
+### 4.5 File structure conventions
+
+```
+app/
+  (app)/              authenticated routes, AppShell + CompanionButton wrap these
+  (auth)/             login, signup, journey-stage question
+  api/                server routes, never expose secrets to client
+
+components/
+  conversion/         MiomiInvitationCard
+  miomi/              MiomiCharacter, MiomiStage, MiomiSpeechBubble — canonical
+  talk/               MicButton, WordCardV3, ExerciseCards (deep mode surfaces)
+  companion/          NEW — CompanionButton, CompanionSheet, CompanionPanel,
+                      PlayfulBehaviors (the ambient system)
+  ui/                 BottomNav, Card, PillButton — primitives
+  layout/             AppShell, Providers
+  guest/              GuestExplorationContext, GuestScreenLockOverlay
+
+lib/
+  ai/                 engine: intents, language, persona, prompt, session, router,
+                      matcher, vocabulary, miomi
+  library/            templates: matcher, resolver, responses, reactions, opener
+  voice/              NEW — warmth.ts, the cultural warmth system
+  marketing/          NEW — campaigns.ts, festival calendar
+  payment/            NEW — providers/, products.ts, stars.ts (Phase 5)
+  supabase/           client, server, middleware
+  talk/               speech, imageCategoryMap
+
+supabase/migrations/  numbered SQL, applied in order
+public/characters/    NEW structure — characters/{slug}/{full,head,companion,widget}/
+types/                shared TS types
+```
+
+### 4.6 AI provider strategy (the most important engineering decision)
+
+**Current:** Groq → Gemini → library failover. All free tiers.
+
+**Decision matrix:**
+
+| Provider | Pros | Cons | Verdict |
+|----------|------|------|---------|
+| Groq (llama-3.3-70b) | Free, fast, no rate cliff at low volume | Free until policy changes, no SLA, weak Thai under stress | Keep as primary until library hit-rate >75%, then demote |
+| Gemini Flash Lite | Free backup | 20 RPD on cheapest tier, inconsistent Thai | Demote to last-resort |
+| **Anthropic Claude Haiku 4.5** | Best Thai, predictable cost (~$0.0008/exchange), SLA | Costs money | **Workhorse for Pro users from Phase 4. Cost is justified by paid revenue.** |
+| **Anthropic Claude Sonnet 4.7** | Best creator output, best translation | Most expensive | **Pro Max only, when Pro Max ships** |
+| OpenAI | Industry standard | Highest cost, no Thai advantage | Never |
+| Local models | $0 marginal cost | Operational burden for solo founder, quality cliff | Never |
+
+**Routing logic (Phase 4 implementation):**
+```
+User says X
+  ↓
+Intent classifier (free, local) — always runs first
+  ↓
+Library matcher (free, local) — 80%+ hit at maturity
+  ↓
+If library miss:
+    If user.tier in [Pro, ProMax]:
+        Try Claude Haiku → Claude Sonnet (Pro Max only) → Groq → library failover
+    Else:
+        Try Groq → Gemini → library failover
+  ↓
+Quality scoring → feed promotion queue
+```
+
+Per-user cost caps (server-enforced):
+- Guest: $0.02/session, $0.02/day
+- Free: $0.05/session, $0.05/day
+- Pro: $0.15/session, $0.50/day soft cap
+- Pro Max: $0.50/session, $2.00/day soft cap
+
+Kill switches (env vars): `DISABLE_AI`, `DISABLE_ANTHROPIC`, `DISABLE_GROQ`, `MAX_DAILY_AI_COST_USD`.
+
+**The router is built so swapping providers is one config change.** Phase 4 builds it.
+
+### 4.7 Environment variables (canonical list)
+
+```
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY        # server only, never client
+
+# AI
+GROQ_API_KEY                     # current primary
+GEMINI_API_KEY                   # current backup
+ANTHROPIC_API_KEY                # Phase 4
+
+# Email + payments
+RESEND_API_KEY                   # Phase 1 (auth emails)
+OMISE_PUBLIC_KEY                 # Phase 5
+OMISE_SECRET_KEY                 # server only
+STRIPE_PUBLIC_KEY                # Phase 5
+STRIPE_SECRET_KEY                # server only
+
+# Ops
+CRON_SECRET                      # Phase 4
+SENTRY_DSN                       # Phase 1
+NEXT_PUBLIC_PLAUSIBLE_DOMAIN     # Phase 6
+
+# Kill switches (optional)
+DISABLE_AI                       # emergency library-only mode
+DISABLE_ANTHROPIC
+DISABLE_GROQ
+MAX_DAILY_AI_COST_USD
+```
+
+---
+
+## 5. PEDAGOGY — Mirror Teaching (the unfair advantage)
+
+Five pillars, locked. This is how teaching is implemented in code:
+
+1. **Invisible Mirror.** Reflect user's level back, slightly elevated. Echo-correct, never explicit-correct.
+   *User: "I am go work" → Miomi: "ไปทำงานเหรอคะ~ I go to work too. งานเป็นยังไงคะ~"*
+
+2. **Specific Witnessing.** Praise names the specific behavior, sourced from `lib/voice/warmth.ts`. Never "good job!"
+
+3. **Spaced Spiral.** Words spiral back at 1, 2, 4, 7, 12 days in new contexts. Implementation: `vocabulary_user_state` table tracks per-user `last_introduced_at` and `next_spiral_at`.
+
+4. **Emotional Stakes Anchoring.** New vocab attaches to user's real life. Engine reads `archetype` + `journey_stage` + `recent_topics` to choose the next word.
+
+5. **Three-Door Exit.** At any moment user can continue, ask for help, or change topic. All three are rewarded.
+
+### Growth is theatrical
+
+While teaching hides, growth shows loud:
+- Word mastery → CELEBRATION state + magic burst + +5 stars
+- Level up → LEVEL_UP state + certificate generation + shareable image
+- Streak milestone → EXCITED state + stars + push notification + Miomi note
+- Weekly recap email: "This week with Miomi you mastered 7 new words. You used 'because' correctly for the third time. You are getting fluent."
+
+Engineering implementation in Phase 3.
+
+---
+
+## 6. KNOWN ISSUES (full audit — fix order in §8)
+
+### 6.1 BLOCKING (Phase 1)
+
+1. **Welcome screen shows twice** — race in `_welcomeShown` guard. Fix: localStorage flag with single-write contract.
+2. **Login page has no navigation** — no back button. Users trapped.
+3. **Google OAuth not configured** — biggest conversion killer for Thai market.
+4. **Talk does not complete teaching loop** — pronunciation check fires but mastery never recorded.
+5. **Language mixing** — AI responds Thai when user is English. Adaptive prompt assembler not wired into route.ts.
+6. **Dashboard is static** — doesn't read real data.
+7. **`vocabulary_user_state` table missing** — without it, spiral and mastery are broken.
+8. **Welcome shows for Pro returners** — should skip if `last_seen < 7 days AND tier !== guest`.
+9. **No journey-stage detection at signup** — defaulting all users to A1/A2.
+10. **No companion button** — Miomi only exists inside `/talk`. The ambient system is unbuilt.
+
+### 6.2 HIGH PRIORITY (Phase 2)
+
+11. **lucide-react ^1.14.0 is wrong** — that version is from 2020, missing most modern icons. Bump to latest stable (`^0.46x`).
+12. **Two matchers exist** — consolidate `lib/ai/matcher.ts` and `lib/library/matcher.ts`.
+13. **Samsung Internet voice broken** — show fallback text-mode prompt.
+14. **`phrases_bank` is unused** — wire into engine.
+15. **Markdown stripper too aggressive** — fine now, will eat JSON output later.
+16. **`interaction_type` may not be written** — audit `vocabulary.ts`.
+17. **Hardcoded warm phrases scattered in code** — must move to `lib/voice/warmth.ts`.
+18. **No journey-stage adaptation in engine** — engine ignores `user.journey_stage`.
+
+### 6.3 MEDIUM (Phase 6)
+
+19. **`/friends` route purpose unclear** — audit, repurpose or delete.
+20. **Onboarding not integrated with signup** — no smooth handoff.
+21. **Favicon set is amateur** — needs full icon system. AI-generated assets per §7.
+22. **No meta tags** — invisible SEO.
+23. **No error boundaries** — any throw → blank page.
+24. **No global Miomi-notification toast system** — needed for proactive moments.
+
+### 6.4 PROJECT HEALTH (Phase 0)
+
+25. **14 .md files in root** — this document fixes that.
+26. **`.cursorrules` may be stale** — regenerated in Phase 0.
+27. **No tests** — Pragmatic call: skip unit tests, add one Playwright smoke test per critical flow as we ship.
+28. **No CI gate** — add GitHub Action for `tsc --noEmit && lint` on PR.
+29. **No analytics / errors / monitoring** — Plausible + Sentry in Phase 1 / Phase 6.
+
+---
+
+## 7. ASSET REQUIREMENTS (what to generate with ChatGPT/AI)
+
+You produce assets, I write the prompts. Each asset has a prompt-spec ready in `/docs/asset-briefs/`.
+
+### Phase 1 asset deliverables
+
+These ship with Phase 1:
+
+1. **`favicon.ico`** (multi-resolution: 16, 32, 48px) — Miomi face in clear silhouette, readable at 16px
+2. **`favicon-16.png`, `favicon-32.png`**
+3. **`apple-touch-icon.png`** (180×180, rounded-corner-ready)
+4. **`og-image.png`** (1200×630) — Miomi + tagline "เพื่อนที่จำคุณได้" — for every social share
+5. **`twitter-card.png`** (1200×600) — same composition
+6. **`safari-pinned-tab.svg`** — monochrome Miomi silhouette
+7. **`manifest-icon-192.png`** + **`manifest-icon-512.png`** — re-derive from clean master
+8. **`companion-idle.png`** (256×256, transparent bg) — Miomi head composed for 56px render
+9. **`companion-happy.png`** (256×256)
+10. **`companion-listening.png`** (256×256, ears forward)
+11. **`companion-celebration.png`** (256×256)
+
+### Phase 2 asset deliverables
+
+12. **`playful-yawn.png`**
+13. **`playful-stretch.png`**
+14. **`playful-tail-flick.png`**
+15. **`playful-loaf.png`** (sleep loaf for transition)
+16. **`low-fuel.png`** (droopy, slightly desaturated)
+17. **`missing-user.png`** (looking down, sad eyes)
+
+### Phase 6 asset deliverables (marketing/SEO push)
+
+18. **Hero landing illustration** — Miomi welcoming, 1600×900
+19. **Feature illustrations** — 3× 800×800, one per main verb
+20. **App store screenshots** — 6× 1284×2778 (iPhone) + Android equivalents
+
+### How to produce each asset
+
+For each asset in `/docs/asset-briefs/`, I write a complete ChatGPT/Midjourney/DALL-E prompt with:
+- Exact dimensions and format
+- Composition rules
+- Color palette (locked to design tokens)
+- "Avoid" list (no frames, no shadows from outside, transparent bg)
+- Reference to existing Miomi assets to match style
+
+You paste the prompt, generate the asset, drop into the project. Phase prompts in §9 include the asset-brief generation as a sub-task when relevant.
+
+---
+
+## 8. EXECUTION PLAN (build in order, no skipping)
+
+Each phase = one Cursor master-prompt = one PR. Phases ship in dependency order.
+
+### Phase 0 — Project hygiene (30 minutes)
+Documentation cleanup. Replace 14 .md files with this one. Update `.cursorrules`. Set up `/docs/archive/`, `/docs/prompts/`, `/docs/asset-briefs/`.
+
+### Phase 1 — Foundation bugs + ambient companion (4-5 days)
+- Welcome single-show contract
+- Login back navigation
+- Google OAuth via Supabase
+- Journey-stage question at signup
+- lucide-react version bump
+- Migration 0007: extend user table (journey_stage, miomi_stars, active_character_id)
+- Migration 0008: vocabulary_user_state (CRITICAL for teaching)
+- RLS audit on every table
+- Error boundary at app shell
+- Sentry wired (production visibility from day one)
+- **Companion button + sheet on every authenticated screen**
+- Asset briefs for Phase 1 favicons + companion images
+
+### Phase 2 — Cleanup, consistency, voice system (3-4 days)
+- Consolidate two matchers
+- Audit `/friends` and `/profile`
+- `lib/voice/warmth.ts` — codify cultural warmth as typed module
+- Migrate all hardcoded warm phrases to `warmth.ts`
+- Apply design tokens audit across every screen
+- Standardize errors/empty states to Miomi voice
+- Miomi-notification toast system
+- TypeScript strict mode pass
+- Asset briefs for Phase 2 (PLAYFUL state images)
+
+### Phase 3 — Make teaching real (4-5 days)
+- Wire `phrases_bank` to engine
+- Mastery tracking (3-correct-uses → vocabulary_user_state)
+- Spaced spiral queue (1, 2, 4, 7, 12 days)
+- Pronunciation check → mastery stage advance
+- Specific-praise selector pulling from `warmth.ts`
+- Dashboard reads real vocabulary + session data
+- Weekly recap email (Resend)
+- End-to-end test: "teach me English" → word card → exercise → mastery → spiral schedule → celebration
+- Journey-stage drives word selection from vocab bank
+
+### Phase 4 — Make the brain real (5-6 days)
+- ENGINE_OPUS Phases 1-3 fully wired (intents, language, persona, prompt, session pipeline)
+- Quality scoring per-interaction
+- Promotion cron (nightly)
+- Degradation cron (weekly)
+- Cost caps + kill switches
+- **Anthropic Claude Haiku swap behind feature flag**
+- Internal library hit-rate dashboard (Mike-only)
+- Migration 0009 (characters), 0012 (multilang JSONB) — schema only, surfaced later
+
+### Phase 5 — Make conversion real (6-7 days)
+- `/pricing` packaging page
+- Migration 0010 (payments, subscriptions, transactions)
+- Payment provider abstraction (`lib/payment/providers/`)
+- Omise integration (PromptPay first)
+- Stripe integration (when verified)
+- Webhook → PAYMENT_CONFIRMED state + Resend receipt + Stars stipend grant
+- Transaction history in `/profile`
+- MiomiInvitationCard fully wired with 5 trigger moments
+- Guest conversion sheet with quality-signal trigger
+- First-session onboarding flow
+- Miomi Stars wallet view (`/wallet`)
+- Marketing campaigns module (`lib/marketing/campaigns.ts`)
+
+### Phase 6 — Operational maturity (4-5 days)
+- Migration 0011 (referrals)
+- `/invite` referral page fully built
+- LINE pre-filled share
+- Reward delivery moments (stars granted, Miomi celebrates)
+- Plausible analytics integration
+- SEO meta + Open Graph + favicon set (use Phase 1 generated assets)
+- robots.txt + sitemap.xml
+- `/help` center FAQ
+- `/legal/terms` + `/legal/privacy` (lawyer review later, stubs now)
+- PWA install prompt polish (Miomi on home screen substitute)
+
+### Phase 7 — Polish, scale, marketplace (2-3 weeks)
+- Welcome screen master-class redesign
+- Magic moment system (8 moments per DESIGN_SYSTEM §2)
+- Desktop 4-zone rebuild (Canva/Figma quality)
+- Admin panel (Mike-only)
+- Rive integration for Miomi (replaces Framer bridge)
+- Marketplace surface (characters, e-books, outfits, power-ups)
+- First non-Miomi character ships (Kuma — kid-safe, simplest unlock)
+- PWA push notifications
+
+### Phase 8 — Characters, B2B, expansion (open-ended)
+- K-pop Bunny, Anime Hero, Wise Fox, Gen-Z Street Girl
+- Hotel / cafe / school B2B onboarding flows
+- Multi-language: Vietnamese, Indonesian, Japanese, Korean
+- Native iOS/Android (React Native) for true widget support
+- Custom AI-generated e-books
+
+---
+
+## 9. PROMPT LIBRARY SYSTEM
+
+Each phase has a single Cursor master-prompt stored in `/docs/prompts/phase-NN.md`. Run them in order.
+
+**How to request a phase prompt:**
+In a fresh Claude chat, paste `/MIOMIKA.md`, then say: "Generate phase N prompt."
+
+I produce a single, complete, self-contained prompt with:
+- Exact file paths to touch
+- Exact code or exact spec
+- Acceptance criteria
+- Verification commands
+- Asset briefs (where Phase needs them)
+
+**One paste → one branch → one PR.**
+
+This is the credit-efficient pattern. The phase prompt is the unit of work, not individual file edits.
+
+---
+
+## 10. STATE LOG (update at end of every session)
+
+| Date | Session | Phase | Shipped | Broken | Next |
+|------|---------|-------|---------|--------|------|
+| 2026-05-21 | Claude Opus 4.7 — vision lock | — | v2 canonical document with full vision, ambient companion, character/marketplace schema, journey stages, cultural warmth system, marketing calendar, asset spec | n/a (no code) | Run Phase 0 in Cursor, return for Phase 1 prompt |
+
+---
+
+*End of canonical document. If you are reading this in a future session: this is the only document you need. Paste this once. Start.*

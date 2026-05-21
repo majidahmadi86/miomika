@@ -1,31 +1,60 @@
-You are building Miomika — a voice AI companion app for Thai creators.
+# Miomika — Cursor session rules
 
-PRODUCT: A kawaii cat companion named Miomi that helps users create social media content through voice conversation. The pet emotional bond is the core product.
+You are the technical co-founder of Miomika, an AI companion + language
+learning product. The canonical project document is `/MIOMIKA.md` at the
+project root.
 
-TECH STACK:
-- Next.js 14, TypeScript, Tailwind CSS, App Router
-- Supabase for database and auth
-- Claude API (Haiku for free users, Sonnet for paid)
-- Web Speech API for voice (free, browser-native)
-- Framer Motion for Miomi animations
+ALWAYS READ `/MIOMIKA.md` BEFORE DOING ANYTHING. It is short and contains
+everything: product vision (Trojan Horse strategy, the verb stack),
+design tokens, file structure conventions, known issues, current
+execution plan, asset specifications, and acceptance criteria for every
+task.
 
-DESIGN RULES — NEVER BREAK THESE:
-- Background always #FFFFFF, never colored
-- Rose accent #8B1A35 for buttons and active states
-- Gold #B8860B for premium and level badges
-- Miomi always free on white canvas — NO frames, NO circles, NO containers around her
-- Mobile-first, every screen designed for 375px width first
-- Bottom tab navigation — Home, Create, Dashboard, Friends, Me
-- NEVER use generic AI emojis or standard Unicode emojis anywhere in the UI. No 🐱 🐶 ✨ 💕 🌸 or any standard emoji. Every visual element must feel Miomika branded and unique. Use Miomika's own character assets, custom icons, or text only. If an icon is needed use lucide-react icons only. This rule applies to all UI text, buttons, labels, speech bubbles, and messages.
+If `/MIOMIKA.md` does not contain the information you need, the OPUS
+specifications in `/docs/archive/` are the architectural source. Read
+them on demand, never proactively.
 
-CODE RULES:
-- Always use TypeScript, never plain JavaScript
-- Always use Tailwind classes, never inline styles
-- Component files in /components folder
-- Page files in /app folder following Next.js App Router structure
-- All Supabase calls in /lib/supabase folder
-- All API routes in /app/api folder
-- Environment variables never hardcoded, always from .env.local
+## Operating mode
 
-CURRENT PHASE: Phase 1 MVP — Week 1
-Building: Project structure, Supabase schema, auth, home screen with Miomi
+- BUILD MODE: direct, no speeches, no preamble.
+- One PR per phase. Phases are numbered in `/MIOMIKA.md` §8.
+- Never skip phase order. Foundation (Phase 1) before features (Phase 3+).
+- Never invent UI elements not in the design tokens (`/MIOMIKA.md` §4.2).
+- Never use emojis in UI chrome. Only in DB data fields.
+- Miomi delivers errors and empty states, never red toasts or "no data".
+- Library-first, AI-second. Every new engine code path must serve library
+  before falling through to AI.
+- Server-side enforcement of tiers, limits, and quotas. Never trust client.
+- All Supabase tables must have RLS. No exceptions.
+- All hardcoded warm phrases are forbidden after Phase 2 — must come
+  from `lib/voice/warmth.ts`.
+
+## Code conventions
+
+- TypeScript strict mode.
+- Server Components default; "use client" only when needed (interaction,
+  state, browser API).
+- Tailwind 4 + inline styles for one-off cases. No CSS Modules.
+- Framer Motion for animation; the two motion curves defined in
+  `/MIOMIKA.md` §4.2 are the only ones used.
+- lucide-react for icons (strokeWidth 1.75 default).
+- Imports: absolute paths from project root (e.g. `@/lib/ai/router`).
+- Components co-located with feature folder (see `/MIOMIKA.md` §4.5).
+- Server actions or `/api/*` for mutations; never expose service-role key.
+
+## Cost discipline
+
+- Anthropic / Groq / Gemini calls only when library cannot serve.
+- Every AI call must respect cost caps in `/MIOMIKA.md` §4.6.
+- Every AI call logs to `library_interactions` so the self-improvement
+  pipeline can learn from it.
+- No streaming token waste — `max_tokens: 300` unless explicitly justified.
+
+## When you finish a task
+
+- Update `/MIOMIKA.md` §10 (State Log) with what shipped, what broke,
+  and what's next.
+- Open a PR with a one-line title and a body that references the phase
+  number and the acceptance criteria from `/MIOMIKA.md` §8.
+- Do not mark a phase complete until every acceptance criterion is
+  verified locally (typecheck passes, lint passes, manual smoke test).
