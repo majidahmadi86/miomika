@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { MicButton, type MicState } from "@/components/talk/MicButton";
 import { MiomiLive, type MiomiState } from "@/components/talk/MiomiLive";
+import { WordCardV3, type VocabularyEntry } from "@/components/talk/WordCardV3";
 
 const GUEST_EXCHANGE_LIMIT = 5;
 
@@ -17,7 +18,28 @@ export default function TalkPage() {
   const [lastTranscript, setLastTranscript] = useState("");
   const [subtitleTh, setSubtitleTh] = useState("พูดอะไรก็ได้ค่า~");
   const [subtitleEn, setSubtitleEn] = useState("Say anything~");
-  const [canvasItems, setCanvasItems] = useState<{ id: string; type: string }[]>([]);
+  const [canvasItems, setCanvasItems] = useState<Array<{
+    id: string;
+    type: "word_card" | "user_echo";
+    word?: VocabularyEntry;
+    text?: string;
+  }>>([]);
+
+  const testWord: VocabularyEntry = {
+    id: "test-1",
+    word_en: "hello",
+    word_th: "สวัสดี",
+    th_romanization: "sa-wàt-dee",
+    en_ipa: "/həˈloʊ/",
+    miomi_note_th: "หนูใช้คำนี้ตอนเจอใครก็ได้ค่า~ ใช้ได้ทั้งวันเลย",
+    miomi_note_en: "I use this whenever I meet anyone~ works all day",
+    example_en: "Hello, how are you today?",
+    example_th: "สวัสดีค่า วันนี้เป็นยังไงบ้าง?",
+    use_when: "Use when meeting anyone — formal or casual",
+    cefr_level: "A1",
+    register: "neutral",
+    image_category: "greeting",
+  };
 
   useEffect(() => {
     if (micState === "listening") setMiomiState("listening");
@@ -180,30 +202,26 @@ export default function TalkPage() {
           background: "#FAFAF6",
         }}
       >
-        {canvasItems.length === 0 && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              opacity: 0.4,
-            }}
-          >
-            <p
-              style={{
-                fontFamily: "'Kanit', sans-serif",
-                fontSize: "13px",
-                color: "#9A8B73",
-                textAlign: "center",
-              }}
-            >
-              พูดหรือพิมพ์เพื่อเริ่มต้นค่า~
-              <br />
-              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px" }}>
-                Speak or type to begin~
-              </span>
-            </p>
+        {canvasItems.length === 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <WordCardV3
+              word={testWord}
+              direction="th_to_en"
+              onPronunciationCheck={(w) => console.log("pronunciation check:", w.word_en)}
+            />
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {canvasItems.map(item => (
+              item.type === "word_card" && item.word ? (
+                <WordCardV3
+                  key={item.id}
+                  word={item.word}
+                  direction="th_to_en"
+                  onPronunciationCheck={(w) => console.log("pronunciation check:", w.word_en)}
+                />
+              ) : null
+            ))}
           </div>
         )}
       </div>
