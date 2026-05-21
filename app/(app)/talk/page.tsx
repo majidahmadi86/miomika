@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,11 +13,12 @@ import { resolveWordCard } from "@/lib/library/resolver";
 import { getSessionOpener } from "@/lib/library/sessionOpener";
 import { getCorrectReaction } from "@/lib/library/reactions";
 
-const GUEST_EXCHANGE_LIMIT = 5;
-
 export default function TalkPage() {
+  const GUEST_LIMIT = 5;
   const { isGuest, authReady } = useGuestExploration();
-  const [guestExchangesRemaining] = useState(GUEST_EXCHANGE_LIMIT);
+  const [guestExchanges, setGuestExchanges] = useState(0);
+  const [showGuestSheet, setShowGuestSheet] = useState(false);
+  const [uiLang, setUiLang] = useState<"th" | "en">("th");
   const [micState, setMicState] = useState<MicState>("idle");
   const [miomiState, setMiomiState] = useState<MiomiState>("idle");
   const [lastTranscript, setLastTranscript] = useState("");
@@ -50,23 +52,43 @@ export default function TalkPage() {
   }, [micState]);
 
   useEffect(() => {
+    const lang = navigator.language || "th";
+    if (lang.startsWith("en")) {
+      setUiLang("en");
+    }
+  }, []);
+
+  useEffect(() => {
     const opener = getSessionOpener({
       isFirstSession: true,
       hoursSinceLastSession: null,
       streakDays: 0,
     });
-    setSubtitleTh("สวัสดีค่า~");
+
+    const openerTh = uiLang === "en"
+      ? "Hi~ I'm Miomi! Want to learn Thai today? or improve your English?"
+      : opener.speech_th;
+    const openerEn = uiLang === "en"
+      ? "พูดหรือพิมพ์อะไรก็ได้ค่า~"
+      : opener.speech_en;
+
+    setSubtitleTh(uiLang === "en" ? "Hi~ I'm Miomi!" : "สวัสดีค่า~");
     setCanvasItems([{
       id: crypto.randomUUID(),
       type: "miomi_message" as const,
-      textTh: opener.speech_th,
-      textEn: opener.speech_en,
+      textTh: openerTh,
+      textEn: openerEn,
     }]);
     window.setTimeout(() => setMiomiState("idle"), 1000);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [uiLang]);
 
   const processUserInput = useCallback(async (text: string) => {
+    // Guest limit check
+    if (isGuest && guestExchanges >= GUEST_LIMIT) {
+      setShowGuestSheet(true);
+      return;
+    }
+
     if (!text.trim()) return;
     setInputText("");
 
@@ -76,6 +98,22 @@ export default function TalkPage() {
       type: "user_echo" as const,
       text: text.trim(),
     }]);
+    if (isGuest) {
+      setGuestExchanges(prev => {
+        const next = prev + 1;
+        if (next === GUEST_LIMIT - 1) {
+          window.setTimeout(() => {
+            setCanvasItems(items => [...items, {
+              id: crypto.randomUUID(),
+              type: "miomi_message" as const,
+              textTh: "คุยกับคุณสนุกมากเลยค่า~ หนูอยากจำคุณไว้นะคะ ถ้าสมัครฟรี เราคุยกันได้ตลอดเลยค่า",
+              textEn: "I love talking with you~ I want to remember you. Sign up free and we can talk forever~",
+            }]);
+          }, 3000);
+        }
+        return next;
+      });
+    }
 
     // Library-first routing
     const template = matchLibrary(text.trim(), { wordsIntroduced });
@@ -100,18 +138,16 @@ export default function TalkPage() {
 
         if (word) {
           setWordsIntroduced(prev => [...prev, word.word_en]);
+          setMiomiState("teaching");
+          setSubtitleTh("หนูสอนคำใหม่ให้ค่า~");
           window.setTimeout(() => {
-            setMiomiState("teaching");
-            setSubtitleTh("หนูสอนคำใหม่ให้ค่า~");
-            window.setTimeout(() => {
-              setCanvasItems(prev => [...prev, {
-                id: crypto.randomUUID(),
-                type: "word_card" as const,
-                word,
-              }]);
-              setMiomiState("idle");
-            }, 600);
-          }, 1200);
+            setCanvasItems(prev => [...prev, {
+              id: crypto.randomUUID(),
+              type: "word_card" as const,
+              word,
+            }]);
+            setMiomiState("idle");
+          }, 800);
         } else {
           window.setTimeout(() => setMiomiState("idle"), 2000);
         }
@@ -174,7 +210,7 @@ export default function TalkPage() {
         }]);
       }
     }
-  }, [wordsIntroduced, canvasItems]);
+  }, [wordsIntroduced, canvasItems, isGuest, guestExchanges, GUEST_LIMIT]);
 
   return (
     <div
@@ -232,7 +268,7 @@ export default function TalkPage() {
                 padding: "3px 10px",
               }}
             >
-              เหลืออีก {guestExchangesRemaining} ครั้ง
+              เหลืออีก {Math.max(0, GUEST_LIMIT - guestExchanges)} ครั้ง
             </span>
           ) : (
             <span
@@ -329,11 +365,7 @@ export default function TalkPage() {
         {canvasItems.length === 0 && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", opacity: 0.4 }}>
             <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", color: "#9A8B73", textAlign: "center" }}>
-              พูดหรือพิมพ์เพื่อเริ่มต้นค่า~
-              <br />
-              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px" }}>
-                Speak or type to begin~
-              </span>
+              {uiLang === "en" ? "Speak or type to begin~" : "พูดหรือพิมพ์เพื่อเริ่มต้นค่า~"}
             </p>
           </div>
         )}
@@ -472,7 +504,7 @@ export default function TalkPage() {
       >
         <MicButton
           state={micState}
-          language="auto"
+          language={uiLang === "en" ? "en-US" : "th-TH"}
           onTranscript={async (text, isFinal) => {
             if (!isFinal) return;
             setLastTranscript(text);
@@ -497,7 +529,7 @@ export default function TalkPage() {
                 void processUserInput(textInput);
               }
             }}
-            placeholder="พิมพ์ที่นี่ค่า~"
+            placeholder={uiLang === "en" ? "Type here~" : "พิมพ์ที่นี่ค่า~"}
             style={{
               flex: 1,
               height: "36px",
@@ -537,6 +569,84 @@ export default function TalkPage() {
           )}
         </div>
       </div>
+
+      {showGuestSheet && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(26,26,24,0.4)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "flex-end",
+          }}
+          onClick={() => setShowGuestSheet(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              background: "#FFFFFF",
+              borderRadius: "24px 24px 0 0",
+              padding: "24px 24px 40px",
+              boxShadow: "0 -8px 32px rgba(26,26,24,0.12)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "16px" }}>
+              <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E8E5DF" }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+              <Image src="/miomi/head-happy.png" alt="Miomi" width={100} height={100} style={{ objectFit: "contain" }} />
+            </div>
+            <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "18px", fontWeight: 500, color: "#1A1A18", textAlign: "center", margin: "0 0 6px" }}>
+              หนูอยากจำคุณได้ค่า~
+            </p>
+            <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", color: "#9A8B73", textAlign: "center", margin: "0 0 20px" }}>
+              Sign up free — I&apos;ll remember everything we learned~
+            </p>
+            <div style={{ background: "#FAFAF6", borderRadius: "12px", padding: "12px 16px", marginBottom: "20px" }}>
+              {[
+                { th: "หนูจำชื่อและความก้าวหน้าของคุณได้", en: "I remember your name and progress" },
+                { th: "คำศัพท์ที่เรียนสะสมไว้ไม่หายไป", en: "Your vocabulary stays saved" },
+                { th: "คุยกับหนูได้ไม่จำกัด", en: "Chat with me unlimited" },
+              ].map((b, i) => (
+                <div key={i} style={{ display: "flex", gap: "8px", marginBottom: i < 2 ? "8px" : 0 }}>
+                  <span style={{ color: "#F9A8D4", fontSize: "14px" }}>✦</span>
+                  <div>
+                    <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", fontWeight: 500, color: "#1A1A18", margin: 0 }}>{b.th}</p>
+                    <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", color: "#9A8B73", margin: 0 }}>{b.en}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Link
+              href="/signup"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: "100%", height: "52px", borderRadius: "999px",
+                background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                fontFamily: "'Kanit', sans-serif", fontSize: "16px",
+                fontWeight: 500, color: "#FFFFFF", textDecoration: "none",
+                boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)",
+                marginBottom: "12px",
+              }}
+            >
+              สมัครฟรีเลยค่า~
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowGuestSheet(false)}
+              style={{
+                display: "block", width: "100%", background: "none",
+                border: "none", fontFamily: "'Quicksand', sans-serif",
+                fontSize: "13px", color: "#C4BDB5", cursor: "pointer", padding: "8px",
+              }}
+            >
+              ไว้ทีหลังนะคะ~ · Maybe later
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
