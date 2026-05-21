@@ -21,12 +21,13 @@ export default function TalkPage() {
   const [miomiState, setMiomiState] = useState<MiomiState>("idle");
   const [lastTranscript, setLastTranscript] = useState("");
   const [subtitleTh, setSubtitleTh] = useState("พูดอะไรก็ได้ค่า~");
-  const [subtitleEn, setSubtitleEn] = useState("Say anything~");
   const [canvasItems, setCanvasItems] = useState<Array<{
     id: string;
-    type: "word_card" | "user_echo";
+    type: "word_card" | "user_echo" | "miomi_message";
     word?: VocabularyEntry;
     text?: string;
+    textTh?: string;
+    textEn?: string;
   }>>([]);
   const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -54,9 +55,13 @@ export default function TalkPage() {
       hoursSinceLastSession: null,
       streakDays: 0,
     });
-    setSubtitleTh(opener.speech_th);
-    setSubtitleEn(opener.speech_en);
-    // No TTS for Miomi speech — subtitle only
+    setSubtitleTh("สวัสดีค่า~");
+    setCanvasItems([{
+      id: crypto.randomUUID(),
+      type: "miomi_message" as const,
+      textTh: opener.speech_th,
+      textEn: opener.speech_en,
+    }]);
     window.setTimeout(() => setMiomiState("idle"), 1000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -76,9 +81,14 @@ export default function TalkPage() {
     const template = matchLibrary(text.trim(), { wordsIntroduced });
 
     if (template) {
-      setSubtitleTh(template.response.speech_th);
-      setSubtitleEn(template.response.speech_en);
+      setSubtitleTh("หนูตอบแล้วค่า~");
       setMiomiState(template.miomi_state_during as MiomiState);
+      setCanvasItems(prev => [...prev, {
+        id: crypto.randomUUID(),
+        type: "miomi_message" as const,
+        textTh: template.response.speech_th,
+        textEn: template.response.speech_en,
+      }]);
 
       if (template.follow_up?.type === "word_card" && template.follow_up.payload_resolver) {
         const word = await resolveWordCard(
@@ -92,6 +102,7 @@ export default function TalkPage() {
           setWordsIntroduced(prev => [...prev, word.word_en]);
           window.setTimeout(() => {
             setMiomiState("teaching");
+            setSubtitleTh("หนูสอนคำใหม่ให้ค่า~");
             window.setTimeout(() => {
               setCanvasItems(prev => [...prev, {
                 id: crypto.randomUUID(),
@@ -108,9 +119,14 @@ export default function TalkPage() {
         window.setTimeout(() => setMiomiState("idle"), 2000);
       }
     } else {
-      setSubtitleTh("หนูเข้าใจค่า~ กำลังคิดให้นะคะ");
-      setSubtitleEn("I understand~ let me think...");
+      setSubtitleTh("กำลังคิดให้ค่า...");
       setMiomiState("thinking");
+      setCanvasItems(prev => [...prev, {
+        id: crypto.randomUUID(),
+        type: "miomi_message" as const,
+        textTh: "หนูเข้าใจค่า~ กำลังคิดให้นะคะ",
+        textEn: "I understand~ let me think...",
+      }]);
       window.setTimeout(() => setMiomiState("idle"), 2000);
     }
   }, [wordsIntroduced]);
@@ -124,6 +140,7 @@ export default function TalkPage() {
         flexDirection: "column",
         background: "#FAFAF6",
         overflow: "hidden",
+        paddingTop: "env(safe-area-inset-top, 0px)",
       }}
     >
       {/* TOP BAR — 44px */}
@@ -191,17 +208,18 @@ export default function TalkPage() {
         </div>
       </div>
 
-      {/* MIOMI STAGE — 200px */}
+      {/* MIOMI STAGE */}
       <div
         style={{
-          height: "200px",
+          height: "180px",
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "flex-end",
-          paddingBottom: "12px",
+          justifyContent: "center",
+          paddingTop: "8px",
           position: "relative",
+          overflow: "visible",
         }}
       >
         {/* Soft ambient glow behind Miomi */}
@@ -219,15 +237,15 @@ export default function TalkPage() {
           }}
         />
 
-        {/* Miomi head — 160px */}
-        <MiomiLive state={miomiState} size={160} />
+        {/* Miomi head */}
+        <MiomiLive state={miomiState} size={130} />
 
-        {/* Subtitle */}
+        {/* Subtitle — short emotional cue only */}
         <div
           style={{
-            marginTop: "4px",
+            marginTop: "6px",
             textAlign: "center",
-            padding: "0 24px",
+            padding: "0 32px",
             maxWidth: "320px",
             position: "relative",
             zIndex: 1,
@@ -236,25 +254,17 @@ export default function TalkPage() {
           <p
             style={{
               fontFamily: "'Kanit', sans-serif",
-              fontSize: "15px",
+              fontSize: "13px",
               fontWeight: 500,
-              color: "#1A1A18",
-              lineHeight: 1.5,
+              color: "#9A8B73",
+              lineHeight: 1.4,
               margin: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             {subtitleTh}
-          </p>
-          <p
-            style={{
-              fontFamily: "'Quicksand', sans-serif",
-              fontSize: "12px",
-              fontWeight: 500,
-              color: "#9A8B73",
-              margin: "2px 0 0",
-            }}
-          >
-            {subtitleEn}
           </p>
         </div>
       </div>
@@ -283,58 +293,116 @@ export default function TalkPage() {
         )}
         {canvasItems.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {canvasItems.map(item => (
-              item.type === "word_card" && item.word ? (
-                <WordCardV3
-                  key={item.id}
-                  word={item.word}
-                  direction="th_to_en"
-                  onPronunciationCheck={(w) => {
-                    const reaction = getCorrectReaction({ type: "pronunciation", word: w.word_en });
-                    setSubtitleTh(reaction.speech_th);
-                    setSubtitleEn(reaction.speech_en);
-                    setMiomiState("reacting");
-                    window.setTimeout(() => setMiomiState("idle"), 1200);
-                  }}
-                />
-              ) : item.type === "user_echo" && item.text ? (
-                <div
-                  key={item.id}
-                  style={{
-                    width: "100%",
-                    padding: "6px 0",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    justifyContent: "center",
-                  }}>
-                    <div style={{ flex: 1, height: "1px", background: "#E8E5DF" }} />
-                    <span style={{
-                      fontFamily: "'Quicksand', sans-serif",
-                      fontSize: "9px", fontWeight: 600,
-                      letterSpacing: "0.10em",
-                      textTransform: "uppercase",
-                      color: "#C4BDB5",
-                      whiteSpace: "nowrap",
+            {canvasItems.map(item => {
+              if (item.type === "word_card" && item.word) {
+                return (
+                  <WordCardV3
+                    key={item.id}
+                    word={item.word}
+                    direction="th_to_en"
+                    onPronunciationCheck={(w) => {
+                      const reaction = getCorrectReaction({ type: "pronunciation", word: w.word_en });
+                      setSubtitleTh("เก่งมากค่า~");
+                      setCanvasItems(prev => [...prev, {
+                        id: crypto.randomUUID(),
+                        type: "miomi_message" as const,
+                        textTh: reaction.speech_th,
+                        textEn: reaction.speech_en,
+                      }]);
+                      setMiomiState("reacting");
+                      window.setTimeout(() => setMiomiState("idle"), 1200);
+                    }}
+                  />
+                );
+              }
+              if (item.type === "user_echo" && item.text) {
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      width: "100%",
+                      padding: "6px 0",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      justifyContent: "center",
                     }}>
-                      User said
-                    </span>
-                    <div style={{ flex: 1, height: "1px", background: "#E8E5DF" }} />
+                      <div style={{ flex: 1, height: "1px", background: "#E8E5DF" }} />
+                      <span style={{
+                        fontFamily: "'Quicksand', sans-serif",
+                        fontSize: "9px", fontWeight: 600,
+                        letterSpacing: "0.10em",
+                        textTransform: "uppercase",
+                        color: "#C4BDB5",
+                        whiteSpace: "nowrap",
+                      }}>
+                        User said
+                      </span>
+                      <div style={{ flex: 1, height: "1px", background: "#E8E5DF" }} />
+                    </div>
+                    <p style={{
+                      fontFamily: "'Quicksand', sans-serif",
+                      fontSize: "12px", fontStyle: "italic",
+                      color: "#9A8B73", margin: "2px 0 0",
+                    }}>
+                      {item.text.length > 60 ? item.text.slice(0, 60) + "…" : item.text}
+                    </p>
                   </div>
-                  <p style={{
-                    fontFamily: "'Quicksand', sans-serif",
-                    fontSize: "12px", fontStyle: "italic",
-                    color: "#9A8B73", margin: "2px 0 0",
-                  }}>
-                    {item.text.length > 60 ? item.text.slice(0, 60) + "…" : item.text}
-                  </p>
-                </div>
-              ) : null
-            ))}
+                );
+              }
+              if (item.type === "miomi_message") {
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-start",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: "85%",
+                        background: "#FFFFFF",
+                        border: "1px solid #EDE8E0",
+                        borderRadius: "4px 20px 20px 20px",
+                        padding: "12px 16px",
+                        boxShadow: "0 1px 3px rgba(26,26,24,0.04)",
+                      }}
+                    >
+                      <p style={{
+                        fontFamily: "'Kanit', sans-serif",
+                        fontSize: "15px",
+                        fontWeight: 500,
+                        color: "#1A1A18",
+                        lineHeight: 1.65,
+                        margin: 0,
+                        whiteSpace: "pre-line",
+                      }}>
+                        {item.textTh}
+                      </p>
+                      {item.textEn && (
+                        <p style={{
+                          fontFamily: "'Quicksand', sans-serif",
+                          fontSize: "12px",
+                          color: "#9A8B73",
+                          marginTop: "4px",
+                          lineHeight: 1.5,
+                          margin: "4px 0 0",
+                        }}>
+                          {item.textEn}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })}
           </div>
         )}
       </div>
