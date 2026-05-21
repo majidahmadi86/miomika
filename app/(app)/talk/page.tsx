@@ -7,6 +7,11 @@ import { useGuestExploration } from "@/components/guest/GuestExplorationContext"
 import { MicButton, type MicState } from "@/components/talk/MicButton";
 import { MiomiLive, type MiomiState } from "@/components/talk/MiomiLive";
 import { WordCardV3, type VocabularyEntry } from "@/components/talk/WordCardV3";
+import { matchLibrary } from "@/lib/library/matcher";
+import { resolveWordCard } from "@/lib/library/resolver";
+import { getSessionOpener } from "@/lib/library/sessionOpener";
+import { getCorrectReaction } from "@/lib/library/reactions";
+import { speakText } from "@/lib/talk/speech";
 
 const GUEST_EXCHANGE_LIMIT = 5;
 
@@ -24,22 +29,7 @@ export default function TalkPage() {
     word?: VocabularyEntry;
     text?: string;
   }>>([]);
-
-  const testWord: VocabularyEntry = {
-    id: "test-1",
-    word_en: "hello",
-    word_th: "สวัสดี",
-    th_romanization: "sa-wàt-dee",
-    en_ipa: "/həˈloʊ/",
-    miomi_note_th: "หนูใช้คำนี้ตอนเจอใครก็ได้ค่า~ ใช้ได้ทั้งวันเลย",
-    miomi_note_en: "I use this whenever I meet anyone~ works all day",
-    example_en: "Hello, how are you today?",
-    example_th: "สวัสดีค่า วันนี้เป็นยังไงบ้าง?",
-    use_when: "Use when meeting anyone — formal or casual",
-    cefr_level: "A1",
-    register: "neutral",
-    image_category: "greeting",
-  };
+  const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
 
   useEffect(() => {
     if (micState === "listening") setMiomiState("listening");
@@ -47,6 +37,21 @@ export default function TalkPage() {
     else if (micState === "speaking") setMiomiState("speaking");
     else setMiomiState("idle");
   }, [micState]);
+
+  useEffect(() => {
+    const opener = getSessionOpener({
+      isFirstSession: true,
+      hoursSinceLastSession: null,
+      streakDays: 0,
+    });
+    setSubtitleTh(opener.speech_th);
+    setSubtitleEn(opener.speech_en);
+    setMiomiState("speaking");
+    speakText(opener.speech_th, "th-TH").then(() => {
+      setMiomiState("idle");
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
@@ -202,15 +207,18 @@ export default function TalkPage() {
           background: "#FAFAF6",
         }}
       >
-        {canvasItems.length === 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <WordCardV3
-              word={testWord}
-              direction="th_to_en"
-              onPronunciationCheck={(w) => console.log("pronunciation check:", w.word_en)}
-            />
+        {canvasItems.length === 0 && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", opacity: 0.4 }}>
+            <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", color: "#9A8B73", textAlign: "center" }}>
+              พูดหรือพิมพ์เพื่อเริ่มต้นค่า~
+              <br />
+              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px" }}>
+                Speak or type to begin~
+              </span>
+            </p>
           </div>
-        ) : (
+        )}
+        {canvasItems.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {canvasItems.map(item => (
               item.type === "word_card" && item.word ? (
@@ -218,8 +226,50 @@ export default function TalkPage() {
                   key={item.id}
                   word={item.word}
                   direction="th_to_en"
-                  onPronunciationCheck={(w) => console.log("pronunciation check:", w.word_en)}
+                  onPronunciationCheck={(w) => {
+                    const reaction = getCorrectReaction({ type: "pronunciation", word: w.word_en });
+                    setSubtitleTh(reaction.speech_th);
+                    setSubtitleEn(reaction.speech_en);
+                    setMiomiState("reacting");
+                    void speakText(reaction.speech_th, "th-TH").then(() => setMiomiState("idle"));
+                  }}
                 />
+              ) : item.type === "user_echo" && item.text ? (
+                <div
+                  key={item.id}
+                  style={{
+                    width: "100%",
+                    padding: "6px 0",
+                    textAlign: "center",
+                  }}
+                >
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    justifyContent: "center",
+                  }}>
+                    <div style={{ flex: 1, height: "1px", background: "#E8E5DF" }} />
+                    <span style={{
+                      fontFamily: "'Quicksand', sans-serif",
+                      fontSize: "9px", fontWeight: 600,
+                      letterSpacing: "0.10em",
+                      textTransform: "uppercase",
+                      color: "#C4BDB5",
+                      whiteSpace: "nowrap",
+                    }}>
+                      User said
+                    </span>
+                    <div style={{ flex: 1, height: "1px", background: "#E8E5DF" }} />
+                  </div>
+                  <p style={{
+                    fontFamily: "'Quicksand', sans-serif",
+                    fontSize: "12px", fontStyle: "italic",
+                    color: "#9A8B73", margin: "2px 0 0",
+                  }}>
+                    {item.text.length > 60 ? item.text.slice(0, 60) + "…" : item.text}
+                  </p>
+                </div>
               ) : null
             ))}
           </div>
@@ -244,8 +294,61 @@ export default function TalkPage() {
         <MicButton
           state={micState}
           language="auto"
-          onTranscript={(text, isFinal) => {
-            if (isFinal) setLastTranscript(text);
+          onTranscript={async (text, isFinal) => {
+            if (!isFinal) return;
+            setLastTranscript(text);
+
+            // Add user echo to canvas
+            setCanvasItems(prev => [...prev, {
+              id: crypto.randomUUID(),
+              type: "user_echo" as const,
+              text,
+            }]);
+
+            // Library-first routing
+            const template = matchLibrary(text, { wordsIntroduced });
+
+            if (template) {
+              // Set subtitle and speak
+              setSubtitleTh(template.response.speech_th);
+              setSubtitleEn(template.response.speech_en);
+              setMiomiState(template.miomi_state_during as MiomiState);
+
+              void speakText(template.response.speech_th, "th-TH");
+
+              // Resolve follow-up word card
+              if (template.follow_up?.type === "word_card" && template.follow_up.payload_resolver) {
+                const word = await resolveWordCard(
+                  template.follow_up.payload_resolver,
+                  (template.follow_up.payload_params ?? {}) as Record<string, unknown>,
+                  text,
+                  wordsIntroduced
+                );
+
+                if (word) {
+                  setWordsIntroduced(prev => [...prev, word.word_en]);
+                  window.setTimeout(() => {
+                    setMiomiState("teaching");
+                    window.setTimeout(() => {
+                      setCanvasItems(prev => [...prev, {
+                        id: crypto.randomUUID(),
+                        type: "word_card" as const,
+                        word,
+                      }]);
+                      setMiomiState("idle");
+                    }, 600);
+                  }, 1200);
+                }
+              } else {
+                window.setTimeout(() => setMiomiState("idle"), 2000);
+              }
+            } else {
+              // AI fallback — for now just acknowledge
+              setSubtitleTh("หนูเข้าใจค่า~ กำลังคิดให้นะคะ");
+              setSubtitleEn("I understand~ let me think...");
+              setMiomiState("thinking");
+              window.setTimeout(() => setMiomiState("idle"), 2000);
+            }
           }}
           onStateChange={setMicState}
         />
