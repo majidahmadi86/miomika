@@ -1,3 +1,21 @@
+# ⛔ ARCHIVED — DO NOT READ
+
+> **These files are historical reference ONLY.**
+> **DO NOT use them to make decisions about the current project.**
+>
+> The canonical source of truth is `/MIOMIKA.md` at project root.
+> Founder context is in `/MASTER-HANDOFF.md` at project root.
+>
+> If something in these archive files contradicts `/MIOMIKA.md`,
+> `/MIOMIKA.md` wins. Always.
+>
+> These files exist because they contain architectural details (engine pipeline,
+> design system specifics, vocabulary architecture) that are referenced ON-DEMAND
+> by phase prompts when implementing specific subsystems. They are NOT to be read
+> proactively or used to seed context.
+
+---
+
 # Archived Documentation
 
 > These documents are historical reference only. They are NOT canonical.

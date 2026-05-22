@@ -143,24 +143,48 @@ function StatPill({ icon: Icon, percent, iconClass, ariaLabel }: {
 }
 
 const CELEBRATION_STORAGE_KEY = "miomika-signup-celebrated-v1";
+const CELEBRATION_DURATION_MS = 2400;
 
-/** Reads ?celebrate=signup from URL and fires the burst animation. Only fires once per signup. */
+/** Reads ?celebrate=signup from URL and fires the burst animation. Only fires once per signup.
+ *  Storage flag is set AFTER the burst completes so a failed render never blocks a future replay. */
 function CelebrationTrigger() {
   const searchParams = useSearchParams();
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (searchParams.get("celebrate") !== "signup") return;
     try {
-      if (localStorage.getItem(CELEBRATION_STORAGE_KEY)) return;
-      localStorage.setItem(CELEBRATION_STORAGE_KEY, "1");
+      if (localStorage.getItem(CELEBRATION_STORAGE_KEY) === "1") return;
     } catch {
-      // private mode — still fire, just might repeat on next load
+      // private mode — proceed anyway
     }
-    import("@/lib/celebration/burst").then(({ triggerCelebration }) => {
-      triggerCelebration({ intensity: "high", miomi_state: "excited", duration_ms: 2400 });
-    }).catch(() => {});
+
+    console.log("[home] celebration trigger detected");
+
     const url = new URL(window.location.href);
     url.searchParams.delete("celebrate");
     window.history.replaceState({}, "", url.toString());
+
+    import("@/lib/celebration/burst")
+      .then(({ triggerCelebration }) => {
+        triggerCelebration({
+          intensity: "high",
+          miomi_state: "excited",
+          duration_ms: CELEBRATION_DURATION_MS,
+        });
+      })
+      .catch(() => {
+        // Burst module failed to load — don't set flag so next visit retries.
+      });
+
+    const timeout = window.setTimeout(() => {
+      try {
+        localStorage.setItem(CELEBRATION_STORAGE_KEY, "1");
+      } catch {
+        // private mode — best effort only
+      }
+    }, CELEBRATION_DURATION_MS);
+
+    return () => window.clearTimeout(timeout);
   }, [searchParams]);
   return null;
 }

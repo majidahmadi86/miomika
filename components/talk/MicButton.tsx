@@ -101,6 +101,7 @@ export function MicButton({
     hasFinalResultRef.current = false;
 
     recognition.onstart = () => {
+      console.log("[MicButton] recognition.onstart fired");
       isListeningRef.current = true;
       onStateChange("listening");
       // Amplitude meter fires off the gesture path; safe to await here.
@@ -129,7 +130,9 @@ export function MicButton({
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (e: { error?: string } | Event) => {
+      const code = (e as { error?: string }).error ?? "unknown";
+      console.error("[MicButton] recognition.onerror:", code);
       isListeningRef.current = false;
       stopAmplitude();
       setLiveTranscript("");
