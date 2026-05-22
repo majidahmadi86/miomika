@@ -29,9 +29,12 @@ export type Gender = "masculine" | "feminine" | "neutral";
 export interface Profile {
   id: string;
   email: string | null;
+  display_name: string | null;
   tier: Tier;
   journey_stage: JourneyStage | null;
   gender: Gender | null;
+  level: number | null;
+  streak: number | null;
   last_seen_at: string | null;
   welcome_shown_at: string | null;
   onboarding_completed_at: string | null;
@@ -74,7 +77,7 @@ export function useProfile(): ProfileState {
       const { data: row, error } = await supabase
         .from("profiles")
         .select(
-          "id, email, tier, journey_stage, gender, last_seen_at, welcome_shown_at, onboarding_completed_at, ui_language, active_character_id, miomi_stars",
+          "id, email, display_name, tier, journey_stage, gender, level, streak, last_seen_at, welcome_shown_at, onboarding_completed_at, ui_language, active_character_id, miomi_stars",
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -85,9 +88,12 @@ export function useProfile(): ProfileState {
           profile: {
             id: user.id,
             email: user.email ?? null,
+            display_name: null,
             tier: "free",
             journey_stage: null,
             gender: null,
+            level: 1,
+            streak: 0,
             last_seen_at: null,
             welcome_shown_at: null,
             onboarding_completed_at: null,
@@ -105,9 +111,12 @@ export function useProfile(): ProfileState {
         profile: {
           id: row.id as string,
           email: (row.email as string | null) ?? user.email ?? null,
+          display_name: (row.display_name as string | null) ?? null,
           tier: ((row.tier as Tier) ?? "free"),
           journey_stage: (row.journey_stage as JourneyStage | null) ?? null,
           gender: (row.gender as Gender | null) ?? null,
+          level: (row.level as number | null) ?? 1,
+          streak: (row.streak as number | null) ?? 0,
           last_seen_at: (row.last_seen_at as string | null) ?? null,
           welcome_shown_at: (row.welcome_shown_at as string | null) ?? null,
           onboarding_completed_at: (row.onboarding_completed_at as string | null) ?? null,

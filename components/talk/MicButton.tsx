@@ -1,16 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, Volume2, Loader2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Mic, MicOff } from "lucide-react";
+import { motion } from "framer-motion";
+import { COLORS } from "@/lib/design/colors";
 import {
   getSpeechRecognitionConstructor,
-  speechRecognitionStatus,
-  unsupportedCopy,
   type SpeechRecognitionEventLike,
   type SpeechRecognitionLike,
 } from "@/lib/talk/speech-support";
-import { useUILanguage } from "@/lib/i18n/client";
 
 export type MicState = "idle" | "listening" | "processing" | "speaking";
 
@@ -22,6 +20,21 @@ interface MicButtonProps {
   disabled?: boolean;
 }
 
+type SpeechSupport =
+  | { supported: true }
+  | { supported: false; reason: "samsung_internet" | "firefox" | "no_api" };
+
+function detectSpeechSupport(): SpeechSupport {
+  if (typeof window === "undefined") return { supported: false, reason: "no_api" };
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes("samsungbrowser")) return { supported: false, reason: "samsung_internet" };
+  if (ua.includes("firefox")) return { supported: false, reason: "firefox" };
+  const hasAPI =
+    "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
+  if (!hasAPI) return { supported: false, reason: "no_api" };
+  return { supported: true };
+}
+
 export function MicButton({
   state,
   language = "auto",
@@ -29,24 +42,63 @@ export function MicButton({
   onStateChange,
   disabled = false,
 }: MicButtonProps) {
-  const [supportStatus] = useState(() => speechRecognitionStatus());
+  const [support] = useState<SpeechSupport>(() =>
+    typeof window === "undefined"
+      ? { supported: true }
+      : detectSpeechSupport(),
+  );
   const [amplitude, setAmplitude] = useState(0);
-  const [liveTranscript, setLiveTranscript] = useState("");
-  const [unsupportedTooltipOpen, setUnsupportedTooltipOpen] = useState(false);
+  const [debugVisible, setDebugVisible] = useState(false);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [debugSnapshot, setDebugSnapshot] = useState({ listening: false, buffer: "" });
+
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animFrameRef = useRef<number | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const isListeningRef = useRef(false);
   const isManualStopRef = useRef(false);
-  const hasFinalResultRef = useRef(false);
-  const uiLang = useUILanguage();
+  const transcriptBufferRef = useRef("");
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+
+
+  const log = useCallback((msg: string) => {
+    if (typeof window === "undefined") return;
+    console.log(`[MicButton] ${msg}`);
+    setDebugSnapshot({
+      listening: isListeningRef.current,
+      buffer: transcriptBufferRef.current.slice(0, 30),
+    });
+    setDebugLog((prev) => [...prev.slice(-9), `${new Date().toLocaleTimeString()}  ${msg}`]);
+  }, []);
+
+  const startAmplitude = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const ctx = new AudioContext();
+      audioContextRef.current = ctx;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      const source = ctx.createMediaStreamSource(stream);
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        setAmplitude(avg / 255);
+        animFrameRef.current = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch (e) {
+      log(`amplitude unavailable: ${(e as Error).message}`);
+    }
+  }, [log]);
 
   const stopAmplitude = useCallback(() => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
     if (streamRef.current) {
@@ -56,55 +108,40 @@ export function MicButton({
     setAmplitude(0);
   }, []);
 
-  // Amplitude meter — independent of recognition. Failure to acquire mic
-  // here is non-fatal: SpeechRecognition has its own permission flow on iOS.
-  const startAmplitude = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const ctx = new AudioContext();
-      audioContextRef.current = ctx;
-      const analyser = ctx.createAnalyser();
-      analyserRef.current = analyser;
-      analyser.fftSize = 256;
-      const source = ctx.createMediaStreamSource(stream);
-      source.connect(analyser);
-      const data = new Uint8Array(analyser.frequencyBinCount);
-
-      const tick = () => {
-        analyser.getByteFrequencyData(data);
-        const avg = data.reduce((a, b) => a + b, 0) / data.length;
-        setAmplitude(avg / 255);
-        animFrameRef.current = requestAnimationFrame(tick);
-      };
-      tick();
-    } catch {
-      // Amplitude unavailable — recognition still works
+  const commit = useCallback((text: string) => {
+    const cleaned = text.trim();
+    if (cleaned.length === 0) {
+      onStateChange("idle");
+      return;
     }
-  }, []);
+    log(`commit: "${cleaned.slice(0, 40)}"`);
+    transcriptBufferRef.current = "";
+    onTranscript(cleaned, true);
+    onStateChange("processing");
+  }, [log, onStateChange, onTranscript]);
 
-  // CRITICAL: This must be callable SYNCHRONOUSLY inside a user gesture
-  // handler. iOS Safari loses the gesture context if we await anything
-  // before SpeechRecognition.start().
   const startListening = useCallback(() => {
-    if (disabled || isListeningRef.current) return;
-    const Ctor = getSpeechRecognitionConstructor();
-    if (!Ctor) return;
+    if (isListeningRef.current) return;
+    if (typeof window === "undefined") return;
 
-    const recognition: SpeechRecognitionLike = new Ctor();
+    const SpeechRecognitionImpl = getSpeechRecognitionConstructor();
+    if (!SpeechRecognitionImpl) {
+      log("no SpeechRecognition API");
+      return;
+    }
+
+    const recognition = new SpeechRecognitionImpl();
     recognition.lang = language === "auto" ? "th-TH" : language;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    isManualStopRef.current = false;
-    hasFinalResultRef.current = false;
-
     recognition.onstart = () => {
-      console.log("[MicButton] recognition.onstart fired");
+      log("onstart");
       isListeningRef.current = true;
+      isManualStopRef.current = false;
+      transcriptBufferRef.current = "";
       onStateChange("listening");
-      // Amplitude meter fires off the gesture path; safe to await here.
       void startAmplitude();
     };
 
@@ -114,310 +151,243 @@ export function MicButton({
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
         if (r?.isFinal) final += r[0]?.transcript ?? "";
-        else interim += r?.[0]?.transcript ?? "";
+        else interim += r[0]?.transcript ?? "";
       }
       if (final.trim()) {
-        // Commit immediately — don't wait for onend (fixes Android Chrome isFinal timing).
-        hasFinalResultRef.current = true;
-        setLiveTranscript("");
-        onTranscript(final.trim(), true);
-        onStateChange("processing");
-        // Stop manually; onend will see hasFinalResultRef and not restart.
-        try { recognitionRef.current?.stop(); } catch { /* ignore */ }
+        log(`onresult final: "${final.slice(0, 40)}"`);
+        isManualStopRef.current = true;
+        try { recognition.stop(); } catch { /* ignore */ }
+        commit(final);
+        stopAmplitude();
       } else if (interim) {
-        setLiveTranscript(interim);
+        transcriptBufferRef.current = interim;
         onTranscript(interim, false);
       }
     };
 
     recognition.onerror = (e: { error?: string } | Event) => {
       const code = (e as { error?: string }).error ?? "unknown";
-      console.error("[MicButton] recognition.onerror:", code);
+      log(`onerror: ${code}`);
       isListeningRef.current = false;
       stopAmplitude();
-      setLiveTranscript("");
-      onStateChange("idle");
+      if (code === "not-allowed" || code === "permission-denied") {
+        onStateChange("idle");
+      }
     };
 
     recognition.onend = () => {
+      log(`onend (manual=${isManualStopRef.current}, buffer="${transcriptBufferRef.current.slice(0, 30)}")`);
       isListeningRef.current = false;
-      stopAmplitude();
 
-      // If a final result was already committed by onresult, nothing left to do.
-      if (hasFinalResultRef.current) {
-        hasFinalResultRef.current = false;
-        setLiveTranscript("");
-        return;
-      }
-
-      // User explicitly tapped to stop — commit any remaining interim transcript.
       if (isManualStopRef.current) {
-        isManualStopRef.current = false;
-        setLiveTranscript((prev) => {
-          if (prev && prev.trim().length > 0) {
-            onTranscript(prev.trim(), true);
-            onStateChange("processing");
-          } else {
-            onStateChange("idle");
-          }
-          return "";
-        });
+        if (transcriptBufferRef.current.trim().length > 0) {
+          commit(transcriptBufferRef.current);
+        } else {
+          onStateChange("idle");
+        }
+        stopAmplitude();
         return;
       }
 
-      // Android Chrome silently times out after ~3s of silence.
-      // Auto-restart unless we're no longer in listening intent.
-      // The try/catch guards against "recognition already started" edge cases.
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.start();
-          isListeningRef.current = true;
-        } catch {
-          // Start failed — fall back to committing interim or going idle.
-          setLiveTranscript((prev) => {
-            if (prev && prev.trim().length > 0) {
-              onTranscript(prev.trim(), true);
-              onStateChange("processing");
-            } else {
-              onStateChange("idle");
-            }
-            return "";
-          });
-        }
+      if (transcriptBufferRef.current.trim().length > 0) {
+        log("auto-commit interim (timeout)");
+        commit(transcriptBufferRef.current);
+        stopAmplitude();
+        return;
+      }
+
+      try {
+        log("auto-restart");
+        recognition.start();
+        isListeningRef.current = true;
+      } catch (e) {
+        log(`restart failed: ${(e as Error).message}`);
+        onStateChange("idle");
+        stopAmplitude();
       }
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-  }, [disabled, language, onStateChange, onTranscript, startAmplitude, stopAmplitude]);
+    try {
+      recognition.start();
+    } catch (e) {
+      log(`start failed: ${(e as Error).message}`);
+      onStateChange("idle");
+    }
+  }, [language, log, commit, onStateChange, onTranscript, startAmplitude, stopAmplitude]);
 
   const stopListening = useCallback(() => {
     if (!isListeningRef.current) return;
+    log("manual stop");
     isManualStopRef.current = true;
     try { recognitionRef.current?.stop(); } catch { /* ignore */ }
-    stopAmplitude();
-    isListeningRef.current = false;
-  }, [stopAmplitude]);
+  }, [log]);
 
-  // Synchronous pointer-down handler. Calls startListening() immediately
-  // inside the gesture so iOS Safari accepts the recognition.start() call.
-  // Block A2 of Phase 2.
-  const handlePress = useCallback(
-    (e: React.PointerEvent) => {
-      e.preventDefault();
-      if (disabled) return;
-      if (state === "speaking") {
-        onStateChange("idle");
-        return;
-      }
-      if (state === "listening") {
-        stopListening();
-        return;
-      }
-      if (state === "idle") {
-        startListening();
-      }
-    },
-    [disabled, onStateChange, startListening, state, stopListening],
-  );
+  const handlePress = useCallback(() => {
+    if (disabled) return;
+    if (!support.supported) return;
+    if (state === "speaking") { onStateChange("idle"); return; }
+    if (state === "listening") { stopListening(); return; }
+    if (state === "idle") {
+      startListening();
+    }
+  }, [disabled, support.supported, state, onStateChange, startListening, stopListening]);
+
+  const onPointerDown = useCallback(() => {
+    longPressTimerRef.current = window.setTimeout(() => {
+      setDebugSnapshot({
+        listening: isListeningRef.current,
+        buffer: transcriptBufferRef.current.slice(0, 30),
+      });
+      setDebugVisible((v) => !v);
+    }, 800);
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
       stopAmplitude();
+      try { recognitionRef.current?.stop(); } catch { /* ignore */ }
     };
   }, [stopAmplitude]);
 
-  const ringScale = 1 + amplitude * 0.08;
+  if (!support.supported) {
+    const reasonMsgTh =
+      support.reason === "samsung_internet"
+        ? "เปิดใน Chrome เพื่อใช้เสียง~ พิมพ์ก็ได้ค่า"
+        : "ใช้เสียงไม่ได้ค่า~ พิมพ์ได้เลยนะ";
+    const reasonMsgEn =
+      support.reason === "samsung_internet"
+        ? "Open in Chrome for voice~ or just type"
+        : "Voice unavailable~ just type below";
 
-  if (!supportStatus.supported) {
-    const copy = unsupportedCopy(supportStatus.reason, uiLang);
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
         <button
           type="button"
-          onClick={() => setUnsupportedTooltipOpen((v) => !v)}
-          aria-label={copy.primary}
+          disabled
+          aria-label="Voice not available"
           style={{
-            width: "80px",
-            height: "80px",
+            width: "72px",
+            height: "72px",
             borderRadius: "50%",
-            border: "2px dashed #EDE8E0",
-            background: "#FAFAF6",
+            background: COLORS.surface,
+            border: `1px solid ${COLORS.borderLight}`,
+            opacity: 0.5,
+            cursor: "not-allowed",
             display: "flex",
-            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            gap: "4px",
-            cursor: "pointer",
-            padding: 0,
           }}
         >
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#C4BDB5"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <line x1="1" y1="1" x2="23" y2="23" />
-            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
-            <line x1="12" x2="12" y1="19" y2="22" />
-          </svg>
+          <MicOff size={28} strokeWidth={1.75} color={COLORS.textMuted} />
         </button>
-        <div style={{ textAlign: "center", maxWidth: "280px" }}>
-          <p
-            style={{
-              fontFamily: uiLang === "th" ? "'Kanit', sans-serif" : "'Quicksand', sans-serif",
-              fontSize: "12px",
-              color: "#9A8B73",
-              margin: "0 0 4px",
-              lineHeight: 1.5,
-            }}
-          >
-            {copy.primary}
-          </p>
-          <p
-            style={{
-              fontFamily: "'Quicksand', sans-serif",
-              fontSize: "10px",
-              color: "#C4BDB5",
-              margin: 0,
-              display: unsupportedTooltipOpen ? "block" : "none",
-            }}
-          >
-            {copy.secondary}
-          </p>
-        </div>
+        <p style={{
+          fontSize: "12px",
+          color: COLORS.textMuted,
+          textAlign: "center",
+          maxWidth: "260px",
+          fontFamily: "Kanit, sans-serif",
+          margin: 0,
+          lineHeight: 1.4,
+        }}>
+          {reasonMsgTh}
+          <br />
+          <span style={{ fontFamily: "Quicksand, sans-serif", fontSize: "11px", opacity: 0.8 }}>
+            {reasonMsgEn}
+          </span>
+        </p>
       </div>
     );
   }
 
+  const isActive = state === "listening";
+  const ringScale = 1 + amplitude * 0.18;
+
   return (
-    <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-      <AnimatePresence>
-        {liveTranscript && state === "listening" && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            style={{
-              position: "absolute",
-              bottom: "calc(100% + 12px)",
-              left: "50%",
-              transform: "translateX(-50%)",
-              background: "#FFFFFF",
-              border: "1px solid #EDE8E0",
-              borderRadius: "999px",
-              padding: "6px 14px",
-              maxWidth: "300px",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              fontFamily: "'Kanit', sans-serif",
-              fontSize: "12px",
-              fontStyle: "italic",
-              color: "#9A8B73",
-              boxShadow: "0 2px 8px rgba(26,26,24,0.08)",
-              zIndex: 20,
-            }}
-          >
-            {liveTranscript}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <motion.div
-        animate={{
-          scale: state === "listening" ? ringScale : 1,
-          opacity: state === "listening" ? 1 : 0,
-        }}
-        transition={{ duration: 0.1 }}
-        style={{
-          position: "absolute",
-          width: "92px",
-          height: "92px",
-          borderRadius: "50%",
-          background: "rgba(249,168,212,0.20)",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
-
+    <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
       <motion.button
         type="button"
-        onPointerDown={handlePress}
-        animate={state === "idle" ? { scale: [1, 1.02, 1] } : {}}
-        transition={state === "idle" ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : {}}
+        onClick={handlePress}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+        disabled={disabled}
+        aria-label={isActive ? "Stop recording" : "Start recording"}
+        aria-pressed={isActive}
+        whileTap={{ scale: 0.94 }}
         style={{
-          width: "80px",
-          height: "80px",
+          position: "relative",
+          width: "72px",
+          height: "72px",
           borderRadius: "50%",
-          border:
-            state === "idle"
-              ? "2px solid #E8E5DF"
-              : state === "processing"
-                ? "2px solid #C9A96E"
-                : state === "speaking"
-                  ? "2px solid #F9A8D4"
-                  : "none",
-          background:
-            state === "listening"
-              ? "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)"
-              : state === "processing"
-                ? "#FFF8F2"
-                : "#FFFFFF",
-          boxShadow:
-            state === "listening"
-              ? "0 8px 32px rgba(219,39,119,0.35)"
-              : "0 4px 16px rgba(26,26,24,0.06)",
+          background: isActive ? COLORS.ctaGradient : COLORS.surface,
+          border: `1px solid ${isActive ? "transparent" : COLORS.borderMedium}`,
+          cursor: disabled ? "not-allowed" : "pointer",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          cursor: disabled ? "not-allowed" : "pointer",
-          position: "relative",
-          zIndex: 1,
-          overflow: "hidden",
-          opacity: disabled ? 0.4 : 1,
-          flexShrink: 0,
-          touchAction: "manipulation",
+          opacity: disabled ? 0.5 : 1,
+          boxShadow: isActive
+            ? "0 8px 24px rgba(201, 169, 110, 0.40)"
+            : "0 2px 8px rgba(26, 26, 24, 0.06)",
+          transition: "background 240ms cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
-        {state === "processing" ? (
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}>
-            <Loader2 style={{ width: "24px", height: "24px", color: "#9A8B73" }} />
-          </motion.div>
-        ) : state === "speaking" ? (
-          <Volume2 style={{ width: "32px", height: "32px", color: "#DB2777" }} strokeWidth={1.75} />
-        ) : (
-          <Mic
+        {isActive && (
+          <motion.div
+            animate={{ scale: ringScale }}
+            transition={{ duration: 0.12 }}
             style={{
-              width: "32px",
-              height: "32px",
-              color: state === "listening" ? "#FFFFFF" : "#DB2777",
+              position: "absolute",
+              inset: "-8px",
+              borderRadius: "50%",
+              border: `2px solid ${COLORS.ctaSolid}`,
+              opacity: 0.4,
+              pointerEvents: "none",
             }}
-            strokeWidth={state === "listening" ? 2.0 : 1.75}
           />
         )}
-
-        {state === "listening" && (
-          <div style={{ display: "flex", gap: "3px", position: "absolute", bottom: "12px" }}>
-            {[0, 1, 2].map((i) => (
-              <motion.div
-                key={i}
-                animate={{ height: [8, 8 + amplitude * 16, 8] }}
-                transition={{ duration: 0.3, repeat: Infinity, delay: i * 0.1 }}
-                style={{ width: "4px", background: "#FFFFFF", borderRadius: "2px", minHeight: "8px" }}
-              />
-            ))}
-          </div>
-        )}
+        <Mic
+          size={28}
+          strokeWidth={1.75}
+          color={isActive ? "#FFFFFF" : COLORS.textPrimary}
+        />
       </motion.button>
+
+      {debugVisible && (
+        <div style={{
+          position: "fixed",
+          bottom: "16px",
+          left: "16px",
+          right: "16px",
+          background: "rgba(26, 26, 24, 0.92)",
+          color: "#FFFFFF",
+          padding: "12px",
+          borderRadius: "8px",
+          fontSize: "11px",
+          fontFamily: "monospace",
+          maxHeight: "240px",
+          overflow: "auto",
+          zIndex: 9999,
+        }}>
+          <p style={{ margin: 0, marginBottom: "4px", color: COLORS.ctaSolid }}>
+            MicButton debug · state={state} · listening={String(debugSnapshot.listening)} · buffer=&quot;{debugSnapshot.buffer}&quot;
+          </p>
+          {debugLog.map((line, i) => (
+            <p key={i} style={{ margin: 0, opacity: 0.85 }}>{line}</p>
+          ))}
+          <p style={{ margin: 0, marginTop: "8px", opacity: 0.5, fontSize: "10px" }}>
+            long-press mic to toggle
+          </p>
+        </div>
+      )}
     </div>
   );
 }
