@@ -203,7 +203,7 @@ function AppLayoutInner({
     <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden md:flex md:h-screen md:max-h-none md:bg-[#F2EEF0] md:overflow-hidden">
       <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-[#EAD0DB] bg-white md:flex">
         <div className="flex flex-col items-center px-4 pb-4 pt-6">
-          <p className="text-base font-medium text-[#8B1A35]">Miomika</p>
+          <p className="text-base font-medium text-[#DB2777]">Miomika</p>
           <div className="miomi-login-float mt-4 flex justify-center">
             <Image
               src="/miomi/idle.png"
@@ -242,8 +242,8 @@ function AppLayoutInner({
             const navClass = cn(
               "flex items-center gap-2 rounded-lg py-2.5 pl-4 pr-4 transition-colors",
               active
-                ? "border-l-2 border-[#8B1A35] bg-[#FBEAF0]"
-                : "border-l-2 border-transparent hover:bg-[#FAFAFA]",
+                ? "border-l-2 border-[#DB2777] bg-[#FFF8F2]"
+                : "border-l-2 border-transparent hover:bg-[#FAFAF6]",
             );
             const guestLocked =
               authReady &&
@@ -262,13 +262,13 @@ function AppLayoutInner({
                     <Icon
                       className={cn(
                         "h-4 w-4 blur-[0.35px] contrast-75",
-                        active ? "text-[#8B1A35]" : "text-neutral-600",
+                        active ? "text-[#DB2777]" : "text-neutral-600",
                       )}
                       strokeWidth={2}
                       aria-hidden
                     />
                     <Lock
-                      className="absolute -right-1 -top-1 h-2.5 w-2.5 text-[#8B1A35]"
+                      className="absolute -right-1 -top-1 h-2.5 w-2.5 text-[#DB2777]"
                       strokeWidth={2.5}
                       aria-hidden
                     />
@@ -277,7 +277,7 @@ function AppLayoutInner({
                     <span
                       className={cn(
                         "text-[11px] font-medium leading-none",
-                        active ? "text-[#8B1A35]" : "text-neutral-900",
+                        active ? "text-[#DB2777]" : "text-neutral-900",
                       )}
                     >
                       {thai}
@@ -297,7 +297,7 @@ function AppLayoutInner({
                 <Icon
                   className={cn(
                     "h-4 w-4 shrink-0",
-                    active ? "text-[#8B1A35]" : "text-neutral-600",
+                    active ? "text-[#DB2777]" : "text-neutral-600",
                   )}
                   strokeWidth={2}
                 />
@@ -305,7 +305,7 @@ function AppLayoutInner({
                   <span
                     className={cn(
                       "text-[11px] font-medium leading-none",
-                      active ? "text-[#8B1A35]" : "text-neutral-900",
+                      active ? "text-[#DB2777]" : "text-neutral-900",
                     )}
                   >
                     {thai}
@@ -353,7 +353,7 @@ function AppLayoutInner({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <span className="inline-block rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2 py-0.5 text-[8px] font-medium text-[#8B1A35]">
+                    <span className="inline-block rounded-full border border-[#EDE8E0] bg-[#FAFAF6] px-2 py-0.5 text-[8px] font-medium text-[#9A8B73]">
                       {item.platform}
                     </span>
                     <p className="mt-2 line-clamp-2 text-[10px] leading-snug text-neutral-800">
@@ -365,7 +365,7 @@ function AppLayoutInner({
                     onClick={() => {
                       void navigator.clipboard.writeText(item.hook);
                     }}
-                    className="shrink-0 rounded-lg p-1.5 text-[#8B1A35] transition-colors hover:bg-[#FBEAF0]"
+                    className="shrink-0 rounded-lg p-1.5 text-[#9A8B73] transition-colors hover:bg-[#FAFAF6]"
                     aria-label="Copy"
                   >
                     <Copy className="h-3.5 w-3.5" strokeWidth={2} />

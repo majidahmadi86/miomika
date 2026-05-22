@@ -182,7 +182,7 @@ export default function ProfilePage() {
     <>
       <div className="flex h-full flex-col overflow-hidden bg-white">
         <div className="flex shrink-0 items-center gap-3 border-b border-[#EAD0DB] px-4 py-3">
-          <Link href="/home" className="text-[#8B1A35]">
+          <Link href="/home" className="text-[#DB2777]">
             <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
           </Link>
           <div>
@@ -220,11 +220,12 @@ export default function ProfilePage() {
         </div>
         <Link
           href="/signup"
-          className="w-full bg-[#8B1A35] text-white rounded-full py-3 text-[13px] font-medium text-center block"
+          className="w-full text-white rounded-full py-3 text-[13px] font-medium text-center block"
+          style={{ background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)" }}
         >
           สมัครฟรี — ไม่มีค่าใช้จ่าย
         </Link>
-        <Link href="/login" className="text-[12px] text-[#8B1A35]">
+        <Link href="/login" className="text-[12px] text-[#DB2777]">
           มีบัญชีแล้ว? เข้าสู่ระบบค่า →
         </Link>
       </div>
@@ -240,11 +241,11 @@ export default function ProfilePage() {
           { icon: "Gift", th: "ระบบ referral และรางวัล", en: "Referral rewards system" },
         ].map((item) => (
           <div key={item.th} className="flex items-start gap-3 py-2.5 border-b border-[#F5F2EC] last:border-none">
-            <div className="w-8 h-8 rounded-lg bg-[#FBEAF0] flex items-center justify-center flex-shrink-0">
-              {item.icon === "Brain" && <Brain className="w-4 h-4 text-[#8B1A35]" />}
-              {item.icon === "BookOpen" && <BookOpen className="w-4 h-4 text-[#8B1A35]" />}
-              {item.icon === "Trophy" && <Trophy className="w-4 h-4 text-[#8B1A35]" />}
-              {item.icon === "Gift" && <Gift className="w-4 h-4 text-[#8B1A35]" />}
+            <div className="w-8 h-8 rounded-lg bg-[#FFF8F2] flex items-center justify-center flex-shrink-0">
+              {item.icon === "Brain" && <Brain className="w-4 h-4 text-[#DB2777]" />}
+              {item.icon === "BookOpen" && <BookOpen className="w-4 h-4 text-[#DB2777]" />}
+              {item.icon === "Trophy" && <Trophy className="w-4 h-4 text-[#DB2777]" />}
+              {item.icon === "Gift" && <Gift className="w-4 h-4 text-[#DB2777]" />}
             </div>
             <div>
               <p className="text-[12px] font-medium text-[#1A1A18]">{item.th}</p>

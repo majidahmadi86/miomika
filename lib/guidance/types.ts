@@ -20,7 +20,8 @@ export type GuidanceTrigger =
   | "returning_after_absence"
   | "feature_not_discovered"
   | "voice_unavailable"
-  | "pronunciation_failed_thrice";
+  | "pronunciation_failed_thrice"
+  | "feature_pro_locked";
 
 export type NextActionKind =
   | "navigate"

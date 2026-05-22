@@ -1,6 +1,8 @@
 ﻿"use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Coffee, Heart, Zap, type LucideIcon } from "lucide-react";
 import {
@@ -35,7 +37,7 @@ const DAILY_CHALLENGE = {
 };
 
 const tapFeedback =
-  "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8B1A35]";
+  "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#DB2777]";
 
 const TAP_BUBBLE_CYCLE = [
   { th: "วันนี้โพสต์อะไรดีคะ คิดถึงเลยค่า", en: "What are we posting today? I missed you~" },
@@ -140,6 +142,21 @@ function StatPill({ icon: Icon, percent, iconClass, ariaLabel }: {
   );
 }
 
+/** Reads ?celebrate=signup from URL and fires the burst animation. */
+function CelebrationTrigger() {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("celebrate") !== "signup") return;
+    import("@/lib/celebration/burst").then(({ triggerCelebration }) => {
+      triggerCelebration({ intensity: "high", miomi_state: "excited", duration_ms: 2400 });
+    }).catch(() => {});
+    const url = new URL(window.location.href);
+    url.searchParams.delete("celebrate");
+    window.history.replaceState({}, "", url.toString());
+  }, [searchParams]);
+  return null;
+}
+
 export default function HomePage() {
   const reduceMotion = useReducedMotion();
   const { isGuest, authReady, openSoftSignupPrompt, dismissGuestInvite } = useGuestExploration();
@@ -172,6 +189,7 @@ export default function HomePage() {
     const loaded = loadPetStats();
     queueMicrotask(() => { setPet(loaded); setPetReady(true); });
   }, []);
+
 
   useEffect(() => {
     if (!petReady) return;
@@ -442,6 +460,7 @@ export default function HomePage() {
 
   return (
     <>
+      <Suspense fallback={null}><CelebrationTrigger /></Suspense>
       <WelcomeScreen />
       <AppShell>
         <div className="flex h-full max-h-full flex-col overflow-hidden">
@@ -515,9 +534,9 @@ export default function HomePage() {
                   {guestSignupMoment ? (
                     <Link
                       href="/signup"
-                      className={cn("mt-2 flex w-full flex-col items-center rounded-full border border-[#EAD0DB] bg-[#FBEAF0] px-3 py-2 text-center", tapFeedback)}
+                      className={cn("mt-2 flex w-full flex-col items-center rounded-full border border-[#EDE8E0] bg-[#FFF8F2] px-3 py-2 text-center", tapFeedback)}
                     >
-                      <span className="text-[10px] font-medium text-[#8B1A35]">จำชื่อฉันนะคะ</span>
+                      <span className="text-[10px] font-medium text-[#DB2777]">จำชื่อฉันนะคะ</span>
                       <span className="text-[11px] font-normal leading-[1.6] text-[#666666]">Remember my name</span>
                     </Link>
                   ) : null}

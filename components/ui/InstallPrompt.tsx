@@ -114,7 +114,8 @@ export function InstallPrompt() {
         <button
           type="button"
           onClick={handleInstall}
-          className="flex-1 rounded-full bg-[#8B1A35] py-2 text-xs font-medium text-white transition-transform active:scale-[0.97]"
+          className="flex-1 rounded-full py-2 text-xs font-medium text-white transition-transform active:scale-[0.97]"
+          style={{ background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)" }}
         >
           ติดตั้งเลยค่า
         </button>

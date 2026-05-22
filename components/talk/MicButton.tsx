@@ -110,11 +110,14 @@ export function MicButton({
         if (r?.isFinal) final += r[0]?.transcript ?? "";
         else interim += r?.[0]?.transcript ?? "";
       }
-      if (final) {
+      if (final.trim()) {
+        // Commit immediately — don't wait for onend (fixes Android Chrome isFinal timing).
         setLiveTranscript("");
         onTranscript(final.trim(), true);
         onStateChange("processing");
-      } else {
+        // Stop manually so onend doesn't fire a duplicate reset.
+        try { recognitionRef.current?.stop(); } catch { /* ignore */ }
+      } else if (interim) {
         setLiveTranscript(interim);
         onTranscript(interim, false);
       }
@@ -130,8 +133,18 @@ export function MicButton({
     recognition.onend = () => {
       isListeningRef.current = false;
       stopAmplitude();
-      setLiveTranscript("");
-      setTimeout(() => onStateChange("idle"), 100);
+
+      // If we have interim transcript but isFinal never fired (silent timeout on Android),
+      // commit the interim as final rather than silently resetting.
+      setLiveTranscript((prev) => {
+        if (prev && prev.trim().length > 0) {
+          onTranscript(prev.trim(), true);
+          onStateChange("processing");
+        } else {
+          setTimeout(() => onStateChange("idle"), 100);
+        }
+        return "";
+      });
     };
 
     recognitionRef.current = recognition;

@@ -36,6 +36,12 @@ import {
   type PromptContext,
 } from "@/lib/ai/prompt";
 import { getWordForSession } from "@/lib/ai/vocabulary";
+import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
+import {
+  pickPhrase,
+  RECOVERY_STRUGGLE,
+  GUIDANCE_GUEST_LIMIT_HIT,
+} from "@/lib/voice/warmth";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -92,6 +98,23 @@ export async function POST(req: NextRequest) {
       };
     }
 
+    // ── SERVER-SIDE GUEST LIMIT (never trust client) ──────────────────────────
+    if (isGuest && state.exchangeNumber >= GUEST_EXCHANGE_LIMIT) {
+      const lang = state.primaryLanguage === "english" ? "en" : "th";
+      return NextResponse.json({
+        content: pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang }),
+        wordCard: null,
+        phraseCard: null,
+        creatorAsset: null,
+        sessionContext: buildSessionContext(state),
+        servedVia: "guest_limit",
+        wasFailover: false,
+        intent: null,
+        sessionMode: state.sessionMode,
+        needsClarification: false,
+      } satisfies MiomiResponse);
+    }
+
     // ── STAGE 2: Language detection ──────────────────────────────────────────
     state = updateSessionWithLanguage(state, userInput);
 
@@ -104,6 +127,24 @@ export async function POST(req: NextRequest) {
 
     // ── STAGE 4: Update session mode ─────────────────────────────────────────
     state = updateSessionWithIntent(state, userInput);
+
+    // ── STAGE 4b: Recovery — negative emotion override ───────────────────────
+    // Never teach when user is frustrated. Face-saving is enforced.
+    if (intentResult.family === "social" && intentResult.primary.intent === "social_emotion_negative") {
+      const lang = state.primaryLanguage === "english" ? "en" : "th";
+      return NextResponse.json({
+        content: pickPhrase(RECOVERY_STRUGGLE, { lang }),
+        wordCard: null,
+        phraseCard: null,
+        creatorAsset: null,
+        sessionContext: buildSessionContext({ ...state, exchangeNumber: state.exchangeNumber + 1 }),
+        servedVia: "recovery_struggle",
+        wasFailover: false,
+        intent: "social_emotion_negative",
+        sessionMode: state.sessionMode,
+        needsClarification: false,
+      } satisfies MiomiResponse);
+    }
 
     // ── STAGE 5: Handle clarification needed ─────────────────────────────────
     if (intentResult.needsClarification) {
