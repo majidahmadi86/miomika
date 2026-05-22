@@ -150,10 +150,17 @@ export default function ProfilePage() {
   }, [loadProfile]);
 
   async function handleLogout() {
+    if (typeof window !== "undefined") {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("sb-") || key.startsWith("supabase")) {
+          localStorage.removeItem(key);
+        }
+      });
+      sessionStorage.clear();
+    }
     const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    await supabase.auth.signOut({ scope: "global" });
+    window.location.href = "/";
   }
 
   function handleDeleteAccount() {
@@ -197,10 +204,6 @@ export default function ProfilePage() {
   </div>
 ) : !authEmail && !profile.email ? (
   <div className="flex h-full flex-col overflow-hidden">
-    <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[#E8E5DF]">
-      <p className="text-[15px] font-medium text-[#1A1A18]">ฉัน</p>
-      <p className="text-[11px] text-[#888] ml-1">Me</p>
-    </div>
     <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5 flex flex-col gap-4">
       <div className="bg-[#FAFAF9] border border-[#E8E5DF] rounded-2xl p-5 flex flex-col items-center gap-4 text-center">
         <Image
