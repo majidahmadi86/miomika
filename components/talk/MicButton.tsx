@@ -228,29 +228,29 @@ export function MicButton({
             <line x1="12" x2="12" y1="19" y2="22" />
           </svg>
         </button>
-        <div style={{ textAlign: "center", maxWidth: "220px" }}>
+        <div style={{ textAlign: "center", maxWidth: "280px" }}>
           <p
             style={{
               fontFamily: uiLang === "th" ? "'Kanit', sans-serif" : "'Quicksand', sans-serif",
-              fontSize: "11px",
+              fontSize: "12px",
               color: "#9A8B73",
-              margin: "0 0 2px",
+              margin: "0 0 4px",
+              lineHeight: 1.5,
             }}
           >
             {copy.primary}
           </p>
-          {unsupportedTooltipOpen ? (
-            <p
-              style={{
-                fontFamily: "'Quicksand', sans-serif",
-                fontSize: "10px",
-                color: "#C4BDB5",
-                margin: 0,
-              }}
-            >
-              {copy.secondary}
-            </p>
-          ) : null}
+          <p
+            style={{
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "10px",
+              color: "#C4BDB5",
+              margin: 0,
+              display: unsupportedTooltipOpen ? "block" : "none",
+            }}
+          >
+            {copy.secondary}
+          </p>
         </div>
       </div>
     );

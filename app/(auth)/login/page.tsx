@@ -47,6 +47,10 @@ export default function LoginPage() {
         provider: "google",
         options: {
           redirectTo: `${origin}/auth/callback?next=/home`,
+          queryParams: {
+            prompt: "select_account",
+            access_type: "offline",
+          },
         },
       });
       if (oauthError) {

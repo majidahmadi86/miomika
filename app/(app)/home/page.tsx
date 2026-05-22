@@ -142,11 +142,19 @@ function StatPill({ icon: Icon, percent, iconClass, ariaLabel }: {
   );
 }
 
-/** Reads ?celebrate=signup from URL and fires the burst animation. */
+const CELEBRATION_STORAGE_KEY = "miomika-signup-celebrated-v1";
+
+/** Reads ?celebrate=signup from URL and fires the burst animation. Only fires once per signup. */
 function CelebrationTrigger() {
   const searchParams = useSearchParams();
   useEffect(() => {
     if (searchParams.get("celebrate") !== "signup") return;
+    try {
+      if (localStorage.getItem(CELEBRATION_STORAGE_KEY)) return;
+      localStorage.setItem(CELEBRATION_STORAGE_KEY, "1");
+    } catch {
+      // private mode — still fire, just might repeat on next load
+    }
     import("@/lib/celebration/burst").then(({ triggerCelebration }) => {
       triggerCelebration({ intensity: "high", miomi_state: "excited", duration_ms: 2400 });
     }).catch(() => {});

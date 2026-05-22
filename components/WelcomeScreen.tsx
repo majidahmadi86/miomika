@@ -27,6 +27,7 @@ import { useHasMounted } from "@/lib/hooks/use-media-query";
 import {
   shouldShowWelcome,
   markWelcomeShownLocal,
+  WELCOME_LOCAL_STORAGE_KEY,
 } from "@/lib/welcome/show-welcome";
 import { markWelcomeShown } from "@/lib/welcome/actions";
 
@@ -45,6 +46,7 @@ type WelcomeScreenProps = {
 export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
   const mounted = useHasMounted();
   const [shouldShow, setShouldShow] = useState(false);
+  const [decided, setDecided] = useState(false);
   const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
 
   const { profile, authReady } = useProfile();
@@ -59,16 +61,17 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
   // once per session — no need to clear it on re-renders.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (_welcomeShownInSession) return;
     if (!authReady) return;
+
+    if (_welcomeShownInSession) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDecided(true);
+      return;
+    }
 
     const decision = shouldShowWelcome(profile, window.localStorage);
     _welcomeShownInSession = true;
-    // The lint rule flags setState-in-effect as cascading, but this is the
-    // canonical "react to async profile data" pattern — useSyncExternalStore
-    // isn't applicable because profile resolution itself owns a useEffect.
-    // setShouldShow fires at most once per session via the module guard above.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDecided(true);
     if (decision) setShouldShow(true);
   }, [profile, authReady]);
 
@@ -93,9 +96,34 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
     };
   }, [shouldShow, onComplete]);
 
-  // SSR + first paint: render nothing. Eliminates the hydration mismatch
-  // that caused the Phase-1 double-show bug.
-  if (!mounted || !shouldShow) return null;
+  // SSR: render nothing to avoid hydration mismatch.
+  if (!mounted) return null;
+
+  // While waiting for auth/profile to resolve, show a cream blocking overlay
+  // so home content doesn't flash behind the incoming welcome screen.
+  // Skip the gate if localStorage already has the flag — returning users see
+  // no flicker at all.
+  if (!decided) {
+    let alreadyWelcomed = false;
+    try {
+      alreadyWelcomed = !!localStorage.getItem(WELCOME_LOCAL_STORAGE_KEY);
+    } catch {
+      // private mode — show gate to be safe
+    }
+    if (alreadyWelcomed) return null;
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "#FAFAF6",
+          zIndex: 9999,
+        }}
+      />
+    );
+  }
+
+  if (!shouldShow) return null;
 
   const heading =
     lang === "th"

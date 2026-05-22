@@ -48,6 +48,10 @@ export default function SignupPage() {
         provider: "google",
         options: {
           redirectTo: `${origin}/auth/callback?next=/onboarding`,
+          queryParams: {
+            prompt: "select_account",
+            access_type: "offline",
+          },
         },
       });
       if (oauthError) {

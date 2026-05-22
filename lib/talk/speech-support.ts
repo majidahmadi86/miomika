@@ -95,25 +95,34 @@ export function unsupportedCopy(
 ): { primary: string; secondary: string } {
   switch (reason) {
     case "samsung_internet":
+      return lang === "th"
+        ? {
+            primary: "เปิดใน Chrome เพื่อใช้เสียง~ หรือพิมพ์ก็ได้ค่า",
+            secondary: "Samsung Internet ไม่รองรับไมค์ค่า",
+          }
+        : {
+            primary: "Open in Chrome for voice~ or just type below",
+            secondary: "Samsung Internet doesn't support the mic",
+          };
     case "in_app_browser":
       return lang === "th"
         ? {
-            primary: "ลองเปิดใน Chrome เพื่อใช้เสียงค่า~",
-            secondary: "พิมพ์ได้เลยนะคะ — ก็เวิร์คเหมือนกัน",
+            primary: "เปิดใน Chrome เพื่อใช้เสียง~ หรือพิมพ์ก็ได้ค่า",
+            secondary: "แอปในแอปไม่รองรับไมค์ค่า",
           }
         : {
-            primary: "Open in Chrome for voice~",
-            secondary: "Typing works too — go ahead~",
+            primary: "Open in Chrome for voice~ or just type below",
+            secondary: "In-app browsers don't support the mic",
           };
     case "firefox":
       return lang === "th"
         ? {
-            primary: "ลองเปิดใน Chrome เพื่อใช้เสียงค่า~",
-            secondary: "หรือพิมพ์ก็ได้นะคะ",
+            primary: "ใช้เสียงไม่ได้ค่า~ พิมพ์ได้เลยนะ",
+            secondary: "Firefox ไม่รองรับไมค์ค่า",
           }
         : {
-            primary: "Open in Chrome for voice~",
-            secondary: "Typing works too~",
+            primary: "Voice unavailable~ just type below",
+            secondary: "Firefox doesn't support the mic",
           };
     default:
       return lang === "th"

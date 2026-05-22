@@ -202,7 +202,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      router.push("/home");
+      router.push("/home?celebrate=signup");
       router.refresh();
     }
 
