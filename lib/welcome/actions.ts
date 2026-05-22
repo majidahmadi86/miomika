@@ -20,7 +20,7 @@ export async function markWelcomeShown(): Promise<{ ok: boolean }> {
     if (!user) return { ok: false };
 
     const { error } = await supabase
-      .from("users")
+      .from("profiles")
       .update({
         welcome_shown_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString(),

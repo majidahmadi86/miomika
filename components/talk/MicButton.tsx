@@ -39,6 +39,8 @@ export function MicButton({
   const animFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const isListeningRef = useRef(false);
+  const isManualStopRef = useRef(false);
+  const hasFinalResultRef = useRef(false);
   const uiLang = useUILanguage();
 
   const stopAmplitude = useCallback(() => {
@@ -91,9 +93,12 @@ export function MicButton({
 
     const recognition: SpeechRecognitionLike = new Ctor();
     recognition.lang = language === "auto" ? "th-TH" : language;
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
+
+    isManualStopRef.current = false;
+    hasFinalResultRef.current = false;
 
     recognition.onstart = () => {
       isListeningRef.current = true;
@@ -112,10 +117,11 @@ export function MicButton({
       }
       if (final.trim()) {
         // Commit immediately — don't wait for onend (fixes Android Chrome isFinal timing).
+        hasFinalResultRef.current = true;
         setLiveTranscript("");
         onTranscript(final.trim(), true);
         onStateChange("processing");
-        // Stop manually so onend doesn't fire a duplicate reset.
+        // Stop manually; onend will see hasFinalResultRef and not restart.
         try { recognitionRef.current?.stop(); } catch { /* ignore */ }
       } else if (interim) {
         setLiveTranscript(interim);
@@ -134,17 +140,48 @@ export function MicButton({
       isListeningRef.current = false;
       stopAmplitude();
 
-      // If we have interim transcript but isFinal never fired (silent timeout on Android),
-      // commit the interim as final rather than silently resetting.
-      setLiveTranscript((prev) => {
-        if (prev && prev.trim().length > 0) {
-          onTranscript(prev.trim(), true);
-          onStateChange("processing");
-        } else {
-          setTimeout(() => onStateChange("idle"), 100);
+      // If a final result was already committed by onresult, nothing left to do.
+      if (hasFinalResultRef.current) {
+        hasFinalResultRef.current = false;
+        setLiveTranscript("");
+        return;
+      }
+
+      // User explicitly tapped to stop — commit any remaining interim transcript.
+      if (isManualStopRef.current) {
+        isManualStopRef.current = false;
+        setLiveTranscript((prev) => {
+          if (prev && prev.trim().length > 0) {
+            onTranscript(prev.trim(), true);
+            onStateChange("processing");
+          } else {
+            onStateChange("idle");
+          }
+          return "";
+        });
+        return;
+      }
+
+      // Android Chrome silently times out after ~3s of silence.
+      // Auto-restart unless we're no longer in listening intent.
+      // The try/catch guards against "recognition already started" edge cases.
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+          isListeningRef.current = true;
+        } catch {
+          // Start failed — fall back to committing interim or going idle.
+          setLiveTranscript((prev) => {
+            if (prev && prev.trim().length > 0) {
+              onTranscript(prev.trim(), true);
+              onStateChange("processing");
+            } else {
+              onStateChange("idle");
+            }
+            return "";
+          });
         }
-        return "";
-      });
+      }
     };
 
     recognitionRef.current = recognition;
@@ -153,7 +190,8 @@ export function MicButton({
 
   const stopListening = useCallback(() => {
     if (!isListeningRef.current) return;
-    recognitionRef.current?.stop();
+    isManualStopRef.current = true;
+    try { recognitionRef.current?.stop(); } catch { /* ignore */ }
     stopAmplitude();
     isListeningRef.current = false;
   }, [stopAmplitude]);

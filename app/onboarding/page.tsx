@@ -177,7 +177,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      const { error } = await supabase.from("users").upsert(
+      const { error } = await supabase.from("profiles").upsert(
         {
           id: user.id,
           email: user.email,

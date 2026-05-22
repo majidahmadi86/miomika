@@ -1,6 +1,6 @@
-# MIOMIKA — CANONICAL PROJECT DOCUMENT v2
+# MIOMIKA — CANONICAL PROJECT DOCUMENT v3
 > Single source of truth. Replaces all other .md files in project root.
-> Version: 2.0 — May 21, 2026
+> Version: 3.0 — May 22, 2026
 > If you are a new Claude or Cursor session, **read this entire document before doing anything.**
 
 ---
@@ -917,7 +917,110 @@ This is the credit-efficient pattern. The phase prompt is the unit of work, not 
 
 ---
 
-## 10. STATE LOG (update at end of every session)
+## 11. CODEBASE MAP (truth, not aspiration)
+
+Every future Claude or Cursor session reads this first. It is the authoritative map of where things actually are in the repo. When you can't find a file by guessing, look here.
+
+### 11.1 Canonical database tables
+
+| Table | Purpose | Read by |
+|---|---|---|
+| `public.profiles` | All user profile data (tier, journey_stage, stars, language, gender, xp, level, streak, mood, legacy fields) | lib/auth/use-profile.ts, lib/welcome/actions.ts, app/api/miomi/session-init/route.ts, app/(app)/profile/page.tsx, app/onboarding/page.tsx |
+| `public.vocabulary_bank` | Reference vocabulary (1,134+ rows) | lib/ai/vocabulary.ts, lib/library/resolver.ts |
+| `public.phrases_bank` | Reference phrases (not yet wired to engine — Phase 3B) | (none yet) |
+| `public.library_entries` | Cached AI responses promoted to library | lib/library/supabase-matcher.ts, app/api/miomi/route.ts |
+| `public.library_interactions` | Logged interactions with quality signals | lib/ai/vocabulary.ts, lib/library/supabase-matcher.ts |
+| `public.library_promotions_queue` | Pipeline for AI→library promotion (service_role only) | server-only |
+| `public.user_sessions` | Per-user session state | app/api/miomi/session-init/route.ts |
+| `public.vocabulary_user_state` | Per-user word mastery + spiral schedule (Phase 1) | (wired in Phase 3B) |
+| `public.users_legacy_backup` | RENAMED OLD TABLE — historical reference only, do not write | (no code should read this) |
+
+### 11.2 Hook inventory
+
+| Hook | File | Purpose |
+|---|---|---|
+| `useProfile()` | `lib/auth/use-profile.ts` | Returns `{ profile, loading, authReady }`. Reads `profiles`. Subscribes to auth state changes. |
+| `useSessionState()` | `lib/ai/use-session-state.ts` | Returns current session shape (exchange_count, fuel, streak). Updated via window event `miomi:session-update`. |
+| `useGuidanceEngine(ctx)` | `lib/guidance/use-guidance.ts` | Runs guidance triggers on context change. Owns the "what to show next" decision. |
+| `useMediaQuery(query)` | `lib/hooks/use-media-query.ts` | Standard CSS media query hook with SSR safety. |
+
+### 11.3 Route inventory
+
+| Route | File | Auth | Purpose |
+|---|---|---|---|
+| `/` | `app/page.tsx` | public | Redirects authenticated users to /home, others to landing |
+| `/login` | `app/(auth)/login/page.tsx` | public | Google OAuth + email signin |
+| `/signup` | `app/(auth)/signup/page.tsx` | public | Google OAuth + email signup |
+| `/onboarding` | `app/onboarding/page.tsx` | auth | Journey-stage question. Final redirect: `/home?celebrate=signup` |
+| `/home` | `app/(app)/home/page.tsx` | auth | Main app screen with Miomi, fuel bars, CTA |
+| `/talk` | `app/(app)/talk/page.tsx` | auth | Deep-focus conversation mode |
+| `/profile` | `app/(app)/profile/page.tsx` | auth | User profile, tier, settings |
+| `/dashboard` | `app/(app)/dashboard/page.tsx` | auth | Stats and progress (Phase 3+ wires real data) |
+| `/api/auth/callback` | `app/api/auth/callback/route.ts` | — | OAuth exchange-code endpoint |
+| `/api/miomi` | `app/api/miomi/route.ts` | auth | Main engine endpoint (library matcher + AI fallback) |
+| `/api/miomi/session-init` | `app/api/miomi/session-init/route.ts` | auth | Returns opener + session state |
+
+### 11.4 Auth flow files
+
+| Concern | File |
+|---|---|
+| Browser Supabase client | `lib/supabase/client.ts` |
+| Server Supabase client | `lib/supabase/server.ts` |
+| Middleware (session refresh + language cookie) | `middleware.ts` |
+| Profile hook | `lib/auth/use-profile.ts` |
+| Welcome decision logic | `lib/welcome/show-welcome.ts` |
+| Welcome side effects (mark shown server-side) | `lib/welcome/actions.ts` |
+| Welcome UI | `components/WelcomeScreen.tsx` |
+| Auth gate (blocks home flash) | `app/(app)/layout.tsx` |
+| Sign out implementation | `components/layout/AppShell.tsx` (or wherever sign-out button lives) |
+
+### 11.5 Cultural Warmth + Guidance files
+
+| Concern | File |
+|---|---|
+| Warmth vectors and pickPhrase | `lib/voice/warmth.ts` |
+| Guidance trigger detectors | `lib/guidance/triggers.ts` |
+| Guidance moment types | `lib/guidance/types.ts` |
+| Guidance Zustand store | `lib/guidance/store.ts` |
+| Guidance engine hook | `lib/guidance/use-guidance.ts` |
+| Guidance UI pill | `components/guidance/GuidancePill.tsx` |
+
+### 11.6 Companion files
+
+| Concern | File |
+|---|---|
+| Companion state store | `lib/companion/store.ts` |
+| Floating button | `components/companion/CompanionButton.tsx` |
+| Mobile sheet | `components/companion/CompanionSheet.tsx` |
+| Desktop panel | `components/companion/CompanionPanel.tsx` |
+| Drift animation | inside CompanionButton.tsx (useAnimate + setInterval pattern) |
+
+### 11.7 Migrations applied
+
+| File | Applied? | Purpose |
+|---|---|---|
+| 0001_add_interaction_type.sql | ✓ | library_interactions interaction_type column |
+| 0002_vocabulary_rpcs.sql | ✓ | vocabulary RPCs |
+| 0003_user_sessions_state.sql | ✓ | user_sessions table |
+| 0004-0006 | (skipped) | Were OPUS pipeline; deferred to Phase 4 |
+| 0007_user_extended.sql | ✓ (via inline SQL block) | profiles table + handle_new_user trigger |
+| 0008_vocabulary_user_state.sql | ✓ | per-user mastery tracking |
+| 0009_rls_lockdown.sql | needs apply | RLS policies audit |
+| 0010_profile_ui_language.sql | needs apply | profiles.ui_language column |
+| 0011_profile_legacy_fields.sql | needs apply (this phase) | gender, cat_name, xp, level, streak, mood backfilled from users_legacy_backup |
+
+### 11.8 Known sharp edges (read before debugging)
+
+- **There used to be a `public.users` table.** It is now `public.users_legacy_backup`. Do NOT read or write to it. All user data lives in `public.profiles`.
+- **The welcome flash bug** was caused by layout rendering children before auth resolved. Fixed in Phase 3A-final by the `authReady` gate in `app/(app)/layout.tsx`.
+- **Android Chrome speech recognition** times out after ~3s of silence. Solution in `MicButton.tsx`: `recognition.continuous = true` + auto-restart in `onend` unless `isManualStopRef.current === true`.
+- **Samsung Internet** does NOT support Web Speech API. `lib/talk/speech-support.ts` detects via UA `samsungbrowser` and MicButton renders the disabled grey button with inline "Open in Chrome" message.
+- **Onboarding path is `/onboarding`** (singular page), NOT `/onboarding/journey`. Celebration redirect targets `/home?celebrate=signup` from this page.
+- **The `users_legacy_backup.email` may differ from `profiles.email`** for the same id — the trigger uses `auth.users.email` as truth. Treat `auth.users.email` as canonical.
+
+---
+
+## 12. STATE LOG (update at end of every session)
 
 | Date | Session | Phase | Shipped | Broken | Next |
 |------|---------|-------|---------|--------|------|
@@ -926,6 +1029,7 @@ This is the credit-efficient pattern. The phase prompt is the unit of work, not 
 | 2026-05-22 | Cursor — Claude Sonnet 4.6 — Phase 3A | 3A | Visual discipline: `#8B1A35` removed from all CTAs → pink gradient on CTAs, `#DB2777` on text/icons; BottomNav rebuilt flat (no elevated pill, all 5 tabs equal, active = pink, inactive = `#9A8B73`); `lib/ai/limits.ts` with `GUEST_EXCHANGE_LIMIT=5`; server-side guest limit in route.ts; RECOVERY_STRUGGLE for negative emotions; session-init rewritten with warmth.ts (CARE_EATEN/RECOVERY_RETURN/PRAISE_PROGRESS); MicButton onend race fixed (Android interim → final, isFinal commits immediately then stops recognition); CompanionButton dreamy drift (24×16px wander 8-12s) + playful behaviors (ear-twitch/head-tilt/hop 20-30s intervals); `lib/celebration/burst.ts` canvas confetti (80 gold+pink particles, 1.4s); `lib/email/welcome.ts` Resend welcome email; auth callback adds `?celebrate=signup` + fires welcome email; home page handles `celebrate=signup` via `<CelebrationTrigger>` in Suspense; `components/ui/ProBadge.tsx` gold star badge + `useProGate()`; `feature_pro_locked` added to GuidanceTrigger union; MIOMIKA.md §4.2 Visual discipline subsection appended. tsc: PASS, lint: 0 errors, build: PASS. | Client-component hardcoded warm phrases (home/page.tsx WELCOME_BUBBLE, TAP_BUBBLE_CYCLE etc.) deferred — require new warmth.ts vectors (Phase 3B cleanup). ProBadge wired to ProBadge.tsx but not yet applied to individual locked-feature card UIs — blocked on Phase 3B teaching loop cards. | Mike: (1) Verify Resend domain at resend.com/domains, (2) Supabase → Auth → Email → disable email confirmations (auto-confirm), (3) Test iPhone: tap mic → allow → speak → transcript appears, (4) Test Android: same, (5) Incognito English browser → English UI, (6) Incognito Thai browser → Thai UI, (7) Guest sign up → confetti + welcome email. |
 | 2026-05-22 | Cursor Sonnet 4.5 — Phase 3A-fix-2 | 3A-fix-2 | Forced prompt=select_account on Google OAuth (login + signup); Samsung inline fallback combined Chrome+type hint now 12px always-visible; signup celebration moved to onboarding completion with localStorage one-shot guard; WelcomeScreen shows cream blocking gate while auth resolves so home content never flashes on first visit. tsc: PASS, lint: 0 errors, build: PASS. | n/a | Mike verify on Samsung A52 + new email signup, then Phase 3B |
 | 2026-05-22 | Cursor Sonnet 4.6 — Phase 3A-fix | 3A-fix | Logout scope:global + localStorage/sessionStorage clear + hard navigation; useProfile auth-state subscription already wired (no change needed); /profile duplicate "ฉัน Me" header removed from guest branch; bilingual labels already complete (no change); signup CelebrationBurst already wired via CelebrationTrigger + lib/celebration/burst.ts (no change); CompanionButton drift fully intact (no change); single bubble on home confirmed (no change); Samsung Internet fallback already in MicButton (no change); SEO meta expanded: title, description, keywords, authors, metadataBase, openGraph, twitter card, favicon set. tsc: PASS, lint: 0 errors, build: PASS. | n/a | Mike to verify on Samsung A52 + iPhone + desktop incognito, return for Phase 3B |
+| 2026-05-22 | Cursor Sonnet 4.6 — Phase 3A-final | 3A-final | Root-cause fix: all .from("users") → .from("profiles") (use-profile.ts, welcome/actions.ts, session-init/route.ts, profile/page.tsx, onboarding/page.tsx — 5 files total); welcome flash gated in (app)/layout.tsx via authReady from useGuestExploration; celebration redirect already at /onboarding completion (router.push('/home?celebrate=signup')); CelebrationTrigger + lib/celebration/burst.ts already wired; Android Chrome voice continuous+restart — recognition.continuous=true, isManualStopRef, hasFinalResultRef, onend auto-restart with manual-stop gate; migration 0011 written (gender + legacy fields backfilled from users_legacy_backup); /MIOMIKA.md v3 with full §11 Codebase Map | n/a | Mike applies 0011 in Supabase, tests all 4 flows on devices, returns for Phase 3B (real teaching brain) |
 | 2026-05-22 | Cursor — Claude Opus 4.7 | 2 | Blocks A–F shipped. **A1**: WelcomeScreen self-gates via `useHasMounted` (useSyncExternalStore-based, no setState-in-effect) + `lib/welcome/show-welcome.ts` decision helper + `lib/welcome/actions.ts` server action that writes `users.welcome_shown_at`. **A2**: `lib/talk/speech-support.ts` with browser detection (Samsung Internet, Firefox, in-app webviews) + iOS-Safari gesture-lost fix in `MicButton.tsx` (synchronous `startListening()` inside pointerdown handler, getUserMedia kept off the gesture path). **A3**: `lib/hooks/use-media-query.ts` (useSyncExternalStore) + split `CompanionSurface` into `CompanionSheet.tsx` (mobile-only) and `CompanionPanel.tsx` (desktop-only), mutually exclusive. **A4**: `CompanionButton.tsx` rebuilt on framer-motion with triple-layer shadow + 1px white ring + micro-lift on press + subtle Y-breath. **A5**: Home `คุยกับมิโอมิ` CTA opens companion sheet via Zustand store (`useCompanionStore.open`) instead of routing to `/create`. **A6**: BottomNav already had `env(safe-area-inset-bottom)`; no horizontal scroll verified (all containers use overflow-hidden + max-width). **B**: Server-side language detection in `middleware.ts` (Accept-Language → `ui-language` cookie, 1-year, lax) + `lib/i18n/server.ts` + client `useUILanguage` via useSyncExternalStore + `lib/i18n/strings.ts` typed string table + migration **0010** adds `users.ui_language`. **C**: `lib/voice/warmth.ts` ships 30 praise / 15 care / 16 recovery / 10 humor + guidance vectors + typed `pickPhrase` / `pickPhraseWith` selectors honoring gender / journey-stage / time-of-day. Error boundaries migrated to RECOVERY_STRUGGLE. **D**: Full guidance system: `lib/guidance/{types,triggers,store,use-guidance}.ts` with 12 triggers, Zustand-backed store, throttled engine; `GuidancePill` + `GuidanceHost` wired into `(app)/layout.tsx`; idle-tracking, guest-limit, streak, returning-after-absence, pronunciation-failure detectors all live. **E**: `DesktopHoldBanner` sticky on ≥1024px, dismissible per-browser. **F1**: deleted `lib/ai/matcher.ts`; Supabase-backed matcher moved to `lib/library/supabase-matcher.ts` and renamed `matchLibraryFromDB`; `/api/miomi` updated. **F2**: `/friends` route deleted (placeholder only — no nav links pointed to it). **F3**: error-state warm phrases migrated; library-response templates left as-is per spec note. Companion state migrated from Context to Zustand (`lib/companion/store.ts`); old `CompanionStateContext` is now a backward-compat shim. Minimal `useProfile` + `useSessionState` hooks added. **Build green**, **typecheck green**, **lint 0 errors / 32 pre-existing warnings**. `zustand@^5` added. | Pre-existing React-19 `react-hooks/set-state-in-effect` errors in `/talk` surfaces (talk/page.tsx, MiomiLive.tsx, WordCardV3.tsx) suppressed at file/effect level with `TODO(phase-3)` markers — proper refactor (useReducer / derived state / static maps) deferred to Phase 3 when `/talk` gets its real teaching loop. Guidance triggers `feature_not_discovered` and `voice_unavailable` are stubs (return null) — first needs companion-first-opened-at telemetry (Phase 6), second is handled inline by MicButton. The home CTA now opens the sheet for everyone (guest + authed); the old guest-only signup-prompt branch is removed but the soft-signup invite card pattern remains via `GuestExplorationContext`. | Mike: (1) apply migration `0010_profile_ui_language.sql` in Supabase SQL editor, (2) run the manual mobile smoke test (see PR body / Block G), (3) verify Google OAuth still works (no regression — middleware language cookie is the only change touching that path), (4) push branch + open PR with title "Phase 2: Mobile foundation + Cultural Warmth + Guidance System". After merge return for Phase 3 prompt (Real Teaching). |
 
 ---

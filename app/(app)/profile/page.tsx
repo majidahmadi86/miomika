@@ -100,7 +100,7 @@ export default function ProfilePage() {
     setAuthEmail(user.email ?? null);
 
     const full = await supabase
-      .from("users")
+      .from("profiles")
       .select(
         "cat_name, email, tier, language, personality, xp, level, outputs_used, outputs_limit",
       )
@@ -110,7 +110,7 @@ export default function ProfilePage() {
     const base =
       full.error || !full.data
         ? await supabase
-            .from("users")
+            .from("profiles")
             .select("cat_name, email, tier, language, personality")
             .eq("id", user.id)
             .maybeSingle()

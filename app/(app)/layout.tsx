@@ -199,6 +199,22 @@ function AppLayoutInner({
   const hiddenNav = pathname === "/talk";
   const { isGuest, authReady } = useGuestExploration();
 
+  // Block render until auth is resolved to prevent home-content flash
+  // before WelcomeScreen takes over on first visit.
+  if (!authReady) {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "#FAFAF6",
+          zIndex: 9999,
+        }}
+        aria-hidden="true"
+      />
+    );
+  }
+
   return (
     <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden md:flex md:h-screen md:max-h-none md:bg-[#F2EEF0] md:overflow-hidden">
       <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-[#EAD0DB] bg-white md:flex">

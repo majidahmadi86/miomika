@@ -72,7 +72,7 @@ export function useProfile(): ProfileState {
       }
 
       const { data: row, error } = await supabase
-        .from("users")
+        .from("profiles")
         .select(
           "id, email, tier, journey_stage, gender, last_seen_at, welcome_shown_at, onboarding_completed_at, ui_language, active_character_id, miomi_stars",
         )

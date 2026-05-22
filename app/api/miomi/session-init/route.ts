@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         .limit(1)
         .single(),
       supabase
-        .from("users")
+        .from("profiles")
         .select("journey_stage, gender, last_seen_at, welcome_shown_at")
         .eq("id", userId)
         .maybeSingle(),
