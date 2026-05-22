@@ -122,13 +122,30 @@ export function useProfile(): ProfileState {
 
     void load();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      void load();
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "USER_UPDATED"
+      ) {
+        void load();
+      } else if (event === "SIGNED_OUT") {
+        if (cancelled) return;
+        setState({ profile: null, loading: false, authReady: true });
+      }
     });
+
+    const onForceRefresh = () => void load();
+    if (typeof window !== "undefined") {
+      window.addEventListener("miomika:profile-refresh", onForceRefresh);
+    }
 
     return () => {
       cancelled = true;
       authListener?.subscription.unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("miomika:profile-refresh", onForceRefresh);
+      }
     };
   }, []);
 

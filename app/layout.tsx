@@ -93,7 +93,7 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
     shortcut: "/favicon-32.png",
-    other: [{ rel: "mask-icon", url: "/safari-pinned-tab.svg", color: "#F9A8D4" }],
+    other: [{ rel: "mask-icon", url: "/safari-pinned-tab.svg", color: "#C9A96E" }],
   },
 
   other: {

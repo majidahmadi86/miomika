@@ -42,6 +42,7 @@ import {
   RECOVERY_STRUGGLE,
   GUIDANCE_GUEST_LIMIT_HIT,
 } from "@/lib/voice/warmth";
+import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -62,11 +63,15 @@ type MiomiResponse = {
 
 export async function POST(req: NextRequest) {
   try {
+    // SERVER reads user identity from cookies. Client cannot lie about tier.
+    const profile = await getServerProfile();
+    const serverUserId = profile?.id ?? null;
+    const serverIsGuest = !profile;
+    // Phase 4 will read profile.tier here for cost-cap enforcement.
+
     const {
       messages,
-      isGuest,
       sessionId,
-      userId,
       sessionContext: clientSessionContext,
     } = await req.json();
 
@@ -81,8 +86,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Empty message" }, { status: 400 });
     }
 
-    // ── STAGE 1: Reconstruct session state ───────────────────────────────────
-    let state: SessionState = createSessionState(!!isGuest, userId ?? null);
+    if (serverUserId) {
+      void touchLastSeen(serverUserId);
+    }
+
+    // ── STAGE 1: Reconstruct session state (server-resolved identity) ────────
+    let state: SessionState = createSessionState(serverIsGuest, serverUserId);
     if (sessionId) state.sessionId = sessionId;
     if (clientSessionContext) {
       state = {
@@ -99,7 +108,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── SERVER-SIDE GUEST LIMIT (never trust client) ──────────────────────────
-    if (isGuest && state.exchangeNumber >= GUEST_EXCHANGE_LIMIT) {
+    if (serverIsGuest && state.exchangeNumber >= GUEST_EXCHANGE_LIMIT) {
       const lang = state.primaryLanguage === "english" ? "en" : "th";
       return NextResponse.json({
         content: pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang }),
@@ -211,7 +220,7 @@ export async function POST(req: NextRequest) {
       wordsIntroduced: state.wordsIntroduced,
       currentTargetWord: state.currentTargetWord?.word ?? null,
       emotionalMomentum: state.emotionalMomentum,
-      isGuest: !!isGuest,
+      isGuest: serverIsGuest,
       wordToIntroduce: wordToIntroduce?.word ?? null,
       wordToIntroduceThai: wordToIntroduce?.thai ?? null,
       shouldCelebrate: false,
@@ -240,7 +249,7 @@ export async function POST(req: NextRequest) {
       void logInteraction({
         sessionId: state.sessionId,
         exchangeNumber: state.exchangeNumber,
-        userId: userId ?? null,
+        userId: serverUserId,
         userInput,
         servedResponse: content,
         servedVia,
@@ -265,7 +274,7 @@ export async function POST(req: NextRequest) {
       void logInteraction({
         sessionId: state.sessionId,
         exchangeNumber: state.exchangeNumber,
-        userId: userId ?? null,
+        userId: serverUserId,
         userInput,
         servedResponse: content,
         servedVia,

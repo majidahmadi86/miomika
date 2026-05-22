@@ -1,6 +1,6 @@
-# MIOMIKA — CANONICAL PROJECT DOCUMENT v3
+# MIOMIKA — CANONICAL PROJECT DOCUMENT v4
 > Single source of truth. Replaces all other .md files in project root.
-> Version: 3.0 — May 22, 2026
+> Version: 4.0 — Brutal Reset, May 22, 2026
 > If you are a new Claude or Cursor session, **read this entire document before doing anything.**
 
 ---
@@ -460,18 +460,22 @@ Hosting:      Vercel
 
 ```
 COLORS
-  Pink gradient CTA:  linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)
-  Gold (achievement): #C9A96E
-  Coral (creator):    #FF8A80
-  Teal (translate):   #7DD3C0
-  Background:         #FAFAF6
-  Surface:            #FFFFFF
-  Text primary:       #1A1A18
-  Text muted:         #9A8B73
-  Text subtle:        #C4BDB5
-  Border light:       #EDE8E0
-  Border medium:      #E8E5DF
-  Destructive only:   #8B1A35 (cancel-subscription button only, never primary)
+  Primary CTA gradient: linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%) (honey gold)
+  Primary CTA solid:    #C9A96E
+  CTA hover:            #B8985C
+  Gold (achievement):   #C9A96E
+  Pink (mood/heart only): #F9A8D4  ← ONLY for the heart fuel bar icon + tiny accents
+  Teal (focus):         #7DD3C0
+  Coral (small accent): #FF8A80
+  Background:           #FAFAF6
+  Surface:              #FFFFFF
+  Surface warm (Pro):   #FFF8F2
+  Text primary:         #1A1A18
+  Text muted:           #9A8B73
+  Text subtle:          #C4BDB5
+  Border light:         #EDE8E0
+  Border medium:        #E8E5DF
+  Destructive only:     #8B1A35 (cancel-subscription button only, never primary)
 
 MOTION (only two curves, never mix)
   UI:        cubic-bezier(0.4, 0, 0.2, 1), durations 180 / 240 / 360ms
@@ -483,6 +487,7 @@ ICONS:    lucide-react strokeWidth 1.75 (2.0 for brand fuel ♥ ⚡ ✦)
 MOBILE:   100svh, no page scroll ever, 320–412px primary
 
 FORBIDDEN
+  - Pink-gradient as primary CTA background (was old design — REPLACED with honey gold)
   - Emojis in UI chrome (only in DB data fields, e.g. vocabulary.emoji)
   - The old dark red as primary CTA
   - Spinners (Miomi IS the loading indicator)
@@ -491,9 +496,9 @@ FORBIDDEN
   - Hardcoded warm phrases (must come from lib/voice/warmth.ts)
 ```
 
-### Visual discipline (Phase 3A — immutable additions)
+### Visual discipline (RESET-1 — immutable additions)
 
-1. **Pink gradient reserved for primary CTAs ONLY.** No pink-gradient backgrounds, pills, nav fills, badges, banners, or chrome. Pink earns weight by scarcity.
+1. **Honey-gold gradient reserved for primary CTAs ONLY.** No gold backgrounds, pills, nav fills, badges, banners, or chrome. Gold earns weight by scarcity. Pink is reserved for the heart fuel bar and tiny accents — see `/docs/COLOR-SYSTEM.md`.
 2. **One clear focus per screen.** Each screen has exactly ONE primary CTA visible at any time. Everything else is ghost button, text link, or muted surface.
 3. **Intelligent CTA per user × screen.** The Guidance System produces the next-action. Static CTAs are replaced with contextual ones driven by `useGuidance()`.
 4. **Visual hierarchy is ruthless.** Miomi is hero. Current next-action is loud. Everything else recedes to warm neutrals (`#FAFAF6`, `#FFF8F2`, `#FFFFFF`).
@@ -969,14 +974,17 @@ Every future Claude or Cursor session reads this first. It is the authoritative 
 | `/api/miomi` | `app/api/miomi/route.ts` | auth | Main engine endpoint (library matcher + AI fallback) |
 | `/api/miomi/session-init` | `app/api/miomi/session-init/route.ts` | auth | Returns opener + session state |
 
-### 11.4 Auth flow files
+### 11.4 Auth flow files (post RESET-1)
 
 | Concern | File |
 |---|---|
 | Browser Supabase client | `lib/supabase/client.ts` |
 | Server Supabase client | `lib/supabase/server.ts` |
 | Middleware (session refresh + language cookie) | `middleware.ts` |
-| Profile hook | `lib/auth/use-profile.ts` |
+| **Server-side profile reader (canonical)** | **`lib/auth/get-server-profile.ts`** |
+| Client-side profile hook | `lib/auth/use-profile.ts` |
+| **Post-signup canonical route** | **`app/api/auth/post-signup/route.ts`** |
+| OAuth callback | `app/auth/callback/route.ts` |
 | Welcome decision logic | `lib/welcome/show-welcome.ts` |
 | Welcome side effects (mark shown server-side) | `lib/welcome/actions.ts` |
 | Welcome UI | `components/WelcomeScreen.tsx` |
@@ -1017,10 +1025,14 @@ Every future Claude or Cursor session reads this first. It is the authoritative 
 | 0009_rls_lockdown.sql | needs apply | RLS policies audit |
 | 0010_profile_ui_language.sql | needs apply | profiles.ui_language column |
 | 0011_profile_legacy_fields.sql | needs apply (this phase) | gender, cat_name, xp, level, streak, mood backfilled from users_legacy_backup |
+| **0012_brutal_reset.sql** | **needs apply (RESET-1)** | **Drops users_legacy_backup permanently, verifies profiles schema, refreshes handle_new_user trigger + auth.users backfill, RLS audit. Idempotent.** |
 
 ### 11.8 Known sharp edges (read before debugging)
 
-- **There used to be a `public.users` table.** It is now `public.users_legacy_backup`. Do NOT read or write to it. All user data lives in `public.profiles`.
+- **`public.users` and `public.users_legacy_backup` are GONE.** Dropped permanently in migration `0012_brutal_reset.sql`. Any code reading `.from("users")` is a bug from a forgotten file. All user data lives in `public.profiles`.
+- **Client-sent `tier`, `isGuest`, `userId` in API requests is IGNORED.** Server always reads via `getServerProfile()` from cookies. The client's job is to ASK what tier it is, never to TELL.
+- **CTA color is HONEY GOLD now, not pink.** `linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)`. Pink belongs to the heart fuel bar and tiny accents only. See `/docs/COLOR-SYSTEM.md`.
+- **Onboarding completion** dispatches `window.dispatchEvent(new Event("miomika:profile-refresh"))` then calls `/api/auth/post-signup` for the redirect. `useProfile()` listens and refetches.
 - **The welcome flash bug** was caused by layout rendering children before auth resolved. Fixed in Phase 3A-final by the `authReady` gate in `app/(app)/layout.tsx`.
 - **Android Chrome speech recognition** times out after ~3s of silence. Solution in `MicButton.tsx`: `recognition.continuous = true` + auto-restart in `onend` unless `isManualStopRef.current === true`.
 - **Samsung Internet** does NOT support Web Speech API. `lib/talk/speech-support.ts` detects via UA `samsungbrowser` and MicButton renders the disabled grey button with inline "Open in Chrome" message.
@@ -1040,6 +1052,7 @@ Every future Claude or Cursor session reads this first. It is the authoritative 
 | 2026-05-22 | Cursor Sonnet 4.6 — Phase 3A-fix | 3A-fix | Logout scope:global + localStorage/sessionStorage clear + hard navigation; useProfile auth-state subscription already wired (no change needed); /profile duplicate "ฉัน Me" header removed from guest branch; bilingual labels already complete (no change); signup CelebrationBurst already wired via CelebrationTrigger + lib/celebration/burst.ts (no change); CompanionButton drift fully intact (no change); single bubble on home confirmed (no change); Samsung Internet fallback already in MicButton (no change); SEO meta expanded: title, description, keywords, authors, metadataBase, openGraph, twitter card, favicon set. tsc: PASS, lint: 0 errors, build: PASS. | n/a | Mike to verify on Samsung A52 + iPhone + desktop incognito, return for Phase 3B |
 | 2026-05-22 | Cursor Sonnet 4.6 — Phase 3A-final | 3A-final | Root-cause fix: all .from("users") → .from("profiles") (use-profile.ts, welcome/actions.ts, session-init/route.ts, profile/page.tsx, onboarding/page.tsx — 5 files total); welcome flash gated in (app)/layout.tsx via authReady from useGuestExploration; celebration redirect already at /onboarding completion (router.push('/home?celebrate=signup')); CelebrationTrigger + lib/celebration/burst.ts already wired; Android Chrome voice continuous+restart — recognition.continuous=true, isManualStopRef, hasFinalResultRef, onend auto-restart with manual-stop gate; migration 0011 written (gender + legacy fields backfilled from users_legacy_backup); /MIOMIKA.md v3 with full §11 Codebase Map | n/a | Mike applies 0011 in Supabase, tests all 4 flows on devices, returns for Phase 3B (real teaching brain) |
 | 2026-05-22 | Cursor Opus 4.7 — Phase 3A-final-2 | 3A-final-2 | Docs consolidation: `/MASTER-HANDOFF.md` created at project root (founder context, communication style, current state, sharp edges, next-session protocol); `/docs/HOW-TO-START-A-NEW-CHAT.md` created (exact handoff protocol so new Claude chats need only two pasted files); `/docs/archive/README.md` prepended with `⛔ ARCHIVED — DO NOT READ` warning routing future sessions to `/MIOMIKA.md` + `/MASTER-HANDOFF.md`; `MIOMIKA.md §11.0 Top-level documentation` added. Bug fixes: MicButton recognition now logs `[MicButton] recognition.onstart fired` and `[MicButton] recognition.onerror: <code>` so Mike can verify mic flow via Chrome remote DevTools on Samsung A52 (other 7 acceptance criteria — continuous=true, isManualStopRef, onend auto-restart + interim commit, onresult immediate final commit, synchronous handlePress, no-await gesture, amplitude ring — all confirmed in place from Phase 3A-final). Celebration burst: `CelebrationTrigger` in `app/(app)/home/page.tsx` rewritten so `miomika-signup-celebrated-v1` localStorage flag is set AFTER the 2.4s burst completes (was set before — meant a failed dynamic import would silently block future replays), URL is cleaned immediately, `console.log("[home] celebration trigger detected")` added for verification, single setter / single reader confirmed via repo grep. | n/a | Mike: (1) On Samsung A52 Chrome open https://miomika.com/talk → tap mic → speak "hello" → DevTools console should log `[MicButton] recognition.onstart fired` and transcript should commit; (2) brand-new Gmail signup in incognito → complete onboarding → land on `/home` → 2.4s confetti burst visible → reload `/home` → no burst (flag now set); (3) start next chat using `/docs/HOW-TO-START-A-NEW-CHAT.md` protocol with both root docs attached for Phase 3B (real teaching brain, Opus 4.7). |
+| 2026-05-22 | Cursor Opus 4.7 — RESET-1 | RESET-1 | Brutal foundation reset: migration 0012 drops `public.users_legacy_backup` permanently + idempotent profiles-column verification + refreshed `handle_new_user` trigger + auth-users backfill + RLS audit. `lib/auth/get-server-profile.ts` is now the single server-side source of truth — `app/api/miomi/route.ts` and `app/api/miomi/session-init/route.ts` no longer trust client-sent `isGuest`/`userId`/`tier`. New canonical route `app/api/auth/post-signup/route.ts` decides redirect destination (`/onboarding` / `/home` / `/home?celebrate=signup`); `app/auth/callback/route.ts` and `app/onboarding/page.tsx` both delegate to it. `useProfile()` now subscribes to `miomika:profile-refresh` events and refetches on `SIGNED_IN` / `TOKEN_REFRESHED` / `USER_UPDATED`. Color migration: every primary CTA in the codebase is now `linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)` honey gold — home, dashboard, talk, error, install prompt, companion sheet/panel, guidance pill, conversion card, word card v3, welcome email; nav active state, brand wordmark, achievement borders, link text on warm surfaces all migrated. Pink retained only in heart fuel icon, ≤8px companion presence dots, sparkle decorations. `lib/design/colors.ts` is the new token surface. Docs v4: `/MIOMIKA.md` §4.2 rewritten with honey-gold tokens + "pink-gradient as primary CTA" added to FORBIDDEN; `/docs/SCHEMA.md`, `/docs/AUTH-FLOW.md`, `/docs/COLOR-SYSTEM.md` created; `/MASTER-HANDOFF.md` rewritten with Mike's real story (Persian, Iran→Thailand, teaching motive at Saint Gabriel's, 25K TikTok, Mikaro income, Phuket/Krabi dream). | n/a — RESET-2 still owes MicButton.tsx + profile page rebuild + final polish pass. CompanionButton listening/speaking presence dots still pink (allowed under ≤8px accent rule, can revisit in RESET-2). | Mike: (1) apply `supabase/migrations/0012_brutal_reset.sql` in Supabase SQL Editor, (2) verify on Vercel preview — login → `/profile` shows Free tier (not guest), (3) verify all primary CTAs are honey-gold not pink on every screen, (4) verify new signup → onboarding → `/home` celebration burst fires once, (5) verify sign-out → sign-in with different account still works, (6) after green, request RESET-2 (MicButton rewrite + profile page rebuild + polish pass). |
 | 2026-05-22 | Cursor — Claude Opus 4.7 | 2 | Blocks A–F shipped. **A1**: WelcomeScreen self-gates via `useHasMounted` (useSyncExternalStore-based, no setState-in-effect) + `lib/welcome/show-welcome.ts` decision helper + `lib/welcome/actions.ts` server action that writes `users.welcome_shown_at`. **A2**: `lib/talk/speech-support.ts` with browser detection (Samsung Internet, Firefox, in-app webviews) + iOS-Safari gesture-lost fix in `MicButton.tsx` (synchronous `startListening()` inside pointerdown handler, getUserMedia kept off the gesture path). **A3**: `lib/hooks/use-media-query.ts` (useSyncExternalStore) + split `CompanionSurface` into `CompanionSheet.tsx` (mobile-only) and `CompanionPanel.tsx` (desktop-only), mutually exclusive. **A4**: `CompanionButton.tsx` rebuilt on framer-motion with triple-layer shadow + 1px white ring + micro-lift on press + subtle Y-breath. **A5**: Home `คุยกับมิโอมิ` CTA opens companion sheet via Zustand store (`useCompanionStore.open`) instead of routing to `/create`. **A6**: BottomNav already had `env(safe-area-inset-bottom)`; no horizontal scroll verified (all containers use overflow-hidden + max-width). **B**: Server-side language detection in `middleware.ts` (Accept-Language → `ui-language` cookie, 1-year, lax) + `lib/i18n/server.ts` + client `useUILanguage` via useSyncExternalStore + `lib/i18n/strings.ts` typed string table + migration **0010** adds `users.ui_language`. **C**: `lib/voice/warmth.ts` ships 30 praise / 15 care / 16 recovery / 10 humor + guidance vectors + typed `pickPhrase` / `pickPhraseWith` selectors honoring gender / journey-stage / time-of-day. Error boundaries migrated to RECOVERY_STRUGGLE. **D**: Full guidance system: `lib/guidance/{types,triggers,store,use-guidance}.ts` with 12 triggers, Zustand-backed store, throttled engine; `GuidancePill` + `GuidanceHost` wired into `(app)/layout.tsx`; idle-tracking, guest-limit, streak, returning-after-absence, pronunciation-failure detectors all live. **E**: `DesktopHoldBanner` sticky on ≥1024px, dismissible per-browser. **F1**: deleted `lib/ai/matcher.ts`; Supabase-backed matcher moved to `lib/library/supabase-matcher.ts` and renamed `matchLibraryFromDB`; `/api/miomi` updated. **F2**: `/friends` route deleted (placeholder only — no nav links pointed to it). **F3**: error-state warm phrases migrated; library-response templates left as-is per spec note. Companion state migrated from Context to Zustand (`lib/companion/store.ts`); old `CompanionStateContext` is now a backward-compat shim. Minimal `useProfile` + `useSessionState` hooks added. **Build green**, **typecheck green**, **lint 0 errors / 32 pre-existing warnings**. `zustand@^5` added. | Pre-existing React-19 `react-hooks/set-state-in-effect` errors in `/talk` surfaces (talk/page.tsx, MiomiLive.tsx, WordCardV3.tsx) suppressed at file/effect level with `TODO(phase-3)` markers — proper refactor (useReducer / derived state / static maps) deferred to Phase 3 when `/talk` gets its real teaching loop. Guidance triggers `feature_not_discovered` and `voice_unavailable` are stubs (return null) — first needs companion-first-opened-at telemetry (Phase 6), second is handled inline by MicButton. The home CTA now opens the sheet for everyone (guest + authed); the old guest-only signup-prompt branch is removed but the soft-signup invite card pattern remains via `GuestExplorationContext`. | Mike: (1) apply migration `0010_profile_ui_language.sql` in Supabase SQL editor, (2) run the manual mobile smoke test (see PR body / Block G), (3) verify Google OAuth still works (no regression — middleware language cookie is the only change touching that path), (4) push branch + open PR with title "Phase 2: Mobile foundation + Cultural Warmth + Guidance System". After merge return for Phase 3 prompt (Real Teaching). |
 
 ---

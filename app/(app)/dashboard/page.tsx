@@ -16,7 +16,7 @@ export default function DashboardPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white">
       <div className="flex shrink-0 items-center gap-3 border-b border-[#EAD0DB] px-4 py-3">
-        <Link href="/home" className="text-[#DB2777]">
+        <Link href="/home" className="text-[#C9A96E]">
           <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
         </Link>
         <div>
@@ -80,7 +80,7 @@ export default function DashboardPage() {
           ].map(({ icon: Icon, value, th, en }) => (
             <div key={th} className="rounded-xl bg-[#FFF8F2] p-3 text-center">
               <Icon
-                className="mx-auto h-5 w-5 text-[#DB2777]"
+                className="mx-auto h-5 w-5 text-[#C9A96E]"
                 strokeWidth={2}
                 aria-hidden
               />
@@ -128,7 +128,7 @@ export default function DashboardPage() {
             <Link
               href="/create"
               className="mt-4 inline-flex rounded-full px-6 py-2 text-sm font-medium text-white"
-              style={{ background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)" }}
+              style={{ background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)" }}
             >
               เริ่มเรียนเลย
             </Link>

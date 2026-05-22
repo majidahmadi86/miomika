@@ -130,7 +130,7 @@ export function WordCardV3({ word, direction, onPronunciationCheck }: WordCardV3
             }}
           >
             <Volume2
-              style={{ width: "20px", height: "20px", color: audioPlaying ? "#DB2777" : "#C4BDB5" }}
+              style={{ width: "20px", height: "20px", color: audioPlaying ? "#C9A96E" : "#C4BDB5" }}
               strokeWidth={1.75}
             />
           </motion.button>
@@ -289,7 +289,7 @@ export function WordCardV3({ word, direction, onPronunciationCheck }: WordCardV3
               background: "none", border: "none", cursor: "pointer",
               padding: "0 0 10px",
               fontFamily: "'Kanit', sans-serif",
-              fontSize: "12px", fontWeight: 500, color: "#DB2777",
+              fontSize: "12px", fontWeight: 500, color: "#C9A96E",
             }}
           >
             {expanded
@@ -323,7 +323,7 @@ export function WordCardV3({ word, direction, onPronunciationCheck }: WordCardV3
             style={{
               width: "100%", height: "44px",
               borderRadius: "12px",
-              background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+              background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
               border: "none", cursor: "pointer",
               display: "flex", alignItems: "center",
               justifyContent: "center", gap: "8px",

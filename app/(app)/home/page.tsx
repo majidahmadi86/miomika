@@ -37,7 +37,7 @@ const DAILY_CHALLENGE = {
 };
 
 const tapFeedback =
-  "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#DB2777]";
+  "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A96E]";
 
 const TAP_BUBBLE_CYCLE = [
   { th: "วันนี้โพสต์อะไรดีคะ คิดถึงเลยค่า", en: "What are we posting today? I missed you~" },
@@ -568,7 +568,7 @@ export default function HomePage() {
                       href="/signup"
                       className={cn("mt-2 flex w-full flex-col items-center rounded-full border border-[#EDE8E0] bg-[#FFF8F2] px-3 py-2 text-center", tapFeedback)}
                     >
-                      <span className="text-[10px] font-medium text-[#DB2777]">จำชื่อฉันนะคะ</span>
+                      <span className="text-[10px] font-medium text-[#C9A96E]">จำชื่อฉันนะคะ</span>
                       <span className="text-[11px] font-normal leading-[1.6] text-[#666666]">Remember my name</span>
                     </Link>
                   ) : null}
@@ -650,7 +650,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleGuestCreatePress(); }}
-                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", border: "none", cursor: "pointer" }}
+                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", border: "none", cursor: "pointer" }}
                         >
                           ฝึกเลย
                         </button>
@@ -658,7 +658,7 @@ export default function HomePage() {
                         <Link
                           href="/create"
                           onClick={(e) => e.stopPropagation()}
-                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", textDecoration: "none" }}
+                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", textDecoration: "none" }}
                         >
                           ฝึกเลย
                         </Link>
@@ -714,7 +714,7 @@ export default function HomePage() {
                 type="button"
                 onClick={handleTalkCTA}
                 className={tapFeedback}
-                style={{ height: "52px", borderRadius: "999px", background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: "0 4px 16px -4px rgba(219,39,119,0.40)" }}
+                style={{ height: "52px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: "0 4px 16px -4px rgba(201,169,110,0.40)" }}
               >
                 <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "15px", fontWeight: 500, color: "#FFFFFF", lineHeight: 1.3 }}>คุยกับมิโอมิ</span>
                 <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.80)", letterSpacing: "0.06em" }}>Talk to Miomi</span>
@@ -733,7 +733,7 @@ export default function HomePage() {
               <p className="mt-2 text-lg font-medium leading-[1.6] text-[#1A1A1A]">{DAILY_CHALLENGE.phrase}</p>
               <p className="mt-1 text-sm leading-[1.6] text-[#1A1A1A]">{DAILY_CHALLENGE.th}</p>
               <p className="mt-2 text-xs leading-[1.6] text-[#666666]">{DAILY_CHALLENGE.meaning}</p>
-              <Link href="/create" className={cn("mt-4 inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)" }}>
+              <Link href="/create" className={cn("mt-4 inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)" }}>
                 ฝึกเลย
               </Link>
             </motion.div>

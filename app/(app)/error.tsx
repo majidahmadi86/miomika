@@ -61,7 +61,7 @@ export default function AppError({
         <button
           type="button"
           onClick={reset}
-          className="w-full rounded-full bg-gradient-to-br from-[#F9A8D4] to-[#DB2777] py-3 text-sm font-semibold text-white shadow-[0_4px_16px_-4px_rgba(219,39,119,0.4)]"
+          className="w-full rounded-full bg-gradient-to-br from-[#E8C77A] to-[#C9A96E] py-3 text-sm font-semibold text-white shadow-[0_4px_16px_-4px_rgba(201,169,110,0.4)]"
         >
           {lang === "th" ? "ลองอีกครั้ง · Try again" : "Try again"}
         </button>

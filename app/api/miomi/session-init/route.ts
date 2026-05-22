@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getServerProfile } from "@/lib/auth/get-server-profile";
 import {
   pickPhrase,
   RECOVERY_RETURN,
@@ -17,39 +18,40 @@ function opener(ctx: PhraseContext & { isNew: boolean; isReturning: boolean }) {
   };
 }
 
-export async function POST(req: NextRequest) {
+/**
+ * POST /api/miomi/session-init
+ *
+ * Returns the opener Miomi should greet the user with. Identity is resolved
+ * server-side from the session cookie via getServerProfile() — the client
+ * cannot influence which voice vector fires.
+ */
+export async function POST() {
   try {
-    const { userId } = await req.json();
+    const profile = await getServerProfile();
 
-    if (!userId) {
-      return NextResponse.json(opener({ isNew: true, isReturning: false, lang: "th" }));
+    if (!profile) {
+      return NextResponse.json(
+        opener({ isNew: true, isReturning: false, lang: "th" }),
+      );
     }
 
     const supabase = await createClient();
+    const sessionRes = await supabase
+      .from("user_sessions")
+      .select("started_at")
+      .eq("user_id", profile.id)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    const [sessionRes, profileRes] = await Promise.all([
-      supabase
-        .from("user_sessions")
-        .select("started_at")
-        .eq("user_id", userId)
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .single(),
-      supabase
-        .from("profiles")
-        .select("journey_stage, gender, last_seen_at, welcome_shown_at")
-        .eq("id", userId)
-        .maybeSingle(),
-    ]);
+    const stage = profile.journey_stage as PhraseContext["stage"];
+    const gender = (profile.gender ?? "neutral") as PhraseContext["gender"];
 
-    const profile = profileRes.data;
-    const stage = (profile?.journey_stage as PhraseContext["stage"]) ?? "unspecified";
-    const gender = (profile?.gender as PhraseContext["gender"]) ?? "neutral";
-
-    const isNew = !profile?.welcome_shown_at && !sessionRes.data;
+    const isNew = !profile.welcome_shown_at && !sessionRes.data;
 
     const hoursSinceLast = sessionRes.data?.started_at
-      ? (Date.now() - new Date(sessionRes.data.started_at).getTime()) / (1000 * 60 * 60)
+      ? (Date.now() - new Date(sessionRes.data.started_at).getTime()) /
+        (1000 * 60 * 60)
       : 999;
     const isReturning = hoursSinceLast > 24 * 3;
 

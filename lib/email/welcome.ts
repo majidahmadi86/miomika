@@ -13,7 +13,7 @@ const FROM = "Miomi <miomi@miomika.com>";
 const WELCOME_HTML_TH = `
 <div style="font-family:'Kanit',sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1A1A18;">
   <img src="https://miomika.com/miomi/happy.png" alt="Miomi" width="96" height="96" style="display:block;margin:0 auto 16px;" />
-  <h1 style="text-align:center;font-size:20px;color:#DB2777;margin:0 0 8px;">
+  <h1 style="text-align:center;font-size:20px;color:#C9A96E;margin:0 0 8px;">
     หนูจำคุณได้แล้วค่า~
   </h1>
   <p style="text-align:center;font-size:14px;color:#9A8B73;margin:0 0 24px;">
@@ -25,7 +25,7 @@ const WELCOME_HTML_TH = `
     </p>
   </div>
   <div style="text-align:center;">
-    <a href="https://miomika.com/home" style="display:inline-block;background:linear-gradient(135deg,#F9A8D4 0%,#DB2777 100%);color:#FFFFFF;text-decoration:none;padding:12px 32px;border-radius:999px;font-size:14px;font-weight:600;">
+    <a href="https://miomika.com/home" style="display:inline-block;background:linear-gradient(135deg,#E8C77A 0%,#C9A96E 100%);color:#FFFFFF;text-decoration:none;padding:12px 32px;border-radius:999px;font-size:14px;font-weight:600;">
       กลับไปเรียนกับมิโอมิ
     </a>
   </div>
@@ -35,7 +35,7 @@ const WELCOME_HTML_TH = `
 const WELCOME_HTML_EN = `
 <div style="font-family:'Quicksand',sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1A1A18;">
   <img src="https://miomika.com/miomi/happy.png" alt="Miomi" width="96" height="96" style="display:block;margin:0 auto 16px;" />
-  <h1 style="text-align:center;font-size:20px;color:#DB2777;margin:0 0 8px;">
+  <h1 style="text-align:center;font-size:20px;color:#C9A96E;margin:0 0 8px;">
     I'll remember you now~
   </h1>
   <p style="text-align:center;font-size:14px;color:#9A8B73;margin:0 0 24px;">
@@ -47,7 +47,7 @@ const WELCOME_HTML_EN = `
     </p>
   </div>
   <div style="text-align:center;">
-    <a href="https://miomika.com/home" style="display:inline-block;background:linear-gradient(135deg,#F9A8D4 0%,#DB2777 100%);color:#FFFFFF;text-decoration:none;padding:12px 32px;border-radius:999px;font-size:14px;font-weight:600;">
+    <a href="https://miomika.com/home" style="display:inline-block;background:linear-gradient(135deg,#E8C77A 0%,#C9A96E 100%);color:#FFFFFF;text-decoration:none;padding:12px 32px;border-radius:999px;font-size:14px;font-weight:600;">
       Back to learning with Miomi
     </a>
   </div>

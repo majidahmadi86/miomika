@@ -33,12 +33,12 @@ export function WordCard({ word, variant = "intro" }: WordCardProps) {
     <div
       style={{
         background: "#FFFFFF",
-        border: isCelebration ? "1.5px solid #F9A8D4" : "1.5px solid #E8E5DF",
+        border: isCelebration ? "1.5px solid #C9A96E" : "1.5px solid #E8E5DF",
         borderRadius: "16px",
         padding: "16px 18px",
         margin: "8px 0",
         boxShadow: isCelebration
-          ? "0 4px 20px rgba(249,168,212,0.18)"
+          ? "0 4px 20px rgba(201,169,110,0.18)"
           : "0 2px 12px rgba(0,0,0,0.06)",
         position: "relative",
         overflow: "hidden",
@@ -74,7 +74,7 @@ export function WordCard({ word, variant = "intro" }: WordCardProps) {
             left: 0,
             right: 0,
             height: "3px",
-            background: "linear-gradient(90deg, #F9A8D4, #FBBF24, #F9A8D4)",
+            background: "linear-gradient(90deg, #E8C77A, #C9A96E, #E8C77A)",
             borderRadius: "16px 16px 0 0",
           }}
         />

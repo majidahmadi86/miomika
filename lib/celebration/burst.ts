@@ -26,8 +26,8 @@ export interface CelebrationOptions {
 
 const PARTICLE_COUNT = 80;
 const PARTICLE_COLORS = [
-  "#C9A96E", "#F9A8D4", "#DB2777", "#FFF0A0",
-  "#FFD700", "#F9A8D4", "#C9A96E", "#FFFFFF",
+  "#C9A96E", "#E8C77A", "#FFD700", "#FFF0A0",
+  "#F9A8D4", "#C9A96E", "#E8C77A", "#FFFFFF",
 ];
 
 function randomColor() {

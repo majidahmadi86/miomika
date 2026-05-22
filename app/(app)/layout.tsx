@@ -219,7 +219,7 @@ function AppLayoutInner({
     <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden md:flex md:h-screen md:max-h-none md:bg-[#F2EEF0] md:overflow-hidden">
       <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-[#EAD0DB] bg-white md:flex">
         <div className="flex flex-col items-center px-4 pb-4 pt-6">
-          <p className="text-base font-medium text-[#DB2777]">Miomika</p>
+          <p className="text-base font-medium text-[#C9A96E]">Miomika</p>
           <div className="miomi-login-float mt-4 flex justify-center">
             <Image
               src="/miomi/idle.png"
@@ -258,7 +258,7 @@ function AppLayoutInner({
             const navClass = cn(
               "flex items-center gap-2 rounded-lg py-2.5 pl-4 pr-4 transition-colors",
               active
-                ? "border-l-2 border-[#DB2777] bg-[#FFF8F2]"
+                ? "border-l-2 border-[#C9A96E] bg-[#FFF8F2]"
                 : "border-l-2 border-transparent hover:bg-[#FAFAF6]",
             );
             const guestLocked =
@@ -278,13 +278,13 @@ function AppLayoutInner({
                     <Icon
                       className={cn(
                         "h-4 w-4 blur-[0.35px] contrast-75",
-                        active ? "text-[#DB2777]" : "text-neutral-600",
+                        active ? "text-[#C9A96E]" : "text-neutral-600",
                       )}
                       strokeWidth={2}
                       aria-hidden
                     />
                     <Lock
-                      className="absolute -right-1 -top-1 h-2.5 w-2.5 text-[#DB2777]"
+                      className="absolute -right-1 -top-1 h-2.5 w-2.5 text-[#C9A96E]"
                       strokeWidth={2.5}
                       aria-hidden
                     />
@@ -293,7 +293,7 @@ function AppLayoutInner({
                     <span
                       className={cn(
                         "text-[11px] font-medium leading-none",
-                        active ? "text-[#DB2777]" : "text-neutral-900",
+                        active ? "text-[#C9A96E]" : "text-neutral-900",
                       )}
                     >
                       {thai}
@@ -313,7 +313,7 @@ function AppLayoutInner({
                 <Icon
                   className={cn(
                     "h-4 w-4 shrink-0",
-                    active ? "text-[#DB2777]" : "text-neutral-600",
+                    active ? "text-[#C9A96E]" : "text-neutral-600",
                   )}
                   strokeWidth={2}
                 />
@@ -321,7 +321,7 @@ function AppLayoutInner({
                   <span
                     className={cn(
                       "text-[11px] font-medium leading-none",
-                      active ? "text-[#DB2777]" : "text-neutral-900",
+                      active ? "text-[#C9A96E]" : "text-neutral-900",
                     )}
                   >
                     {thai}

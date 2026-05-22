@@ -177,6 +177,7 @@ export default function OnboardingPage() {
         return;
       }
 
+      const nowIso = new Date().toISOString();
       const { error } = await supabase.from("profiles").upsert(
         {
           id: user.id,
@@ -187,7 +188,8 @@ export default function OnboardingPage() {
           creator_type: creatorTypes.join(", "),
           language,
           platforms: platforms.join(", "),
-          last_seen_at: new Date().toISOString(),
+          last_seen_at: nowIso,
+          onboarding_completed_at: nowIso,
         },
         { onConflict: "id" },
       );
@@ -202,7 +204,31 @@ export default function OnboardingPage() {
         return;
       }
 
-      router.push("/home?celebrate=signup");
+      // Signal useProfile() callers to refetch with the fresh row.
+      try {
+        window.dispatchEvent(new Event("miomika:profile-refresh"));
+      } catch {
+        /* SSR-safe */
+      }
+
+      // Ask the canonical router where this user should go next.
+      let redirectTo = "/home?celebrate=signup";
+      try {
+        const res = await fetch("/api/auth/post-signup", {
+          method: "POST",
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const json = (await res.json()) as { redirect_to?: string };
+          if (typeof json.redirect_to === "string" && json.redirect_to.startsWith("/")) {
+            redirectTo = json.redirect_to;
+          }
+        }
+      } catch {
+        /* fall through to default redirect */
+      }
+
+      router.push(redirectTo);
       router.refresh();
     }
 

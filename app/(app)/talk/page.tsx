@@ -563,7 +563,7 @@ export default function TalkPage() {
                 width: "36px",
                 height: "36px",
                 borderRadius: "50%",
-                background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
                 border: "none",
                 cursor: "pointer",
                 display: "flex",
@@ -677,7 +677,7 @@ export default function TalkPage() {
                   }}
                 >
                   <span style={{
-                    color: "#F9A8D4",
+                    color: "#C9A96E",
                     fontSize: "16px",
                     lineHeight: 1,
                     marginTop: "2px",
@@ -717,13 +717,13 @@ export default function TalkPage() {
                   justifyContent: "center",
                   height: "56px",
                   borderRadius: "999px",
-                  background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                  background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
                   fontFamily: "'Kanit', sans-serif",
                   fontSize: "18px",
                   fontWeight: 500,
                   color: "#FFFFFF",
                   textDecoration: "none",
-                  boxShadow: "0 6px 20px -4px rgba(219,39,119,0.45)",
+                  boxShadow: "0 6px 20px -4px rgba(201,169,110,0.45)",
                 }}
               >
                 {uiLang === "en" ? "Sign up free~" : "สมัครฟรีเลยค่า~"}

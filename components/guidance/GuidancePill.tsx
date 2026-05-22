@@ -77,7 +77,7 @@ export function GuidancePill() {
             padding: "12px 16px",
             background: "#FFFFFF",
             border: "1px solid #EDE8E0",
-            borderLeft: "3px solid #F9A8D4",
+            borderLeft: "3px solid #C9A96E",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(26,26,24,0.05)",
             maxWidth: "400px",
@@ -129,7 +129,7 @@ export function GuidancePill() {
               onClick={handleAction}
               style={{
                 padding: "8px 16px",
-                background: "linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)",
+                background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
                 color: "#FFFFFF",
                 border: "none",
                 borderRadius: "999px",
