@@ -46,12 +46,12 @@ function applyLanguageDetection(
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Let the OAuth callback handler run untouched — it manages its own
-  // cookie writes via the redirect response.
+  // OAuth callback MUST bypass middleware entirely. The callback handler
+  // writes session cookies onto its own redirect response, and any wrapping
+  // by middleware (even a passthrough) can strip the Set-Cookie headers on
+  // Android Chrome. Language detection can wait until the user's next page.
   if (pathname.startsWith("/auth/callback")) {
-    const passthrough = NextResponse.next({ request });
-    applyLanguageDetection(request, passthrough);
-    return passthrough;
+    return NextResponse.next();
   }
 
   const { response, user } = await updateSession(request);
@@ -79,6 +79,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Match everything EXCEPT static assets and the OAuth callback.
+    // The OAuth callback writes session cookies onto its redirect response;
+    // ANY middleware interference can strip those cookies on stricter
+    // browsers (Android Chrome).
+    "/((?!_next/static|_next/image|favicon.ico|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
