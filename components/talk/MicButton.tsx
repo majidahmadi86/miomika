@@ -24,9 +24,9 @@ interface MicButtonProps {
 
 // --- Tuning constants ------------------------------------------------------
 
-const SILENCE_THRESHOLD = 0.03;      // RMS amplitude below this counts as silence
-const SILENCE_DURATION_MS = 1500;    // How long silence must persist to stop
-const MIN_SPEECH_DURATION_MS = 400;  // Ignore "stops" before this much audio
+const SILENCE_THRESHOLD = 0.025;     // Slightly more sensitive
+const SILENCE_DURATION_MS = 900;     // Trim 600ms off end-of-utterance lag
+const MIN_SPEECH_DURATION_MS = 400;  // Ignore stops before this much audio
 const MAX_RECORDING_MS = 12000;      // Hard cap to prevent runaway recordings
 
 // --- Browser support detection --------------------------------------------
@@ -81,6 +81,7 @@ export function MicButton({
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
 
@@ -89,6 +90,7 @@ export function MicButton({
   const isRecordingRef = useRef(false);
   const mimeTypeRef = useRef<string>("audio/webm");
   const hardStopTimerRef = useRef<number | null>(null);
+  const idleReleaseTimerRef = useRef<number | null>(null);
 
   const trace = useCallback((msg: string, data?: Record<string, unknown>) => {
     if (typeof window === "undefined") return;
@@ -109,9 +111,8 @@ export function MicButton({
     }
   }, []);
 
-  // --- Teardown ------------------------------------------------------------
-
-  const teardown = useCallback(() => {
+  // Lightweight reset between utterances — keeps the mic stream warm.
+  const resetForNextUtterance = useCallback(() => {
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
@@ -120,18 +121,28 @@ export function MicButton({
       clearTimeout(hardStopTimerRef.current);
       hardStopTimerRef.current = null;
     }
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
     setAmplitude(0);
     silenceStartTimeRef.current = null;
     isRecordingRef.current = false;
   }, []);
+
+  // Full teardown — only on unmount or 60s idle. Releases OS mic handle.
+  const fullTeardown = useCallback(() => {
+    resetForNextUtterance();
+    if (idleReleaseTimerRef.current !== null) {
+      clearTimeout(idleReleaseTimerRef.current);
+      idleReleaseTimerRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }, [resetForNextUtterance]);
 
   // --- Send audio to server -----------------------------------------------
 
@@ -219,47 +230,64 @@ export function MicButton({
     if (typeof window === "undefined") return;
     if (!support.supported) return;
 
-    trace("warming up mic stream");
-
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (e) {
-      trace("permission denied", { error: (e as Error).message });
-      onStateChange("needs-permission");
-      return;
+    // Cancel any pending idle-release.
+    if (idleReleaseTimerRef.current !== null) {
+      clearTimeout(idleReleaseTimerRef.current);
+      idleReleaseTimerRef.current = null;
     }
 
-    streamRef.current = stream;
-    const mimeType = pickMimeType();
-    mimeTypeRef.current = mimeType;
-    trace("mic stream warm", { mimeType });
+    // Reuse existing stream if available (avoids Android Chrome anti-abuse
+    // lockout from repeated getUserMedia calls).
+    let stream = streamRef.current;
+    if (!stream || stream.getAudioTracks().every((t) => t.readyState !== "live")) {
+      trace("warming up mic stream");
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        trace("permission denied", { error: (e as Error).message });
+        onStateChange("needs-permission");
+        return;
+      }
+      streamRef.current = stream;
+      const mimeType = pickMimeType();
+      mimeTypeRef.current = mimeType;
+      trace("mic stream warm", { mimeType });
 
-    // --- Set up amplitude analyzer for silence detection -------------------
-    let ctx: AudioContext;
-    try {
-      ctx = new AudioContext();
-      audioContextRef.current = ctx;
-    } catch (e) {
-      trace("AudioContext failed", { error: (e as Error).message });
-      teardown();
+      // Set up analyzer ONCE on the persistent stream.
+      try {
+        const ctx = new AudioContext();
+        audioContextRef.current = ctx;
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        const source = ctx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        analyserRef.current = analyser;
+      } catch (e) {
+        trace("AudioContext failed", { error: (e as Error).message });
+        fullTeardown();
+        onStateChange("idle");
+        return;
+      }
+    } else {
+      trace("reusing warm mic stream");
+    }
+
+    const analyser = analyserRef.current;
+    if (!analyser) {
+      trace("analyser missing — recreating");
+      fullTeardown();
       onStateChange("idle");
       return;
     }
-
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    const source = ctx.createMediaStreamSource(stream);
-    source.connect(analyser);
     const data = new Uint8Array(analyser.frequencyBinCount);
 
-    // --- Set up the recorder ----------------------------------------------
+    // Fresh MediaRecorder per utterance (recorders are single-use anyway).
     let recorder: MediaRecorder;
     try {
-      recorder = new MediaRecorder(stream, { mimeType });
+      recorder = new MediaRecorder(stream, { mimeType: mimeTypeRef.current });
     } catch (e) {
       trace("MediaRecorder failed", { error: (e as Error).message });
-      teardown();
+      fullTeardown();
       onStateChange("idle");
       return;
     }
@@ -274,7 +302,18 @@ export function MicButton({
       const chunks = chunksRef.current;
       chunksRef.current = [];
       const blob = new Blob(chunks, { type: mimeTypeRef.current });
-      teardown();
+      resetForNextUtterance();
+
+      // Schedule idle release in 60s. If user starts another utterance
+      // before then, the timer gets cancelled.
+      if (idleReleaseTimerRef.current !== null) {
+        clearTimeout(idleReleaseTimerRef.current);
+      }
+      idleReleaseTimerRef.current = window.setTimeout(() => {
+        trace("idle release — closing mic stream");
+        fullTeardown();
+      }, 60_000);
+
       void transcribeAndCommit(blob);
     };
 
@@ -283,20 +322,19 @@ export function MicButton({
         (ev as Event & { error?: { message?: string } }).error?.message ??
         "unknown";
       trace("recorder onerror", { error: errMsg });
-      teardown();
+      fullTeardown();
       onStateChange("idle");
     };
 
-    // --- Start everything --------------------------------------------------
     recordStartTimeRef.current = Date.now();
     silenceStartTimeRef.current = null;
     isRecordingRef.current = true;
 
     try {
-      recorder.start(250); // emit data chunks every 250ms
+      recorder.start(250);
     } catch (e) {
       trace("recorder.start threw", { error: (e as Error).message });
-      teardown();
+      fullTeardown();
       onStateChange("idle");
       return;
     }
@@ -304,17 +342,14 @@ export function MicButton({
     onStateChange("listening");
     trace("recording started");
 
-    // Hard cap so a mic left running can't drain forever.
     hardStopTimerRef.current = window.setTimeout(() => {
       trace("hard cap reached");
       stopRecording("hard-cap");
     }, MAX_RECORDING_MS);
 
-    // --- Amplitude + silence detection loop -------------------------------
     const tick = () => {
       if (!isRecordingRef.current) return;
       analyser.getByteFrequencyData(data);
-      // RMS-style: average normalized to 0-1
       let sum = 0;
       for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
       const rms = Math.sqrt(sum / data.length) / 255;
@@ -348,7 +383,8 @@ export function MicButton({
     support.supported,
     ensureFlowTag,
     trace,
-    teardown,
+    resetForNextUtterance,
+    fullTeardown,
     transcribeAndCommit,
     onStateChange,
     stopRecording,
@@ -408,7 +444,7 @@ export function MicButton({
 
   useEffect(() => {
     return () => {
-      teardown();
+      fullTeardown();
       const recorder = recorderRef.current;
       if (recorder && recorder.state === "recording") {
         try {
@@ -418,7 +454,7 @@ export function MicButton({
         }
       }
     };
-  }, [teardown]);
+  }, [fullTeardown]);
 
   // --- Render: unsupported ------------------------------------------------
 

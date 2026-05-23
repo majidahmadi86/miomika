@@ -18,7 +18,7 @@ import { log, logError } from "@/lib/debug/log";
  *     for our usage envelope.
  *   - Works on Samsung Internet, Firefox, every browser with MediaRecorder.
  *
- * Auth: requires a session. Guests cannot transcribe.
+ * Auth: optional. Guests and logged-in users may transcribe.
  *
  * Returns: { text: string } on success, or { error: string } on failure.
  */
@@ -36,24 +36,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "server_misconfigured" }, { status: 500 });
   }
 
-  const supabase = createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
+  // Allow guests AND logged-in users. Voice is part of how Miomi seduces
+  // new visitors — gating it behind auth kills the funnel.
+  // We still try to identify the user (for logs and future rate limiting)
+  // but do NOT block guests.
+  let userId: string | null = null;
+  let userEmail: string | null = null;
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll() {
+          /* no-op */
+        },
       },
-      setAll() {
-        /* no-op for this route — we don't refresh tokens here */
-      },
-    },
-  });
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    log("voice.transcribe", "unauthorized", {
-      cookieCount: request.cookies.getAll().length,
-      cookieNames: request.cookies.getAll().map(c => c.name).join(","),
     });
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      userId = user.id;
+      userEmail = user.email ?? null;
+    }
+  } catch {
+    /* guest — fine */
   }
 
   const apiKey = process.env.GROQ_API_KEY;
@@ -96,7 +102,8 @@ export async function POST(request: NextRequest) {
   }
 
   log("voice.transcribe", "received", {
-    user: user.email ?? "unknown",
+    user: userEmail ?? "guest",
+    userId: userId ?? "anon",
     bytes: audioBlob.size,
     type: audioBlob.type,
     language: language ?? "auto",
