@@ -1,748 +1,227 @@
 "use client";
 
 import Image from "next/image";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
+import { log, logError } from "@/lib/debug/log";
 
-const slideTransition = { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const };
-
-const slideVariants = {
-  initial: { x: 56, opacity: 0 },
-  animate: { x: 0, opacity: 1 },
-  exit: { x: -56, opacity: 0 },
-};
-
-type PersonalityId = "sweet" | "cheeky" | "dreamy";
-
-const PERSONALITY_OPTIONS: {
-  id: PersonalityId;
-  th: string;
-  en: string;
-  desc: string;
-}[] = [
-  { id: "sweet", th: "หวาน", en: "Sweet", desc: "gentle, caring" },
-  { id: "cheeky", th: "ซน", en: "Cheeky", desc: "playful, teasing" },
-  { id: "dreamy", th: "ฝัน", en: "Dreamy", desc: "calm, poetic" },
-];
-
-const CREATOR_OPTIONS = [
-  "Beauty",
-  "Cafe",
-  "Gym",
-  "Fashion",
-  "Freelancer",
-  "Other",
-] as const;
-
-const PLATFORM_OPTIONS = [
-  "Instagram",
-  "TikTok",
-  "Facebook",
-  "YouTube",
-] as const;
-
-type LanguageId = "thai" | "english" | "both";
-
-const LANGUAGE_OPTIONS: {
-  id: LanguageId;
-  th: string;
-  en: string;
-}[] = [
-  { id: "thai", th: "ภาษาไทยอย่างเดียว", en: "Thai only" },
-  { id: "english", th: "ภาษาอังกฤษอย่างเดียว", en: "English only" },
-  { id: "both", th: "ทั้งไทยและอังกฤษ", en: "Both (Thai + English)" },
-];
-
-// Journey stage (MIOMIKA.md §2.6) — drives curriculum focus and pricing emphasis.
-type JourneyStage =
-  | "tourist"
-  | "student"
-  | "worker"
-  | "resident"
-  | "unspecified";
-
-const JOURNEY_OPTIONS: {
-  id: JourneyStage;
-  th: string;
-  en: string;
-  desc: string;
-}[] = [
-  { id: "tourist",  th: "มาเที่ยว",   en: "I'm visiting",       desc: "survival phrases, taxi, market" },
-  { id: "student",  th: "มาเรียน",    en: "I'm studying",       desc: "academic, exam prep, classroom" },
-  { id: "worker",   th: "มาทำงาน",    en: "I work here",        desc: "professional, email, meetings" },
-  { id: "resident", th: "อยู่ที่นี่",  en: "I live here",        desc: "cultural fluency, idioms, family" },
-  { id: "unspecified", th: "ยังไม่รู้", en: "Not sure yet",     desc: "general everyday Thai" },
-];
-
-const TOTAL_STEPS = 7;
-
-function ProgressBar({ step }: { step: number }) {
-  const filled = step >= TOTAL_STEPS + 1 ? TOTAL_STEPS : step;
-  return (
-    <div
-      className="grid h-[2px] w-full shrink-0 grid-cols-7 gap-px bg-rose-border"
-      aria-hidden
-    >
-      {Array.from({ length: TOTAL_STEPS }, (_, i) => (
-        <div
-          key={i}
-          className={cn(
-            "min-h-[2px] transition-colors duration-300",
-            i < filled ? "bg-rose-accent" : "bg-white",
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
-function BilingualPrimaryButton({
-  th,
-  en,
-  disabled,
-  onClick,
-}: {
-  th: string;
-  en: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="w-full rounded-full bg-rose-accent py-3.5 text-center transition-colors hover:bg-rose-mid disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      <span className="block text-sm font-semibold text-white">{th}</span>
-      <span className="mt-1 block text-xs font-normal text-white/85">{en}</span>
-    </button>
-  );
-}
-
+/**
+ * Celebration screen shown immediately after sign-up.
+ *
+ * No form. No questions. We greet the user by name, mark onboarding
+ * complete in the DB, dispatch a profile-refresh so client caches update,
+ * then auto-route to /home?celebrate=signup. Total time: ~3 seconds.
+ *
+ * Returning users never see this — the OAuth callback only routes here
+ * for accounts with no onboarding_completed_at set.
+ */
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [journeyStage, setJourneyStage] = useState<JourneyStage | null>(null);
-  const [catName, setCatName] = useState("");
-  const [personality, setPersonality] = useState<PersonalityId | null>(null);
-  const [creatorTypes, setCreatorTypes] = useState<string[]>([]);
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [language, setLanguage] = useState<LanguageId | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveRetry, setSaveRetry] = useState(0);
-  const [saveState, setSaveState] = useState<"idle" | "loading" | "error">(
-    "idle",
-  );
-
-  function toggleMulti(
-    list: string[],
-    setList: (v: string[]) => void,
-    value: string,
-  ) {
-    setList(
-      list.includes(value)
-        ? list.filter((item) => item !== value)
-        : [...list, value],
-    );
-  }
+  const [displayName, setDisplayName] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  const didRunRef = useRef(false);
 
   useEffect(() => {
-    if (step !== TOTAL_STEPS + 1) return;
+    if (didRunRef.current) return;
+    didRunRef.current = true;
 
     let cancelled = false;
 
-    async function persist() {
-      setSaveState("loading");
-      setSaveError(null);
+    async function complete() {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
 
-      if (cancelled) return;
-
-      if (!user) {
-        setSaveError("เซสชันหมดอายุค่า กรุณาเข้าสู่ระบบใหม่");
-        setSaveState("error");
+      // 1. Get the current user.
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        log("onboarding", "no session, redirecting to login");
+        router.replace("/login");
         return;
       }
 
-      if (!personality || !language || !journeyStage) {
-        setSaveError("ข้อมูลไม่ครบค่า กรุณากลับไปเลือกใหม่");
-        setSaveState("error");
-        return;
-      }
+      const user = sessionData.session.user;
 
-      const nowIso = new Date().toISOString();
-      const { error } = await supabase.from("profiles").upsert(
-        {
-          id: user.id,
-          email: user.email,
-          journey_stage: journeyStage,
-          cat_name: catName.trim(),
-          personality,
-          creator_type: creatorTypes.join(", "),
-          language,
-          platforms: platforms.join(", "),
-          last_seen_at: nowIso,
-          onboarding_completed_at: nowIso,
-        },
-        { onConflict: "id" },
-      );
+      // 2. Resolve a display name from Google metadata or email prefix.
+      const metaName =
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined) ??
+        null;
+      const fallbackName = user.email ? user.email.split("@")[0] : "friend";
+      const resolvedName = metaName?.trim() || fallbackName;
 
-      if (cancelled) return;
+      if (!cancelled) setDisplayName(resolvedName);
 
-      if (error) {
-        setSaveError(
-          "บันทึกไม่สำเร็จค่า ลองใหม่อีกครั้ง หรือติดต่อทีมงานนะคะ",
-        );
-        setSaveState("error");
-        return;
-      }
+      log("onboarding", "completing", {
+        user: user.email,
+        nameSource: metaName ? "google" : "email-prefix",
+      });
 
-      // Signal useProfile() callers to refetch with the fresh row.
+      // 3. Mark onboarding complete + set display_name if not already set.
       try {
-        window.dispatchEvent(new Event("miomika:profile-refresh"));
-      } catch {
-        /* SSR-safe */
-      }
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            onboarding_completed_at: new Date().toISOString(),
+            display_name: resolvedName,
+          })
+          .eq("id", user.id);
 
-      // Ask the canonical router where this user should go next.
-      let redirectTo = "/home?celebrate=signup";
-      try {
-        const res = await fetch("/api/auth/post-signup", {
-          method: "POST",
-          cache: "no-store",
-        });
-        if (res.ok) {
-          const json = (await res.json()) as { redirect_to?: string };
-          if (typeof json.redirect_to === "string" && json.redirect_to.startsWith("/")) {
-            redirectTo = json.redirect_to;
-          }
+        if (updateError) {
+          logError("onboarding", "profile update failed", updateError);
+          if (!cancelled) setError("retry");
+          return;
         }
-      } catch {
-        /* fall through to default redirect */
+      } catch (e) {
+        logError("onboarding", "profile update threw", e);
+        if (!cancelled) setError("retry");
+        return;
       }
 
-      router.push(redirectTo);
-      router.refresh();
+      // 4. Notify any mounted useProfile() hooks to re-fetch.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("miomika:profile-refresh"));
+      }
+
+      // 5. Hold the celebration for 3 seconds, then route to /home.
+      window.setTimeout(() => {
+        if (cancelled) return;
+        log("onboarding", "celebration done, routing to /home");
+        router.replace("/home?celebrate=signup");
+      }, 3000);
     }
 
-    void persist();
+    void complete();
 
     return () => {
       cancelled = true;
     };
-  }, [
-    step,
-    saveRetry,
-    catName,
-    journeyStage,
-    personality,
-    creatorTypes,
-    platforms,
-    language,
-    router,
-  ]);
+  }, [router]);
 
-  const showBack = step > 1 && step < TOTAL_STEPS + 1;
-  const nameOk = catName.trim().length > 0;
+  const retry = () => {
+    setError(null);
+    didRunRef.current = false;
+    // Force the effect to re-run by triggering a state change.
+    // The next render will see didRunRef.current === false and re-enter.
+    setDisplayName("");
+    // Schedule a microtask so React re-renders before the effect re-runs.
+    window.setTimeout(() => {
+      didRunRef.current = false;
+      // Trigger the effect by updating a state used in its deps — using
+      // router.refresh keeps everything clean.
+      router.refresh();
+    }, 0);
+  };
+
+  if (error) {
+    return (
+      <main className="flex h-[100dvh] w-full flex-col items-center justify-center bg-white px-6">
+        <div className="miomi-login-float w-[140px] shrink-0">
+          <Image
+            src="/miomi/idle.png"
+            alt="Miomi"
+            width={140}
+            height={140}
+            className="h-auto w-[140px] object-contain"
+            priority
+          />
+        </div>
+        <p className="mt-6 text-center text-base font-semibold text-neutral-900">
+          อุ๊ปส์~ ลองอีกครั้งนะคะ
+        </p>
+        <p className="mt-1 text-center text-sm text-neutral-500">
+          Something went wrong. Let&apos;s try again.
+        </p>
+        <button
+          type="button"
+          onClick={retry}
+          className="mt-6 rounded-full px-6 py-3 text-sm font-semibold text-white"
+          style={{
+            background:
+              "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
+          }}
+        >
+          ลองอีกครั้ง / Try again
+        </button>
+      </main>
+    );
+  }
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-white">
-      <div className="flex h-full min-h-0 w-full flex-col overflow-y-auto bg-white">
-        <ProgressBar step={step} />
-
-        <header className="relative flex h-11 shrink-0 items-center px-3">
-          {showBack ? (
-            <button
-              type="button"
-              onClick={() => {
-                setStep((s) => Math.max(1, s - 1));
-                setSaveError(null);
+    <main className="flex h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-white px-6">
+      {/* Sparkles */}
+      <div className="pointer-events-none absolute inset-0">
+        <AnimatePresence>
+          {[...Array(12)].map((_, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+              animate={{
+                opacity: [0, 1, 0],
+                scale: [0, 1.2, 0.8],
+                x: Math.cos((i / 12) * Math.PI * 2) * 160,
+                y: Math.sin((i / 12) * Math.PI * 2) * 160,
               }}
-              className="text-sm font-medium text-rose-accent hover:text-rose-mid"
+              transition={{
+                duration: 2.4,
+                delay: 0.2 + i * 0.05,
+                ease: "easeOut",
+              }}
+              className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2"
             >
-              กลับ
-            </button>
-          ) : (
-            <span className="w-10" aria-hidden />
-          )}
-        </header>
-
-        <div className="flex flex-1 flex-col px-5 pb-10">
-          <AnimatePresence mode="wait">
-            {step === 1 ? (
-              <motion.div
-                key={1}
-                variants={slideVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={slideTransition}
-                className="flex flex-1 flex-col"
-              >
-                <div className="flex flex-1 flex-col items-center pt-4">
-                  <div className="miomi-login-float w-[200px] shrink-0">
-                    <Image
-                      src="/miomi/happy.png"
-                      alt="Miomi"
-                      width={200}
-                      height={200}
-                      className="mx-auto h-auto w-[200px] object-contain"
-                      priority
-                    />
-                  </div>
-                  <h1 className="mt-8 text-center text-2xl font-semibold text-neutral-900">
-                    สวัสดีค่า~
-                  </h1>
-                  <p className="mt-1 text-center text-sm text-neutral-500">
-                    Hello there!
-                  </p>
-                  <p className="mt-6 text-center text-base leading-relaxed text-neutral-800">
-                    ฉันชื่อ Miomi และฉันจะเป็นเพื่อนของคุณค่า
-                  </p>
-                  <p className="mt-2 text-center text-sm text-neutral-500">
-                    I&apos;m Miomi and I&apos;ll be your companion
-                  </p>
-                </div>
-                <div className="mt-auto">
-                  <BilingualPrimaryButton
-                    th="มาเริ่มเลยค่า"
-                    en={"Let's begin"}
-                    onClick={() => setStep(2)}
-                  />
-                </div>
-              </motion.div>
-            ) : null}
-
-            {step === 2 ? (
-              <motion.div
-                key={2}
-                variants={slideVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={slideTransition}
-                className="flex flex-1 flex-col"
-              >
-                <div className="flex flex-1 flex-col items-center pt-2">
-                  <div className="w-[130px] shrink-0">
-                    <Image
-                      src="/miomi/thinking.png"
-                      alt="Miomi"
-                      width={130}
-                      height={130}
-                      className="mx-auto h-auto w-[130px] object-contain"
-                    />
-                  </div>
-                  <h1 className="mt-5 text-center text-xl font-semibold text-neutral-900">
-                    คุณมาอยู่ที่ไทยเพราะอะไรคะ?
-                  </h1>
-                  <p className="mt-1 text-center text-sm text-neutral-500">
-                    What brings you to Thailand?
-                  </p>
-                  <p className="mt-2 text-center text-[11px] leading-relaxed text-neutral-400">
-                    เลือกเพื่อให้หนูสอนคำที่เหมาะกับคุณค่า
-                  </p>
-                  <div className="mt-6 grid w-full gap-2.5">
-                    {JOURNEY_OPTIONS.map((opt) => {
-                      const selected = journeyStage === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setJourneyStage(opt.id)}
-                          className={cn(
-                            "rounded-xl border-2 p-3 text-left transition-colors",
-                            selected
-                              ? "border-rose-accent bg-white"
-                              : "border-rose-border bg-white hover:border-rose-mid/50",
-                          )}
-                        >
-                          <p className="text-base font-semibold text-neutral-900">
-                            {opt.th}
-                          </p>
-                          <p className="text-sm text-neutral-500">{opt.en}</p>
-                          <p className="mt-1 text-[10px] text-neutral-400">
-                            {opt.desc}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="mt-6">
-                  <BilingualPrimaryButton
-                    th="ถัดไป"
-                    en="Next"
-                    disabled={!journeyStage}
-                    onClick={() => setStep(3)}
-                  />
-                </div>
-              </motion.div>
-            ) : null}
-
-            {step === 3 ? (
-              <motion.div
-                key={3}
-                variants={slideVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={slideTransition}
-                className="flex flex-1 flex-col"
-              >
-                <div className="flex flex-1 flex-col items-center pt-2">
-                  <div className="miomi-login-float w-[150px] shrink-0">
-                    <Image
-                      src="/miomi/happy.png"
-                      alt="Miomi"
-                      width={150}
-                      height={150}
-                      className="mx-auto h-auto w-[150px] object-contain"
-                    />
-                  </div>
-                  <h1 className="mt-6 text-center text-xl font-semibold text-neutral-900">
-                    ตั้งชื่อให้ฉันด้วยนะคะ
-                  </h1>
-                  <p className="mt-1 text-center text-sm text-neutral-500">
-                    Give me a name
-                  </p>
-                  <input
-                    type="text"
-                    value={catName}
-                    onChange={(e) => setCatName(e.target.value)}
-                    placeholder="ชื่อของ Miomi..."
-                    className="mt-8 w-full rounded-xl border border-rose-border bg-[#FAFAFA] px-4 py-4 text-center text-lg font-medium text-neutral-900 outline-none transition-colors focus:border-rose-accent focus:ring-2 focus:ring-rose-accent/25"
-                    autoComplete="off"
-                  />
-                  <p className="mt-2 text-center text-xs text-neutral-400">
-                    Miomi&apos;s name...
-                  </p>
-                </div>
-                <div className="mt-auto">
-                  <BilingualPrimaryButton
-                    th="ตกลงค่า"
-                    en="Perfect!"
-                    disabled={!nameOk}
-                    onClick={() => setStep(4)}
-                  />
-                </div>
-              </motion.div>
-            ) : null}
-
-            {step === 4 ? (
-              <motion.div
-                key={4}
-                variants={slideVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={slideTransition}
-                className="flex flex-1 flex-col"
-              >
-                <div className="flex flex-1 flex-col items-center pt-2">
-                  <div className="w-[130px] shrink-0">
-                    <Image
-                      src="/miomi/idle.png"
-                      alt="Miomi"
-                      width={130}
-                      height={130}
-                      className="mx-auto h-auto w-[130px] object-contain"
-                    />
-                  </div>
-                  <h1 className="mt-5 text-center text-xl font-semibold text-neutral-900">
-                    คุณอยากให้ฉันเป็นแบบไหนคะ?
-                  </h1>
-                  <p className="mt-1 text-center text-sm text-neutral-500">
-                    What&apos;s my personality?
-                  </p>
-                  <div className="mt-6 grid w-full gap-3">
-                    {PERSONALITY_OPTIONS.map((opt) => {
-                      const selected = personality === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setPersonality(opt.id)}
-                          className={cn(
-                            "rounded-xl border-2 p-4 text-left transition-colors",
-                            selected
-                              ? "border-rose-accent bg-white"
-                              : "border-rose-border bg-white hover:border-rose-mid/50",
-                          )}
-                        >
-                          <p className="text-base font-semibold text-neutral-900">
-                            {opt.th}
-                          </p>
-                          <p className="text-sm text-neutral-500">{opt.en}</p>
-                          <p className="mt-1 text-xs text-neutral-400">
-                            {opt.desc}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="mt-8">
-                  <BilingualPrimaryButton
-                    th="ถัดไป"
-                    en="Next"
-                    disabled={!personality}
-                    onClick={() => setStep(5)}
-                  />
-                </div>
-              </motion.div>
-            ) : null}
-
-            {step === 5 ? (
-              <motion.div
-                key={5}
-                variants={slideVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={slideTransition}
-                className="flex flex-1 flex-col"
-              >
-                <div className="flex flex-1 flex-col items-center pt-2">
-                  <div className="w-[130px] shrink-0">
-                    <Image
-                      src="/miomi/thinking.png"
-                      alt="Miomi"
-                      width={130}
-                      height={130}
-                      className="mx-auto h-auto w-[130px] object-contain"
-                    />
-                  </div>
-                  <h1 className="mt-5 text-center text-xl font-semibold text-neutral-900">
-                    คุณทำคอนเทนต์แบบไหนคะ?
-                  </h1>
-                  <p className="mt-1 text-center text-sm text-neutral-500">
-                    What do you create?
-                  </p>
-                  <div className="mt-6 flex w-full flex-wrap justify-center gap-2">
-                    {CREATOR_OPTIONS.map((opt) => {
-                      const selected = creatorTypes.includes(opt);
-                      return (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() =>
-                            toggleMulti(creatorTypes, setCreatorTypes, opt)
-                          }
-                          className={cn(
-                            "rounded-full border px-4 py-2.5 text-sm font-medium transition-colors",
-                            selected
-                              ? "border-rose-accent bg-rose-light text-rose-accent"
-                              : "border-rose-border bg-[#FAFAFA] text-neutral-800",
-                          )}
-                        >
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="mt-8">
-                  <BilingualPrimaryButton
-                    th="ถัดไป"
-                    en="Next"
-                    disabled={creatorTypes.length === 0}
-                    onClick={() => setStep(6)}
-                  />
-                </div>
-              </motion.div>
-            ) : null}
-
-            {step === 6 ? (
-              <motion.div
-                key={6}
-                variants={slideVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={slideTransition}
-                className="flex flex-1 flex-col"
-              >
-                <div className="flex flex-1 flex-col items-center pt-2">
-                  <div className="w-[130px] shrink-0">
-                    <Image
-                      src="/miomi/thinking.png"
-                      alt="Miomi"
-                      width={130}
-                      height={130}
-                      className="mx-auto h-auto w-[130px] object-contain"
-                    />
-                  </div>
-                  <h1 className="mt-5 text-center text-xl font-semibold text-neutral-900">
-                    โพสต์ที่ไหนบ้างคะ?
-                  </h1>
-                  <p className="mt-1 text-center text-sm text-neutral-500">
-                    Where do you post?
-                  </p>
-                  <div className="mt-6 flex w-full flex-wrap justify-center gap-2">
-                    {PLATFORM_OPTIONS.map((opt) => {
-                      const selected = platforms.includes(opt);
-                      return (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() =>
-                            toggleMulti(platforms, setPlatforms, opt)
-                          }
-                          className={cn(
-                            "rounded-full border px-4 py-2.5 text-sm font-medium transition-colors",
-                            selected
-                              ? "border-rose-accent bg-rose-light text-rose-accent"
-                              : "border-rose-border bg-[#FAFAFA] text-neutral-800",
-                          )}
-                        >
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="mt-8">
-                  <BilingualPrimaryButton
-                    th="ถัดไป"
-                    en="Next"
-                    disabled={platforms.length === 0}
-                    onClick={() => setStep(7)}
-                  />
-                </div>
-              </motion.div>
-            ) : null}
-
-            {step === 7 ? (
-              <motion.div
-                key={7}
-                variants={slideVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={slideTransition}
-                className="flex flex-1 flex-col"
-              >
-                <div className="flex flex-1 flex-col items-center pt-2">
-                  <div className="w-[130px] shrink-0">
-                    <Image
-                      src="/miomi/speaking.png"
-                      alt="Miomi"
-                      width={130}
-                      height={130}
-                      className="mx-auto h-auto w-[130px] object-contain"
-                    />
-                  </div>
-                  <h1 className="mt-5 text-center text-xl font-semibold text-neutral-900">
-                    อยากให้ Miomi เขียนภาษาอะไรให้คะ?
-                  </h1>
-                  <p className="mt-1 text-center text-sm text-neutral-500">
-                    What language should I write in?
-                  </p>
-                  <div className="mt-6 grid w-full gap-3">
-                    {LANGUAGE_OPTIONS.map((opt) => {
-                      const selected = language === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setLanguage(opt.id)}
-                          className={cn(
-                            "rounded-xl border-2 p-4 text-left transition-colors",
-                            selected
-                              ? "border-rose-accent bg-white"
-                              : "border-rose-border bg-white hover:border-rose-mid/50",
-                          )}
-                        >
-                          <p className="text-base font-semibold text-neutral-900">
-                            {opt.th}
-                          </p>
-                          <p className="mt-1 text-sm text-neutral-500">
-                            {opt.en}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="mt-8">
-                  <BilingualPrimaryButton
-                    th="เสร็จแล้วค่า"
-                    en="All set"
-                    disabled={!language}
-                    onClick={() => setStep(8)}
-                  />
-                </div>
-              </motion.div>
-            ) : null}
-
-            {step === 8 ? (
-              <motion.div
-                key={8}
-                variants={slideVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={slideTransition}
-                className="flex flex-1 flex-col items-center justify-center text-center"
-              >
-                <div className="miomi-login-float w-[200px] shrink-0">
-                  <Image
-                    src="/miomi/happy.png"
-                    alt="Miomi"
-                    width={200}
-                    height={200}
-                    className="mx-auto h-auto w-[200px] object-contain"
-                  />
-                </div>
-                <h1 className="mt-8 text-2xl font-semibold text-neutral-900">
-                  {catName.trim()} พร้อมแล้วค่า!
-                </h1>
-                <p className="mt-2 text-sm text-neutral-500">
-                  {catName.trim()} is ready!
-                </p>
-                <p className="mt-6 text-base text-neutral-800">
-                  ไปสร้าง content ด้วยกันเลยนะคะ
-                </p>
-                <p className="mt-1 text-sm text-neutral-500">
-                  Let&apos;s create together
-                </p>
-                {saveState === "loading" && !saveError ? (
-                  <p className="mt-8 text-sm text-neutral-500">กำลังบันทึก...</p>
-                ) : null}
-                {saveError ? (
-                  <div className="mt-6 w-full">
-                    <p
-                      className="rounded-xl border border-rose-border bg-rose-light px-3 py-2 text-sm text-rose-accent"
-                      role="alert"
-                    >
-                      {saveError}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSaveError(null);
-                        setSaveState("idle");
-                        setSaveRetry((n) => n + 1);
-                      }}
-                      className="mt-4 w-full rounded-full border border-rose-accent py-3 text-sm font-medium text-rose-accent"
-                    >
-                      ลองอีกครั้ง
-                    </button>
-                  </div>
-                ) : null}
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </div>
+              <div
+                className="h-full w-full rounded-full"
+                style={{
+                  background:
+                    "radial-gradient(circle, #E8C77A 0%, transparent 70%)",
+                }}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
-    </div>
+
+      <motion.div
+        initial={{ scale: 0.6, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        <Image
+          src="/miomi/happy.png"
+          alt="Miomi"
+          width={160}
+          height={160}
+          className="h-auto w-[160px] object-contain"
+          priority
+        />
+      </motion.div>
+
+      <motion.h1
+        initial={{ y: 12, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="mt-6 text-center text-2xl font-semibold text-neutral-900"
+      >
+        ยินดีต้อนรับค่า {displayName ? displayName : ""}~ ✨
+      </motion.h1>
+      <motion.p
+        initial={{ y: 12, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.5 }}
+        className="mt-2 text-center text-sm text-neutral-500"
+      >
+        Welcome {displayName ? displayName : "friend"}~ So happy you&apos;re
+        here!
+      </motion.p>
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 1.0 }}
+        className="mt-6 text-center text-xs text-rose-accent/80"
+      >
+        ดีใจที่ได้เจอกันนะคะ~
+      </motion.p>
+    </main>
   );
 }

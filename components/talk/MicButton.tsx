@@ -44,7 +44,8 @@ function detectSpeechSupport(): SpeechSupport {
   return { supported: true };
 }
 
-const SILENCE_TIMEOUT_MS = 2000;
+const SILENCE_TIMEOUT_MS = 2000;       // After interim text stops arriving
+const NO_SPEECH_TIMEOUT_MS = 6000;     // After onstart with no result at all
 
 export function MicButton({
   state,
@@ -70,6 +71,8 @@ export function MicButton({
   const streamRef = useRef<MediaStream | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
+  const noSpeechTimerRef = useRef<number | null>(null);
+  const gotAnyResultRef = useRef(false);
 
   const trace = useCallback((msg: string, data?: Record<string, unknown>) => {
     if (typeof window === "undefined") return;
@@ -94,6 +97,13 @@ export function MicButton({
     if (silenceTimerRef.current !== null) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
+    }
+  }, []);
+
+  const clearNoSpeechTimer = useCallback(() => {
+    if (noSpeechTimerRef.current !== null) {
+      clearTimeout(noSpeechTimerRef.current);
+      noSpeechTimerRef.current = null;
     }
   }, []);
 
@@ -185,11 +195,29 @@ export function MicButton({
       setDebugLang(resolvedLang);
       isListeningRef.current = true;
       transcriptBufferRef.current = "";
+      gotAnyResultRef.current = false;
       onStateChange("listening");
       void startAmplitude();
+
+      // Arm the no-speech guard. If onresult never fires within this window,
+      // the API has silently closed (common on Android Chrome). Stop cleanly
+      // and let the user re-tap.
+      clearNoSpeechTimer();
+      noSpeechTimerRef.current = window.setTimeout(() => {
+        if (!gotAnyResultRef.current) {
+          trace("no-speech timeout — stopping cleanly");
+          try {
+            recognition.stop();
+          } catch {
+            /* ignore */
+          }
+        }
+      }, NO_SPEECH_TIMEOUT_MS);
     };
 
     recognition.onresult = (e: SpeechRecognitionEventLike) => {
+      gotAnyResultRef.current = true;
+      clearNoSpeechTimer();
       let interim = "";
       let final = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -239,6 +267,7 @@ export function MicButton({
       const code = e?.error ?? "unknown";
       trace("onerror", { code, message: e?.message ?? "" });
       clearSilenceTimer();
+      clearNoSpeechTimer();
       isListeningRef.current = false;
       stopAmplitude();
 
@@ -262,8 +291,10 @@ export function MicButton({
     recognition.onend = () => {
       trace("onend", {
         bufferLength: transcriptBufferRef.current.length,
+        gotResult: gotAnyResultRef.current,
       });
       clearSilenceTimer();
+      clearNoSpeechTimer();
       isListeningRef.current = false;
 
       // If we have buffered interim text but no final result came through,
@@ -292,6 +323,7 @@ export function MicButton({
     startAmplitude,
     stopAmplitude,
     clearSilenceTimer,
+    clearNoSpeechTimer,
     ensureFlowTag,
   ]);
 
@@ -361,6 +393,7 @@ export function MicButton({
   useEffect(() => {
     return () => {
       clearSilenceTimer();
+      clearNoSpeechTimer();
       stopAmplitude();
       try {
         recognitionRef.current?.stop();
@@ -368,7 +401,7 @@ export function MicButton({
         /* ignore */
       }
     };
-  }, [stopAmplitude, clearSilenceTimer]);
+  }, [stopAmplitude, clearSilenceTimer, clearNoSpeechTimer]);
 
   // ---------------------------------------------------------------------------
   // RENDER: unsupported browser fallback
