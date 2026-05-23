@@ -81,10 +81,26 @@ export async function GET(request: NextRequest) {
     /* fall through to default redirect */
   }
 
+  // CRITICAL: copy cookies from fallbackResponse (which Supabase wrote to) onto
+  // the final response. The setAll callback only writes to fallbackResponse,
+  // so we must transfer those cookies to whatever response we actually return.
   const finalResponse = NextResponse.redirect(new URL(redirectTo, origin));
-  collectedCookies.forEach(({ name, value, options }) => {
-    finalResponse.cookies.set(name, value, options);
+
+  // Transfer all cookies that fallbackResponse collected (these are the sb-* tokens)
+  fallbackResponse.cookies.getAll().forEach((cookie) => {
+    finalResponse.cookies.set({
+      name: cookie.name,
+      value: cookie.value,
+      domain: cookie.domain,
+      path: cookie.path,
+      expires: cookie.expires,
+      httpOnly: cookie.httpOnly,
+      secure: cookie.secure,
+      sameSite: cookie.sameSite,
+      maxAge: cookie.maxAge,
+    });
   });
+
   return finalResponse;
 }
 
