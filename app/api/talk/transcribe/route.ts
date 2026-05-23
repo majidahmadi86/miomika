@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import Groq from "groq-sdk";
-import { getServerProfile } from "@/lib/auth/get-server-profile";
+import { createServerClient } from "@supabase/ssr";
 import { log, logError } from "@/lib/debug/log";
 
 /**
@@ -25,9 +25,34 @@ import { log, logError } from "@/lib/debug/log";
 export async function POST(request: NextRequest) {
   Sentry.setTag("flow", "voice");
 
-  const profile = await getServerProfile();
-  if (!profile) {
-    log("voice.transcribe", "unauthorized");
+  // Read the session directly from request cookies. We don't use
+  // getServerProfile() here because cookies() from next/headers can
+  // behave inconsistently in routes that consume a multipart body.
+  // This is the canonical Supabase SSR pattern for API routes.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    log("voice.transcribe", "supabase env missing");
+    return NextResponse.json({ error: "server_misconfigured" }, { status: 500 });
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll() {
+        /* no-op for this route — we don't refresh tokens here */
+      },
+    },
+  });
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    log("voice.transcribe", "unauthorized", {
+      cookieCount: request.cookies.getAll().length,
+      cookieNames: request.cookies.getAll().map(c => c.name).join(","),
+    });
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -71,7 +96,7 @@ export async function POST(request: NextRequest) {
   }
 
   log("voice.transcribe", "received", {
-    user: profile.email,
+    user: user.email ?? "unknown",
     bytes: audioBlob.size,
     type: audioBlob.type,
     language: language ?? "auto",
