@@ -121,12 +121,12 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-if('serviceWorker' in navigator){
-  window.addEventListener('load',function(){
-    navigator.serviceWorker.register('/sw.js')
-  })
-}
-`,
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(reg) { reg.unregister(); });
+        }).catch(function() {});
+      }
+    `,
           }}
         />
       </body>
