@@ -157,6 +157,8 @@ export function MicButton({
         const res = await fetch("/api/talk/transcribe", {
           method: "POST",
           body: form,
+          credentials: "include",
+          cache: "no-store",
         });
 
         if (!res.ok) {
