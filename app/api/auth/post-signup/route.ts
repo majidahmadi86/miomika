@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
+import { log } from "@/lib/debug/log";
 
 /**
  * POST /api/auth/post-signup
@@ -13,7 +15,13 @@ import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
  *  - celebrate      — 'signup' | null
  */
 export async function POST() {
+  Sentry.setTag("flow", "oauth");
+
   const profile = await getServerProfile();
+  log("auth.post-signup", "called", {
+    hasProfile: !!profile,
+    onboarded: !!profile?.onboarding_completed_at,
+  });
 
   if (!profile) {
     return NextResponse.json({ error: "No session" }, { status: 401 });
@@ -36,6 +44,7 @@ export async function POST() {
     }
   }
 
+  log("auth.post-signup", "resolved", { redirect_to, celebrate });
   return NextResponse.json({ profile, redirect_to, celebrate });
 }
 

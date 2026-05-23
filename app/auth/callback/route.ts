@@ -1,35 +1,62 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import * as Sentry from "@sentry/nextjs";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { pickLanguageFromAcceptLanguage } from "@/lib/i18n/server";
+import { getServerProfile } from "@/lib/auth/get-server-profile";
+import { log, logError } from "@/lib/debug/log";
 
 /**
- * Supabase OAuth callback. Exchanges the auth code in the URL for a session,
- * then delegates to /api/auth/post-signup to decide the redirect destination.
+ * Supabase OAuth callback.
  *
- * /api/auth/post-signup is the canonical "what should this user see next?"
- * router — see /docs/AUTH-FLOW.md.
+ * Flow:
+ *   1. Exchange the `code` query param for a session (sets sb-* cookies).
+ *   2. Read the user's profile inline via getServerProfile() — same request
+ *      context, so cookies are visible to next/headers().
+ *   3. Pick redirect destination based on onboarding state.
+ *   4. Redirect with the session cookies attached.
+ *
+ * Critical invariants:
+ *   - Canonical host is www.miomika.com. Supabase Site URL must match.
+ *   - Cookies are written onto ONE response object; the final redirect
+ *     reuses its headers so Set-Cookie survives.
+ *   - No internal fetch hop. getServerProfile() reads cookies directly.
+ *
+ * See /docs/HOW-THIS-WORKS.md §1 for the full flow.
  */
 export async function GET(request: NextRequest) {
+  Sentry.setTag("flow", "oauth");
+
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const isNewSignup = searchParams.get("signup") === "1";
+  const nextOverride = searchParams.get("next");
+
+  log("auth.callback", "received", {
+    hasCode: !!code,
+    isNewSignup,
+    nextOverride: nextOverride ?? null,
+    origin,
+  });
 
   if (!code) {
+    log("auth.callback", "no code, redirecting to login");
     return NextResponse.redirect(new URL("/login?error=oauth_no_code", origin));
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
   if (!supabaseUrl || !supabaseKey) {
+    log("auth.callback", "supabase env missing");
     return NextResponse.redirect(
       new URL("/login?error=oauth_not_configured", origin),
     );
   }
 
-  const fallbackResponse = NextResponse.redirect(new URL("/home", origin));
-  const collectedCookies: { name: string; value: string; options?: Record<string, unknown> }[] = [];
+  // Build the response object up front. Supabase's setAll callback writes
+  // cookies onto THIS response. We rewrite the Location header at the end
+  // so the cookies travel with the final redirect.
+  const response = NextResponse.redirect(new URL("/home", origin));
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
@@ -38,8 +65,10 @@ export async function GET(request: NextRequest) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          collectedCookies.push({ name, value, options });
-          fallbackResponse.cookies.set(name, value, options);
+          response.cookies.set(name, value, options);
+          // Also write to the request cookies so getServerProfile() below
+          // (which reads via next/headers cookies()) sees the fresh session.
+          request.cookies.set(name, value);
         });
       },
     },
@@ -47,85 +76,67 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
+    logError("auth.callback", "exchange failed", error, {
+      errorName: error.name,
+      errorStatus: (error as { status?: number }).status,
+    });
+    Sentry.captureException(error, { tags: { stage: "exchange" } });
     return NextResponse.redirect(
       new URL("/login?error=oauth_exchange", origin),
     );
   }
 
-  // Send welcome email for new signups — fire-and-forget, never block redirect.
+  log("auth.callback", "exchanged session", {
+    user: data.user?.email ?? "unknown",
+    userId: data.user?.id ?? "unknown",
+  });
+
+  // Fire-and-forget welcome email for new signups. Never block the redirect.
   if (isNewSignup && data.user?.email) {
-    const lang = pickLanguageFromAcceptLanguage(request.headers.get("accept-language"));
-    void sendWelcomeEmail(data.user.email, lang);
-  }
-
-  // Delegate redirect choice to the canonical post-signup route. Forward the
-  // freshly-set session cookies so the request is authenticated.
-  let redirectTo = "/home";
-  try {
-    const forwardedCookies = mergeCookieHeader(
-      request.headers.get("cookie"),
-      collectedCookies,
+    const lang = pickLanguageFromAcceptLanguage(
+      request.headers.get("accept-language"),
     );
-    const res = await fetch(`${origin}/api/auth/post-signup`, {
-      method: "POST",
-      headers: { Cookie: forwardedCookies },
-      cache: "no-store",
+    void sendWelcomeEmail(data.user.email, lang).catch((e) => {
+      logError("auth.callback", "welcome email failed", e);
     });
-    if (res.ok) {
-      const json = (await res.json()) as { redirect_to?: string };
-      if (typeof json.redirect_to === "string" && json.redirect_to.startsWith("/")) {
-        redirectTo = json.redirect_to;
-      }
-    }
-  } catch {
-    /* fall through to default redirect */
   }
 
-  // CRITICAL: copy cookies from fallbackResponse (which Supabase wrote to) onto
-  // the final response. The setAll callback only writes to fallbackResponse,
-  // so we must transfer those cookies to whatever response we actually return.
-  const finalResponse = NextResponse.redirect(new URL(redirectTo, origin));
+  // Read profile inline. Same request context — cookies are visible.
+  const profile = await getServerProfile();
+  log("auth.callback", "profile read", {
+    hasProfile: !!profile,
+    tier: profile?.tier ?? "none",
+    onboarded: !!profile?.onboarding_completed_at,
+  });
 
-  // Transfer all cookies that fallbackResponse collected (these are the sb-* tokens)
-  fallbackResponse.cookies.getAll().forEach((cookie) => {
-    finalResponse.cookies.set({
-      name: cookie.name,
-      value: cookie.value,
-      domain: cookie.domain,
-      path: cookie.path,
-      expires: cookie.expires,
-      httpOnly: cookie.httpOnly,
-      secure: cookie.secure,
-      sameSite: cookie.sameSite,
-      maxAge: cookie.maxAge,
-    });
+  // Pick redirect destination.
+  let redirectTo: string;
+  if (nextOverride && nextOverride.startsWith("/")) {
+    // Honor explicit ?next= override from signup/login pages.
+    redirectTo = nextOverride;
+  } else if (!profile) {
+    // Auth succeeded but no profile row — should be rare. Send to home and
+    // let the client-side guard re-fetch.
+    redirectTo = "/home";
+  } else if (!profile.onboarding_completed_at) {
+    redirectTo = "/onboarding";
+  } else {
+    const completedAt = new Date(profile.onboarding_completed_at).getTime();
+    if (!Number.isNaN(completedAt) && Date.now() - completedAt < 30_000) {
+      redirectTo = "/home?celebrate=signup";
+    } else {
+      redirectTo = "/home";
+    }
+  }
+
+  log("auth.callback", "resolved redirect", { to: redirectTo });
+
+  // Build the final redirect response, carrying the Set-Cookie headers from
+  // the original response object so the session lands in the browser.
+  const finalResponse = NextResponse.redirect(new URL(redirectTo, origin));
+  response.cookies.getAll().forEach((cookie) => {
+    finalResponse.cookies.set(cookie);
   });
 
   return finalResponse;
-}
-
-/**
- * Merge the request's existing Cookie header with any cookies the OAuth
- * exchange just set so the post-signup request sees the live session.
- */
-function mergeCookieHeader(
-  existing: string | null,
-  added: { name: string; value: string }[],
-): string {
-  const map = new Map<string, string>();
-  if (existing) {
-    existing.split(/;\s*/).forEach((pair) => {
-      const eq = pair.indexOf("=");
-      if (eq < 0) return;
-      const name = pair.slice(0, eq).trim();
-      const value = pair.slice(eq + 1).trim();
-      if (name) map.set(name, value);
-    });
-  }
-  for (const { name, value } of added) {
-    map.set(name, value);
-  }
-  return Array.from(map.entries())
-    .map(([name, value]) => `${name}=${value}`)
-    .join("; ");
 }
