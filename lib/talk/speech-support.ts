@@ -72,7 +72,7 @@ export interface SpeechRecognitionLike {
   maxAlternatives: number;
   onstart: (() => void) | null;
   onresult: ((e: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((e: { error?: string } | Event) => void) | null;
+  onerror: ((e: Event & { error?: string; message?: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;

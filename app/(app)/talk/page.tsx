@@ -13,10 +13,12 @@ import { matchLibrary } from "@/lib/library/matcher";
 import { resolveWordCard } from "@/lib/library/resolver";
 import { getSessionOpener } from "@/lib/library/sessionOpener";
 import { getCorrectReaction } from "@/lib/library/reactions";
+import { useProfile } from "@/lib/auth/use-profile";
 
 export default function TalkPage() {
   const GUEST_LIMIT = 5;
   const { isGuest, authReady } = useGuestExploration();
+  const { profile } = useProfile();
   const [guestExchanges, setGuestExchanges] = useState(0);
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [uiLang, setUiLang] = useState<"th" | "en">("th");
@@ -221,6 +223,14 @@ export default function TalkPage() {
       }
     }
   }, [wordsIntroduced, canvasItems, isGuest, guestExchanges, GUEST_LIMIT, uiLang]);
+
+  // Default to "auto" (which MicButton resolves to en-US — safe for both languages).
+  // Only force "th-TH" when user has explicitly set Thai as both UI and primary.
+  const recognitionLang: "th-TH" | "en-US" | "auto" =
+    profile?.ui_language === "th" &&
+    (profile as { primary_language?: string } | null)?.primary_language === "th"
+      ? "th-TH"
+      : "auto";
 
   return (
     <div
@@ -516,7 +526,7 @@ export default function TalkPage() {
       >
         <MicButton
           state={micState}
-          language={uiLang === "en" ? "en-US" : "th-TH"}
+          language={recognitionLang}
           onTranscript={async (text, isFinal) => {
             if (!isFinal) return;
             setLastTranscript(text);

@@ -82,6 +82,13 @@ export function useProfile(): ProfileState {
         .eq("id", user.id)
         .maybeSingle();
 
+      // DIAGNOSTIC: remove after verifying
+      console.log("[useProfile] query result:", {
+        user_id: user.id,
+        data: row ? { tier: (row as { tier?: string }).tier, email: (row as { email?: string }).email } : null,
+        error: error ? { message: error.message, code: (error as { code?: string }).code } : null,
+      });
+
       if (cancelled) return;
       if (error || !row) {
         setState({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -25,23 +25,45 @@ import { createClient } from "@/lib/supabase/client";
 import { COLORS } from "@/lib/design/colors";
 
 export default function ProfilePage() {
-  const { profile, authReady } = useProfile();
+  const { profile, authReady, loading } = useProfile();
   const lang = useUILanguage();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
 
+  // DIAGNOSTIC: remove after verifying profile loads correctly
+  useEffect(() => {
+    console.log("[ProfilePage]", {
+      authReady,
+      loading,
+      profile: profile ? { id: profile.id, email: profile.email, tier: profile.tier } : null,
+    });
+  }, [authReady, loading, profile]);
+
+  // STATE 1: Auth not resolved yet — show cream screen, NOT guest view
   if (!authReady) {
     return (
-      <div style={{ position: "fixed", inset: 0, background: COLORS.bg }} aria-hidden="true" />
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: COLORS.bg,
+        }}
+        aria-hidden="true"
+      />
     );
   }
 
-  const isGuest = !profile || profile.tier === "guest";
-
-  if (isGuest) {
+  // STATE 2: Auth resolved, no profile → guest view (true guest, no session)
+  if (!profile) {
     return <GuestProfileView lang={lang} router={router} />;
   }
 
+  // STATE 3: Auth resolved, profile.tier = guest → guest view
+  if (profile.tier === "guest") {
+    return <GuestProfileView lang={lang} router={router} />;
+  }
+
+  // STATE 4: Logged-in user (free / pro / pro_max) → hybrid view
   return (
     <LoggedInProfileView
       profile={profile}

@@ -50,7 +50,7 @@ export function MicButton({
   const [amplitude, setAmplitude] = useState(0);
   const [debugVisible, setDebugVisible] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
-  const [debugSnapshot, setDebugSnapshot] = useState({ listening: false, buffer: "" });
+  const [debugLang, setDebugLang] = useState<string>("?");
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const isListeningRef = useRef(false);
@@ -65,10 +65,6 @@ export function MicButton({
   const log = useCallback((msg: string) => {
     if (typeof window === "undefined") return;
     console.log(`[MicButton] ${msg}`);
-    setDebugSnapshot({
-      listening: isListeningRef.current,
-      buffer: transcriptBufferRef.current.slice(0, 30),
-    });
     setDebugLog((prev) => [...prev.slice(-9), `${new Date().toLocaleTimeString()}  ${msg}`]);
   }, []);
 
@@ -131,13 +127,24 @@ export function MicButton({
     }
 
     const recognition = new SpeechRecognitionImpl();
-    recognition.lang = language === "auto" ? "th-TH" : language;
+    // LANGUAGE STRATEGY (the root fix):
+    // "en-US" is the most permissive setting — Chrome handles English perfectly
+    // AND still returns something for Thai/other languages (better than silent fail).
+    // Only force "th-TH" when caller explicitly requests it via the language prop.
+    // Server-side intent classifier handles actual language routing of the response.
+    const resolvedLang: string =
+      language === "th-TH" ? "th-TH" :
+      language === "en-US" ? "en-US" :
+      "en-US"; // "auto" or anything else → safe en-US default
+
+    recognition.lang = resolvedLang;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
-      log("onstart");
+      log(`onstart (lang=${resolvedLang})`);
+      setDebugLang(resolvedLang);
       isListeningRef.current = true;
       isManualStopRef.current = false;
       transcriptBufferRef.current = "";
@@ -154,7 +161,7 @@ export function MicButton({
         else interim += r[0]?.transcript ?? "";
       }
       if (final.trim()) {
-        log(`onresult final: "${final.slice(0, 40)}"`);
+        log(`onresult FINAL: "${final.slice(0, 60)}"`);
         isManualStopRef.current = true;
         try { recognition.stop(); } catch { /* ignore */ }
         commit(final);
@@ -162,12 +169,14 @@ export function MicButton({
       } else if (interim) {
         transcriptBufferRef.current = interim;
         onTranscript(interim, false);
+      } else {
+        log(`onresult empty (resultIndex=${e.resultIndex}, length=${e.results.length})`);
       }
     };
 
-    recognition.onerror = (e: { error?: string } | Event) => {
-      const code = (e as { error?: string }).error ?? "unknown";
-      log(`onerror: ${code}`);
+    recognition.onerror = (e: Event & { error?: string; message?: string }) => {
+      log(`onerror: ${e?.error ?? "unknown"} message="${e?.message ?? ""}"`);
+      const code = e?.error ?? "unknown";
       isListeningRef.current = false;
       stopAmplitude();
       if (code === "not-allowed" || code === "permission-denied") {
@@ -235,10 +244,6 @@ export function MicButton({
 
   const onPointerDown = useCallback(() => {
     longPressTimerRef.current = window.setTimeout(() => {
-      setDebugSnapshot({
-        listening: isListeningRef.current,
-        buffer: transcriptBufferRef.current.slice(0, 30),
-      });
       setDebugVisible((v) => !v);
     }, 800);
   }, []);
@@ -378,7 +383,7 @@ export function MicButton({
           zIndex: 9999,
         }}>
           <p style={{ margin: 0, marginBottom: "4px", color: COLORS.ctaSolid }}>
-            MicButton debug · state={state} · listening={String(debugSnapshot.listening)} · buffer=&quot;{debugSnapshot.buffer}&quot;
+            MicButton debug · state={state} · lang={debugLang}
           </p>
           {debugLog.map((line, i) => (
             <p key={i} style={{ margin: 0, opacity: 0.85 }}>{line}</p>
