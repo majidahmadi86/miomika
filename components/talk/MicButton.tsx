@@ -5,12 +5,7 @@ import { Mic, MicOff } from "lucide-react";
 import { motion } from "framer-motion";
 import * as Sentry from "@sentry/nextjs";
 import { COLORS } from "@/lib/design/colors";
-import { log } from "@/lib/debug/log";
-import {
-  getSpeechRecognitionConstructor,
-  type SpeechRecognitionEventLike,
-  type SpeechRecognitionLike,
-} from "@/lib/talk/speech-support";
+import { log, logError } from "@/lib/debug/log";
 
 export type MicState =
   | "idle"
@@ -27,25 +22,45 @@ interface MicButtonProps {
   disabled?: boolean;
 }
 
-type SpeechSupport =
-  | { supported: true }
-  | { supported: false; reason: "samsung_internet" | "firefox" | "no_api" };
+// --- Tuning constants ------------------------------------------------------
 
-function detectSpeechSupport(): SpeechSupport {
-  if (typeof window === "undefined")
-    return { supported: false, reason: "no_api" };
-  const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes("samsungbrowser"))
-    return { supported: false, reason: "samsung_internet" };
-  if (ua.includes("firefox")) return { supported: false, reason: "firefox" };
-  const hasAPI =
-    "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
-  if (!hasAPI) return { supported: false, reason: "no_api" };
+const SILENCE_THRESHOLD = 0.03;      // RMS amplitude below this counts as silence
+const SILENCE_DURATION_MS = 1500;    // How long silence must persist to stop
+const MIN_SPEECH_DURATION_MS = 400;  // Ignore "stops" before this much audio
+const MAX_RECORDING_MS = 12000;      // Hard cap to prevent runaway recordings
+
+// --- Browser support detection --------------------------------------------
+
+type MediaSupport =
+  | { supported: true }
+  | { supported: false; reason: "no_recorder" | "no_getUserMedia" };
+
+function detectMediaSupport(): MediaSupport {
+  if (typeof window === "undefined") return { supported: true };
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    return { supported: false, reason: "no_getUserMedia" };
+  }
+  if (typeof MediaRecorder === "undefined") {
+    return { supported: false, reason: "no_recorder" };
+  }
   return { supported: true };
 }
 
-const SILENCE_TIMEOUT_MS = 2000;       // After interim text stops arriving
-const NO_SPEECH_TIMEOUT_MS = 6000;     // After onstart with no result at all
+function pickMimeType(): string {
+  if (typeof MediaRecorder === "undefined") return "audio/webm";
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+  ];
+  for (const t of candidates) {
+    if (MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return "audio/webm";
+}
+
+// --- Component -------------------------------------------------------------
 
 export function MicButton({
   state,
@@ -54,25 +69,26 @@ export function MicButton({
   onStateChange,
   disabled = false,
 }: MicButtonProps) {
-  const [support] = useState<SpeechSupport>(() =>
-    typeof window === "undefined" ? { supported: true } : detectSpeechSupport(),
+  const [support] = useState<MediaSupport>(() =>
+    typeof window === "undefined" ? { supported: true } : detectMediaSupport(),
   );
   const [amplitude, setAmplitude] = useState(0);
   const [debugVisible, setDebugVisible] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
-  const [debugLang, setDebugLang] = useState<string>("?");
   const flowTagSetRef = useRef(false);
 
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const isListeningRef = useRef(false);
-  const transcriptBufferRef = useRef("");
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const animFrameRef = useRef<number | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
-  const silenceTimerRef = useRef<number | null>(null);
-  const noSpeechTimerRef = useRef<number | null>(null);
-  const gotAnyResultRef = useRef(false);
+
+  const recordStartTimeRef = useRef<number>(0);
+  const silenceStartTimeRef = useRef<number | null>(null);
+  const isRecordingRef = useRef(false);
+  const mimeTypeRef = useRef<string>("audio/webm");
+  const hardStopTimerRef = useRef<number | null>(null);
 
   const trace = useCallback((msg: string, data?: Record<string, unknown>) => {
     if (typeof window === "undefined") return;
@@ -89,26 +105,21 @@ export function MicButton({
     try {
       Sentry.setTag("flow", "voice");
     } catch {
-      /* Sentry not initialized in some contexts */
+      /* ignore */
     }
   }, []);
 
-  const clearSilenceTimer = useCallback(() => {
-    if (silenceTimerRef.current !== null) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
-  }, []);
+  // --- Teardown ------------------------------------------------------------
 
-  const clearNoSpeechTimer = useCallback(() => {
-    if (noSpeechTimerRef.current !== null) {
-      clearTimeout(noSpeechTimerRef.current);
-      noSpeechTimerRef.current = null;
+  const teardown = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
     }
-  }, []);
-
-  const stopAmplitude = useCallback(() => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (hardStopTimerRef.current !== null) {
+      clearTimeout(hardStopTimerRef.current);
+      hardStopTimerRef.current = null;
+    }
     if (audioContextRef.current) {
       audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
@@ -118,249 +129,244 @@ export function MicButton({
       streamRef.current = null;
     }
     setAmplitude(0);
+    silenceStartTimeRef.current = null;
+    isRecordingRef.current = false;
   }, []);
 
-  const commit = useCallback(
-    (text: string) => {
-      const cleaned = text.trim();
-      if (cleaned.length === 0) {
+  // --- Send audio to server -----------------------------------------------
+
+  const transcribeAndCommit = useCallback(
+    async (blob: Blob) => {
+      const elapsedMs = Date.now() - recordStartTimeRef.current;
+      trace("uploading", { bytes: blob.size, ms: elapsedMs });
+
+      if (blob.size < 1000) {
+        trace("audio too small, returning to idle");
         onStateChange("idle");
         return;
       }
-      trace("commit", { length: cleaned.length, preview: cleaned.slice(0, 40) });
-      transcriptBufferRef.current = "";
-      onTranscript(cleaned, true);
+
       onStateChange("processing");
+
+      try {
+        const form = new FormData();
+        const ext = mimeTypeRef.current.includes("mp4") ? "mp4" : "webm";
+        form.append("audio", blob, `utterance.${ext}`);
+        form.append("language", language);
+
+        const res = await fetch("/api/talk/transcribe", {
+          method: "POST",
+          body: form,
+        });
+
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          trace("transcribe failed", {
+            status: res.status,
+            error: (errBody as { error?: string }).error ?? "unknown",
+          });
+          onStateChange("idle");
+          return;
+        }
+
+        const json = (await res.json()) as { text?: string };
+        const text = (json.text ?? "").trim();
+
+        if (text.length === 0) {
+          trace("empty transcription");
+          onStateChange("idle");
+          return;
+        }
+
+        trace("transcribed", { preview: text.slice(0, 40) });
+        onTranscript(text, true);
+        // onStateChange will be driven by parent (processing → speaking → idle)
+      } catch (e) {
+        logError("mic", "transcribe network error", e);
+        onStateChange("idle");
+      }
     },
-    [trace, onStateChange, onTranscript],
+    [language, trace, onStateChange, onTranscript],
   );
 
-  const startListening = useCallback(async () => {
+  // --- Stop recording ------------------------------------------------------
+
+  const stopRecording = useCallback(
+    (reason: "silence" | "user" | "hard-cap") => {
+      if (!isRecordingRef.current) return;
+      isRecordingRef.current = false;
+      trace("stopping", { reason });
+
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state === "recording") {
+        try {
+          recorder.stop();
+        } catch (e) {
+          trace("recorder.stop threw", { error: (e as Error).message });
+        }
+      }
+    },
+    [trace],
+  );
+
+  // --- Start recording -----------------------------------------------------
+
+  const startRecording = useCallback(async () => {
     ensureFlowTag();
-    if (isListeningRef.current) return;
+    if (isRecordingRef.current) return;
     if (typeof window === "undefined") return;
+    if (!support.supported) return;
 
-    const SpeechRecognitionImpl = getSpeechRecognitionConstructor();
-    if (!SpeechRecognitionImpl) {
-      trace("no SpeechRecognition API");
-      return;
-    }
+    trace("warming up mic stream");
 
-    // ANDROID CHROME FIX: SpeechRecognition.start() fails silently on Android
-    // if the OS-level mic stream isn't already warm at the moment of the call.
-    // Desktop Chrome tolerates a cold start; Android does not. We acquire the
-    // mic stream first, prove the path, THEN start recognition. The same
-    // stream is reused for amplitude visualization.
+    let stream: MediaStream;
     try {
-      trace("warming up mic stream");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      // Set up amplitude analysis on the already-acquired stream.
-      const ctx = new AudioContext();
-      audioContextRef.current = ctx;
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      const source = ctx.createMediaStreamSource(stream);
-      source.connect(analyser);
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      const tick = () => {
-        analyser.getByteFrequencyData(data);
-        const avg = data.reduce((a, b) => a + b, 0) / data.length;
-        setAmplitude(avg / 255);
-        animFrameRef.current = requestAnimationFrame(tick);
-      };
-      tick();
-      trace("mic stream warm");
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (e) {
-      trace("warm-up failed", { error: (e as Error).message });
+      trace("permission denied", { error: (e as Error).message });
       onStateChange("needs-permission");
       return;
     }
 
-    const recognition = new SpeechRecognitionImpl();
+    streamRef.current = stream;
+    const mimeType = pickMimeType();
+    mimeTypeRef.current = mimeType;
+    trace("mic stream warm", { mimeType });
 
-    // LANGUAGE STRATEGY:
-    // "en-US" is the most permissive — Chrome handles English perfectly and
-    // still returns partial results for other languages. Server-side intent
-    // classifier handles actual language routing of the response.
-    const resolvedLang: string =
-      language === "th-TH"
-        ? "th-TH"
-        : language === "en-US"
-          ? "en-US"
-          : "en-US"; // "auto" or default → safe en-US
-
-    // SINGLE-SHOT recognition. No continuous=true. No auto-restart from onend.
-    // This avoids Chrome's anti-abuse heuristic that revokes the mic after
-    // repeated programmatic start() calls. One tap = one utterance.
-    recognition.lang = resolvedLang;
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      trace("onstart", { lang: resolvedLang });
-      setDebugLang(resolvedLang);
-      isListeningRef.current = true;
-      transcriptBufferRef.current = "";
-      gotAnyResultRef.current = false;
-      onStateChange("listening");
-      // Amplitude already started in warm-up phase above.
-
-      // Arm the no-speech guard. If onresult never fires within this window,
-      // the API has silently closed (common on Android Chrome). Stop cleanly
-      // and let the user re-tap.
-      clearNoSpeechTimer();
-      noSpeechTimerRef.current = window.setTimeout(() => {
-        if (!gotAnyResultRef.current) {
-          trace("no-speech timeout — stopping cleanly");
-          try {
-            recognition.stop();
-          } catch {
-            /* ignore */
-          }
-        }
-      }, NO_SPEECH_TIMEOUT_MS);
-    };
-
-    recognition.onresult = (e: SpeechRecognitionEventLike) => {
-      gotAnyResultRef.current = true;
-      clearNoSpeechTimer();
-      let interim = "";
-      let final = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i];
-        if (r?.isFinal) final += r[0]?.transcript ?? "";
-        else interim += r[0]?.transcript ?? "";
-      }
-
-      if (final.trim()) {
-        trace("onresult final", { preview: final.slice(0, 60) });
-        clearSilenceTimer();
-        try {
-          recognition.stop();
-        } catch {
-          /* ignore */
-        }
-        commit(final);
-        stopAmplitude();
-        return;
-      }
-
-      if (interim) {
-        transcriptBufferRef.current = interim;
-        onTranscript(interim, false);
-
-        // Reset the silence timer on every interim chunk. If 2s passes
-        // without new interim results, commit what we have.
-        clearSilenceTimer();
-        silenceTimerRef.current = window.setTimeout(() => {
-          trace("silence timeout — committing buffer");
-          const buffered = transcriptBufferRef.current;
-          try {
-            recognition.stop();
-          } catch {
-            /* ignore */
-          }
-          if (buffered.trim().length > 0) commit(buffered);
-          else onStateChange("idle");
-          stopAmplitude();
-        }, SILENCE_TIMEOUT_MS);
-      }
-    };
-
-    recognition.onerror = (
-      e: Event & { error?: string; message?: string },
-    ) => {
-      const code = e?.error ?? "unknown";
-      trace("onerror", { code, message: e?.message ?? "" });
-      clearSilenceTimer();
-      clearNoSpeechTimer();
-      isListeningRef.current = false;
-      stopAmplitude();
-
-      if (code === "not-allowed" || code === "permission-denied") {
-        try {
-          Sentry.captureMessage("mic permission revoked", {
-            level: "info",
-            tags: { stage: "recognition.onerror", error_code: code },
-          });
-        } catch {
-          /* ignore */
-        }
-        onStateChange("needs-permission");
-        return;
-      }
-
-      // Other errors (network, aborted, no-speech) — just return to idle.
-      onStateChange("idle");
-    };
-
-    recognition.onend = () => {
-      trace("onend", {
-        bufferLength: transcriptBufferRef.current.length,
-        gotResult: gotAnyResultRef.current,
-      });
-      clearSilenceTimer();
-      clearNoSpeechTimer();
-      isListeningRef.current = false;
-
-      // If we have buffered interim text but no final result came through,
-      // commit what we have. Otherwise return to idle. NO AUTO-RESTART.
-      if (transcriptBufferRef.current.trim().length > 0) {
-        commit(transcriptBufferRef.current);
-      } else {
-        onStateChange("idle");
-      }
-      stopAmplitude();
-    };
-
-    recognitionRef.current = recognition;
+    // --- Set up amplitude analyzer for silence detection -------------------
+    let ctx: AudioContext;
     try {
-      recognition.start();
+      ctx = new AudioContext();
+      audioContextRef.current = ctx;
     } catch (e) {
-      trace("start failed", { error: (e as Error).message });
+      trace("AudioContext failed", { error: (e as Error).message });
+      teardown();
       onStateChange("idle");
+      return;
     }
+
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    const source = ctx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    // --- Set up the recorder ----------------------------------------------
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType });
+    } catch (e) {
+      trace("MediaRecorder failed", { error: (e as Error).message });
+      teardown();
+      onStateChange("idle");
+      return;
+    }
+    recorderRef.current = recorder;
+    chunksRef.current = [];
+
+    recorder.ondataavailable = (e: BlobEvent) => {
+      if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      const chunks = chunksRef.current;
+      chunksRef.current = [];
+      const blob = new Blob(chunks, { type: mimeTypeRef.current });
+      teardown();
+      void transcribeAndCommit(blob);
+    };
+
+    recorder.onerror = (ev: Event) => {
+      const errMsg =
+        (ev as Event & { error?: { message?: string } }).error?.message ??
+        "unknown";
+      trace("recorder onerror", { error: errMsg });
+      teardown();
+      onStateChange("idle");
+    };
+
+    // --- Start everything --------------------------------------------------
+    recordStartTimeRef.current = Date.now();
+    silenceStartTimeRef.current = null;
+    isRecordingRef.current = true;
+
+    try {
+      recorder.start(250); // emit data chunks every 250ms
+    } catch (e) {
+      trace("recorder.start threw", { error: (e as Error).message });
+      teardown();
+      onStateChange("idle");
+      return;
+    }
+
+    onStateChange("listening");
+    trace("recording started");
+
+    // Hard cap so a mic left running can't drain forever.
+    hardStopTimerRef.current = window.setTimeout(() => {
+      trace("hard cap reached");
+      stopRecording("hard-cap");
+    }, MAX_RECORDING_MS);
+
+    // --- Amplitude + silence detection loop -------------------------------
+    const tick = () => {
+      if (!isRecordingRef.current) return;
+      analyser.getByteFrequencyData(data);
+      // RMS-style: average normalized to 0-1
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+      const rms = Math.sqrt(sum / data.length) / 255;
+      setAmplitude(rms);
+
+      const now = Date.now();
+      const elapsed = now - recordStartTimeRef.current;
+
+      if (rms < SILENCE_THRESHOLD) {
+        if (silenceStartTimeRef.current === null) {
+          silenceStartTimeRef.current = now;
+        } else {
+          const silenceFor = now - silenceStartTimeRef.current;
+          if (
+            silenceFor >= SILENCE_DURATION_MS &&
+            elapsed >= MIN_SPEECH_DURATION_MS
+          ) {
+            trace("silence detected — stopping");
+            stopRecording("silence");
+            return;
+          }
+        }
+      } else {
+        silenceStartTimeRef.current = null;
+      }
+
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
   }, [
-    language,
-    trace,
-    commit,
-    onStateChange,
-    onTranscript,
-    stopAmplitude,
-    clearSilenceTimer,
-    clearNoSpeechTimer,
+    support.supported,
     ensureFlowTag,
+    trace,
+    teardown,
+    transcribeAndCommit,
+    onStateChange,
+    stopRecording,
   ]);
 
-  const stopListening = useCallback(() => {
-    if (!isListeningRef.current) return;
-    trace("manual stop");
-    clearSilenceTimer();
-    try {
-      recognitionRef.current?.stop();
-    } catch {
-      /* ignore */
-    }
-  }, [trace, clearSilenceTimer]);
+  // --- Recovery from denied permission ------------------------------------
 
   const requestPermissionAgain = useCallback(async () => {
     trace("recovery: requesting permission");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Immediately release — we only wanted the prompt.
       stream.getTracks().forEach((t) => t.stop());
       trace("recovery: permission granted");
       onStateChange("idle");
     } catch (e) {
-      trace("recovery: permission still denied", {
-        error: (e as Error).message,
-      });
-      // Stay in needs-permission state. User must open browser settings.
+      trace("recovery: still denied", { error: (e as Error).message });
     }
   }, [trace, onStateChange]);
+
+  // --- Button press handlers ----------------------------------------------
 
   const handlePress = useCallback(() => {
     if (disabled) return;
@@ -370,19 +376,19 @@ export function MicButton({
       return;
     }
     if (state === "listening") {
-      stopListening();
+      stopRecording("user");
       return;
     }
     if (state === "idle") {
-      void startListening();
+      void startRecording();
     }
   }, [
     disabled,
     support.supported,
     state,
     onStateChange,
-    startListening,
-    stopListening,
+    startRecording,
+    stopRecording,
   ]);
 
   const onPointerDown = useCallback(() => {
@@ -400,31 +406,21 @@ export function MicButton({
 
   useEffect(() => {
     return () => {
-      clearSilenceTimer();
-      clearNoSpeechTimer();
-      stopAmplitude();
-      try {
-        recognitionRef.current?.stop();
-      } catch {
-        /* ignore */
+      teardown();
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state === "recording") {
+        try {
+          recorder.stop();
+        } catch {
+          /* ignore */
+        }
       }
     };
-  }, [stopAmplitude, clearSilenceTimer, clearNoSpeechTimer]);
+  }, [teardown]);
 
-  // ---------------------------------------------------------------------------
-  // RENDER: unsupported browser fallback
-  // ---------------------------------------------------------------------------
+  // --- Render: unsupported ------------------------------------------------
 
   if (!support.supported) {
-    const reasonMsgTh =
-      support.reason === "samsung_internet"
-        ? "เปิดใน Chrome เพื่อใช้เสียง~ พิมพ์ก็ได้ค่า"
-        : "ใช้เสียงไม่ได้ค่า~ พิมพ์ได้เลยนะ";
-    const reasonMsgEn =
-      support.reason === "samsung_internet"
-        ? "Open in Chrome for voice~ or just type"
-        : "Voice unavailable~ just type below";
-
     return (
       <div
         style={{
@@ -464,7 +460,7 @@ export function MicButton({
             lineHeight: 1.4,
           }}
         >
-          {reasonMsgTh}
+          ใช้เสียงไม่ได้ค่า~ พิมพ์ได้เลยนะ
           <br />
           <span
             style={{
@@ -473,16 +469,14 @@ export function MicButton({
               opacity: 0.8,
             }}
           >
-            {reasonMsgEn}
+            Voice unavailable~ just type below
           </span>
         </p>
       </div>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // RENDER: needs-permission recovery card
-  // ---------------------------------------------------------------------------
+  // --- Render: needs-permission -------------------------------------------
 
   if (state === "needs-permission") {
     return (
@@ -550,7 +544,8 @@ export function MicButton({
             type="button"
             onClick={() => void requestPermissionAgain()}
             style={{
-              background: COLORS.ctaGradient,
+              background:
+                "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
               color: "#FFFFFF",
               border: "none",
               borderRadius: "999px",
@@ -568,12 +563,10 @@ export function MicButton({
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // RENDER: normal mic button
-  // ---------------------------------------------------------------------------
+  // --- Render: normal mic --------------------------------------------------
 
   const isActive = state === "listening";
-  const ringScale = 1 + amplitude * 0.18;
+  const ringScale = 1 + amplitude * 6;
 
   return (
     <div
@@ -658,7 +651,8 @@ export function MicButton({
               color: COLORS.ctaSolid,
             }}
           >
-            MicButton debug · state={state} · lang={debugLang}
+            MicButton debug · state={state} · amp=
+            {amplitude.toFixed(3)}
           </p>
           {debugLog.map((line, i) => (
             <p key={i} style={{ margin: 0, opacity: 0.85 }}>

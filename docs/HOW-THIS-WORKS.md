@@ -72,39 +72,47 @@ If you find code reading `public.users` anywhere, that is a bug. Replace it with
 
 ---
 
-## 3. Voice (Web Speech API)
+## 3. Voice (MediaRecorder + Groq Whisper)
 
-### Strategy: single-shot, never auto-restart
+### Strategy: record audio, transcribe server-side
 
-`components/talk/MicButton.tsx` uses **one tap = one utterance**:
+`components/talk/MicButton.tsx` uses `MediaRecorder` to capture an audio blob, then POSTs it to `/api/talk/transcribe` which transcribes via Groq Whisper.
 
-- `recognition.continuous = false`
-- `recognition.interimResults = true`
-- `recognition.lang = "en-US"` by default (most permissive; works for English perfectly, returns partial results for other languages — server-side intent classifier handles routing).
-- On final result OR 2-second silence after interim results stop arriving → call `recognition.stop()` and commit the buffered transcript.
-- **Do NOT call `recognition.start()` from `onend`.** That triggers Chrome's anti-abuse heuristic which revokes the mic after 1-2 utterances with `not-allowed`.
+Why not Web Speech API: it's broken on many Android Chrome builds (silent `onstart → onend` with no audio delivered). Server-side STT bypasses platform inconsistency entirely.
 
-### Recovery from `not-allowed`
+### Recording lifecycle
 
-When `onerror` fires with `not-allowed` or `permission-denied`:
+1. User taps mic → `getUserMedia({ audio: true })` acquires stream.
+2. `MediaRecorder` starts recording. `AudioContext` analyzer monitors amplitude.
+3. When amplitude stays below `SILENCE_THRESHOLD` (0.03) for `SILENCE_DURATION_MS` (1500ms), recording stops automatically.
+4. User can also tap mic to stop manually.
+5. Hard cap at `MAX_RECORDING_MS` (12000ms) prevents runaway recordings.
+6. On stop, audio blob is POSTed to `/api/talk/transcribe` with the language preference.
+7. Server returns `{ text }` → `onTranscript(text, true)` fires → parent moves to `processing` → `speaking`.
 
-1. Component enters `needs-permission` state.
-2. UI renders a recovery card: "Mic was paused. Tap to allow again."
-3. User taps the recovery button → component calls `navigator.mediaDevices.getUserMedia({ audio: true })` to re-prompt the browser permission dialog → state resets to `idle`.
+### Recovery from denied permission
+
+When `getUserMedia` throws (user blocked mic), component enters `needs-permission` state. UI renders recovery card with "Tap to allow again." Re-tap calls `getUserMedia` again to re-prompt.
 
 ### Debug overlay
 
-Long-press the mic button (800ms) toggles a debug overlay showing the last 10 events with timestamps and current language setting. Useful for diagnosing voice issues on Samsung A52 and other Android devices in the field.
+Long-press the mic button (800ms) toggles a debug overlay showing the last 10 events, current state, and current amplitude. Essential for diagnosing voice issues on real devices.
 
 ### Browser support
 
 | Browser | Status |
 |---|---|
 | Chrome (Android, desktop) | Supported |
-| Edge (desktop) | Supported |
-| Safari (iOS) | Supported — requires `recognition.start()` synchronously in touch handler |
-| Samsung Internet | NOT supported — UI shows fallback message asking user to open in Chrome |
-| Firefox | NOT supported — same fallback |
+| Edge (desktop, mobile) | Supported |
+| Safari (iOS, macOS) | Supported |
+| Samsung Internet | Supported (works now — previously broken with Web Speech API) |
+| Firefox | Supported |
+
+Fallback (no `MediaRecorder` or no `getUserMedia`) shows "Voice unavailable~ just type below" message.
+
+### Cost
+
+Groq Whisper Large v3 Turbo: roughly $0.0001 per utterance. A user speaking 100 times costs ~$0.01. Acceptable for our usage envelope.
 
 ---
 
