@@ -119,14 +119,11 @@ export async function GET(request: NextRequest) {
     // let the client-side guard re-fetch.
     redirectTo = "/home";
   } else if (!profile.onboarding_completed_at) {
+    // Brand-new user — show celebration page which marks onboarding done.
     redirectTo = "/onboarding";
   } else {
-    const completedAt = new Date(profile.onboarding_completed_at).getTime();
-    if (!Number.isNaN(completedAt) && Date.now() - completedAt < 30_000) {
-      redirectTo = "/home?celebrate=signup";
-    } else {
-      redirectTo = "/home";
-    }
+    // Returning user — straight to home. NO celebration replay.
+    redirectTo = "/home";
   }
 
   log("auth.callback", "resolved redirect", { to: redirectTo });

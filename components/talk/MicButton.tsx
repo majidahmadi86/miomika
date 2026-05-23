@@ -107,29 +107,6 @@ export function MicButton({
     }
   }, []);
 
-  const startAmplitude = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const ctx = new AudioContext();
-      audioContextRef.current = ctx;
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      const source = ctx.createMediaStreamSource(stream);
-      source.connect(analyser);
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      const tick = () => {
-        analyser.getByteFrequencyData(data);
-        const avg = data.reduce((a, b) => a + b, 0) / data.length;
-        setAmplitude(avg / 255);
-        animFrameRef.current = requestAnimationFrame(tick);
-      };
-      tick();
-    } catch (e) {
-      trace("amplitude unavailable", { error: (e as Error).message });
-    }
-  }, [trace]);
-
   const stopAmplitude = useCallback(() => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     if (audioContextRef.current) {
@@ -158,7 +135,7 @@ export function MicButton({
     [trace, onStateChange, onTranscript],
   );
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     ensureFlowTag();
     if (isListeningRef.current) return;
     if (typeof window === "undefined") return;
@@ -166,6 +143,38 @@ export function MicButton({
     const SpeechRecognitionImpl = getSpeechRecognitionConstructor();
     if (!SpeechRecognitionImpl) {
       trace("no SpeechRecognition API");
+      return;
+    }
+
+    // ANDROID CHROME FIX: SpeechRecognition.start() fails silently on Android
+    // if the OS-level mic stream isn't already warm at the moment of the call.
+    // Desktop Chrome tolerates a cold start; Android does not. We acquire the
+    // mic stream first, prove the path, THEN start recognition. The same
+    // stream is reused for amplitude visualization.
+    try {
+      trace("warming up mic stream");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      // Set up amplitude analysis on the already-acquired stream.
+      const ctx = new AudioContext();
+      audioContextRef.current = ctx;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      const source = ctx.createMediaStreamSource(stream);
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        setAmplitude(avg / 255);
+        animFrameRef.current = requestAnimationFrame(tick);
+      };
+      tick();
+      trace("mic stream warm");
+    } catch (e) {
+      trace("warm-up failed", { error: (e as Error).message });
+      onStateChange("needs-permission");
       return;
     }
 
@@ -197,7 +206,7 @@ export function MicButton({
       transcriptBufferRef.current = "";
       gotAnyResultRef.current = false;
       onStateChange("listening");
-      void startAmplitude();
+      // Amplitude already started in warm-up phase above.
 
       // Arm the no-speech guard. If onresult never fires within this window,
       // the API has silently closed (common on Android Chrome). Stop cleanly
@@ -320,7 +329,6 @@ export function MicButton({
     commit,
     onStateChange,
     onTranscript,
-    startAmplitude,
     stopAmplitude,
     clearSilenceTimer,
     clearNoSpeechTimer,
@@ -366,7 +374,7 @@ export function MicButton({
       return;
     }
     if (state === "idle") {
-      startListening();
+      void startListening();
     }
   }, [
     disabled,
