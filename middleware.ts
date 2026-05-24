@@ -55,6 +55,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Everything except static assets and the OAuth callback.
-    "/((?!_next/static|_next/image|favicon.ico|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp|wasm|onnx)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|auth/callback|vad/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|wasm|onnx|mjs)$).*)",
   ],
 };
