@@ -21,6 +21,7 @@ export default function TalkPage() {
   const { isGuest, authReady } = useGuestExploration();
   const { profile } = useProfile();
   const [guestExchanges, setGuestExchangesRaw] = useState(0);
+  const hydratedRef = useRef(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const TRANSCRIPT_CLIP = 180;
   const [showGuestSheet, setShowGuestSheet] = useState(false);
@@ -41,10 +42,12 @@ export default function TalkPage() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [textInput, setInputText] = useState("");
 
-  // Hydrate from localStorage on mount (client-only).
+  // Hydrate from localStorage on mount (client-only). Once only.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
     const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
     const parsed = stored ? parseInt(stored, 10) : 0;
     if (!isNaN(parsed) && parsed > 0) {
@@ -275,10 +278,13 @@ export default function TalkPage() {
         position: "relative",
         flex: 1,
         minHeight: 0,
+        height: "100%",
+        maxHeight: "100%",
         display: "flex",
         flexDirection: "column",
         background: "#FAFAF6",
         width: "100%",
+        overflow: "hidden",
       }}
     >
       {/* TOP BAR — sticky with safe-area */}
@@ -318,7 +324,32 @@ export default function TalkPage() {
           <ArrowLeft size={22} strokeWidth={2} />
         </Link>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {canvasItems.length > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                setCanvasItems([]);
+                setLastTranscript("");
+                setSubtitleTh(uiLang === "en" ? "Speak or type to begin~" : "พูดหรือพิมพ์เพื่อเริ่มต้นค่า~");
+                setExpandedItems(new Set());
+              }}
+              aria-label={uiLang === "en" ? "Clear conversation" : "ล้างบทสนทนา"}
+              style={{
+                background: "rgba(255,255,255,0.88)",
+                border: "1px solid #EDE8E0",
+                borderRadius: "999px",
+                padding: "4px 12px",
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "#9A8B73",
+                cursor: "pointer",
+              }}
+            >
+              {uiLang === "en" ? "Clear" : "ล้าง"}
+            </button>
+          )}
           {authReady && isGuest ? (
             <span
               style={{
@@ -646,6 +677,30 @@ export default function TalkPage() {
           locked={isGuest && guestExchanges >= GUEST_LIMIT}
           onLockedTap={() => setShowGuestSheet(true)}
         />
+        <p
+          style={{
+            fontFamily: "'Quicksand', sans-serif",
+            fontSize: "11px",
+            fontWeight: 500,
+            color: micState === "listening" ? "#C9A96E" : "#9A8B73",
+            margin: 0,
+            minHeight: "14px",
+            letterSpacing: "0.02em",
+            transition: "color 200ms ease",
+          }}
+          aria-live="polite"
+        >
+          {(() => {
+            if (isGuest && guestExchanges >= GUEST_LIMIT) {
+              return uiLang === "en" ? "Sign up to keep talking~" : "สมัครเพื่อคุยต่อค่า~";
+            }
+            if (micState === "listening") return uiLang === "en" ? "Listening… tap to stop" : "กำลังฟัง… แตะเพื่อหยุด";
+            if (micState === "processing") return uiLang === "en" ? "Thinking…" : "กำลังคิด…";
+            if (micState === "speaking") return uiLang === "en" ? "Miomi is speaking" : "หนูกำลังพูดค่า";
+            if (micState === "needs-permission") return uiLang === "en" ? "Tap to enable mic" : "แตะเพื่อเปิดไมค์";
+            return uiLang === "en" ? "Tap to speak" : "แตะเพื่อพูดค่า";
+          })()}
+        </p>
 
         <div style={{
           display: "flex",
