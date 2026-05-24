@@ -370,6 +370,37 @@ export default function TalkPage() {
           >
             {subtitleTh}
           </p>
+          {micState === "processing" && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "4px",
+                marginTop: "8px",
+              }}
+              aria-label="Miomi is thinking"
+            >
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+                  transition={{
+                    duration: 1.2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: i * 0.15,
+                  }}
+                  style={{
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    background: "#C9A96E",
+                    display: "inline-block",
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -533,6 +564,8 @@ export default function TalkPage() {
             await processUserInput(text);
           }}
           onStateChange={setMicState}
+          locked={isGuest && guestExchanges >= GUEST_LIMIT}
+          onLockedTap={() => setShowGuestSheet(true)}
         />
 
         <div style={{

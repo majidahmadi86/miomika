@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
-import { Mic, MicOff } from "lucide-react";
+import { Mic, MicOff, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import * as Sentry from "@sentry/nextjs";
 import { COLORS } from "@/lib/design/colors";
@@ -20,6 +20,12 @@ interface MicButtonProps {
   onTranscript: (text: string, isFinal: boolean) => void;
   onStateChange: (state: MicState) => void;
   disabled?: boolean;
+  /**
+   * When true, mic is visually locked with gold overlay + lock icon.
+   * Tapping calls onLockedTap instead of starting recording.
+   */
+  locked?: boolean;
+  onLockedTap?: () => void;
 }
 
 /**
@@ -59,6 +65,8 @@ export function MicButton({
   onTranscript,
   onStateChange,
   disabled = false,
+  locked = false,
+  onLockedTap,
 }: MicButtonProps) {
   const [amplitude, setAmplitude] = useState(0);
   const [debugVisible, setDebugVisible] = useState(false);
@@ -238,6 +246,10 @@ export function MicButton({
 
   const handlePress = useCallback(() => {
     if (disabled) return;
+    if (locked) {
+      if (onLockedTap) onLockedTap();
+      return;
+    }
     // While transcribing, taps are no-ops (prevents kill-during-upload).
     if (state === "processing") {
       return;
@@ -257,7 +269,7 @@ export function MicButton({
     if (state === "idle") {
       void startVAD();
     }
-  }, [disabled, state, onStateChange, startVAD]);
+  }, [disabled, locked, onLockedTap, state, onStateChange, startVAD]);
 
   const onPointerDown = useCallback(() => {
     longPressTimerRef.current = window.setTimeout(() => {
@@ -348,15 +360,16 @@ export function MicButton({
         onPointerLeave={onPointerUp}
         disabled={disabled}
         aria-label={
-          state === "processing" ? "Transcribing"
+          locked ? "Sign up to keep talking"
+            : state === "processing" ? "Transcribing"
             : isActive ? "Stop"
             : "Start talking"
         }
         aria-pressed={isActive}
         whileTap={{ scale: 0.94 }}
-        style={micButtonStyle(isActive)}
+        style={micButtonStyle(isActive, state === "processing", locked)}
       >
-        {isActive && (
+        {isActive && !locked && (
           <>
             {/* Constant breath — alive even in silence */}
             <motion.div
@@ -384,25 +397,34 @@ export function MicButton({
             />
           </>
         )}
-        {state === "processing" ? (
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            style={{
-              width: "20px",
-              height: "20px",
-              borderRadius: "50%",
-              border: `2.5px solid ${COLORS.ctaSolid}`,
-              borderTopColor: "transparent",
-            }}
-          />
-        ) : (
-          <Mic
-            size={28}
-            strokeWidth={1.75}
-            color={isActive ? "#FFFFFF" : COLORS.textPrimary}
-          />
-        )}
+        <>
+          {locked ? (
+            <Lock size={26} strokeWidth={2} color="#FFFFFF" />
+          ) : (
+            <>
+              {isActive && amplitude < 0.1 && (
+                <motion.div
+                  animate={{ opacity: [0.3, 0.9, 0.3], scale: [1, 1.15, 1] }}
+                  transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                  style={{
+                    position: "absolute",
+                    top: "16px",
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    background: "#FFFFFF",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+              <Mic
+                size={28}
+                strokeWidth={1.75}
+                color={isActive ? "#FFFFFF" : COLORS.textPrimary}
+              />
+            </>
+          )}
+        </>
       </motion.button>
 
       {debugVisible && (
@@ -431,22 +453,27 @@ const containerStyle: CSSProperties = {
   gap: "12px",
 };
 
-function micButtonStyle(isActive: boolean): CSSProperties {
+function micButtonStyle(isActive: boolean, isProcessing: boolean = false, isLocked: boolean = false): CSSProperties {
   return {
     position: "relative",
     width: "72px",
     height: "72px",
     borderRadius: "50%",
-    background: isActive ? COLORS.ctaGradient : COLORS.surface,
-    border: `1px solid ${isActive ? "transparent" : COLORS.borderMedium}`,
-    cursor: "pointer",
+    background: isLocked
+      ? COLORS.ctaGradient
+      : isActive
+        ? COLORS.ctaGradient
+        : COLORS.surface,
+    border: `1px solid ${isActive || isLocked ? "transparent" : COLORS.borderMedium}`,
+    cursor: isLocked ? "pointer" : "pointer",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: isActive
+    opacity: isProcessing ? 0.55 : 1,
+    boxShadow: isActive || isLocked
       ? "0 8px 24px rgba(201, 169, 110, 0.40)"
       : "0 2px 8px rgba(26, 26, 24, 0.06)",
-    transition: "background 240ms cubic-bezier(0.4, 0, 0.2, 1)",
+    transition: "background 240ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease-out",
   };
 }
 
