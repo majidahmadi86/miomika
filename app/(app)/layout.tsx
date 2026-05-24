@@ -196,7 +196,6 @@ function AppLayoutInner({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const hiddenNav = pathname === "/talk";
   const { isGuest, authReady } = useGuestExploration();
 
   // Block render until auth is resolved to prevent home-content flash
@@ -349,7 +348,7 @@ function AppLayoutInner({
         <SwipeNavigator pathname={pathname}>
           {children}
         </SwipeNavigator>
-        {!hiddenNav && <BottomNav />}
+        <BottomNav />
         <InstallPrompt />
         <AmbientCompanion />
         <GuidanceHost />

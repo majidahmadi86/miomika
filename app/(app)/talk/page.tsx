@@ -272,11 +272,13 @@ export default function TalkPage() {
   return (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
+        position: "relative",
+        flex: 1,
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         background: "#FAFAF6",
+        width: "100%",
       }}
     >
       {/* TOP BAR — sticky with safe-area */}
@@ -628,7 +630,7 @@ export default function TalkPage() {
           gap: "12px",
           background: "#FAFAF6",
           borderTop: "1px solid rgba(232,229,223,0.6)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 8px) + 8px)",
+          paddingBottom: "12px",
           paddingTop: "12px",
         }}
       >
