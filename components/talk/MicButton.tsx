@@ -9,7 +9,6 @@ import { log, logError } from "@/lib/debug/log";
 
 export type MicState =
   | "idle"
-  | "warming"
   | "listening"
   | "processing"
   | "speaking"
@@ -152,78 +151,62 @@ export function MicButton({
 
   // --- Lazy-load and start VAD --------------------------------------------
 
-  const startVAD = useCallback(async (autoStart: boolean = true) => {
-    if (vadRef.current || isLoadingVadRef.current) {
-      // Already warmed — just start it if caller wants
-      if (vadRef.current && autoStart) {
-        try {
-          await vadRef.current.start();
-          if (mountedRef.current) onStateChange("listening");
-        } catch (e) {
-          trace("VAD resume failed", { error: (e as Error).message });
-        }
+  const startVAD = useCallback(async () => {
+    // Already running — just resume if paused.
+    if (vadRef.current) {
+      try {
+        await vadRef.current.start();
+        if (mountedRef.current) onStateChange("listening");
+      } catch (e) {
+        trace("VAD resume failed", { error: (e as Error).message });
       }
       return;
     }
+    if (isLoadingVadRef.current) return;
     ensureFlowTag();
     isLoadingVadRef.current = true;
-
     try {
       trace("loading VAD library");
       const { MicVAD } = await import("@ricky0123/vad-web");
-
       const vad = await MicVAD.new({
         model: "v5",
         baseAssetPath: "/vad/",
         onnxWASMBasePath: "/vad/",
         workletOptions: {},
         startOnLoad: false,
-
         positiveSpeechThreshold: 0.5,
         negativeSpeechThreshold: 0.35,
         minSpeechMs: 400,
         preSpeechPadMs: 250,
         redemptionMs: 750,
-
         onSpeechStart: () => {
           if (!mountedRef.current) return;
           trace("speech start");
           onStateChange("listening");
         },
-
         onSpeechEnd: (audio: Float32Array) => {
           if (!mountedRef.current) return;
           trace("speech end", { samples: audio.length });
           void transcribeAndCommit(audio);
         },
-
         onVADMisfire: () => {
           if (!mountedRef.current) return;
           trace("vad misfire (too short)");
           onStateChange("idle");
         },
-
         onFrameProcessed: (probs) => {
           if (!mountedRef.current) return;
           setAmplitude(probs.isSpeech);
         },
       });
-
       if (!mountedRef.current) {
-        await vad.destroy();
+        try { await vad.destroy(); } catch { /* ignore */ }
         return;
       }
-
       vadRef.current = vad as unknown as MicVADInstance;
-      if (autoStart) {
-        await vad.start();
-        trace("VAD running");
-        onStateChange("listening");
-      } else {
-        // Pre-warm: loaded but not capturing. Pause it.
-        await vad.pause();
-        trace("VAD pre-warmed (paused)");
-      }
+      await vad.start();
+      trace("VAD running");
+      onStateChange("listening");
     } catch (e) {
       const msg = (e as Error).message ?? "unknown";
       trace("VAD start failed", { error: msg });
@@ -255,9 +238,8 @@ export function MicButton({
 
   const handlePress = useCallback(() => {
     if (disabled) return;
-    // While VAD is loading or transcribing, taps are no-ops (prevents
-    // the "tap-three-times" trap where users kill a half-started session).
-    if (state === "warming" || state === "processing") {
+    // While transcribing, taps are no-ops (prevents kill-during-upload).
+    if (state === "processing") {
       return;
     }
     if (state === "speaking") {
@@ -265,7 +247,7 @@ export function MicButton({
       return;
     }
     if (state === "listening") {
-      // User wants to stop. Pause, don't destroy — keeps VAD warm.
+      // User wants to stop. Pause, don't destroy — keeps VAD warm for next tap.
       if (vadRef.current) {
         void vadRef.current.pause();
       }
@@ -273,7 +255,7 @@ export function MicButton({
       return;
     }
     if (state === "idle") {
-      void startVAD(true);
+      void startVAD();
     }
   }, [disabled, state, onStateChange, startVAD]);
 
@@ -292,43 +274,38 @@ export function MicButton({
 
   // --- Mount / unmount lifecycle ------------------------------------------
 
-  /* eslint-disable react-hooks/set-state-in-effect */
+  // --- Mount / unmount lifecycle ------------------------------------------
   useEffect(() => {
     mountedRef.current = true;
 
-    // Pre-warm VAD in background — don't block render, don't change state.
-    // User tap will resume the paused instance, no 1.2MB reload.
-    onStateChange("warming");
-    void startVAD(false).then(() => {
-      if (mountedRef.current) onStateChange("idle");
-    });
-
-    // Release mic when tab hidden (user switched away).
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden" && vadRef.current) {
-        trace("tab hidden — pausing VAD");
-        void vadRef.current.pause();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibility);
+    // Prefetch VAD library + ONNX + WASM into browser cache so first tap
+    // is fast. Do NOT construct MicVAD.new() yet — that allocates a stream
+    // and audio context, and calling pause() before start() crashes destroy().
+    // Just warm the network cache.
+    if (typeof window !== "undefined") {
+      void import("@ricky0123/vad-web").catch(() => { /* ignore prefetch failure */ });
+      // Prefetch ONNX + WASM via <link rel="prefetch"> for browsers that honor it,
+      // otherwise warm via fetch.
+      const urls = ["/vad/silero_vad_v5.onnx", "/vad/ort-wasm-simd-threaded.wasm"];
+      urls.forEach((u) => {
+        void fetch(u, { cache: "force-cache" }).catch(() => { /* ignore */ });
+      });
+    }
 
     return () => {
       mountedRef.current = false;
-      document.removeEventListener("visibilitychange", onVisibility);
-      // Direct destroy — do NOT call stopVAD here, it would create a
-      // dependency-driven cleanup that fires on every state change.
+      // Direct destroy — only safe if VAD was actually started.
       if (vadRef.current) {
         try {
           vadRef.current.destroy();
         } catch {
-          /* ignore */
+          /* library may throw if stream/context never initialized */
         }
         vadRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // EMPTY deps — runs once on mount, cleanup once on unmount.
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   // --- Render: needs-permission -------------------------------------------
 
@@ -371,8 +348,7 @@ export function MicButton({
         onPointerLeave={onPointerUp}
         disabled={disabled}
         aria-label={
-          state === "warming" ? "Warming up microphone"
-            : state === "processing" ? "Transcribing"
+          state === "processing" ? "Transcribing"
             : isActive ? "Stop"
             : "Start talking"
         }
