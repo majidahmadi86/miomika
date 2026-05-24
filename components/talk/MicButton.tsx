@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef, type CSSProperties } from "react";
 import { Mic, MicOff, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import * as Sentry from "@sentry/nextjs";
@@ -59,7 +59,12 @@ type MicVADInstance = {
   destroy: () => Promise<void>;
 };
 
-export function MicButton({
+export interface MicButtonHandle {
+  start: () => void;
+  stop: () => void;
+}
+
+export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function MicButton({
   state,
   language = "auto",
   onTranscript,
@@ -67,7 +72,7 @@ export function MicButton({
   disabled = false,
   locked = false,
   onLockedTap,
-}: MicButtonProps) {
+}, ref) {
   const [amplitude, setAmplitude] = useState(0);
   const [debugVisible, setDebugVisible] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
@@ -241,6 +246,25 @@ export function MicButton({
       trace("recovery: still denied", { error: (e as Error).message });
     }
   }, [trace, onStateChange]);
+
+  // --- Imperative API (used by VoiceOrb parent to start/stop without clicking)
+  useImperativeHandle(ref, () => ({
+    start: () => {
+      if (disabled || locked) {
+        if (locked && onLockedTap) onLockedTap();
+        return;
+      }
+      if (state === "idle") {
+        void startVAD();
+      }
+    },
+    stop: () => {
+      if (state === "listening" && vadRef.current) {
+        void vadRef.current.pause();
+        onStateChange("idle");
+      }
+    },
+  }), [disabled, locked, onLockedTap, state, startVAD, onStateChange]);
 
   // --- Press handlers ------------------------------------------------------
 
@@ -442,7 +466,7 @@ export function MicButton({
       )}
     </div>
   );
-}
+});
 
 // --- Style fragments (kept inline to avoid touching design tokens) ---------
 

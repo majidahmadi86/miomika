@@ -7,7 +7,7 @@ import { ArrowLeft, Keyboard, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
-import { MicButton, type MicState } from "@/components/talk/MicButton";
+import { MicButton, type MicState, type MicButtonHandle } from "@/components/talk/MicButton";
 import { FuelPill } from "@/components/talk/FuelPill";
 import { VoiceOrb, type OrbState } from "@/components/talk/VoiceOrb";
 import { ModeStrip } from "@/components/talk/ModeStrip";
@@ -48,7 +48,7 @@ export default function TalkPage() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false);
-  const micHostRef = useRef<HTMLDivElement>(null);
+  const micRef = useRef<MicButtonHandle>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -114,7 +114,7 @@ export default function TalkPage() {
   const fuelBrain = 45;
 
   const triggerMic = useCallback(() => {
-    micHostRef.current?.querySelector("button")?.click();
+    micRef.current?.start();
   }, []);
 
   const processInput = useCallback(
@@ -227,8 +227,12 @@ export default function TalkPage() {
       setShowGuestSheet(true);
       return;
     }
-    triggerMic();
-  }, [orbState, triggerMic]);
+    if (micState === "listening") {
+      micRef.current?.stop();
+      return;
+    }
+    micRef.current?.start();
+  }, [orbState, micState]);
 
   return (
     <div
@@ -429,8 +433,9 @@ export default function TalkPage() {
         </div>
       ) : (
         <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "14px", padding: "12px 16px 16px", position: "relative" }}>
-          <div ref={micHostRef} style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
+          <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
             <MicButton
+              ref={micRef}
               state={micState}
               language="auto"
               onTranscript={async (text, isFinal) => {
@@ -504,7 +509,7 @@ export default function TalkPage() {
               <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "#E8E5DF" }} />
             </div>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: "16px" }}>
-              <Image src="/characters/miomi/head/missing.png" alt="Miomi" width={130} height={130} onError={(e) => { (e.target as HTMLImageElement).src = "/characters/miomi/head/idle.png"; }} />
+              <Image src="/characters/miomi/head/idle.png" alt="Miomi" width={130} height={130} />
             </div>
             <div style={{ textAlign: "center", padding: "0 28px", marginBottom: "20px" }}>
               <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "22px", fontWeight: 600, color: "#1A1A18", margin: "0 0 8px", lineHeight: 1.3 }}>
