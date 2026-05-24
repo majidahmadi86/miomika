@@ -28,6 +28,7 @@ const SILENCE_THRESHOLD = 0.025;     // Slightly more sensitive
 const SILENCE_DURATION_MS = 900;     // Trim 600ms off end-of-utterance lag
 const MIN_SPEECH_DURATION_MS = 400;  // Ignore stops before this much audio
 const MAX_RECORDING_MS = 12000;      // Hard cap to prevent runaway recordings
+const COOLDOWN_MS = 250;             // Dodge Android Chrome rapid-acquire detection
 
 // --- Browser support detection --------------------------------------------
 
@@ -91,6 +92,7 @@ export function MicButton({
   const mimeTypeRef = useRef<string>("audio/webm");
   const hardStopTimerRef = useRef<number | null>(null);
   const idleReleaseTimerRef = useRef<number | null>(null);
+  const lastStopAtRef = useRef<number>(0);
 
   const trace = useCallback((msg: string, data?: Record<string, unknown>) => {
     if (typeof window === "undefined") return;
@@ -236,11 +238,38 @@ export function MicButton({
       idleReleaseTimerRef.current = null;
     }
 
-    // Reuse existing stream if available (avoids Android Chrome anti-abuse
-    // lockout from repeated getUserMedia calls).
+    // Cooldown: if we just stopped, wait a bit before re-acquiring.
+    const sinceStop = Date.now() - lastStopAtRef.current;
+    if (lastStopAtRef.current > 0 && sinceStop < COOLDOWN_MS) {
+      const wait = COOLDOWN_MS - sinceStop;
+      trace("cooldown", { ms: wait });
+      await new Promise((r) => setTimeout(r, wait));
+    }
+
+    // If a previous stream is still alive AND tracks are actually usable,
+    // reuse it. Android Chrome often marks tracks as readyState="live" even
+    // after MediaRecorder has stopped, but the recorder won't accept them
+    // for a second pass. So we explicitly test by checking if we already
+    // have a working analyser. If not, get a fresh stream.
     let stream = streamRef.current;
-    if (!stream || stream.getAudioTracks().every((t) => t.readyState !== "live")) {
-      trace("warming up mic stream");
+    const needsFreshStream =
+      !stream ||
+      !analyserRef.current ||
+      stream.getAudioTracks().some((t) => t.readyState !== "live");
+
+    if (needsFreshStream) {
+      // Release any stale stream before acquiring a new one.
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (audioContextRef.current) {
+        await audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+        analyserRef.current = null;
+      }
+
+      trace("acquiring mic stream");
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (e) {
@@ -249,11 +278,11 @@ export function MicButton({
         return;
       }
       streamRef.current = stream;
+
       const mimeType = pickMimeType();
       mimeTypeRef.current = mimeType;
-      trace("mic stream warm", { mimeType });
+      trace("mic stream acquired", { mimeType });
 
-      // Set up analyzer ONCE on the persistent stream.
       try {
         const ctx = new AudioContext();
         audioContextRef.current = ctx;
@@ -273,15 +302,14 @@ export function MicButton({
     }
 
     const analyser = analyserRef.current;
-    if (!analyser) {
-      trace("analyser missing — recreating");
+    if (!analyser || !stream) {
+      trace("analyser/stream missing — bailing");
       fullTeardown();
       onStateChange("idle");
       return;
     }
     const data = new Uint8Array(analyser.frequencyBinCount);
 
-    // Fresh MediaRecorder per utterance (recorders are single-use anyway).
     let recorder: MediaRecorder;
     try {
       recorder = new MediaRecorder(stream, { mimeType: mimeTypeRef.current });
@@ -303,16 +331,20 @@ export function MicButton({
       chunksRef.current = [];
       const blob = new Blob(chunks, { type: mimeTypeRef.current });
       resetForNextUtterance();
+      lastStopAtRef.current = Date.now();
 
-      // Schedule idle release in 60s. If user starts another utterance
-      // before then, the timer gets cancelled.
-      if (idleReleaseTimerRef.current !== null) {
-        clearTimeout(idleReleaseTimerRef.current);
+      // CRITICAL: release the stream after each utterance. Reusing the same
+      // stream for a second MediaRecorder fails on Android Chrome. The 250ms
+      // delay before next acquire dodges anti-abuse rate limiting.
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
       }
-      idleReleaseTimerRef.current = window.setTimeout(() => {
-        trace("idle release — closing mic stream");
-        fullTeardown();
-      }, 60_000);
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+        analyserRef.current = null;
+      }
 
       void transcribeAndCommit(blob);
     };

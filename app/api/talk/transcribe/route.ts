@@ -1,3 +1,9 @@
+// Run this function in Singapore — closer to Thai users than the default
+// iad1 (USA). Cuts ~250ms round-trip per request.
+export const preferredRegion = ["sin1", "hnd1"];
+export const runtime = "nodejs";
+export const maxDuration = 15;
+
 import { NextResponse, type NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import Groq from "groq-sdk";
