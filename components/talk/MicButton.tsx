@@ -304,9 +304,22 @@ export function MicButton({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      stopVAD();
+      // Direct destroy — do NOT call stopVAD here, it would create a
+      // dependency-driven cleanup that fires on every state change.
+      if (idleReleaseTimerRef.current !== null) {
+        clearTimeout(idleReleaseTimerRef.current);
+        idleReleaseTimerRef.current = null;
+      }
+      if (vadRef.current) {
+        try {
+          vadRef.current.destroy();
+        } catch {
+          /* ignore */
+        }
+        vadRef.current = null;
+      }
     };
-  }, [stopVAD]);
+  }, []); // EMPTY deps — runs once on mount, cleanup once on unmount.
 
   // --- Render: needs-permission -------------------------------------------
 
