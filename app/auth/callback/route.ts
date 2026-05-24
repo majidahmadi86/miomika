@@ -9,53 +9,42 @@ import { log, logError } from "@/lib/debug/log";
 /**
  * Supabase OAuth callback.
  *
- * Flow:
- *   1. Exchange the `code` query param for a session (sets sb-* cookies).
- *   2. Read the user's profile inline via getServerProfile() — same request
- *      context, so cookies are visible to next/headers().
- *   3. Pick redirect destination based on onboarding state.
- *   4. Redirect with the session cookies attached.
+ *   1. Exchange ?code= for a session — sets sb-* cookies on response.
+ *   2. Inline read profile via getServerProfile() — same request context.
+ *   3. Redirect: /onboarding for new users, /home for returning.
  *
- * Critical invariants:
- *   - Canonical host is www.miomika.com. Supabase Site URL must match.
- *   - Cookies are written onto ONE response object; the final redirect
- *     reuses its headers so Set-Cookie survives.
- *   - No internal fetch hop. getServerProfile() reads cookies directly.
- *
- * See /docs/HOW-THIS-WORKS.md §1 for the full flow.
+ * MUST run untouched by middleware. middleware.ts matcher excludes
+ * /auth/callback explicitly. See STATE.md.
  */
 export async function GET(request: NextRequest) {
   Sentry.setTag("flow", "oauth");
 
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const isNewSignup = searchParams.get("signup") === "1";
   const nextOverride = searchParams.get("next");
+  const isNewSignup = searchParams.get("signup") === "1";
 
   log("auth.callback", "received", {
     hasCode: !!code,
     isNewSignup,
     nextOverride: nextOverride ?? null,
-    origin,
   });
 
   if (!code) {
-    log("auth.callback", "no code, redirecting to login");
     return NextResponse.redirect(new URL("/login?error=oauth_no_code", origin));
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseKey) {
-    log("auth.callback", "supabase env missing");
     return NextResponse.redirect(
       new URL("/login?error=oauth_not_configured", origin),
     );
   }
 
-  // Build the response object up front. Supabase's setAll callback writes
-  // cookies onto THIS response. We rewrite the Location header at the end
-  // so the cookies travel with the final redirect.
+  // Single response object — Supabase writes session cookies onto it via
+  // setAll. We rewrite the Location header at the end so cookies + final
+  // destination travel together.
   const response = NextResponse.redirect(new URL("/home", origin));
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -64,34 +53,28 @@ export async function GET(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
+        for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
-          // Also write to the request cookies so getServerProfile() below
-          // (which reads via next/headers cookies()) sees the fresh session.
+          // Also mirror onto the request so getServerProfile() below sees
+          // the fresh session (cookies() from next/headers reads request).
           request.cookies.set(name, value);
-        });
+        }
       },
     },
   });
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    logError("auth.callback", "exchange failed", error, {
-      errorName: error.name,
-      errorStatus: (error as { status?: number }).status,
-    });
+    logError("auth.callback", "exchange failed", error);
     Sentry.captureException(error, { tags: { stage: "exchange" } });
-    return NextResponse.redirect(
-      new URL("/login?error=oauth_exchange", origin),
-    );
+    return NextResponse.redirect(new URL("/login?error=oauth_exchange", origin));
   }
 
-  log("auth.callback", "exchanged session", {
+  log("auth.callback", "exchanged", {
     user: data.user?.email ?? "unknown",
-    userId: data.user?.id ?? "unknown",
   });
 
-  // Fire-and-forget welcome email for new signups. Never block the redirect.
+  // Fire-and-forget welcome email for explicit ?signup=1 callbacks.
   if (isNewSignup && data.user?.email) {
     const lang = pickLanguageFromAcceptLanguage(
       request.headers.get("accept-language"),
@@ -101,39 +84,30 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Read profile inline. Same request context — cookies are visible.
+  // Resolve profile inline. Cookies just written are visible.
   const profile = await getServerProfile();
-  log("auth.callback", "profile read", {
+  log("auth.callback", "profile", {
     hasProfile: !!profile,
-    tier: profile?.tier ?? "none",
     onboarded: !!profile?.onboarding_completed_at,
   });
 
-  // Pick redirect destination.
   let redirectTo: string;
   if (nextOverride && nextOverride.startsWith("/")) {
-    // Honor explicit ?next= override from signup/login pages.
     redirectTo = nextOverride;
   } else if (!profile) {
-    // Auth succeeded but no profile row — should be rare. Send to home and
-    // let the client-side guard re-fetch.
     redirectTo = "/home";
   } else if (!profile.onboarding_completed_at) {
-    // Brand-new user — show celebration page which marks onboarding done.
     redirectTo = "/onboarding";
   } else {
-    // Returning user — straight to home. NO celebration replay.
     redirectTo = "/home";
   }
 
-  log("auth.callback", "resolved redirect", { to: redirectTo });
+  log("auth.callback", "redirect", { to: redirectTo });
 
-  // Build the final redirect response, carrying the Set-Cookie headers from
-  // the original response object so the session lands in the browser.
+  // Final response carries the session cookies onto the resolved destination.
   const finalResponse = NextResponse.redirect(new URL(redirectTo, origin));
-  response.cookies.getAll().forEach((cookie) => {
+  for (const cookie of response.cookies.getAll()) {
     finalResponse.cookies.set(cookie);
-  });
-
+  }
   return finalResponse;
 }

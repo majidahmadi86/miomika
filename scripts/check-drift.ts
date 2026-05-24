@@ -16,7 +16,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
-const DOC_PATH = join(ROOT, "docs", "HOW-THIS-WORKS.md");
+const DOC_PATH = join(ROOT, "STATE.md");
 
 function fail(msg: string): never {
   console.error(`[drift] FAIL — ${msg}`);
@@ -30,7 +30,7 @@ function ok(msg: string): void {
 // --- 1. Doc exists ---------------------------------------------------------
 
 if (!existsSync(DOC_PATH)) {
-  fail(`/docs/HOW-THIS-WORKS.md missing (expected at ${DOC_PATH})`);
+  fail(`/STATE.md missing (expected at ${DOC_PATH})`);
 }
 
 const content = readFileSync(DOC_PATH, "utf8");
@@ -49,6 +49,9 @@ while ((match = ROUTE_REGEX.exec(content)) !== null) {
   const route = match[1].replace(/\/$/, "");
   routes.add(route);
 }
+
+// Documented dead-end only — not a real route handler (see STATE.md).
+routes.delete("/api/auth/callback");
 
 if (routes.size === 0) {
   ok("no route references found in doc (nothing to verify)");
