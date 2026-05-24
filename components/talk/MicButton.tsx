@@ -9,6 +9,7 @@ import { log, logError } from "@/lib/debug/log";
 
 export type MicState =
   | "idle"
+  | "warming"
   | "listening"
   | "processing"
   | "speaking"
@@ -47,8 +48,6 @@ interface MicButtonProps {
  * entire lifetime. We start it once, we stop it once.
  */
 
-const IDLE_RELEASE_MS = 60_000;
-
 type MicVADInstance = {
   start: () => Promise<void>;
   pause: () => Promise<void>;
@@ -70,7 +69,6 @@ export function MicButton({
   const vadRef = useRef<MicVADInstance | null>(null);
   const isLoadingVadRef = useRef(false);
   const longPressTimerRef = useRef<number | null>(null);
-  const idleReleaseTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
 
   const trace = useCallback((msg: string, data?: Record<string, unknown>) => {
@@ -154,8 +152,19 @@ export function MicButton({
 
   // --- Lazy-load and start VAD --------------------------------------------
 
-  const startVAD = useCallback(async () => {
-    if (vadRef.current || isLoadingVadRef.current) return;
+  const startVAD = useCallback(async (autoStart: boolean = true) => {
+    if (vadRef.current || isLoadingVadRef.current) {
+      // Already warmed — just start it if caller wants
+      if (vadRef.current && autoStart) {
+        try {
+          await vadRef.current.start();
+          if (mountedRef.current) onStateChange("listening");
+        } catch (e) {
+          trace("VAD resume failed", { error: (e as Error).message });
+        }
+      }
+      return;
+    }
     ensureFlowTag();
     isLoadingVadRef.current = true;
 
@@ -180,24 +189,12 @@ export function MicButton({
           if (!mountedRef.current) return;
           trace("speech start");
           onStateChange("listening");
-          if (idleReleaseTimerRef.current !== null) {
-            clearTimeout(idleReleaseTimerRef.current);
-            idleReleaseTimerRef.current = null;
-          }
         },
 
         onSpeechEnd: (audio: Float32Array) => {
           if (!mountedRef.current) return;
           trace("speech end", { samples: audio.length });
           void transcribeAndCommit(audio);
-          if (idleReleaseTimerRef.current !== null) {
-            clearTimeout(idleReleaseTimerRef.current);
-          }
-          idleReleaseTimerRef.current = window.setTimeout(() => {
-            trace("idle release — destroying VAD");
-            void vadRef.current?.destroy();
-            vadRef.current = null;
-          }, IDLE_RELEASE_MS);
         },
 
         onVADMisfire: () => {
@@ -218,9 +215,15 @@ export function MicButton({
       }
 
       vadRef.current = vad as unknown as MicVADInstance;
-      await vad.start();
-      trace("VAD running");
-      onStateChange("listening");
+      if (autoStart) {
+        await vad.start();
+        trace("VAD running");
+        onStateChange("listening");
+      } else {
+        // Pre-warm: loaded but not capturing. Pause it.
+        await vad.pause();
+        trace("VAD pre-warmed (paused)");
+      }
     } catch (e) {
       const msg = (e as Error).message ?? "unknown";
       trace("VAD start failed", { error: msg });
@@ -233,25 +236,6 @@ export function MicButton({
       isLoadingVadRef.current = false;
     }
   }, [trace, ensureFlowTag, onStateChange, transcribeAndCommit]);
-
-  // --- Stop / cleanup -----------------------------------------------------
-
-  const stopVAD = useCallback(() => {
-    if (idleReleaseTimerRef.current !== null) {
-      clearTimeout(idleReleaseTimerRef.current);
-      idleReleaseTimerRef.current = null;
-    }
-    if (vadRef.current) {
-      try {
-        void vadRef.current.destroy();
-      } catch {
-        /* ignore */
-      }
-      vadRef.current = null;
-      trace("VAD destroyed");
-    }
-    setAmplitude(0);
-  }, [trace]);
 
   // --- Permission recovery -------------------------------------------------
 
@@ -271,19 +255,27 @@ export function MicButton({
 
   const handlePress = useCallback(() => {
     if (disabled) return;
+    // While VAD is loading or transcribing, taps are no-ops (prevents
+    // the "tap-three-times" trap where users kill a half-started session).
+    if (state === "warming" || state === "processing") {
+      return;
+    }
     if (state === "speaking") {
       onStateChange("idle");
       return;
     }
-    if (state === "listening" || state === "processing") {
-      stopVAD();
+    if (state === "listening") {
+      // User wants to stop. Pause, don't destroy — keeps VAD warm.
+      if (vadRef.current) {
+        void vadRef.current.pause();
+      }
       onStateChange("idle");
       return;
     }
     if (state === "idle") {
-      void startVAD();
+      void startVAD(true);
     }
-  }, [disabled, state, onStateChange, startVAD, stopVAD]);
+  }, [disabled, state, onStateChange, startVAD]);
 
   const onPointerDown = useCallback(() => {
     longPressTimerRef.current = window.setTimeout(() => {
@@ -300,16 +292,31 @@ export function MicButton({
 
   // --- Mount / unmount lifecycle ------------------------------------------
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     mountedRef.current = true;
+
+    // Pre-warm VAD in background — don't block render, don't change state.
+    // User tap will resume the paused instance, no 1.2MB reload.
+    onStateChange("warming");
+    void startVAD(false).then(() => {
+      if (mountedRef.current) onStateChange("idle");
+    });
+
+    // Release mic when tab hidden (user switched away).
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden" && vadRef.current) {
+        trace("tab hidden — pausing VAD");
+        void vadRef.current.pause();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       mountedRef.current = false;
+      document.removeEventListener("visibilitychange", onVisibility);
       // Direct destroy — do NOT call stopVAD here, it would create a
       // dependency-driven cleanup that fires on every state change.
-      if (idleReleaseTimerRef.current !== null) {
-        clearTimeout(idleReleaseTimerRef.current);
-        idleReleaseTimerRef.current = null;
-      }
       if (vadRef.current) {
         try {
           vadRef.current.destroy();
@@ -319,7 +326,9 @@ export function MicButton({
         vadRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // EMPTY deps — runs once on mount, cleanup once on unmount.
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // --- Render: needs-permission -------------------------------------------
 
@@ -361,26 +370,63 @@ export function MicButton({
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
         disabled={disabled}
-        aria-label={isActive ? "Stop" : "Start talking"}
+        aria-label={
+          state === "warming" ? "Warming up microphone"
+            : state === "processing" ? "Transcribing"
+            : isActive ? "Stop"
+            : "Start talking"
+        }
         aria-pressed={isActive}
         whileTap={{ scale: 0.94 }}
         style={micButtonStyle(isActive)}
       >
         {isActive && (
+          <>
+            {/* Constant breath — alive even in silence */}
+            <motion.div
+              animate={{ scale: [1, 1.08, 1], opacity: [0.25, 0.4, 0.25] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+              style={{
+                position: "absolute",
+                inset: "-10px",
+                borderRadius: "50%",
+                border: `2px solid ${COLORS.ctaSolid}`,
+                pointerEvents: "none",
+              }}
+            />
+            {/* Speech-driven expansion on top */}
+            <motion.div
+              animate={{ scale: ringScale, opacity: 0.3 + amplitude * 0.5 }}
+              transition={{ duration: 0.08 }}
+              style={{
+                position: "absolute",
+                inset: "-10px",
+                borderRadius: "50%",
+                border: `2px solid ${COLORS.ctaSolid}`,
+                pointerEvents: "none",
+              }}
+            />
+          </>
+        )}
+        {state === "processing" ? (
           <motion.div
-            animate={{ scale: ringScale }}
-            transition={{ duration: 0.08 }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             style={{
-              position: "absolute",
-              inset: "-10px",
+              width: "20px",
+              height: "20px",
               borderRadius: "50%",
-              border: `2px solid ${COLORS.ctaSolid}`,
-              opacity: 0.4 + amplitude * 0.4,
-              pointerEvents: "none",
+              border: `2.5px solid ${COLORS.ctaSolid}`,
+              borderTopColor: "transparent",
             }}
           />
+        ) : (
+          <Mic
+            size={28}
+            strokeWidth={1.75}
+            color={isActive ? "#FFFFFF" : COLORS.textPrimary}
+          />
         )}
-        <Mic size={28} strokeWidth={1.75} color={isActive ? "#FFFFFF" : COLORS.textPrimary} />
       </motion.button>
 
       {debugVisible && (
