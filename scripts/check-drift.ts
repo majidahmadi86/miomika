@@ -16,7 +16,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
-const DOC_PATH = join(ROOT, "STATE.md");
+const DOC_PATHS = [
+  join(ROOT, "STATE.md"),
+  join(ROOT, "MIOMIKA.md"),
+  join(ROOT, "MASTER-HANDOFF.md"),
+];
 
 function fail(msg: string): never {
   console.error(`[drift] FAIL — ${msg}`);
@@ -29,11 +33,15 @@ function ok(msg: string): void {
 
 // --- 1. Doc exists ---------------------------------------------------------
 
-if (!existsSync(DOC_PATH)) {
-  fail(`/STATE.md missing (expected at ${DOC_PATH})`);
+for (const p of DOC_PATHS) {
+  if (!existsSync(p)) {
+    fail(`Required doc missing: ${p}`);
+  }
 }
 
-const content = readFileSync(DOC_PATH, "utf8");
+// Drift check reads STATE.md for route validation (the other two are
+// vision docs and don't contain route references).
+const content = readFileSync(DOC_PATHS[0], "utf8");
 
 // --- 2. Extract route paths from backticks --------------------------------
 // Matches `/auth/...`, `/api/...`, but NOT generic paths like `/home` or

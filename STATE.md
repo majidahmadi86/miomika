@@ -1,143 +1,54 @@
-# MIOMIKA — STATE OF THE PROJECT
+# MIOMIKA — STATE OF THE PROJECT (technical pointer)
 
-> This is the only document any new developer or AI session needs to read.
-> Read this top-to-bottom. Then read the code. You have full context.
->
-> Last clean reset: RESET-FOUNDATION (May 2026)
+> **Read MIOMIKA.md and MASTER-HANDOFF.md FIRST.** They are the soul
+> of the project — why it exists, who it serves, what makes it
+> different. This file is just a short technical pointer to where
+> things live in code.
 
 ---
 
-## What Miomika is
+## The soul of the project
 
-An AI companion (a cat named Miomi) that teaches English to Thai users
-through conversation. Voice-first. Mobile-primary. Built by Mike, a
-solo founder in Bangkok. Hosted on Vercel + Supabase + Groq.
+- **MIOMIKA.md** — the product vision, the verb stack, the trojan-horse strategy, the laws.
+- **MASTER-HANDOFF.md** — founder context (Mike, Bangkok, Persian, building this for Thai families who deserve better than the corrupt private tutoring industry), product philosophy, non-negotiables.
 
-The cat is the product. Language learning is the wedge.
+Anyone touching this codebase reads those two files first. Without them you cannot make good decisions, only technically correct ones.
 
 ---
 
 ## Tech stack
 
-- **Framework:** Next.js 16 App Router, React 19, TypeScript
-- **Auth + DB:** Supabase (project `dfufsjnneiwzllkawahv`)
-- **AI:**
-  - Google Gemini (`@google/genai`) — conversational engine
-  - Groq Whisper Large v3 Turbo — speech-to-text
-- **Voice activity detection:** `@ricky0123/vad-web` (Silero VAD ONNX model, runs in-browser)
-- **Hosting:** Vercel (function region pinned to `sin1` for Thai latency)
-- **Monitoring:** Sentry (`@sentry/nextjs`)
-- **Styling:** Tailwind 4
+- Next.js 16 App Router, React 19, TypeScript
+- Supabase (auth + DB, project `dfufsjnneiwzllkawahv`)
+- Google Gemini conversational engine (`@google/genai`)
+- Groq Whisper Large v3 Turbo for speech-to-text
+- `@ricky0123/vad-web` for voice activity detection (ONNX model, runs in-browser)
+- Vercel (function region pinned to `sin1`)
+- Sentry monitoring
+- Tailwind 4
 
-Canonical host: **`www.miomika.com`** (apex `miomika.com` 307→ www).
-Supabase Site URL: `https://www.miomika.com`. Redirect URLs allow-list must be www-only.
+Canonical host: `www.miomika.com`. Supabase Site URL must match.
 
 ---
 
-## File map — only what matters
+## File map (where code lives)
 
 | Concern | File |
 |---|---|
-| OAuth callback handler | `app/auth/callback/route.ts` |
+| OAuth callback | `app/auth/callback/route.ts` |
 | Post-signup router (client-called) | `app/api/auth/post-signup/route.ts` |
-| Voice transcription (Groq Whisper) | `app/api/talk/transcribe/route.ts` |
-| Mic button (VAD-driven) | `components/talk/MicButton.tsx` |
-| Middleware (auth + language cookie) | `middleware.ts` |
-| Server-side profile read | `lib/auth/get-server-profile.ts` |
-| Client-side profile hook | `lib/auth/use-profile.ts` |
+| Voice transcription | `app/api/talk/transcribe/route.ts` |
+| Mic button (currently buggy, see Known Issues) | `components/talk/MicButton.tsx` |
+| Middleware | `middleware.ts` |
+| Server profile read | `lib/auth/get-server-profile.ts` |
+| Client profile hook | `lib/auth/use-profile.ts` |
 | Supabase clients | `lib/supabase/{client,server,middleware}.ts` |
-| Unified logger | `lib/debug/log.ts` |
-| Drift check (runs in predeploy) | `scripts/check-drift.ts` |
-| Design tokens (colors, gradients) | `lib/design/colors.ts` |
-| Thai/English warm phrases | `lib/voice/warmth.ts` |
+| Logger | `lib/debug/log.ts` |
+| Drift check | `scripts/check-drift.ts` |
+| Design tokens | `lib/design/colors.ts` |
+| Warmth phrases | `lib/voice/warmth.ts` |
 
-Anything not listed: don't touch without re-reading this doc.
-
----
-
-## Auth flow (one paragraph)
-
-User clicks Google on `/login` or `/signup` → Supabase OAuth → returns to
-`https://www.miomika.com/auth/callback?code=...` → callback exchanges code,
-writes `sb-*-auth-token` cookies onto its response, reads
-`getServerProfile()` inline (no fetch hop), redirects to `/onboarding` if
-new user OR `/home` if returning. Onboarding is a 3-second celebration
-(no form), marks `profiles.onboarding_completed_at`, auto-routes to
-`/home?celebrate=signup`. Returning users go straight to `/home`.
-
-**Critical:** middleware MUST NOT touch `/auth/callback`. The matcher
-excludes it explicitly. Wrapping the callback's redirect response in
-middleware strips its `Set-Cookie` headers on Android Chrome.
-
----
-
-## Voice flow (one paragraph)
-
-User opens `/talk` → MicButton mounts → on first tap, requests mic permission
-once and starts a VAD session via `@ricky0123/vad-web`. VAD continuously
-listens, detects speech start (real onset, not amplitude threshold),
-detects speech end (genuine pause, works in noisy environments),
-auto-emits a complete utterance blob. Blob is POSTed to
-`/api/talk/transcribe` with `credentials: "include"`. Server validates,
-calls Groq Whisper, returns `{ text }`. Parent component handles the
-text. The VAD session stays warm across utterances — no stream
-re-acquisition between turns. Releases on unmount or 60s idle.
-
-**Guests CAN use voice.** Voice is the conversion mechanism, not a
-gated feature.
-
----
-
-## State of truth
-
-| Where you are | Use this |
-|---|---|
-| Server component / API route / server action | `getServerProfile()` |
-| Client component | `useProfile()` returns `{ profile, loading, authReady }` |
-
-**Always gate client UI on `authReady === true`** before treating
-`profile === null` as guest. Never trust client-sent tier or userId.
-
----
-
-## Debugging
-
-- **Client logs:** add `?debug=1` to URL, or `localStorage.miomika_debug = "1"`. Otherwise silent in production.
-- **Server logs:** always on at `vercel.com/miomika/logs`. Search by scope prefix like `[auth.callback]` or `[voice.transcribe]`.
-- **All logs go through `log(scope, msg, data?)`** from `lib/debug/log.ts`. Auto-redacts emails in production.
-- **Sentry:** every flow boundary calls `Sentry.setTag("flow", "...")` — values: `oauth`, `voice`, `engine`. Filter Sentry by `flow:voice` to see only mic issues.
-- **Pre-deploy:** `npm run build` automatically runs `tsc + lint + drift check`. Cannot deploy broken code.
-- **Drift check:** `scripts/check-drift.ts` verifies every route mentioned in this STATE.md exists as a `route.ts` file. Runs in `predeploy`.
-
----
-
-## Environment variables
-
-Required in `.env.local` for dev AND in Vercel project settings for prod:
-
-| Variable | Where used |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase clients |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase clients |
-| `GROQ_API_KEY` | `/api/talk/transcribe` |
-| `RESEND_API_KEY` | welcome email |
-| `SENTRY_AUTH_TOKEN` | source maps upload (CI only) |
-
----
-
-## Database (Supabase)
-
-Single user table: `public.profiles`, keyed by `id` (= `auth.users.id`).
-Migration `0012_brutal_reset.sql` dropped the legacy `users_legacy_backup` table permanently. There is no `public.users` table. If you find code reading `public.users`, replace with `getServerProfile()`.
-
-Schema fields you'll actually use (from `lib/auth/get-server-profile.ts`):
-`id, email, display_name, tier, journey_stage, gender, ui_language, primary_language, learning_target_language, miomi_stars, xp, level, streak, mood, welcome_shown_at, onboarding_completed_at, last_seen_at`
-
-Tiers: `guest | free | pro | pro_max`.
-
----
-
-## Routes documented (drift check verifies these exist)
+## Routes documented (drift check verifies)
 
 - `/auth/callback`
 - `/api/auth/post-signup`
@@ -145,24 +56,32 @@ Tiers: `guest | free | pro | pro_max`.
 
 ---
 
-## Migration to another host
+## Environment variables required
 
-If you ever leave Vercel:
-1. The codebase is standard Next.js — works on any Node host (Render, Railway, Fly, AWS).
-2. Update Supabase Dashboard → URL Configuration → new domain in Site URL + Redirect URLs.
-3. Update Google Cloud Console → OAuth Client → Authorized redirect URIs (Supabase URL stays; add new host if used directly).
-4. Set the same environment variables on the new host.
-5. Region pin in `app/api/talk/transcribe/route.ts` (`preferredRegion = ["sin1"]`) is Vercel-specific — remove or replace with host equivalent.
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `GROQ_API_KEY`, `RESEND_API_KEY`, `SENTRY_AUTH_TOKEN`
 
 ---
 
-## Known dead ends (do not re-investigate)
+## Debugging
 
-- `/api/auth/callback` is NOT a real route. Old Google Cloud Console redirect URIs point there; harmless, cosmetic only.
-- Web Speech API on Android Chrome is broken (silent `onstart → onend`). We use MediaRecorder + Groq Whisper + VAD instead. Don't try to "fix" Web Speech.
-- Calling `/api/auth/post-signup` from inside the callback via internal fetch — doesn't work, `cookies()` from `next/headers` reads the outer request not forwarded headers. The callback resolves the profile inline.
-- Wrapping the OAuth callback in middleware (even passthrough) — strips `Set-Cookie` on Android Chrome. Matcher excludes `/auth/callback`.
-- Using RMS amplitude for silence detection — fails in noisy environments. We use VAD.
+- Client logs: `?debug=1` in URL or `localStorage.miomika_debug = "1"`
+- Server logs: vercel.com/miomika/logs, search by scope like `[voice.transcribe]`
+- Sentry: filter by `flow:oauth | voice | engine`
+- Pre-deploy: `npm run build` auto-runs `tsc + lint + drift`
+
+---
+
+## Known Issues (for next session)
+
+1. **MicButton voice flow is buggy.** Currently uses `@ricky0123/vad-web` for VAD. Symptoms:
+   - VAD detects speech start, then `destroy` is called mid-speech before `onSpeechEnd` can fire
+   - Result: no transcription, VAD reloads every tap (~1.5s delay each time), feels like double-tap is needed
+   - Likely cause: a React lifecycle effect with bad dependencies in MicButton.tsx, OR an upstream parent component calling destroy when state transitions occur
+   - Fix attempted but not verified: changing the lifecycle `useEffect` deps to `[]` (empty). Was about to push when handed off.
+   - **Recommended approach for next session:** look at `components/talk/MicButton.tsx` and the parent `/talk` page together. The destroy is likely triggered by a stale closure or a `useEffect` somewhere that re-runs on state change. The VAD instance must live across `state idle → listening → processing → speaking → idle` cycles without ever being destroyed until either (a) component unmount or (b) explicit user action.
+   - The VAD library, ONNX model, and wasm assets are all in place at `public/vad/`. Middleware excludes `/vad/`. The library loads fine. The problem is purely React lifecycle management.
+
+2. **Onboarding works** but is a simple 3-second celebration. Per Mike's vision (see MIOMIKA.md), this should eventually be replaced with an intelligent first-conversation experience — Miomi learning about the user naturally, not a form. Phase 3B work.
 
 ---
 
@@ -173,10 +92,3 @@ npm run dev          # local dev
 npm run build        # tsc + lint + drift, then production build
 npm run check:drift  # standalone drift check
 ```
-
----
-
-## Founder context
-
-Mike (Majid Ahmadi), Persian, 40s, Bangkok. Solo founder, self-funded, no investors.
-Building until master-class, not until MVP. Mobile-primary (Samsung A52 is the test phone). Rates work 1/10 to 10/10 — only 10 = pass. Direct, brutal, allergic to bullshit and credit waste. Read the code before proposing changes. Never claim something is fixed without verifying.
