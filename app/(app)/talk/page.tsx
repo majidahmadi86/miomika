@@ -17,9 +17,12 @@ import { useProfile } from "@/lib/auth/use-profile";
 
 export default function TalkPage() {
   const GUEST_LIMIT = 5;
+  const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
   const { isGuest, authReady } = useGuestExploration();
   const { profile } = useProfile();
-  const [guestExchanges, setGuestExchanges] = useState(0);
+  const [guestExchanges, setGuestExchangesRaw] = useState(0);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const TRANSCRIPT_CLIP = 180;
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [uiLang, setUiLang] = useState<"th" | "en">("th");
   const [micState, setMicState] = useState<MicState>("idle");
@@ -37,6 +40,47 @@ export default function TalkPage() {
   const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [textInput, setInputText] = useState("");
+
+  // Hydrate from localStorage on mount (client-only).
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
+    const parsed = stored ? parseInt(stored, 10) : 0;
+    if (!isNaN(parsed) && parsed > 0) {
+      setGuestExchangesRaw(parsed);
+    }
+  }, []);
+
+  // Clear counter when user converts from guest to logged-in.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (authReady && !isGuest) {
+      window.localStorage.removeItem(GUEST_COUNTER_KEY);
+      setGuestExchangesRaw(0);
+    }
+  }, [authReady, isGuest]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Persist on every change.
+  const setGuestExchanges = useCallback((updater: number | ((prev: number) => number)) => {
+    setGuestExchangesRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(GUEST_COUNTER_KEY, String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -93,7 +137,10 @@ export default function TalkPage() {
   }, [uiLang]);
 
   const processUserInput = useCallback(async (text: string) => {
-    // Guest limit check
+    // Authoritative gate — hold messages until auth resolves.
+    if (!authReady) {
+      return;
+    }
     if (isGuest && guestExchanges >= GUEST_LIMIT) {
       setShowGuestSheet(true);
       return;
@@ -102,28 +149,18 @@ export default function TalkPage() {
     if (!text.trim()) return;
     setInputText("");
 
+    // Increment counter the moment a guest commits a message,
+    // BEFORE library/AI routing — library matches must count.
+    if (isGuest) {
+      setGuestExchanges((prev) => prev + 1);
+    }
+
     // Add user echo
     setCanvasItems(prev => [...prev, {
       id: crypto.randomUUID(),
       type: "user_echo" as const,
       text: text.trim(),
     }]);
-    if (isGuest) {
-      setGuestExchanges(prev => {
-        const next = prev + 1;
-        if (next === GUEST_LIMIT - 1) {
-          window.setTimeout(() => {
-            setCanvasItems(items => [...items, {
-              id: crypto.randomUUID(),
-              type: "miomi_message" as const,
-              textTh: "คุยกับคุณสนุกมากเลยค่า~ หนูอยากจำคุณไว้นะคะ ถ้าสมัครฟรี เราคุยกันได้ตลอดเลยค่า",
-              textEn: "I love talking with you~ I want to remember you. Sign up free and we can talk forever~",
-            }]);
-          }, 3000);
-        }
-        return next;
-      });
-    }
 
     // Library-first routing
     const template = matchLibrary(text.trim(), { wordsIntroduced });
@@ -222,7 +259,7 @@ export default function TalkPage() {
         }]);
       }
     }
-  }, [wordsIntroduced, canvasItems, isGuest, guestExchanges, GUEST_LIMIT, uiLang]);
+  }, [wordsIntroduced, canvasItems, isGuest, guestExchanges, GUEST_LIMIT, uiLang, authReady, setGuestExchanges]);
 
   // Default to "auto" (which MicButton resolves to en-US — safe for both languages).
   // Only force "th-TH" when user has explicitly set Thai as both UI and primary.
@@ -240,38 +277,43 @@ export default function TalkPage() {
         display: "flex",
         flexDirection: "column",
         background: "#FAFAF6",
-        paddingTop: "env(safe-area-inset-top, 0px)",
       }}
     >
-      {/* TOP BAR — 44px */}
+      {/* TOP BAR — sticky with safe-area */}
       <div
         style={{
-          height: "44px",
-          flexShrink: 0,
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 16px",
-          background: "#FFFFFF",
-          borderBottom: "1px solid #E8E5DF",
-          zIndex: 10,
-          position: "relative",
+          padding: "8px 16px",
+          paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
+          background: "rgba(250, 250, 246, 0.95)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          borderBottom: "1px solid rgba(232, 229, 223, 0.4)",
+          minHeight: "44px",
+          flexShrink: 0,
         }}
       >
         <Link
           href="/home"
+          aria-label="Back to home"
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: "32px",
-            height: "32px",
+            width: "40px",
+            height: "40px",
             borderRadius: "50%",
-            background: "rgba(255,255,255,0.8)",
+            color: "#3D352B",
             textDecoration: "none",
+            flexShrink: 0,
           }}
         >
-          <ArrowLeft style={{ width: "20px", height: "20px", color: "#9A8B73" }} strokeWidth={2} />
+          <ArrowLeft size={22} strokeWidth={2} />
         </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -475,13 +517,48 @@ export default function TalkPage() {
                       </span>
                       <div style={{ flex: 1, height: "1px", background: "#E8E5DF" }} />
                     </div>
-                    <p style={{
-                      fontFamily: "'Quicksand', sans-serif",
-                      fontSize: "12px", fontStyle: "italic",
-                      color: "#9A8B73", margin: "2px 0 0",
-                    }}>
-                      {item.text.length > 60 ? item.text.slice(0, 60) + "…" : item.text}
-                    </p>
+                    {(() => {
+                      const fullText = item.text ?? "";
+                      const isLong = fullText.length > TRANSCRIPT_CLIP;
+                      const isExpanded = expandedItems.has(item.id);
+                      const displayText = !isLong || isExpanded ? fullText : fullText.slice(0, TRANSCRIPT_CLIP) + "…";
+                      return (
+                        <>
+                          <p style={{
+                            fontFamily: "'Quicksand', sans-serif",
+                            fontSize: "13px",
+                            color: "#3D352B",
+                            lineHeight: 1.5,
+                            margin: "2px 0 0",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                          }}>
+                            {displayText}
+                          </p>
+                          {isLong && (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpand(item.id)}
+                              style={{
+                                marginTop: "4px",
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                color: "#9A8B73",
+                                fontSize: "12px",
+                                fontFamily: "'Quicksand', sans-serif",
+                                textDecoration: "underline",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {isExpanded
+                                ? (uiLang === "en" ? "Show less" : "ย่อ")
+                                : (uiLang === "en" ? "Show more" : "ดูเพิ่ม")}
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 );
               }
