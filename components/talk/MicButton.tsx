@@ -112,6 +112,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       if (!mountedRef.current) return;
       if (stoppedRef.current) {
         trace("transcribe skipped — user stopped");
+        if (mountedRef.current) onStateChange("idle");
         return;
       }
       const wavBlob = float32ToWav(audio, 16000);
@@ -280,13 +281,21 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       void startVAD();
     },
     stop: () => {
-      // Synchronously gate any in-flight callback.
+      // Synchronously gate any in-flight callback FIRST.
       stoppedRef.current = true;
+      // Then nuke the VAD instance.
       if (vadRef.current) {
         const v = vadRef.current;
         vadRef.current = null;
-        void v.destroy().catch(() => { /* ignore */ });
+        // Fire and forget; in-flight callbacks already gated by stoppedRef.
+        try {
+          void v.destroy().catch(() => { /* ignore */ });
+        } catch {
+          /* ignore */
+        }
       }
+      // Force-cancel the loading flag too, so a tap-during-load doesn't leak.
+      isLoadingVadRef.current = false;
       if (mountedRef.current) onStateChange("idle");
     },
   }), [disabled, locked, onLockedTap, startVAD, onStateChange]);

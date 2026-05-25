@@ -280,7 +280,7 @@ export default function TalkPage() {
         maxHeight: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "#FAFAF6",
+        background: "#FCFCFA",
         width: "100%",
         overflow: "hidden",
       }}
@@ -294,8 +294,7 @@ export default function TalkPage() {
           justifyContent: "space-between",
           padding: "0 12px",
           paddingTop: "calc(env(safe-area-inset-top, 0px))",
-          background: "rgba(250,250,246,0.96)",
-          borderBottom: "0.5px solid rgba(232,229,223,0.5)",
+          background: "transparent",
         }}
       >
         <Link
@@ -307,7 +306,7 @@ export default function TalkPage() {
         </Link>
 
         {authReady && isGuest ? (
-          <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, color: "#9A8B73", background: "rgba(255,255,255,0.88)", border: "0.5px solid #EDE8E0", borderRadius: "999px", padding: "5px 12px" }}>
+          <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, color: "#9A8B73", background: "transparent", borderRadius: "999px", padding: "5px 12px" }}>
             {uiLang === "en" ? `${Math.max(0, GUEST_LIMIT - guestExchanges)} left` : `เหลืออีก ${Math.max(0, GUEST_LIMIT - guestExchanges)} ครั้ง`}
           </span>
         ) : (
