@@ -9,7 +9,7 @@
 
 If you are a future Claude or Cursor: this is your single most important context. Mike has been building Miomika for ~3 weeks. He's burned credits on sessions that didn't have full context. Don't be one of them.
 
-Read this fully. Then `/MIOMIKA.md`. Only then propose actions.
+Read this fully. Then `/MIOMIKA.md`. Then `/docs/architecture/SCREENS.md`. Only then propose actions.
 
 ---
 
