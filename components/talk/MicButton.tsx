@@ -236,6 +236,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     ref,
     () => ({
       start: () => {
+        console.log("[MicButton.start] called from:", new Error().stack?.split("\n").slice(2, 6).join("\n"));
         if (disabled || locked) {
           if (locked && onLockedTap) onLockedTap();
           return;
