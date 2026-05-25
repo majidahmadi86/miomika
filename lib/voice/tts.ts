@@ -4,28 +4,57 @@ export type TtsLang = "th" | "en";
 
 const VOICE_CACHE: { th?: SpeechSynthesisVoice; en?: SpeechSynthesisVoice; loaded?: boolean } = {};
 
-const THAI_VOICE_PRIORITY = ["Kanya", "Premwadee", "Narisa", "th-TH", "Thai"];
+// Ranked by perceived naturalness on real devices (Android Chrome, iOS Safari, Desktop Chrome).
+// "Google" and "Microsoft Natural/Neural" voices generally sound the most human.
+// "Online" voices (suffix on Microsoft) are higher quality than offline.
+const THAI_VOICE_PRIORITY = [
+  "Google ภาษาไทย",
+  "Microsoft Premwadee Online",
+  "Microsoft Niwat Online",
+  "Microsoft Achara Online",
+  "Premwadee",
+  "Niwat",
+  "Achara",
+  "Kanya",
+  "Narisa",
+  "Thai",
+  "th-TH",
+];
+
 const ENGLISH_VOICE_PRIORITY = [
   "Google US English",
+  "Google UK English Female",
+  "Microsoft Aria Online",
+  "Microsoft Jenny Online",
+  "Microsoft Ava Online",
+  "Microsoft Emma Online",
   "Samantha",
   "Karen",
-  "Microsoft Aria",
-  "Microsoft Jenny",
+  "Allison",
+  "Ava",
+  "Aria",
+  "Jenny",
   "en-US",
   "en-GB",
 ];
 
 function pickVoice(voices: SpeechSynthesisVoice[], lang: TtsLang): SpeechSynthesisVoice | undefined {
   const priority = lang === "th" ? THAI_VOICE_PRIORITY : ENGLISH_VOICE_PRIORITY;
+  // First pass: exact substring match on the priority list, in order.
   for (const needle of priority) {
-    const match = voices.find(
-      (v) =>
-        v.name.toLowerCase().includes(needle.toLowerCase()) ||
-        v.lang.toLowerCase().includes(needle.toLowerCase()),
-    );
+    const lowerNeedle = needle.toLowerCase();
+    const match = voices.find((v) => v.name.toLowerCase().includes(lowerNeedle));
     if (match) return match;
   }
-  return voices.find((v) => v.lang.toLowerCase().startsWith(lang));
+  // Second pass: female voices in the right language (sound less robotic on average).
+  const femaleHints = ["female", "woman", "aria", "jenny", "samantha", "karen", "ava", "premwadee", "achara"];
+  const langVoices = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
+  for (const hint of femaleHints) {
+    const match = langVoices.find((v) => v.name.toLowerCase().includes(hint));
+    if (match) return match;
+  }
+  // Third pass: any voice in the right language.
+  return langVoices[0];
 }
 
 function ensureVoicesLoaded(): Promise<SpeechSynthesisVoice[]> {
@@ -80,8 +109,9 @@ export async function speak(
   utter.lang = lang === "th" ? "th-TH" : "en-US";
   const voice = lang === "th" ? VOICE_CACHE.th : VOICE_CACHE.en;
   if (voice) utter.voice = voice;
-  utter.rate = lang === "th" ? 0.95 : 1.0;
-  utter.pitch = 1.15;
+  // Tune per-language. Thai needs slightly slower + lower pitch to sound less squeaky.
+  utter.rate = lang === "th" ? 0.92 : 1.0;
+  utter.pitch = lang === "th" ? 1.05 : 1.12;
   utter.volume = 1.0;
 
   utter.onstart = () => callbacks?.onStart?.();

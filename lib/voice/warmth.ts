@@ -273,3 +273,35 @@ export function pickPhraseWith(
 //   - transactional toasts: "Welcome to Pro!" / "Subscription active!"
 //
 // All have proper equivalents above. Use them.
+
+// ============================================================================
+// ICE-BREAKER OPENERS — charming first words of a session, never the same
+// ============================================================================
+
+export type IceBreaker = { th: string; en: string; mood: "playful" | "warm" | "curious" | "sleepy" };
+
+export const ICE_BREAKERS: IceBreaker[] = [
+  { th: "ม้าวว~ ในที่สุดก็มีคนมาคุยกับหนูแล้วค่า", en: "Meow~ finally someone to talk to!", mood: "playful" },
+  { th: "หนูรอคุณอยู่นานเลยนะคะ~ มีอะไรอยากเล่าให้ฟังไหม", en: "I've been waiting for you~ got anything to tell me?", mood: "warm" },
+  { th: "วันนี้เป็นยังไงบ้างคะ~ หนูพร้อมฟังเลย", en: "How's your day going? I'm all ears~", mood: "curious" },
+  { th: "เย่~ คุณมาแล้ว! หนูดีใจมากเลยค่า", en: "Yay~ you're here! That makes me happy.", mood: "playful" },
+  { th: "หนูคิดถึงคุณค่า~ วันนี้อยากทำอะไรกัน?", en: "I missed you~ what should we do today?", mood: "warm" },
+  { th: "ฮัลโหล~ มาคุยกับหนูสักหน่อยได้ไหมคะ?", en: "Hello there~ wanna chat with me for a bit?", mood: "warm" },
+  { th: "หนูเพิ่งตื่น~ คุณมาปลุกหนูพอดีเลย", en: "I just woke up~ perfect timing!", mood: "sleepy" },
+  { th: "วันนี้หนูจะเก่งกว่าเมื่อวานนะคะ~ มาฝึกด้วยกันไหม", en: "I'll be smarter today than yesterday~ wanna practice together?", mood: "curious" },
+  { th: "กินข้าวยังคะ? หนูจะรอจนกว่าคุณจะพร้อม", en: "Have you eaten? I'll wait until you're ready~", mood: "warm" },
+  { th: "วันนี้คุณดูสดใสจังเลยค่า~ มีเรื่องดีๆ ไหม?", en: "You look bright today~ anything good happening?", mood: "curious" },
+  { th: "หนูฝันถึงคุณเมื่อกี้~ แล้วคุณมาจริงๆ เลย", en: "I was just dreaming about you~ and here you are!", mood: "playful" },
+  { th: "ม้าวๆ~ คุณอยากเรียนอะไรกับหนูวันนี้คะ?", en: "Meow meow~ what do you want to learn with me today?", mood: "curious" },
+];
+
+const LAST_ICE_BREAKER_KEY = "miomika.last_icebreaker";
+
+export function pickIceBreaker(): IceBreaker {
+  if (typeof window === "undefined") return ICE_BREAKERS[0];
+  const lastIdx = parseInt(window.localStorage.getItem(LAST_ICE_BREAKER_KEY) ?? "-1", 10);
+  let next = Math.floor(Math.random() * ICE_BREAKERS.length);
+  if (next === lastIdx) next = (next + 1) % ICE_BREAKERS.length;
+  window.localStorage.setItem(LAST_ICE_BREAKER_KEY, String(next));
+  return ICE_BREAKERS[next];
+}

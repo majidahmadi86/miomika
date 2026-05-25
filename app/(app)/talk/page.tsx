@@ -19,9 +19,9 @@ import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { matchLibrary } from "@/lib/library/matcher";
 import { resolveWordCard } from "@/lib/library/resolver";
-import { getSessionOpener } from "@/lib/library/sessionOpener";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
 import { speak, stopTts, detectLang, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
+import { pickIceBreaker } from "@/lib/voice/warmth";
 
 type CanvasItem =
   | { id: string; kind: "mini_cat"; textTh: string; textEn: string }
@@ -46,8 +46,8 @@ function readUiLang(): "th" | "en" {
 }
 
 function makeOpenerItem(): CanvasItem {
-  const opener = getSessionOpener({ isFirstSession: true, hoursSinceLastSession: null, streakDays: 0 });
-  return { id: crypto.randomUUID(), kind: "mini_cat", textTh: opener.speech_th, textEn: opener.speech_en };
+  const iceBreaker = pickIceBreaker();
+  return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
 }
 
 export default function TalkPage() {
@@ -60,7 +60,7 @@ export default function TalkPage() {
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [uiLang, setUiLang] = useState<"th" | "en">(readUiLang);
   const [micState, setMicState] = useState<MicState>("idle");
-  const [items, setItems] = useState<CanvasItem[]>(() => [makeOpenerItem()]);
+  const [items, setItems] = useState<CanvasItem[]>([]);
   const [textInput, setTextInput] = useState("");
   const [keyboardMode, setKeyboardMode] = useState(false);
   const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
@@ -103,6 +103,28 @@ export default function TalkPage() {
     if (ttsStored !== null) setTtsOn(ttsStored === "1");
     void preloadTtsVoices();
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
+  useEffect(() => {
+    if (items.length > 0) return;
+    const iceBreaker = pickIceBreaker();
+    setItems([{ id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en }]);
+    // Speak the ice-breaker if TTS is on. Small delay so voices have time to load.
+    if (ttsOn) {
+      const lang = conversationLangRef.current;
+      const speakText = lang === "th" ? iceBreaker.th : iceBreaker.en;
+      window.setTimeout(() => {
+        if (!mountedRefForTts.current) return;
+        setMicState("speaking");
+        void speak(speakText, lang, {
+          onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
+          onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
+        });
+      }, 1200);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset + auto-raise CTA on limit */
@@ -241,8 +263,9 @@ export default function TalkPage() {
               const langRule = userLang === "th"
                 ? "The user spoke in Thai. Respond in Thai ONLY. Be warm and natural."
                 : "The user spoke in English. Respond in English ONLY. Be warm and natural. Do NOT add Thai unless they ask to learn Thai.";
+              const levelRule = "CRITICAL: Mirror the user's language level. Look at the complexity, vocabulary, and sentence length of their LAST message. If they used simple words and short sentences, reply with simple words and short sentences. If they used advanced vocabulary, you can match it. Never speak above their level. Beginners get short, warm, easy replies — like a kind friend, not a textbook.";
               const modeRule = config.mode === "teach" ? `You are in Teach mode. The user is learning ${config.teach.learning === "th" ? "Thai" : "English"} at ${config.teach.level} level.` : config.mode === "social" ? `You are in Social mode. ${config.social.channel ? `Channel: ${config.social.channel}.` : ""} ${config.social.niche ? `Niche: ${config.social.niche}.` : ""}` : config.mode === "translate" ? "You are in Translator mode. Always provide translations with romanization." : config.mode === "chat" ? "You are in Just-chat mode. Be warm, present, brief, no teaching." : "Auto mode. Detect what the user needs and respond accordingly.";
-              return `You are Miomi, a warm kawaii cat companion. ${modeRule} ${langRule} ${lengthRule} Always end with one question or invitation.`;
+              return `You are Miomi, a warm kawaii cat companion. ${modeRule} ${langRule} ${levelRule} ${lengthRule} Always end with one question or invitation.`;
             })(),
             sessionContext: { exchangeNumber: items.filter((i) => i.kind === "user_said").length, wordsIntroduced },
           }),
