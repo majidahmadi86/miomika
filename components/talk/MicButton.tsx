@@ -145,7 +145,16 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       return;
     }
     if (vadRef.current) {
-      // Already running; do nothing.
+      // Instance exists — just resume listening (instant, no re-allocation).
+      try {
+        await vadRef.current.start();
+        if (mountedRef.current && userIntentRef.current) {
+          trace("VAD resumed (warm)");
+          onStateChange("listening");
+        }
+      } catch (e) {
+        trace("VAD resume failed", { error: (e as Error).message });
+      }
       return;
     }
     if (isLoadingVadRef.current) return;
@@ -247,11 +256,14 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       stop: () => {
         // Synchronous intent flip is the source of truth.
         userIntentRef.current = false;
-        killVAD();
+        // Pause keeps instance warm for next tap; destroy only on lock/unmount.
+        if (vadRef.current) {
+          try { void vadRef.current.pause().catch(() => { /* ignore */ }); } catch { /* ignore */ }
+        }
         if (mountedRef.current) onStateChange("idle");
       },
     }),
-    [disabled, locked, onLockedTap, startVAD, killVAD, onStateChange],
+    [disabled, locked, onLockedTap, startVAD, onStateChange],
   );
 
   const handlePress = useCallback(() => {
@@ -263,7 +275,10 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     if (state === "processing") return;
     if (state === "speaking" || state === "listening") {
       userIntentRef.current = false;
-      killVAD();
+      // Pause, don't destroy — keeps instance warm for next tap.
+      if (vadRef.current) {
+        try { void vadRef.current.pause().catch(() => { /* ignore */ }); } catch { /* ignore */ }
+      }
       onStateChange("idle");
       return;
     }
@@ -271,7 +286,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       userIntentRef.current = true;
       void startVAD();
     }
-  }, [disabled, locked, onLockedTap, state, onStateChange, killVAD, startVAD]);
+  }, [disabled, locked, onLockedTap, state, onStateChange, startVAD]);
 
   const onPointerDown = useCallback(() => {
     longPressTimerRef.current = window.setTimeout(() => {
