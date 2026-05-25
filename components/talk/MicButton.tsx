@@ -259,10 +259,14 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       }
     },
     stop: () => {
-      if (state === "listening" && vadRef.current) {
-        void vadRef.current.pause();
-        onStateChange("idle");
+      // Explicit user stop — fully destroy the VAD instance to release the mic
+      // and prevent the in-flight onSpeechEnd from firing after we said "stop".
+      if (vadRef.current) {
+        const v = vadRef.current;
+        vadRef.current = null;
+        void v.destroy().catch(() => { /* ignore */ });
       }
+      if (mountedRef.current) onStateChange("idle");
     },
   }), [disabled, locked, onLockedTap, state, startVAD, onStateChange]);
 
@@ -283,9 +287,12 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       return;
     }
     if (state === "listening") {
-      // User wants to stop. Pause, don't destroy — keeps VAD warm for next tap.
+      // User wants to stop. Destroy fully — pause leaves a dangling listener
+      // that fires onSpeechEnd after the user explicitly stopped.
       if (vadRef.current) {
-        void vadRef.current.pause();
+        const v = vadRef.current;
+        vadRef.current = null;
+        void v.destroy().catch(() => { /* ignore */ });
       }
       onStateChange("idle");
       return;

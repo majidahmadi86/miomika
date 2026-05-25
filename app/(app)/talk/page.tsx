@@ -4,13 +4,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Keyboard, Plus } from "lucide-react";
+import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
+import { ModeStripBar } from "@/components/talk/ModeStripBar";
+import { Toolbox, type ResponseLength, type ResponseLang } from "@/components/talk/Toolbox";
+import { GuestCtaInline } from "@/components/talk/GuestCtaInline";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
 import { MicButton, type MicState, type MicButtonHandle } from "@/components/talk/MicButton";
 import { FuelPill } from "@/components/talk/FuelPill";
 import { VoiceOrb, type OrbState } from "@/components/talk/VoiceOrb";
-import { ModeStrip } from "@/components/talk/ModeStrip";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
@@ -42,6 +45,10 @@ export default function TalkPage() {
   const [textInput, setTextInput] = useState("");
   const [keyboardMode, setKeyboardMode] = useState(false);
   const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
+  const [respLength, setRespLength] = useState<ResponseLength>("normal");
+  const [respLang, setRespLang] = useState<ResponseLang>("both");
+  const [ttsOn, setTtsOn] = useState(false);
+  const [guestCtaDismissed, setGuestCtaDismissed] = useState(false);
   const [guestExchanges, setGuestExchangesRaw] = useState(0);
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -101,6 +108,13 @@ export default function TalkPage() {
   }, [items.length]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  const miomiMood: MiomiMood = (() => {
+    if (micState === "listening") return "listening";
+    if (micState === "processing") return "thinking";
+    if (micState === "speaking") return "speaking";
+    return "idle";
+  })();
+
   const orbState: OrbState = (() => {
     if (authReady && isGuest && guestExchanges >= GUEST_LIMIT) return "locked";
     if (micState === "listening") return "listening";
@@ -120,7 +134,10 @@ export default function TalkPage() {
   const processInput = useCallback(
     async (text: string) => {
       if (!authReady) return;
+      // HARD STOP: guest limit reached. Kill mic, show CTA, NEVER hit the API.
       if (isGuest && guestExchanges >= GUEST_LIMIT) {
+        micRef.current?.stop();
+        setMicState("idle");
         setShowGuestSheet(true);
         return;
       }
@@ -176,10 +193,25 @@ export default function TalkPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: [{ role: "user", content: text.trim() }],
-            sessionInstruction:
-              uiLang === "en"
-                ? "You are Miomi, a warm kawaii cat companion. Respond in English first, Thai phrases in quotes if relevant. Under 50 words. End with one question or invitation."
-                : "You are Miomi, a warm kawaii cat companion. Respond in Thai first, English below. Under 50 words. End with one question or invitation.",
+            sessionInstruction: (() => {
+              const lengthRule =
+                respLength === "short" ? "Under 25 words."
+                : respLength === "detailed" ? "60-100 words, thorough."
+                : "Under 50 words.";
+              const langRule =
+                respLang === "th" ? "Respond in Thai only."
+                : respLang === "en" ? "Respond in English only."
+                : uiLang === "en"
+                  ? "Respond in English first, Thai phrases in quotes if relevant."
+                  : "Respond in Thai first, English below.";
+              const modeRule =
+                config.mode === "teach" ? `You are in Teach mode. The user is learning ${config.teach.learning === "th" ? "Thai" : "English"} at ${config.teach.level} level.`
+                : config.mode === "social" ? `You are in Social mode. ${config.social.channel ? `Channel: ${config.social.channel}.` : ""} ${config.social.niche ? `Niche: ${config.social.niche}.` : ""}`
+                : config.mode === "translate" ? "You are in Translator mode. Always provide translations with romanization."
+                : config.mode === "chat" ? "You are in Just-chat mode. Be warm, present, brief, no teaching."
+                : "Auto mode. Detect what the user needs and respond accordingly.";
+              return `You are Miomi, a warm kawaii cat companion. ${modeRule} ${langRule} ${lengthRule} Always end with one question or invitation.`;
+            })(),
             sessionContext: {
               exchangeNumber: items.filter((i) => i.kind === "user_said").length,
               wordsIntroduced,
@@ -205,7 +237,7 @@ export default function TalkPage() {
         ]);
       }
     },
-    [authReady, isGuest, guestExchanges, wordsIntroduced, uiLang, items, setGuestExchanges]
+    [authReady, isGuest, guestExchanges, wordsIntroduced, uiLang, items, setGuestExchanges, config, respLength, respLang]
   );
 
   const toggleExpand = useCallback((id: string) => {
@@ -224,7 +256,6 @@ export default function TalkPage() {
 
   const handleOrbTap = useCallback(() => {
     if (orbState === "locked") {
-      setShowGuestSheet(true);
       return;
     }
     if (micState === "listening") {
@@ -298,41 +329,36 @@ export default function TalkPage() {
         </button>
       </div>
 
-      <ModeStrip
-        mode={config.mode}
-        isLive={micState === "listening" || micState === "processing"}
+      <PersistentMiomi
+        mood={miomiMood}
         uiLang={uiLang}
-        onTap={() => setAdjustOpen(true)}
+        subtitleTh={items.length <= 1 ? "หนูพร้อมแล้วค่า~" : undefined}
+        subtitleEn={items.length <= 1 ? "I'm ready~" : undefined}
       />
 
-      <div
-        ref={canvasRef}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          padding: "14px 14px 0",
-          display: "flex",
-          flexDirection: "column",
-          gap: "12px",
-        }}
-      >
-        {items.length <= 1 && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 0 18px", position: "relative" }}>
-            <div style={{ position: "absolute", width: "300px", height: "300px", borderRadius: "50%", background: "radial-gradient(circle, rgba(249,168,212,0.16) 0%, transparent 65%)", top: "-10px", pointerEvents: "none" }} />
-            <div style={{ position: "absolute", width: "260px", height: "260px", borderRadius: "50%", border: "1px solid rgba(232,199,122,0.2)", animation: "ringBreatheBig 3.8s ease-in-out infinite", top: "-10px" }} />
-            <div style={{ width: "200px", height: "200px", borderRadius: "50%", background: "linear-gradient(135deg, #FFF4E8 0%, #FFE8D6 100%)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 1, animation: "catBreatheBig 4s ease-in-out infinite" }}>
-              <Image src="/characters/miomi/full/idle.png" alt="Miomi" width={172} height={172} style={{ objectFit: "contain" }} priority />
-            </div>
-            <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "15px", fontWeight: 500, color: "#3D352B", margin: "22px 0 4px", textAlign: "center" }}>
-              {uiLang === "en" ? "I'm ready~" : "หนูพร้อมแล้วค่า~"}
-            </p>
-            <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "12px", color: "#9A8B73", margin: 0, textAlign: "center" }}>
-              {uiLang === "en" ? "just start talking · I'll keep up" : "พูดอะไรก็ได้ค่า~ หนูเข้าใจ"}
-            </p>
-          </div>
-        )}
-
+      <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <Toolbox
+          length={respLength}
+          lang={respLang}
+          ttsOn={ttsOn}
+          uiLang={uiLang}
+          onCycleLength={() => setRespLength((p) => (p === "short" ? "normal" : p === "normal" ? "detailed" : "short"))}
+          onCycleLang={() => setRespLang((p) => (p === "th" ? "en" : p === "en" ? "both" : "th"))}
+          onToggleTts={() => setTtsOn((p) => !p)}
+        />
+        <div
+          ref={canvasRef}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            padding: "8px 14px 0",
+            paddingRight: "52px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
         {items.map((item) => {
           if (item.kind === "mini_cat") {
             return <MiniCatRow key={item.id} textTh={item.textTh} textEn={item.textEn} uiLang={uiLang} />;
@@ -390,11 +416,27 @@ export default function TalkPage() {
           return null;
         })}
 
+        {authReady && isGuest && guestExchanges >= GUEST_LIMIT && !guestCtaDismissed && (
+          <GuestCtaInline uiLang={uiLang} onDismiss={() => setGuestCtaDismissed(true)} />
+        )}
+
         <div style={{ height: "8px" }} />
+        </div>
       </div>
 
+      <ModeStripBar
+        current={config.mode}
+        uiLang={uiLang}
+        onChange={(m) => {
+          const next = { ...config, mode: m };
+          setConfig(next);
+          saveTalkConfig(next);
+        }}
+        onOpenAdjust={() => setAdjustOpen(true)}
+      />
+
       {keyboardMode ? (
-        <div style={{ flexShrink: 0, padding: "10px 12px 14px", background: "linear-gradient(180deg, rgba(250,250,246,0) 0%, #FAFAF6 30%)" }}>
+        <div style={{ flexShrink: 0, padding: "6px 12px 12px", background: "linear-gradient(180deg, rgba(250,250,246,0) 0%, #FAFAF6 30%)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#FFFFFF", border: "0.5px solid #EDE8E0", borderRadius: "26px", padding: "5px 5px 5px 16px", boxShadow: "0 2px 10px rgba(26,26,24,0.04)" }}>
             <input
               type="text"
@@ -432,7 +474,7 @@ export default function TalkPage() {
           </div>
         </div>
       ) : (
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "14px", padding: "12px 16px 16px", position: "relative" }}>
+        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "14px", padding: "4px 16px 14px", position: "relative" }}>
           <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
             <MicButton
               ref={micRef}
@@ -440,6 +482,13 @@ export default function TalkPage() {
               language="auto"
               onTranscript={async (text, isFinal) => {
                 if (!isFinal) return;
+                // Second-line defense: if guest already at limit, drop the transcript.
+                if (authReady && isGuest && guestExchanges >= GUEST_LIMIT) {
+                  micRef.current?.stop();
+                  setMicState("idle");
+                  setShowGuestSheet(true);
+                  return;
+                }
                 await processInput(text);
               }}
               onStateChange={setMicState}
@@ -531,10 +580,6 @@ export default function TalkPage() {
         </motion.div>
       )}
 
-      <style>{`
-        @keyframes catBreatheBig { 0%,100% { transform:scale(1); } 50% { transform:scale(1.02); } }
-        @keyframes ringBreatheBig { 0%,100% { transform:scale(1); opacity:0.5; } 50% { transform:scale(1.06); opacity:0.8; } }
-      `}</style>
     </div>
   );
 }

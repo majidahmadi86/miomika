@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -28,6 +28,22 @@ interface AdjustSheetProps {
 
 export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp }: AdjustSheetProps) {
   const [draft, setDraft] = useState<TalkConfig>(config);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPop = (e: PopStateEvent) => {
+      e.preventDefault();
+      onClose();
+    };
+    window.history.pushState({ adjustOpen: true }, "");
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (window.history.state?.adjustOpen) {
+        window.history.back();
+      }
+    };
+  }, [open, onClose]);
 
   const socialNeeds = (() => {
     let count = 0;
@@ -106,7 +122,7 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp
               <div style={{ width: "36px" }} />
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 12px" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 40px", WebkitOverflowScrolling: "touch" }}>
               <Group label={uiLang === "en" ? "Lock her role" : "ล็อคบทบาท"} help={uiLang === "en" ? "Auto = she reads you. Lock = she stays in one mode." : "อัตโนมัติ = หนูอ่านคุณ ล็อค = หนูอยู่ในโหมดเดียว"}>
                 <ModeGrid value={draft.mode} onChange={(m) => setDraft({ ...draft, mode: m })} uiLang={uiLang} />
               </Group>
@@ -243,20 +259,25 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp
                     </Pill>
                   ))}
                 </PillRow>
-                <MiniLabel label={uiLang === "en" ? "How deep should she go" : "ลึกแค่ไหน"} mt />
+                <MiniLabel label={uiLang === "en" ? "How intelligent should she be" : "ความฉลาดของหนู"} mt />
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", fontFamily: "'Quicksand', sans-serif", fontSize: "11px", color: "#9A8B73" }}>
-                  <span>{uiLang === "en" ? "Quick" : "เร็ว"}</span>
+                  <span>{uiLang === "en" ? "Fast" : "เร็ว"}</span>
                   <input
                     type="range"
                     min={0}
                     max={100}
-                    step={5}
+                    step={50}
                     value={draft.depth}
                     onChange={(e) => setDraft({ ...draft, depth: parseInt(e.target.value, 10) })}
                     style={{ flex: 1, accentColor: "#C9A96E" }}
                   />
-                  <span>{uiLang === "en" ? "Deep" : "ลึก"}</span>
+                  <span>{uiLang === "en" ? "Genius" : "อัจฉริยะ"}</span>
                 </div>
+                <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10.5px", color: "#9A8B73", margin: "4px 0 0", textAlign: "center" }}>
+                  {draft.depth <= 33 ? (uiLang === "en" ? "Fast · short answers" : "เร็ว · สั้น")
+                    : draft.depth <= 66 ? (uiLang === "en" ? "Smart · balanced" : "ฉลาด · สมดุล")
+                    : (uiLang === "en" ? "Genius · deep & thoughtful" : "อัจฉริยะ · ลึก")}
+                </p>
               </Section>
 
               <Section icon={Brain} title={uiLang === "en" ? "Memory" : "ความจำ"}>
