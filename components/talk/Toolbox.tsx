@@ -32,21 +32,23 @@ export function Toolbox({
     <div
       style={{
         position: "absolute",
-        right: "8px",
+        right: "6px",
         bottom: "12px",
         display: "flex",
-        flexDirection: "column",
-        gap: "14px",
+        flexDirection: "column-reverse",
+        gap: "16px",
         zIndex: 4,
         alignItems: "center",
+        background: "transparent",
+        pointerEvents: "auto",
       }}
     >
       <ToolBtn
-        Icon={ttsOn ? Volume2 : VolumeX}
-        active={ttsOn}
+        Icon={Keyboard}
+        active={keyboardMode}
         label=""
-        title={uiLang === "en" ? (ttsOn ? "Voice on" : "Voice off") : "เสียง"}
-        onClick={onToggleTts}
+        title={uiLang === "en" ? "Keyboard" : "แป้นพิมพ์"}
+        onClick={onToggleKeyboard}
       />
       <ToolBtn
         Icon={Type}
@@ -63,11 +65,11 @@ export function Toolbox({
         onClick={onCycleLang}
       />
       <ToolBtn
-        Icon={Keyboard}
-        active={keyboardMode}
+        Icon={ttsOn ? Volume2 : VolumeX}
+        active={ttsOn}
         label=""
-        title={uiLang === "en" ? "Keyboard" : "แป้นพิมพ์"}
-        onClick={onToggleKeyboard}
+        title={uiLang === "en" ? (ttsOn ? "Voice on" : "Voice off") : "เสียง"}
+        onClick={onToggleTts}
       />
     </div>
   );
@@ -94,9 +96,8 @@ function ToolBtn({
       aria-label={title}
       aria-pressed={active}
       style={{
-        width: "36px",
-        height: "36px",
-        borderRadius: "50%",
+        width: "40px",
+        height: "40px",
         background: "transparent",
         border: "none",
         display: "flex",
@@ -104,20 +105,21 @@ function ToolBtn({
         alignItems: "center",
         justifyContent: "center",
         cursor: "pointer",
-        gap: "1px",
         padding: 0,
+        position: "relative",
       }}
     >
-      <Icon size={20} color={active ? "#C9A96E" : "#9A8B73"} strokeWidth={2} />
+      <Icon size={22} color={active ? "#C9A96E" : "#9A8B73"} strokeWidth={2} />
       {label && (
         <span
           style={{
+            position: "absolute",
+            bottom: "-4px",
             fontFamily: "'Quicksand', sans-serif",
             fontSize: "8px",
             color: active ? "#C9A96E" : "#9A8B73",
             fontWeight: 700,
             lineHeight: 1,
-            marginTop: "1px",
           }}
         >
           {label}

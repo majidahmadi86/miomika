@@ -260,18 +260,27 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
   }, [trace, onStateChange]);
 
   // --- Imperative API (used by VoiceOrb parent to start/stop without clicking)
+  // CRITICAL: do NOT depend on `state` here. `state` is captured in closure
+  // and goes stale fast. The ref check (vadRef.current) is the truth.
+  // Also: do NOT block start() on state === "idle" — the parent may call
+  // start() before React has flushed the previous idle state.
   useImperativeHandle(ref, () => ({
     start: () => {
       if (disabled || locked) {
         if (locked && onLockedTap) onLockedTap();
         return;
       }
-      if (state === "idle") {
-        void startVAD();
+      // If a VAD instance exists from before, blow it away first
+      // (prevents zombie listeners from a prior session).
+      if (vadRef.current) {
+        const v = vadRef.current;
+        vadRef.current = null;
+        void v.destroy().catch(() => { /* ignore */ });
       }
+      void startVAD();
     },
     stop: () => {
-      // Flip the flag FIRST — synchronously gates any in-flight callback.
+      // Synchronously gate any in-flight callback.
       stoppedRef.current = true;
       if (vadRef.current) {
         const v = vadRef.current;
@@ -280,7 +289,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       }
       if (mountedRef.current) onStateChange("idle");
     },
-  }), [disabled, locked, onLockedTap, state, startVAD, onStateChange]);
+  }), [disabled, locked, onLockedTap, startVAD, onStateChange]);
 
   // --- Press handlers ------------------------------------------------------
 

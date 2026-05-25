@@ -5,14 +5,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
-import { ModeStripBar } from "@/components/talk/ModeStripBar";
+import { MicRow } from "@/components/talk/MicRow";
 import { Toolbox, type ResponseLength, type ResponseLang } from "@/components/talk/Toolbox";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
 import { MicButton, type MicState, type MicButtonHandle } from "@/components/talk/MicButton";
 import { FuelPill } from "@/components/talk/FuelPill";
-import { VoiceOrb, type OrbState } from "@/components/talk/VoiceOrb";
+import { type OrbState } from "@/components/talk/VoiceOrb";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
@@ -427,18 +427,8 @@ export default function TalkPage() {
         </div>
       </div>
 
-      <ModeStripBar
-        current={config.mode}
-        uiLang={uiLang}
-        onChange={(m) => {
-          const next = { ...config, mode: m };
-          setConfig(next);
-          saveTalkConfig(next);
-        }}
-      />
-
       {keyboardMode ? (
-        <div style={{ flexShrink: 0, padding: "6px 12px 12px", background: "linear-gradient(180deg, rgba(250,250,246,0) 0%, #FAFAF6 30%)" }}>
+        <div style={{ flexShrink: 0, padding: "6px 12px 12px", background: "transparent" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#FFFFFF", border: "0.5px solid #EDE8E0", borderRadius: "26px", padding: "5px 5px 5px 16px", boxShadow: "0 2px 10px rgba(26,26,24,0.04)" }}>
             <input
               type="text"
@@ -476,7 +466,7 @@ export default function TalkPage() {
           </div>
         </div>
       ) : (
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "4px 16px 14px", position: "relative" }}>
+        <>
           <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
             <MicButton
               ref={micRef}
@@ -484,7 +474,6 @@ export default function TalkPage() {
               language="auto"
               onTranscript={async (text, isFinal) => {
                 if (!isFinal) return;
-                // Second-line defense: if guest already at limit, drop the transcript.
                 if (authReady && isGuest && guestExchanges >= GUEST_LIMIT) {
                   micRef.current?.stop();
                   setMicState("idle");
@@ -498,20 +487,23 @@ export default function TalkPage() {
               onLockedTap={() => setShowGuestSheet(true)}
             />
           </div>
-          <VoiceOrb
-            state={orbState}
-            onTap={handleOrbTap}
-            ariaLabel={
+          <MicRow
+            current={config.mode}
+            orbState={orbState}
+            uiLang={uiLang}
+            onModeChange={(m) => {
+              const next = { ...config, mode: m };
+              setConfig(next);
+              saveTalkConfig(next);
+            }}
+            onOrbTap={handleOrbTap}
+            orbAriaLabel={
               orbState === "listening"
-                ? uiLang === "en"
-                  ? "Stop listening"
-                  : "หยุดฟัง"
-                : uiLang === "en"
-                  ? "Tap to talk with Miomi"
-                  : "แตะเพื่อพูดกับหนู"
+                ? uiLang === "en" ? "Stop listening" : "หยุดฟัง"
+                : uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู"
             }
           />
-        </div>
+        </>
       )}
 
       {items.length > 1 && (
