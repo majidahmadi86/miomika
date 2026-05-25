@@ -7,7 +7,6 @@ interface ModeStripBarProps {
   current: TalkMode;
   uiLang: "th" | "en";
   onChange: (m: TalkMode) => void;
-  onOpenAdjust: () => void;
 }
 
 const MODES: { key: TalkMode; Icon: LucideIcon; labelTh: string; labelEn: string }[] = [
@@ -18,14 +17,14 @@ const MODES: { key: TalkMode; Icon: LucideIcon; labelTh: string; labelEn: string
   { key: "chat", Icon: Heart, labelTh: "คุย", labelEn: "Chat" },
 ];
 
-export function ModeStripBar({ current, uiLang, onChange, onOpenAdjust }: ModeStripBarProps) {
+export function ModeStripBar({ current, uiLang, onChange }: ModeStripBarProps) {
   return (
     <div
       style={{
         flexShrink: 0,
         display: "flex",
-        gap: "10px",
-        padding: "8px 14px 4px",
+        gap: "8px",
+        padding: "10px 16px 4px",
         overflowX: "auto",
         scrollbarWidth: "none",
         background: "transparent",
@@ -46,31 +45,40 @@ export function ModeStripBar({ current, uiLang, onChange, onOpenAdjust }: ModeSt
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "4px",
+              gap: "3px",
               background: "transparent",
               border: "none",
-              padding: "4px 2px",
+              padding: "4px 6px",
               cursor: "pointer",
               flexShrink: 0,
             }}
           >
             <span
               style={{
-                width: "44px",
-                height: "44px",
+                width: "40px",
+                height: "40px",
                 borderRadius: "50%",
-                background: active
-                  ? "linear-gradient(135deg, #FFF4E8 0%, #FFE8D6 100%)"
-                  : "rgba(255,255,255,0.7)",
-                border: active ? "1.5px solid #C9A96E" : "0.5px solid #EDE8E0",
+                background: "transparent",
+                border: "none",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                boxShadow: active ? "0 2px 8px rgba(201,169,110,0.2)" : "none",
+                position: "relative",
                 transition: "all 220ms ease",
               }}
             >
-              <Icon size={19} strokeWidth={2} color={active ? "#C9A96E" : "#9A8B73"} />
+              {active && (
+                <span
+                  style={{
+                    position: "absolute",
+                    inset: "-2px",
+                    borderRadius: "50%",
+                    background: "radial-gradient(circle, rgba(232,199,122,0.25) 0%, transparent 70%)",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+              <Icon size={22} strokeWidth={active ? 2.2 : 1.8} color={active ? "#C9A96E" : "#9A8B73"} />
             </span>
             <span
               style={{
@@ -78,6 +86,7 @@ export function ModeStripBar({ current, uiLang, onChange, onOpenAdjust }: ModeSt
                 fontSize: "9.5px",
                 fontWeight: active ? 600 : 500,
                 color: active ? "#B8985C" : "#9A8B73",
+                transition: "color 220ms ease",
               }}
             >
               {uiLang === "en" ? labelEn : labelTh}
@@ -85,26 +94,6 @@ export function ModeStripBar({ current, uiLang, onChange, onOpenAdjust }: ModeSt
           </button>
         );
       })}
-      <button
-        type="button"
-        onClick={onOpenAdjust}
-        aria-label="Open adjust"
-        style={{
-          width: "44px",
-          height: "44px",
-          borderRadius: "50%",
-          background: "transparent",
-          border: "0.5px dashed #C4BDB5",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          marginLeft: "2px",
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "18px", color: "#9A8B73", lineHeight: 1 }}>···</span>
-      </button>
     </div>
   );
 }

@@ -3,11 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Keyboard, Plus } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
 import { ModeStripBar } from "@/components/talk/ModeStripBar";
 import { Toolbox, type ResponseLength, type ResponseLang } from "@/components/talk/Toolbox";
-import { GuestCtaInline } from "@/components/talk/GuestCtaInline";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
@@ -48,7 +47,6 @@ export default function TalkPage() {
   const [respLength, setRespLength] = useState<ResponseLength>("normal");
   const [respLang, setRespLang] = useState<ResponseLang>("both");
   const [ttsOn, setTtsOn] = useState(false);
-  const [guestCtaDismissed, setGuestCtaDismissed] = useState(false);
   const [guestExchanges, setGuestExchangesRaw] = useState(0);
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -159,6 +157,9 @@ export default function TalkPage() {
             textEn: template.response.speech_en,
           },
         ]);
+        if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
+          window.setTimeout(() => setShowGuestSheet(true), 800);
+        }
 
         if (template.follow_up?.type === "word_card" && template.follow_up.payload_resolver) {
           const word = await resolveWordCard(
@@ -225,6 +226,10 @@ export default function TalkPage() {
         const textTh = parts[0]?.trim() ?? content;
         const textEn = parts[1]?.trim() ?? "";
         setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "mini_cat", textTh, textEn }]);
+        // After this reply, if guest just consumed their last exchange, surface the warm CTA.
+        if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
+          window.setTimeout(() => setShowGuestSheet(true), 800);
+        }
       } catch {
         setItems((prev) => [
           ...prev,
@@ -341,10 +346,12 @@ export default function TalkPage() {
           length={respLength}
           lang={respLang}
           ttsOn={ttsOn}
+          keyboardMode={keyboardMode}
           uiLang={uiLang}
           onCycleLength={() => setRespLength((p) => (p === "short" ? "normal" : p === "normal" ? "detailed" : "short"))}
           onCycleLang={() => setRespLang((p) => (p === "th" ? "en" : p === "en" ? "both" : "th"))}
           onToggleTts={() => setTtsOn((p) => !p)}
+          onToggleKeyboard={() => setKeyboardMode((p) => !p)}
         />
         <div
           ref={canvasRef}
@@ -416,10 +423,6 @@ export default function TalkPage() {
           return null;
         })}
 
-        {authReady && isGuest && guestExchanges >= GUEST_LIMIT && !guestCtaDismissed && (
-          <GuestCtaInline uiLang={uiLang} onDismiss={() => setGuestCtaDismissed(true)} />
-        )}
-
         <div style={{ height: "8px" }} />
         </div>
       </div>
@@ -432,7 +435,6 @@ export default function TalkPage() {
           setConfig(next);
           saveTalkConfig(next);
         }}
-        onOpenAdjust={() => setAdjustOpen(true)}
       />
 
       {keyboardMode ? (
@@ -474,7 +476,7 @@ export default function TalkPage() {
           </div>
         </div>
       ) : (
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "14px", padding: "4px 16px 14px", position: "relative" }}>
+        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "4px 16px 14px", position: "relative" }}>
           <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
             <MicButton
               ref={micRef}
@@ -509,14 +511,6 @@ export default function TalkPage() {
                   : "แตะเพื่อพูดกับหนู"
             }
           />
-          <button
-            type="button"
-            onClick={() => setKeyboardMode(true)}
-            aria-label="Use keyboard"
-            style={{ position: "absolute", right: "24px", width: "36px", height: "36px", borderRadius: "50%", background: "transparent", border: "0.5px solid #EDE8E0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-          >
-            <Keyboard size={16} color="#9A8B73" strokeWidth={2} />
-          </button>
         </div>
       )}
 

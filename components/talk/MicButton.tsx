@@ -82,6 +82,9 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
   const isLoadingVadRef = useRef(false);
   const longPressTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
+  // Set true when user explicitly stops. Gates onSpeechEnd / transcribeAndCommit
+  // against in-flight VAD frames that fire after stop() was called.
+  const stoppedRef = useRef(false);
 
   const trace = useCallback((msg: string, data?: Record<string, unknown>) => {
     if (typeof window === "undefined") return;
@@ -107,7 +110,10 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
   const transcribeAndCommit = useCallback(
     async (audio: Float32Array) => {
       if (!mountedRef.current) return;
-
+      if (stoppedRef.current) {
+        trace("transcribe skipped — user stopped");
+        return;
+      }
       const wavBlob = float32ToWav(audio, 16000);
       trace("uploading", { samples: audio.length, bytes: wavBlob.size });
 
@@ -165,6 +171,8 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
   // --- Lazy-load and start VAD --------------------------------------------
 
   const startVAD = useCallback(async () => {
+    // Reset stop flag — fresh start.
+    stoppedRef.current = false;
     // Already running — just resume if paused.
     if (vadRef.current) {
       try {
@@ -199,6 +207,10 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         },
         onSpeechEnd: (audio: Float32Array) => {
           if (!mountedRef.current) return;
+          if (stoppedRef.current) {
+            trace("speech end ignored — user stopped");
+            return;
+          }
           trace("speech end", { samples: audio.length });
           void transcribeAndCommit(audio);
         },
@@ -259,8 +271,8 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       }
     },
     stop: () => {
-      // Explicit user stop — fully destroy the VAD instance to release the mic
-      // and prevent the in-flight onSpeechEnd from firing after we said "stop".
+      // Flip the flag FIRST — synchronously gates any in-flight callback.
+      stoppedRef.current = true;
       if (vadRef.current) {
         const v = vadRef.current;
         vadRef.current = null;
@@ -287,8 +299,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       return;
     }
     if (state === "listening") {
-      // User wants to stop. Destroy fully — pause leaves a dangling listener
-      // that fires onSpeechEnd after the user explicitly stopped.
+      stoppedRef.current = true;
       if (vadRef.current) {
         const v = vadRef.current;
         vadRef.current = null;
