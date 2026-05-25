@@ -4,15 +4,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
-import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
-import { MicRow } from "@/components/talk/MicRow";
-import { Toolbox, type ResponseLength, type ResponseLang } from "@/components/talk/Toolbox";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
 import { MicButton, type MicState, type MicButtonHandle } from "@/components/talk/MicButton";
 import { FuelPill } from "@/components/talk/FuelPill";
 import { type OrbState } from "@/components/talk/VoiceOrb";
+import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
+import { MicRow } from "@/components/talk/MicRow";
+import { Toolbox, type ResponseLength, type ResponseLang } from "@/components/talk/Toolbox";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
@@ -25,57 +25,62 @@ import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } 
 type CanvasItem =
   | { id: string; kind: "mini_cat"; textTh: string; textEn: string }
   | { id: string; kind: "practice"; word: VocabularyEntry; position: number; total: number; topic?: string }
-  | { id: string; kind: "draft"; channel: string; label: string; body: string }
   | { id: string; kind: "user_said"; text: string };
 
 const GUEST_LIMIT = 5;
 const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
 const TRANSCRIPT_CLIP = 180;
 
+function readGuestExchanges(): number {
+  if (typeof window === "undefined") return 0;
+  const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
+  const parsed = stored ? parseInt(stored, 10) : 0;
+  return !isNaN(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function readUiLang(): "th" | "en" {
+  if (typeof window === "undefined") return "th";
+  const lang = navigator.language || "th";
+  return lang.startsWith("en") ? "en" : "th";
+}
+
+function makeOpenerItem(): CanvasItem {
+  const opener = getSessionOpener({ isFirstSession: true, hoursSinceLastSession: null, streakDays: 0 });
+  return { id: crypto.randomUUID(), kind: "mini_cat", textTh: opener.speech_th, textEn: opener.speech_en };
+}
+
 export default function TalkPage() {
   const { isGuest, authReady } = useGuestExploration();
   const { profile } = useProfile();
 
-  const [config, setConfig] = useState<TalkConfig>(DEFAULT_TALK_CONFIG);
+  const [config, setConfig] = useState<TalkConfig>(() =>
+    typeof window !== "undefined" ? loadTalkConfig() : DEFAULT_TALK_CONFIG,
+  );
   const [adjustOpen, setAdjustOpen] = useState(false);
-  const [uiLang, setUiLang] = useState<"th" | "en">("th");
+  const [uiLang] = useState<"th" | "en">(readUiLang);
   const [micState, setMicState] = useState<MicState>("idle");
-  const [items, setItems] = useState<CanvasItem[]>([]);
+  const [items, setItems] = useState<CanvasItem[]>(() => [makeOpenerItem()]);
   const [textInput, setTextInput] = useState("");
   const [keyboardMode, setKeyboardMode] = useState(false);
   const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
   const [respLength, setRespLength] = useState<ResponseLength>("normal");
   const [respLang, setRespLang] = useState<ResponseLang>("both");
   const [ttsOn, setTtsOn] = useState(false);
-  const [guestExchanges, setGuestExchangesRaw] = useState(0);
+  const [guestExchangesRaw, setGuestExchangesRaw] = useState(readGuestExchanges);
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const canvasRef = useRef<HTMLDivElement>(null);
-  const hydratedRef = useRef(false);
   const micRef = useRef<MicButtonHandle>(null);
-
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (hydratedRef.current) return;
-    hydratedRef.current = true;
-    setConfig(loadTalkConfig());
-    const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
-    const parsed = stored ? parseInt(stored, 10) : 0;
-    if (!isNaN(parsed) && parsed > 0) setGuestExchangesRaw(parsed);
-    const lang = navigator.language || "th";
-    if (lang.startsWith("en")) setUiLang("en");
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (authReady && !isGuest) {
       window.localStorage.removeItem(GUEST_COUNTER_KEY);
-      setGuestExchangesRaw(0);
     }
   }, [authReady, isGuest]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const guestExchanges = authReady && !isGuest ? 0 : guestExchangesRaw;
 
   const setGuestExchanges = useCallback((updater: number | ((p: number) => number)) => {
     setGuestExchangesRaw((prev) => {
@@ -91,30 +96,17 @@ export default function TalkPage() {
     }
   }, [items]);
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (items.length > 0) return;
-    const opener = getSessionOpener({ isFirstSession: true, hoursSinceLastSession: null, streakDays: 0 });
-    setItems([
-      {
-        id: crypto.randomUUID(),
-        kind: "mini_cat",
-        textTh: opener.speech_th,
-        textEn: opener.speech_en,
-      },
-    ]);
-  }, [items.length]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  const isLocked = authReady && isGuest && guestExchanges >= GUEST_LIMIT;
 
-  const miomiMood: MiomiMood = (() => {
+  const orbState: OrbState = (() => {
+    if (isLocked) return "locked";
     if (micState === "listening") return "listening";
     if (micState === "processing") return "thinking";
     if (micState === "speaking") return "speaking";
     return "idle";
   })();
 
-  const orbState: OrbState = (() => {
-    if (authReady && isGuest && guestExchanges >= GUEST_LIMIT) return "locked";
+  const miomiMood: MiomiMood = (() => {
     if (micState === "listening") return "listening";
     if (micState === "processing") return "thinking";
     if (micState === "speaking") return "speaking";
@@ -125,15 +117,10 @@ export default function TalkPage() {
   const fuelZap = 64;
   const fuelBrain = 45;
 
-  const triggerMic = useCallback(() => {
-    micRef.current?.start();
-  }, []);
-
   const processInput = useCallback(
     async (text: string) => {
       if (!authReady) return;
-      // HARD STOP: guest limit reached. Kill mic, show CTA, NEVER hit the API.
-      if (isGuest && guestExchanges >= GUEST_LIMIT) {
+      if (isLocked) {
         micRef.current?.stop();
         setMicState("idle");
         setShowGuestSheet(true);
@@ -150,38 +137,22 @@ export default function TalkPage() {
       if (template) {
         setItems((prev) => [
           ...prev,
-          {
-            id: crypto.randomUUID(),
-            kind: "mini_cat",
-            textTh: template.response.speech_th,
-            textEn: template.response.speech_en,
-          },
+          { id: crypto.randomUUID(), kind: "mini_cat", textTh: template.response.speech_th, textEn: template.response.speech_en },
         ]);
         if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
           window.setTimeout(() => setShowGuestSheet(true), 800);
         }
-
         if (template.follow_up?.type === "word_card" && template.follow_up.payload_resolver) {
           const word = await resolveWordCard(
             template.follow_up.payload_resolver,
             (template.follow_up.payload_params ?? {}) as Record<string, unknown>,
             text.trim(),
-            wordsIntroduced
+            wordsIntroduced,
           );
           if (word) {
             setWordsIntroduced((p) => [...p, word.word_en]);
             window.setTimeout(() => {
-              setItems((prev) => [
-                ...prev,
-                {
-                  id: crypto.randomUUID(),
-                  kind: "practice",
-                  word,
-                  position: wordsIntroduced.length + 1,
-                  total: 3,
-                  topic: undefined,
-                },
-              ]);
+              setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "practice", word, position: wordsIntroduced.length + 1, total: 3, topic: undefined }]);
             }, 600);
           }
         }
@@ -195,28 +166,12 @@ export default function TalkPage() {
           body: JSON.stringify({
             messages: [{ role: "user", content: text.trim() }],
             sessionInstruction: (() => {
-              const lengthRule =
-                respLength === "short" ? "Under 25 words."
-                : respLength === "detailed" ? "60-100 words, thorough."
-                : "Under 50 words.";
-              const langRule =
-                respLang === "th" ? "Respond in Thai only."
-                : respLang === "en" ? "Respond in English only."
-                : uiLang === "en"
-                  ? "Respond in English first, Thai phrases in quotes if relevant."
-                  : "Respond in Thai first, English below.";
-              const modeRule =
-                config.mode === "teach" ? `You are in Teach mode. The user is learning ${config.teach.learning === "th" ? "Thai" : "English"} at ${config.teach.level} level.`
-                : config.mode === "social" ? `You are in Social mode. ${config.social.channel ? `Channel: ${config.social.channel}.` : ""} ${config.social.niche ? `Niche: ${config.social.niche}.` : ""}`
-                : config.mode === "translate" ? "You are in Translator mode. Always provide translations with romanization."
-                : config.mode === "chat" ? "You are in Just-chat mode. Be warm, present, brief, no teaching."
-                : "Auto mode. Detect what the user needs and respond accordingly.";
+              const lengthRule = respLength === "short" ? "Under 25 words." : respLength === "detailed" ? "60-100 words, thorough." : "Under 50 words.";
+              const langRule = respLang === "th" ? "Respond in Thai only." : respLang === "en" ? "Respond in English only." : uiLang === "en" ? "Respond in English first, Thai phrases in quotes if relevant." : "Respond in Thai first, English below.";
+              const modeRule = config.mode === "teach" ? `You are in Teach mode. The user is learning ${config.teach.learning === "th" ? "Thai" : "English"} at ${config.teach.level} level.` : config.mode === "social" ? `You are in Social mode. ${config.social.channel ? `Channel: ${config.social.channel}.` : ""} ${config.social.niche ? `Niche: ${config.social.niche}.` : ""}` : config.mode === "translate" ? "You are in Translator mode. Always provide translations with romanization." : config.mode === "chat" ? "You are in Just-chat mode. Be warm, present, brief, no teaching." : "Auto mode. Detect what the user needs and respond accordingly.";
               return `You are Miomi, a warm kawaii cat companion. ${modeRule} ${langRule} ${lengthRule} Always end with one question or invitation.`;
             })(),
-            sessionContext: {
-              exchangeNumber: items.filter((i) => i.kind === "user_said").length,
-              wordsIntroduced,
-            },
+            sessionContext: { exchangeNumber: items.filter((i) => i.kind === "user_said").length, wordsIntroduced },
           }),
         });
         if (!res.ok) throw new Error("api failed");
@@ -226,23 +181,17 @@ export default function TalkPage() {
         const textTh = parts[0]?.trim() ?? content;
         const textEn = parts[1]?.trim() ?? "";
         setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "mini_cat", textTh, textEn }]);
-        // After this reply, if guest just consumed their last exchange, surface the warm CTA.
         if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
           window.setTimeout(() => setShowGuestSheet(true), 800);
         }
       } catch {
         setItems((prev) => [
           ...prev,
-          {
-            id: crypto.randomUUID(),
-            kind: "mini_cat",
-            textTh: "หนูขอโทษค่า~ มีบางอย่างผิดพลาด",
-            textEn: "Sorry~ something went wrong.",
-          },
+          { id: crypto.randomUUID(), kind: "mini_cat", textTh: "หนูขอโทษค่า~ มีบางอย่างผิดพลาด", textEn: "Sorry~ something went wrong." },
         ]);
       }
     },
-    [authReady, isGuest, guestExchanges, wordsIntroduced, uiLang, items, setGuestExchanges, config, respLength, respLang]
+    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, uiLang, items, setGuestExchanges, config, respLength, respLang],
   );
 
   const toggleExpand = useCallback((id: string) => {
@@ -255,20 +204,23 @@ export default function TalkPage() {
   }, []);
 
   const handleClear = useCallback(() => {
-    setItems([]);
+    setItems([makeOpenerItem()]);
     setExpandedItems(new Set());
   }, []);
 
   const handleOrbTap = useCallback(() => {
-    if (orbState === "locked") {
+    if (isLocked) {
+      setShowGuestSheet(true);
       return;
     }
     if (micState === "listening") {
       micRef.current?.stop();
       return;
     }
-    micRef.current?.start();
-  }, [orbState, micState]);
+    if (micState === "idle") {
+      micRef.current?.start();
+    }
+  }, [micState, isLocked]);
 
   return (
     <div
@@ -297,16 +249,12 @@ export default function TalkPage() {
           background: "transparent",
         }}
       >
-        <Link
-          href="/home"
-          aria-label="Back"
-          style={{ width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3D352B", textDecoration: "none" }}
-        >
+        <Link href="/home" aria-label="Back" style={{ width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3D352B", textDecoration: "none" }}>
           <ArrowLeft size={22} strokeWidth={2} />
         </Link>
 
         {authReady && isGuest ? (
-          <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, color: "#9A8B73", background: "transparent", borderRadius: "999px", padding: "5px 12px" }}>
+          <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, color: "#9A8B73", background: "transparent", padding: "5px 12px" }}>
             {uiLang === "en" ? `${Math.max(0, GUEST_LIMIT - guestExchanges)} left` : `เหลืออีก ${Math.max(0, GUEST_LIMIT - guestExchanges)} ครั้ง`}
           </span>
         ) : (
@@ -320,15 +268,10 @@ export default function TalkPage() {
           style={{ width: "36px", height: "36px", borderRadius: "50%", background: "transparent", border: "none", color: "#9A8B73", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="21" y1="6" x2="14" y2="6" />
-            <line x1="10" y1="6" x2="3" y2="6" />
-            <line x1="21" y1="12" x2="12" y2="12" />
-            <line x1="8" y1="12" x2="3" y2="12" />
-            <line x1="21" y1="18" x2="16" y2="18" />
-            <line x1="12" y1="18" x2="3" y2="18" />
-            <line x1="14" y1="9" x2="14" y2="3" />
-            <line x1="8" y1="15" x2="8" y2="9" />
-            <line x1="16" y1="21" x2="16" y2="15" />
+            <line x1="21" y1="6" x2="14" y2="6" /><line x1="10" y1="6" x2="3" y2="6" />
+            <line x1="21" y1="12" x2="12" y2="12" /><line x1="8" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="18" x2="16" y2="18" /><line x1="12" y1="18" x2="3" y2="18" />
+            <line x1="14" y1="9" x2="14" y2="3" /><line x1="8" y1="15" x2="8" y2="9" /><line x1="16" y1="21" x2="16" y2="15" />
           </svg>
         </button>
       </div>
@@ -365,69 +308,75 @@ export default function TalkPage() {
             gap: "12px",
           }}
         >
-        {items.map((item) => {
-          if (item.kind === "mini_cat") {
-            return <MiniCatRow key={item.id} textTh={item.textTh} textEn={item.textEn} uiLang={uiLang} />;
-          }
-          if (item.kind === "user_said") {
-            const fullText = item.text;
-            const isLong = fullText.length > TRANSCRIPT_CLIP;
-            const isExpanded = expandedItems.has(item.id);
-            const display = !isLong || isExpanded ? fullText : fullText.slice(0, TRANSCRIPT_CLIP) + "…";
-            return (
-              <div key={item.id} style={{ display: "flex", justifyContent: "flex-end" }}>
-                <div
-                  style={{
-                    maxWidth: "78%",
-                    background: "linear-gradient(135deg, #FFF8F2 0%, #FFEFE0 100%)",
-                    border: "0.5px solid rgba(232,199,122,0.35)",
-                    borderRadius: "18px 4px 18px 18px",
-                    padding: "11px 14px",
-                  }}
-                >
-                  <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "14px", color: "#1A1A18", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                    {display}
-                  </p>
-                  {isLong && (
-                    <button
-                      type="button"
-                      onClick={() => toggleExpand(item.id)}
-                      style={{ marginTop: "4px", background: "none", border: "none", padding: 0, color: "#9A8B73", fontSize: "12px", fontFamily: "'Quicksand', sans-serif", textDecoration: "underline", cursor: "pointer" }}
-                    >
-                      {isExpanded ? (uiLang === "en" ? "Show less" : "ย่อ") : (uiLang === "en" ? "Show more" : "ดูเพิ่ม")}
-                    </button>
-                  )}
+          {items.map((item) => {
+            if (item.kind === "mini_cat") {
+              return <MiniCatRow key={item.id} textTh={item.textTh} textEn={item.textEn} uiLang={uiLang} />;
+            }
+            if (item.kind === "user_said") {
+              const fullText = item.text;
+              const isLong = fullText.length > TRANSCRIPT_CLIP;
+              const isExpanded = expandedItems.has(item.id);
+              const display = !isLong || isExpanded ? fullText : fullText.slice(0, TRANSCRIPT_CLIP) + "…";
+              return (
+                <div key={item.id} style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <div style={{ maxWidth: "78%", background: "linear-gradient(135deg, rgba(232,199,122,0.16) 0%, rgba(232,199,122,0.06) 100%)", border: "0.5px solid rgba(232,199,122,0.3)", borderRadius: "18px 4px 18px 18px", padding: "11px 14px" }}>
+                    <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "14px", color: "#1A1A18", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{display}</p>
+                    {isLong && (
+                      <button type="button" onClick={() => toggleExpand(item.id)} style={{ marginTop: "4px", background: "none", border: "none", padding: 0, color: "#9A8B73", fontSize: "12px", fontFamily: "'Quicksand', sans-serif", textDecoration: "underline", cursor: "pointer" }}>
+                        {isExpanded ? (uiLang === "en" ? "Show less" : "ย่อ") : (uiLang === "en" ? "Show more" : "ดูเพิ่ม")}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          }
-          if (item.kind === "practice") {
-            return (
-              <PracticeCard
-                key={item.id}
-                word={item.word}
-                position={item.position}
-                total={item.total}
-                topic={item.topic}
-                uiLang={uiLang}
-                onHear={() => { /* future TTS hook */ }}
-                onSpeak={triggerMic}
-                onCopy={() => {
-                  void navigator.clipboard.writeText(item.word.word_th);
-                }}
-                onNext={() => { /* engine advances */ }}
-              />
-            );
-          }
-          return null;
-        })}
-
-        <div style={{ height: "8px" }} />
+              );
+            }
+            if (item.kind === "practice") {
+              return (
+                <PracticeCard
+                  key={item.id}
+                  word={item.word}
+                  position={item.position}
+                  total={item.total}
+                  topic={item.topic}
+                  uiLang={uiLang}
+                  onHear={() => { /* TTS */ }}
+                  onSpeak={() => micRef.current?.start()}
+                  onCopy={() => { void navigator.clipboard.writeText(item.word.word_th); }}
+                  onNext={() => { /* engine */ }}
+                />
+              );
+            }
+            return null;
+          })}
+          <div style={{ height: "8px" }} />
         </div>
       </div>
 
-      {keyboardMode ? (
-        <div style={{ flexShrink: 0, padding: "6px 12px 12px", background: "transparent" }}>
+      {/* HIDDEN MicButton drives VAD pipeline; UI is the orb inside MicRow */}
+      <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
+        <MicButton
+          ref={micRef}
+          state={micState}
+          language="auto"
+          onTranscript={async (text, isFinal) => {
+            if (!isFinal) return;
+            if (isLocked) {
+              micRef.current?.stop();
+              setMicState("idle");
+              setShowGuestSheet(true);
+              return;
+            }
+            await processInput(text);
+          }}
+          onStateChange={setMicState}
+          locked={isLocked}
+          onLockedTap={() => setShowGuestSheet(true)}
+        />
+      </div>
+
+      {/* MicRow ALWAYS visible. Keyboard mode just adds the input above it. */}
+      {keyboardMode && (
+        <div style={{ flexShrink: 0, padding: "6px 12px 4px", background: "transparent" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#FFFFFF", border: "0.5px solid #EDE8E0", borderRadius: "26px", padding: "5px 5px 5px 16px", boxShadow: "0 2px 10px rgba(26,26,24,0.04)" }}>
             <input
               type="text"
@@ -441,75 +390,38 @@ export default function TalkPage() {
               placeholder={uiLang === "en" ? "Message Miomi~" : "พิมพ์ถึงหนู~"}
               style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "'Kanit', sans-serif", fontSize: "13.5px", color: "#1A1A18", padding: "8px 0" }}
             />
-            <button
-              type="button"
-              onClick={() => setKeyboardMode(false)}
-              aria-label="Use voice"
-              style={{ width: "34px", height: "34px", borderRadius: "50%", background: "transparent", border: "none", color: "#9A8B73", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}
-            >
+            <button type="button" onClick={() => { /* placeholder attach */ }} aria-label="Attach" style={{ width: "32px", height: "32px", borderRadius: "50%", background: "transparent", border: "none", color: "#9A8B73", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>
               <Plus size={17} strokeWidth={2} />
             </button>
             {textInput.trim() && (
-              <button
-                type="button"
-                onClick={() => void processInput(textInput)}
-                aria-label="Send"
-                style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-              >
+              <button type="button" onClick={() => void processInput(textInput)} aria-label="Send" style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="19" x2="12" y2="5" />
-                  <polyline points="5 12 12 5 19 12" />
+                  <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
                 </svg>
               </button>
             )}
           </div>
         </div>
-      ) : (
-        <>
-          <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
-            <MicButton
-              ref={micRef}
-              state={micState}
-              language="auto"
-              onTranscript={async (text, isFinal) => {
-                if (!isFinal) return;
-                if (authReady && isGuest && guestExchanges >= GUEST_LIMIT) {
-                  micRef.current?.stop();
-                  setMicState("idle");
-                  setShowGuestSheet(true);
-                  return;
-                }
-                await processInput(text);
-              }}
-              onStateChange={setMicState}
-              locked={authReady && isGuest && guestExchanges >= GUEST_LIMIT}
-              onLockedTap={() => setShowGuestSheet(true)}
-            />
-          </div>
-          <MicRow
-            current={config.mode}
-            orbState={orbState}
-            uiLang={uiLang}
-            onModeChange={(m) => {
-              const next = { ...config, mode: m };
-              setConfig(next);
-              saveTalkConfig(next);
-            }}
-            onOrbTap={handleOrbTap}
-            orbAriaLabel={
-              orbState === "listening"
-                ? uiLang === "en" ? "Stop listening" : "หยุดฟัง"
-                : uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู"
-            }
-          />
-        </>
       )}
+
+      <MicRow
+        current={config.mode}
+        orbState={orbState}
+        uiLang={uiLang}
+        onModeChange={(m) => {
+          const next = { ...config, mode: m };
+          setConfig(next);
+          saveTalkConfig(next);
+        }}
+        onOrbTap={handleOrbTap}
+        orbAriaLabel={orbState === "listening" ? (uiLang === "en" ? "Stop listening" : "หยุดฟัง") : (uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู")}
+      />
 
       {items.length > 1 && (
         <button
           type="button"
           onClick={handleClear}
-          style={{ position: "absolute", top: "62px", right: "12px", background: "rgba(255,255,255,0.88)", border: "0.5px solid #EDE8E0", borderRadius: "999px", padding: "4px 12px", fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 600, color: "#9A8B73", cursor: "pointer", zIndex: 5 }}
+          style={{ position: "absolute", top: "62px", right: "12px", background: "transparent", border: "none", padding: "4px 12px", fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 600, color: "#9A8B73", cursor: "pointer", zIndex: 5 }}
         >
           {uiLang === "en" ? "Clear" : "ล้าง"}
         </button>
@@ -519,19 +431,11 @@ export default function TalkPage() {
         open={adjustOpen}
         config={config}
         uiLang={uiLang}
-        onSave={(c) => {
-          setConfig(c);
-          saveTalkConfig(c);
-          setAdjustOpen(false);
-        }}
+        onSave={(c) => { setConfig(c); saveTalkConfig(c); setAdjustOpen(false); }}
         onClose={() => setAdjustOpen(false)}
         onMiomiHelp={(topic) => {
           setAdjustOpen(false);
-          const promptTh = topic === "pillars"
-            ? "ช่วยหนูตั้งเสาหลักของเนื้อหาให้หน่อยค่า~"
-            : topic === "niche"
-              ? "ช่วยหนูหานิชของฉันหน่อยค่า~"
-              : "ช่วยหนูตั้งสไตล์เนื้อหาให้หน่อยค่า~";
+          const promptTh = topic === "pillars" ? "ช่วยหนูตั้งเสาหลักของเนื้อหาให้หน่อยค่า~" : topic === "niche" ? "ช่วยหนูหานิชของฉันหน่อยค่า~" : "ช่วยหนูตั้งสไตล์เนื้อหาให้หน่อยค่า~";
           void processInput(promptTh);
         }}
       />
@@ -564,7 +468,6 @@ export default function TalkPage() {
           </motion.div>
         </motion.div>
       )}
-
     </div>
   );
 }

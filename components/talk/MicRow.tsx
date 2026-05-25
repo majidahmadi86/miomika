@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wand2, GraduationCap, Sparkles, Languages, Heart, AudioWaveform, type LucideIcon } from "lucide-react";
 import type { TalkMode } from "@/lib/talk/modes";
@@ -27,105 +27,114 @@ export function MicRow({ current, orbState, uiLang, onModeChange, onOrbTap, orbA
   const activeIdx = Math.max(0, MODES.findIndex((m) => m.key === current));
   const activeMode = MODES[activeIdx];
 
-  // Build ring = all modes except active, in order. Take 4, place 2 left + 2 right.
   const ring = MODES.filter((_, i) => i !== activeIdx);
   const leftSlots = ring.slice(0, 2);
   const rightSlots = ring.slice(2, 4);
-  // If fewer than 4 ring modes (won't happen with 5 modes but guard anyway), pad with nulls
   while (leftSlots.length < 2) leftSlots.push(null as never);
   while (rightSlots.length < 2) rightSlots.push(null as never);
 
-  // Swipe detection on the row itself
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
-  const intent = useRef<"h" | "v" | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startXRef = useRef<number | null>(null);
+  const startYRef = useRef<number | null>(null);
+  const intentRef = useRef<"h" | "v" | null>(null);
+  const activeIdxRef = useRef(activeIdx);
+  useEffect(() => { activeIdxRef.current = activeIdx; }, [activeIdx]);
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    const t = e.touches[0];
-    if (!t) return;
-    touchStartX.current = t.clientX;
-    touchStartY.current = t.clientY;
-    intent.current = null;
+  const onChangeRef = useRef(onModeChange);
+  useEffect(() => { onChangeRef.current = onModeChange; }, [onModeChange]);
+
+  // Native touch listeners with passive: false so we can stopPropagation/preventDefault
+  // BEFORE the swipe is hijacked by parent scroll containers.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      startXRef.current = t.clientX;
+      startYRef.current = t.clientY;
+      intentRef.current = null;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (startXRef.current === null || startYRef.current === null) return;
+      const t = e.touches[0];
+      if (!t) return;
+      const dx = t.clientX - startXRef.current;
+      const dy = t.clientY - startYRef.current;
+      if (intentRef.current === null) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        intentRef.current = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+      }
+      if (intentRef.current === "h") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (intentRef.current !== "h" || startXRef.current === null) {
+        startXRef.current = null;
+        startYRef.current = null;
+        intentRef.current = null;
+        return;
+      }
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - startXRef.current;
+      startXRef.current = null;
+      startYRef.current = null;
+      intentRef.current = null;
+      if (Math.abs(dx) < 36) return;
+      const dir = dx < 0 ? 1 : -1;
+      const next = (activeIdxRef.current + dir + MODES.length) % MODES.length;
+      onChangeRef.current(MODES[next].key);
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
   }, []);
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (touchStartX.current === null || touchStartY.current === null) return;
-    const t = e.touches[0];
-    if (!t) return;
-    const dx = t.clientX - touchStartX.current;
-    const dy = t.clientY - touchStartY.current;
-    if (intent.current === null) {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-      intent.current = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
-    }
-    if (intent.current === "h") e.stopPropagation();
-  }, []);
-
-  const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (intent.current !== "h" || touchStartX.current === null) {
-      touchStartX.current = null;
-      touchStartY.current = null;
-      intent.current = null;
-      return;
-    }
-    const t = e.changedTouches[0];
-    if (!t) return;
-    const dx = t.clientX - touchStartX.current;
-    touchStartX.current = null;
-    touchStartY.current = null;
-    intent.current = null;
-    if (Math.abs(dx) < 36) return;
-    // Swipe left → next mode, swipe right → previous
-    const dir = dx < 0 ? 1 : -1;
-    const next = (activeIdx + dir + MODES.length) % MODES.length;
-    onModeChange(MODES[next].key);
-  }, [activeIdx, onModeChange]);
-
-  // Orb icon: show mode icon when idle, waveform when listening/processing/speaking
-  const OrbIcon = orbState === "listening" || orbState === "thinking" || orbState === "speaking"
-    ? AudioWaveform
-    : activeMode.Icon;
+  const OrbIcon =
+    orbState === "listening" || orbState === "thinking" || orbState === "speaking"
+      ? AudioWaveform
+      : activeMode.Icon;
 
   return (
     <div
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
+      ref={containerRef}
       style={{
         flexShrink: 0,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "16px 14px 14px",
+        padding: "14px 14px 12px",
         gap: "8px",
         background: "transparent",
         touchAction: "pan-y",
         position: "relative",
         zIndex: 6,
+        userSelect: "none",
       }}
     >
       {leftSlots.map((m, i) => (
-        <ModePill key={`l-${i}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
+        <ModePill key={`l-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
       ))}
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, margin: "0 2px" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, margin: "0 4px" }}>
         <button
           type="button"
           onClick={onOrbTap}
           aria-label={orbAriaLabel}
-          style={{
-            width: "88px",
-            height: "88px",
-            borderRadius: "50%",
-            border: "none",
-            background: "transparent",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            position: "relative",
-            padding: 0,
-          }}
+          style={{ width: "88px", height: "88px", borderRadius: "50%", border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", padding: 0 }}
         >
           {orbState === "idle" && (
             <>
@@ -136,22 +145,11 @@ export function MicRow({ current, orbState, uiLang, onModeChange, onOrbTap, orbA
           <motion.div
             animate={orbState === "listening" ? { scale: [1, 1.04, 1] } : { scale: 1 }}
             transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-            style={{
-              width: "68px",
-              height: "68px",
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 8px 22px rgba(201,169,110,0.45), 0 0 0 1px rgba(255,255,255,0.5)",
-              position: "relative",
-              zIndex: 2,
-            }}
+            style={{ width: "68px", height: "68px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 22px rgba(201,169,110,0.45), 0 0 0 1px rgba(255,255,255,0.5)", position: "relative", zIndex: 2 }}
           >
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeMode.key + (orbState === "listening" ? "-listening" : "-idle")}
+                key={activeMode.key + (orbState === "listening" || orbState === "thinking" || orbState === "speaking" ? "-active" : "-idle")}
                 initial={{ opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.85 }}
@@ -163,22 +161,13 @@ export function MicRow({ current, orbState, uiLang, onModeChange, onOrbTap, orbA
             </AnimatePresence>
           </motion.div>
         </button>
-        <span
-          style={{
-            fontFamily: "'Quicksand', sans-serif",
-            fontSize: "11px",
-            fontWeight: 600,
-            color: "#B8985C",
-            letterSpacing: "0.03em",
-            marginTop: "4px",
-          }}
-        >
+        <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 600, color: "#B8985C", letterSpacing: "0.03em", marginTop: "4px" }}>
           {uiLang === "en" ? activeMode.labelEn : activeMode.labelTh}
         </span>
       </div>
 
       {rightSlots.map((m, i) => (
-        <ModePill key={`r-${i}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
+        <ModePill key={`r-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
       ))}
     </div>
   );
@@ -189,31 +178,12 @@ function PulseRing({ delay }: { delay: number }) {
     <motion.span
       animate={{ scale: [1, 2], opacity: [0.7, 0] }}
       transition={{ duration: 2.2, repeat: Infinity, delay, ease: "easeOut" }}
-      style={{
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        width: "66px",
-        height: "66px",
-        marginTop: "-33px",
-        marginLeft: "-33px",
-        borderRadius: "50%",
-        border: "2px solid rgba(232,199,122,0.55)",
-        pointerEvents: "none",
-      }}
+      style={{ position: "absolute", top: "50%", left: "50%", width: "66px", height: "66px", marginTop: "-33px", marginLeft: "-33px", borderRadius: "50%", border: "2px solid rgba(232,199,122,0.55)", pointerEvents: "none" }}
     />
   );
 }
 
-function ModePill({
-  mode,
-  uiLang,
-  onClick,
-}: {
-  mode: { key: TalkMode; Icon: LucideIcon; labelTh: string; labelEn: string } | null;
-  uiLang: "th" | "en";
-  onClick: (() => void) | undefined;
-}) {
+function ModePill({ mode, uiLang, onClick }: { mode: { key: TalkMode; Icon: LucideIcon; labelTh: string; labelEn: string } | null; uiLang: "th" | "en"; onClick: (() => void) | undefined }) {
   if (!mode) {
     return <div style={{ width: "50px", minHeight: "60px", flexShrink: 0 }} aria-hidden="true" />;
   }
@@ -226,43 +196,12 @@ function ModePill({
       whileTap={{ scale: 0.92 }}
       layout
       transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-      style={{
-        width: "50px",
-        minHeight: "60px",
-        background: "transparent",
-        border: "none",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "4px",
-        cursor: "pointer",
-        padding: 0,
-        flexShrink: 0,
-      }}
+      style={{ width: "50px", minHeight: "60px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer", padding: 0, flexShrink: 0 }}
     >
-      <span
-        style={{
-          width: "44px",
-          height: "44px",
-          borderRadius: "50%",
-          background: "#FFFFFF",
-          border: "0.5px solid rgba(237,232,224,0.7)",
-          boxShadow: "0 4px 12px rgba(26,26,24,0.07), 0 1px 3px rgba(26,26,24,0.04)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#FFFFFF", border: "0.5px solid rgba(237,232,224,0.7)", boxShadow: "0 4px 12px rgba(26,26,24,0.07), 0 1px 3px rgba(26,26,24,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Icon size={19} color="#9A8B73" strokeWidth={2} />
       </span>
-      <span
-        style={{
-          fontFamily: "'Quicksand', sans-serif",
-          fontSize: "9.5px",
-          fontWeight: 500,
-          color: "#9A8B73",
-        }}
-      >
+      <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "9.5px", fontWeight: 500, color: "#9A8B73" }}>
         {uiLang === "en" ? labelEn : labelTh}
       </span>
     </motion.button>
