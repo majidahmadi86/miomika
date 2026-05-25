@@ -29,7 +29,7 @@ export function GuidancePill() {
         router.push("/signup");
         break;
       case "open_pricing":
-        router.push("/profile");
+        router.push("/me");
         break;
       case "open_sheet":
         openCompanion();

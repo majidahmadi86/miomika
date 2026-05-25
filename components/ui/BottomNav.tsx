@@ -10,7 +10,7 @@ const tabs = [
   { href: "/dashboard", labelTh: "แดชบอร์ด",  labelEn: "Growth", icon: TrendingUp },
   { href: "/talk",      labelTh: "เรียน",      labelEn: "Learn",  icon: Sparkles },
   { href: "/invite",    labelTh: "ชวนเพื่อน",  labelEn: "Invite", icon: Gift     },
-  { href: "/profile",   labelTh: "ฉัน",        labelEn: "Me",     icon: User     },
+  { href: "/me",        labelTh: "ฉัน",        labelEn: "Me",     icon: User     },
 ] as const;
 
 export function BottomNav() {

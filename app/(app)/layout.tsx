@@ -32,7 +32,7 @@ const navItems = [
     thai: "แดชบอร์ด",
     english: "Dashboard",
   },
-  { href: "/profile", Icon: User, thai: "ฉัน", english: "Me" },
+  { href: "/me", Icon: User, thai: "ฉัน", english: "Me" },
 ] as const;
 
 const recentOutputs = [
@@ -62,7 +62,7 @@ export default function AppLayout({
   );
 }
 
-const SCREENS = ["/home", "/dashboard", "/create", "/invite", "/profile"];
+const SCREENS = ["/home", "/dashboard", "/create", "/invite", "/me"];
 
 function SwipeNavigator({
   children,
@@ -264,7 +264,7 @@ function AppLayoutInner({
               authReady &&
               isGuest &&
               (href === "/create" || href === "/dashboard");
-            const guestMe = authReady && isGuest && href === "/profile";
+            const guestMe = authReady && isGuest && href === "/me";
 
             if (guestLocked) {
               return (

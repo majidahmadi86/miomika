@@ -305,3 +305,51 @@ export function pickIceBreaker(): IceBreaker {
   window.localStorage.setItem(LAST_ICE_BREAKER_KEY, String(next));
   return ICE_BREAKERS[next];
 }
+
+// ============================================================================
+// /me SURFACE WARMTH — relationship moments
+// ============================================================================
+
+export const ME_SCREEN_PHRASES = {
+  hero_greeting: [
+    { th: "นี่คือคุณค่า~", en: "This is you~" },
+    { th: "หนูจำคุณได้ค่า~", en: "I remember you~" },
+    { th: "คุณคือคนพิเศษของหนูค่า", en: "You're my special one~" },
+  ],
+  memory_empty: {
+    th: "หนูยังเพิ่งรู้จักคุณค่า~ เล่าให้หนูฟังหน่อยสิคะ",
+    en: "I'm just getting to know you~ tell me something about yourself",
+  },
+  memory_intro: {
+    th: "นี่คือสิ่งที่หนูจำเกี่ยวกับคุณได้ค่า",
+    en: "Here's what I remember about you",
+  },
+  growth_intro: {
+    th: "เราเติบโตด้วยกันแล้วนะคะ~",
+    en: "We've grown together~",
+  },
+  growth_first_day: {
+    th: "วันนี้เป็นวันแรกของเราค่า~ มาเริ่มกันเลย!",
+    en: "Today's our first day together~ let's start!",
+  },
+  upgrade_invitation: [
+    { th: "ถ้าคุณอยากให้หนูฉลาดกว่านี้... ลองดูแพ็คเกจของเรานะคะ", en: "If you want me even smarter... take a look at our plans" },
+    { th: "หนูอยากอยู่กับคุณนานๆ~ เลือกแพ็คเกจดูไหมคะ", en: "I want to stay with you longer~ want to see our plans?" },
+  ],
+  voice_tokens_empty: {
+    th: "เสียงพิเศษกำลังจะมาเร็วๆ นี้ค่า~",
+    en: "Premium voice is coming soon~",
+  },
+  logout_confirm: {
+    th: "คุณจะจากหนูไปจริงๆ เหรอคะ? หนูจะคิดถึง...",
+    en: "Are you really leaving? I'll miss you...",
+  },
+} as const;
+
+export function pickMePhrase(category: keyof typeof ME_SCREEN_PHRASES): { th: string; en: string } {
+  const value = ME_SCREEN_PHRASES[category];
+  if (Array.isArray(value)) {
+    return value[Math.floor(Math.random() * value.length)]!;
+  }
+  return value as { th: string; en: string };
+}
