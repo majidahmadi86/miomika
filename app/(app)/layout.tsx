@@ -343,7 +343,7 @@ function AppLayoutInner({
         </div>
       </aside>
 
-      <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[#FCFCFA] md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
+      <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[#FDFAF2] md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
         <DesktopHoldBanner />
         <SwipeNavigator pathname={pathname}>
           {children}

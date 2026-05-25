@@ -73,14 +73,26 @@ export default function TalkPage() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const micRef = useRef<MicButtonHandle>(null);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset + auto-raise CTA on limit */
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (authReady && !isGuest) {
       window.localStorage.removeItem(GUEST_COUNTER_KEY);
+      setGuestExchangesRaw(0);
     }
   }, [authReady, isGuest]);
 
   const guestExchanges = authReady && !isGuest ? 0 : guestExchangesRaw;
+
+  // Auto-raise the guest CTA sheet the instant the limit is hit.
+  useEffect(() => {
+    if (authReady && isGuest && guestExchanges >= GUEST_LIMIT) {
+      micRef.current?.stop();
+      setMicState("idle");
+      setShowGuestSheet(true);
+    }
+  }, [authReady, isGuest, guestExchanges]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const setGuestExchanges = useCallback((updater: number | ((p: number) => number)) => {
     setGuestExchangesRaw((prev) => {
@@ -232,7 +244,7 @@ export default function TalkPage() {
         maxHeight: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "#FCFCFA",
+        background: "linear-gradient(180deg, #FEFCF7 0%, #FDFAF2 100%)",
         width: "100%",
         overflow: "hidden",
       }}

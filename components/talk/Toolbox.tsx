@@ -96,10 +96,11 @@ function ToolBtn({
       aria-label={title}
       aria-pressed={active}
       style={{
-        width: "40px",
-        height: "40px",
-        background: "transparent",
-        border: "none",
+        width: "42px",
+        height: "42px",
+        borderRadius: "50%",
+        background: "#FFFFFF",
+        border: "0.5px solid rgba(237,232,224,0.5)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -107,6 +108,7 @@ function ToolBtn({
         cursor: "pointer",
         padding: 0,
         position: "relative",
+        boxShadow: "0 6px 16px rgba(26,26,24,0.08), 0 2px 4px rgba(26,26,24,0.05), 0 0 0 0.5px rgba(255,255,255,0.8) inset",
       }}
     >
       <Icon size={22} color={active ? "#C9A96E" : "#9A8B73"} strokeWidth={2} />
