@@ -116,6 +116,17 @@ For **professionals using Translate**:
 
 ## Surface 4: MARKETPLACE
 
+> **⚠️ First job when /marketplace is built (locked May 26 2026):** The "Plan with me" / Upgrade section must be architected from a **conversion psychology** standpoint — not as a feature list. Required elements:
+> - Two clear primary options (Pro monthly + Pro yearly), Pro Max as a soft third option
+> - Anchor-pricing presentation (yearly saves 2 months — show the math visually)
+> - Loss-framing on Free ("what you're missing" warmly, never punitively)
+> - Social proof if available (X Thai families learning together)
+> - Festival pricing slots (Songkran, back-to-school) per /MIOMIKA.md §1.10
+> - PromptPay-first checkout (Thai market default; Stripe second)
+> - NO lock icons. NO "UPGRADE NOW" caps. ALL framing warm — Miomi inviting, never demanding.
+> 
+> See /MIOMIKA.md §6.1 for tier truth. The /me Card 2 stub ("Go Pro together?") routes here.
+
 **What it is (Mike's words):** Characters, teams, e-books, future features; also houses referral system and Star economy and pricing entry — all in one screen, all related to the app's economy and growth-of-the-app.
 
 **Primary feeling:** delightful, optional, "look at all the things she can be."
@@ -185,67 +196,90 @@ Reasoning: Talk's mode carousel works because all five modes are equivalent verb
 
 ---
 
-## Surface 5: PROFILE
+## Surface 5: PROFILE (route: /me, UI label: "Profile")
 
-**What it is (Mike's words):** The personal/general screen — avatar, name, settings, general adjustments, help. Subscription tier is part of identity in our system.
+**What it is:** The relationship surface. Answers four user questions in order: (1) Am I making progress? (2) Am I getting value from my plan? (3) How do I shape Miomi and the app? (4) Am I safe and supported?
 
-**Primary feeling:** in-control, known, "this is mine."
+**Primary feeling:** in-control, known, "this is mine and she knows me."
 
-### What lives here
+**Status:** Visual layer LOCKED at v2.1 (May 26 2026). Content wiring debt tracked in /MIOMIKA.md §9.0.
 
-**Identity (top of screen, hero section):**
-- User avatar (uploadable; Miomika may provide system avatars in the future)
+### The 7-card anatomy (shipped)
+
+**Hero (no card, floats on cream):**
+- Avatar 80px circle
 - Display name
-- **Pro badge** (if applicable) — displayed proudly as identity, not as a billing detail
-- Journey stage (Tourist / Student / Worker / Resident / Entrepreneur — editable; life stages change, the cat adapts)
-- Native language + learning language
+- ONE tier chip ("Miomika Free" / "Miomika Pro" / "Miomika Pro Max")
+- NO journey stage chip, NO bio fields, NO "Lives in X" — those are settings, not identity broadcast
 
-**Subscription identity & management:**
-- Current tier (Free / Pro / Pro Max) — clearly displayed
-- Plan benefits summary
-- "Manage subscription" → opens billing details, cancel, change plan
-- Billing history
-- Next renewal date
-- Upgrade entry → routes to Marketplace § Upgrade
-- **Why both Marketplace AND Profile have subscription:** Marketplace is where users BUY (discovery + conversion). Profile is where users MANAGE (their identity + billing reality). Same truth, different contexts.
+**Card 1 — Our progress together (the proud card):**
+- CEFR level + progress bar to next level (or "Starting fresh together~" empty state)
+- Days learning together (only if days ≥ 2)
+- Three stat columns: Words / Streak / Conversations
+  - Populated: numeric value + label
+  - Empty: motivating lucide icon (BookOpen / Flame / MessageCircle) + invitation copy
+- "See all progress" outline button → /dashboard
 
-**Premium Voice tokens:**
-- Token balance (separate from Stars — this is voice-only currency)
-- Recent usage
-- Top-up entry → routes to Marketplace (where Stars and Premium Voice tokens are both purchased)
+**Card 2 — Your plan with me (the money card):**
+- Tier name + plan summary line
+- Stars row with balance + "Top up" pill → /marketplace
+- Voice tokens row with balance + "Add more" pill → /marketplace
+- Bottom CTA: Free → honey-gold "Go Pro together?" → /marketplace § Upgrade. Pro/Pro Max → secondary outline "Manage plan" → /me/billing
 
-**Memory editor (the trust signal):**
-- "Here's what Miomi knows about you"
-- User can edit, delete, add memories
-- Critical for AI trust — people LOVE control over what AI remembers about them
+**Card 3 — Who Miomi is to you (the bond card):**
+This is where the user shapes the cat. Critical: this is NOT a settings card, it's a relationship card.
+- Her name (rename Miomi)
+- How she sounds (Free / Premium voice)
+- How she talks to you (conversation mode, reads `miomika.talk_config`)
+- Her warmth (Soft / Balanced / Playful)
+- What she calls you (display name — edited HERE, not echoed as a fake memory)
 
-**Settings:**
-- Voice on/off (default on)
-- Voice quality (free browser voice / Premium Voice when purchased)
-- Language preference
-- Notifications
-- Theme (later)
-- Data export (later)
+**Card 4 — App preferences (the cold-but-needed card):**
+- Theme (Light / Auto / Dark)
+- Sound effects toggle
+- Alerts toggle
+- App language
 
-**Growth story snippet:**
-- "You've been with Miomi for X days"
-- "She remembers Y things about you"
-- "Together you've practiced Z words"
-- Links to Dashboard for full growth view
+**Card 5 — Your privacy with me (the trust card):**
+- "Things I've learned from us — N" (real memories from conversations, NOT signup fields)
+- "Download my data" (Thai PDPA + GDPR)
+- "Forget everything and start over" (calm muted, not destructive red)
+- Empty state when N=0: "Nothing yet — we'll grow into this together"
 
-**Help & legal:**
-- Help / FAQ
-- Privacy
-- Terms
-- Contact
-- Logout
+**Card 6 — Help & feedback (the problem-solving card):**
+- "Something's broken or confusing"
+- "Help center"
+- "Chat with a human"
+- "What's new in Miomika"
+
+**Card 7 — About & legal (the quiet card):**
+- Privacy / Terms / About Miomika
+
+**Logout:**
+- Muted text link, centered, warm phrase ("Until next time~"), NOT a button, NOT red
+
+### What this anatomy gets right (locked reasoning, do not regress)
+
+1. **Progress before identity broadcast.** Users open /me to see they're growing, not to read back what they typed at signup.
+2. **No fake memories.** "Things I remember about you" filled with signup form data is surveillance theater. Real memories live in Card 5; identity facts are NOT memories.
+3. **Settings split by intent.** Card 3 (Relationship) is warm — how Miomi behaves toward you. Card 4 (App preferences) is cold — how the shell behaves. Mixing them is wrong.
+4. **One honey-gold CTA.** Free → "Go Pro together?". Pro → zero gold buttons on this screen.
+5. **Privacy is one card, calm, honest, not a placeholder.** Phase 3B fills it with real data; visual contract holds today.
+6. **Problem-solving has a first-class card.** Most apps bury Contact. /me elevates "Something's broken" to a row.
 
 ### What MUST NOT be here
-- Cold settings-list aesthetic (think relationship surface, not iOS Settings)
-- Bureaucratic identity forms
-- Hidden "delete account" buttons that feel punitive
 
-**Conversion role:** Where Pro identity is celebrated. Where memory control earns trust. Where settings respect user preferences. The relationship surface.
+- iOS Settings cold-list aesthetic
+- Bureaucratic identity forms (DOB, address, etc)
+- Emojis in section headers or chrome
+- Multiple honey-gold buttons
+- Lock icons for Pro gating (Pro is celebrated as identity via chip, never gated here)
+- Re-display of signup fields as memories
+- Journey stage chip on display (it's a setting, accessed via Card 3)
+
+### Conversion role
+
+Where Pro identity is celebrated. Where memory control earns trust. Where the user shapes Miomi to their preferences. The relationship surface — not iOS Settings.
 
 ---
 

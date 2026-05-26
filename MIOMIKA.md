@@ -1354,6 +1354,60 @@ Every future Claude or Cursor session reads this first. It is the authoritative 
 
 ## 9. What's Documented But Not Yet Built
 
+### 9.0 /me v2.1 stub destinations (Phase 3B–7 wiring)
+
+/me shipped May 26 2026 (v2.1) with full DESIGN-RULES compliance and 7-card anatomy. Every row is real visually; most destinations are stubbed. Wire these in the phases noted.
+
+**Card 1: Progress (Phase 3B — Real teaching brain)**
+- [ ] `profile.cefr_level` + `profile.cefr_progress_pct` — wire from teaching brain output
+- [ ] `profile.words_mastered_count` — read from `vocabulary_user_state` mastery rows
+- [ ] `profile.streak_days` — wire from session-end logic
+- [ ] `profile.conversation_count` — wire from conversations table when shipped (Voice Law build order Session 3)
+- [ ] "See all progress" → /dashboard (route exists, dashboard rebuild is later screen)
+
+**Card 2: Plan & credits (Phase 5 — Payment + Phase 7 — Marketplace)**
+- [ ] "Top up" pill (Stars) → /marketplace § Stars wallet — needs /marketplace built first
+- [ ] "Add more" pill (Voice) → /marketplace § Premium Voice — needs /marketplace built first
+- [ ] "Go Pro together" (Free) → /marketplace § Upgrade — needs /marketplace built first
+- [ ] "Manage plan" (Pro) → /me/billing — page doesn't exist yet (Phase 5)
+- [ ] Real `profile.miomi_stars` reading (column may not exist yet — verify in Phase 4 migration 0007)
+- [ ] Real `profile.premium_voice_credits` reading (column may not exist yet — verify in Phase 5 migration 0010)
+
+**Card 3: Who Miomi is to you (Phase 7 — Polish/marketplace)**
+- [ ] "Her name" row — opens rename sheet, persists to `profile.miomi_display_name`
+- [ ] "How she sounds" row — voice provider picker, ties to Premium Voice tokens
+- [ ] "How she talks to you" row — opens AdjustSheet (component already exists at /talk, surface here)
+- [ ] "Her warmth" row — picker with Soft / Balanced / Playful, persists to `profile.miomi_warmth`
+- [ ] "What she calls you" row — opens display_name edit sheet
+
+**Card 4: App preferences (Phase 6 — Operational)**
+- [ ] Theme row — opens Light / Auto / Dark picker; Auto + Dark are post-launch stubs
+- [ ] Sound effects toggle — persists to `miomika.sounds_on` localStorage + ties to cat SFX library (§9.1)
+- [ ] Alerts toggle — push notification opt-in (Phase 6 PWA, Phase 8 native)
+- [ ] App language row — uiLang switcher, already has cookie infra from RESET-1
+
+**Card 5: Privacy with me (Phase 3B — Memory + Phase 6 — Compliance)**
+- [ ] "Things I've learned from us — N" — wire from memory layer (Phase 3B `conversations` table + Phase 4 derivation)
+- [ ] "Download my data" — Thai PDPA + GDPR export (Phase 6)
+- [ ] "Forget everything and start over" — destructive account reset with warm confirm modal (Phase 6)
+
+**Card 6: Help & feedback (Phase 6)**
+- [ ] "Something's broken or confusing" — currently mailto stub, replace with in-app feedback form
+- [ ] "Help center" → /help (Phase 6 page)
+- [ ] "Chat with a human" — currently mailto stub, replace with Crisp/Intercom or LINE OA when available
+- [ ] "What's new in Miomika" → /changelog (Phase 6 page)
+
+**Card 7: About & legal (Phase 6)**
+- [ ] Privacy → /legal/privacy (Phase 6 page)
+- [ ] Terms → /legal/terms (Phase 6 page)
+- [ ] About Miomika → /legal/about (Phase 6 page)
+
+**Logout — already wired, no debt.**
+
+**Hero — already wired, no debt** (avatar fallback + display_name + tier chip all read from profile).
+
+**Visual layer LOCKED. Content wiring debt only.** No future /me work should touch the visual structure without explicit founder approval.
+
 Priority order. Each item: what, why, when, trigger.
 
 ### 9.1 Cat sound effects library (~30 phrases)
@@ -1448,6 +1502,7 @@ Nightly promotion cron, weekly degradation cron, Mike-only admin UI. Trigger: Ph
 
 | Date | Session | Phase | Shipped | Broken | Next |
 |------|---------|-------|---------|--------|------|
+| 2026-05-26 | Claude UI/UX architect chat — /me v2.1 LOCKED | /me v2.1 | Relationship surface shipped: 7-card anatomy (Progress / Plan & credits / Who Miomi is to you / App preferences / Privacy / Help & feedback / About & legal) + warm Logout link. Full DESIGN-RULES.md v1.0 compliance verified. Empty stat columns show motivating lucide icons (BookOpen / Flame / MessageCircle) instead of dashes. Visual layer LOCKED — content wiring debt tracked in §9.0. DESIGN-RULES.md and SCREENS.md §Surface 5 reflect shipped reality. Marketplace § Upgrade psychology pinned as first job of /marketplace build. | Stubs: theme/voice/warmth/name pickers, billing page, memory editor backend, help/legal pages, data export, account reset. All tracked §9.0. | /home rebuild (companion surface) next. |
 | 2026-05-26 | Cursor Opus 4.7 — /me v2 | /me v2 | `/me` full rewrite: 7-card relationship anatomy (Progress → Plan → Bond → App prefs → Privacy → Help → Legal); hero avatar + display name + ONE tier chip only; `me.*` warmth vectors extended in `lib/voice/warmth.ts`; scroll fix (`overflow-y: auto` on page root); post-login `redirect_to` via `lib/auth/redirect-to.ts` + login/OAuth/post-signup/onboarding; companion hidden on `/me`. Doc-debt: SCREENS.md §Surface 5 not updated (separate doc-pass). tsc: PASS, lint: PASS (27 warnings), build: PASS. | Progress stats show "—" until Phase 3B wires `cefr_level`, `words_mastered_count`, `streak_days`, `conversation_count`, `premium_voice_credits`, `avatar_url`, `miomi_warmth`. Bond/theme/warmth pickers stubbed. | Mike: smoke-test `/me` scroll on 375×812 + post-login return to `/me`; doc-pass SCREENS.md §Surface 5. |
 | 2026-05-25 | Cursor Composer 2.5 — Session 4 | Session 4 | `/me` rebuild per SCREENS.md §Surface 5: route renamed `/profile` → `/me` (redirects preserved for `/profile`, `/profile/journey`, `/profile/language`); BottomNav + layout SCREENS + GuidancePill updated; relationship surface with hero (avatar + Pro badge + journey/lang chips), subscription identity, premium voice tokens placeholder, memory editor warm empty state, settings toggles, growth story link, help/legal/logout; `ME_SCREEN_PHRASES` + `pickMePhrase()` in `lib/voice/warmth.ts`. tsc: PASS, lint: PASS (27 warnings), build: PASS. | Memory editor, billing history, voice token top-up, growth stats — placeholder warm states until backend ships. Guest /me view from old profile page not ported (logged-out users see empty hero). | Mike: smoke-test `/me` on A52; wire real memory + growth data in Session 5. |
 | 2026-05-21 | Cursor — Claude Opus 4.7 | 1 | Blocks A–I shipped: welcome single-show contract (bug #1 + #8), login/signup back nav (bug #2), Google OAuth + `/auth/callback` route (bug #3), journey-stage question inserted as onboarding step 2 (bug #9), `lucide-react ^1.16.0` bump (bug #11), `@sentry/nextjs ^10.53.1` wired via `instrumentation.ts` / `instrumentation-client.ts` (env-guarded so missing DSN never breaks build), Miomi-voice `error.tsx` + `global-error.tsx`, ambient `CompanionButton` + `CompanionSurface` mounted on every authenticated route except `/talk`, migrations 0007 (journey_stage, miomi_stars, active_character_id, last_seen_at, welcome_shown_at), 0008 (vocabulary_user_state + advance_word_mastery / touch_word_exposure RPCs — CRITICAL for teaching), 0009 (RLS lockdown for users, user_sessions, vocabulary_user_state, vocabulary_bank, phrases_bank, library_entries, library_interactions, library_promotions_queue + audit_rls_status helper), three asset briefs in `/docs/asset-briefs/`, lazy-init for Groq/Gemini clients so `next build` no longer needs runtime keys. | npm run lint reports 7 pre-existing React 19 hooks/static-components errors in /talk surfaces (talk/page.tsx, MicButton.tsx, MiomiLive.tsx, WordCardV3.tsx) — these predate Phase 1 and are scoped to Phase 2 "Cleanup, consistency". Phase 1 code itself is lint-clean. Bug #10 ambient companion now ships but its conversation engine is a placeholder that promotes to `/talk` for the real mic/voice loop — full inline conversation lands when Phase 3 wires mastery + spiral. | Mike: (1) apply migrations 0007 → 0008 → 0009 in Supabase SQL editor, (2) enable Google OAuth in Supabase Dashboard → Authentication → Providers with redirect `https://miomika.com/auth/callback` (+ local `http://localhost:3000/auth/callback`), (3) generate Phase 1 assets per `/docs/asset-briefs/`, (4) set `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` env vars in Vercel, (5) push branch + open PR with title "Phase 1: Foundation + Ambient Companion". After merge return for Phase 2 prompt. |
