@@ -307,49 +307,312 @@ export function pickIceBreaker(): IceBreaker {
 }
 
 // ============================================================================
-// /me SURFACE WARMTH — relationship moments
+// /me SURFACE WARMTH — relationship moments (DESIGN-RULES §C.5)
 // ============================================================================
 
-export const ME_SCREEN_PHRASES = {
-  hero_greeting: [
-    { th: "นี่คือคุณค่า~", en: "This is you~" },
-    { th: "หนูจำคุณได้ค่า~", en: "I remember you~" },
-    { th: "คุณคือคนพิเศษของหนูค่า", en: "You're my special one~" },
-  ],
-  memory_empty: {
-    th: "หนูยังเพิ่งรู้จักคุณค่า~ เล่าให้หนูฟังหน่อยสิคะ",
-    en: "I'm just getting to know you~ tell me something about yourself",
+const ME_WELCOME_BACK: WarmPhrase[] = [
+  { th: "วันนี้คุณเป็นยังไงคะ~?", en: "How are you today?" },
+  { th: "วันนี้เป็นอย่างไรบ้างคะ~?", en: "How's your day going?" },
+  { th: "ดีใจที่ได้เจอคุณอีกแล้วค่า~", en: "So glad to see you again~" },
+  { th: "หนูรอคุณอยู่นะคะ~ วันนี้เป็นไงบ้าง?", en: "I was waiting for you~ how are you?" },
+  { th: "มาแล้วเหรอคะ~ วันนี้สบายดีไหม?", en: "You're here~ doing okay today?" },
+];
+
+const ME_GROWTH_STORY: WarmPhrase[] = [
+  {
+    th: "เราอยู่ด้วยกันมา {days} วันแล้วนะคะ~ หนูจำเรื่องของคุณได้ {memories} อย่างเลย",
+    en: "We've been together {days} days~ I remember {memories} things about you",
   },
-  memory_intro: {
-    th: "นี่คือสิ่งที่หนูจำเกี่ยวกับคุณได้ค่า",
-    en: "Here's what I remember about you",
+  {
+    th: "หนูจำคุณมา {days} วันแล้วค่า~ และจำได้ {memories} เรื่องเกี่ยวกับคุณ",
+    en: "I've remembered you for {days} days~ and {memories} things about you",
   },
-  growth_intro: {
-    th: "เราเติบโตด้วยกันแล้วนะคะ~",
-    en: "We've grown together~",
+  {
+    th: "เราคุยกันมา {days} วันแล้ว~ หนูจำคุณไว้ {memories} อย่าง และเรียนไป {words} คำแล้ว",
+    en: "We've talked for {days} days~ I keep {memories} memories and we've practiced {words} words",
   },
-  growth_first_day: {
-    th: "วันนี้เป็นวันแรกของเราค่า~ มาเริ่มกันเลย!",
-    en: "Today's our first day together~ let's start!",
+  {
+    th: "{days} วันแล้วนะคะที่เราอยู่ด้วยกัน~ หนูรู้จักคุณ {memories} เรื่องแล้ว",
+    en: "{days} days together~ I know {memories} things about you now",
   },
-  upgrade_invitation: [
-    { th: "ถ้าคุณอยากให้หนูฉลาดกว่านี้... ลองดูแพ็คเกจของเรานะคะ", en: "If you want me even smarter... take a look at our plans" },
-    { th: "หนูอยากอยู่กับคุณนานๆ~ เลือกแพ็คเกจดูไหมคะ", en: "I want to stay with you longer~ want to see our plans?" },
-  ],
-  voice_tokens_empty: {
-    th: "เสียงพิเศษกำลังจะมาเร็วๆ นี้ค่า~",
-    en: "Premium voice is coming soon~",
+  {
+    th: "เราอยู่ข้างกันมา {days} วัน~ หนูเก็บความทรงจำ {memories} อย่างไว้ให้คุณ",
+    en: "Side by side for {days} days~ I hold {memories} memories for you",
   },
-  logout_confirm: {
-    th: "คุณจะจากหนูไปจริงๆ เหรอคะ? หนูจะคิดถึง...",
-    en: "Are you really leaving? I'll miss you...",
+];
+
+const ME_SECTION_SUBSCRIPTION: WarmPhrase[] = [
+  { th: "แผนของเรา", en: "Your plan with me" },
+  { th: "แพ็คเกจที่เราใช้ด้วยกัน", en: "The plan we share" },
+  { th: "เราใช้แผนไหนอยู่", en: "Our plan together" },
+];
+
+const ME_SECTION_MEMORY: WarmPhrase[] = [
+  { th: "เรื่องที่หนูจำได้", en: "Things I remember about you" },
+  { th: "สิ่งที่หนูรู้จักเกี่ยวกับคุณ", en: "Things I know about you" },
+  { th: "ความทรงจำของเรา", en: "What I keep about you" },
+];
+
+const ME_SECTION_VOICE: WarmPhrase[] = [
+  { th: "เสียงพิเศษ", en: "Premium voice" },
+  { th: "เสียงของหนู", en: "My premium voice" },
+  { th: "โทเค็นเสียงพิเศษ", en: "Voice tokens" },
+];
+
+const ME_SECTION_SETTINGS: WarmPhrase[] = [
+  { th: "การตั้งค่า", en: "Preferences" },
+  { th: "สิ่งที่คุณชอบ", en: "What you prefer" },
+  { th: "ปรับให้เหมาะกับคุณ", en: "Tune things for you" },
+];
+
+const ME_SECTION_HELP: WarmPhrase[] = [
+  { th: "ความช่วยเหลือ", en: "Help & info" },
+  { th: "ช่วยเหลือและข้อมูล", en: "Help & information" },
+  { th: "ถามหรืออ่านเพิ่ม", en: "Help & resources" },
+];
+
+const ME_CTA_UPGRADE: WarmPhrase[] = [
+  { th: "อัปเกรดไปด้วยกัน", en: "Upgrade with me" },
+  { th: "ไปด้วยกันแบบ Pro ไหมคะ", en: "Go Pro together?" },
+  { th: "อยากให้หนูฉลาดขึ้นไหม~ อัปเกรดเลย", en: "Want me smarter~? Upgrade together" },
+];
+
+const ME_CTA_MANAGE: WarmPhrase[] = [
+  { th: "จัดการแผน", en: "Manage plan" },
+  { th: "ดูแผนของเรา", en: "Manage our plan" },
+  { th: "ปรับแผน", en: "Adjust plan" },
+];
+
+const ME_CTA_EDIT_MEMORY: WarmPhrase[] = [
+  { th: "แก้ไขความทรงจำ", en: "Edit what I remember" },
+  { th: "ปรับสิ่งที่หนูจำ", en: "Change what I remember" },
+  { th: "แก้ความทรงจำของหนู", en: "Edit my memories of you" },
+];
+
+const ME_CTA_TOPUP_VOICE: WarmPhrase[] = [
+  { th: "เติมเสียง", en: "Top up voice" },
+  { th: "เติมโทเค็นเสียง", en: "Top up tokens" },
+  { th: "เพิ่มเสียงพิเศษ", en: "Add voice tokens" },
+];
+
+const ME_EMPTY_MEMORY: WarmPhrase[] = [
+  {
+    th: "หนูเพิ่งเริ่มรู้จักคุณค่า~ เล่าให้ฟังตอนไหนก็ได้นะคะ",
+    en: "I'm just starting to know you. Tell me about yourself any time~",
+  },
+  {
+    th: "หนูยังจำได้ไม่มาก~ เล่าเรื่องของคุณให้ฟังได้ทุกเมื่อนะคะ",
+    en: "I don't know much yet~ tell me about yourself whenever you like",
+  },
+  {
+    th: "เราเพิ่งเริ่มคุยกัน~ บอกหนูเรื่องของคุณได้เลยค่า",
+    en: "We're just getting started~ share anything about yourself",
+  },
+];
+
+const ME_LOGOUT: WarmPhrase[] = [
+  { th: "เจอกันใหม่นะคะ", en: "See you soon" },
+  { th: "ไว้เจอกันนะคะ~", en: "Until next time~" },
+  { th: "หนูจะรอคุณอยู่นะคะ", en: "I'll be here when you return" },
+];
+
+const ME_BADGE_PRO: WarmPhrase[] = [
+  { th: "Pro Miomi", en: "Pro Miomi" },
+  { th: "Pro", en: "Pro" },
+];
+
+const ME_BADGE_PRO_MAX: WarmPhrase[] = [
+  { th: "Pro Max", en: "Pro Max" },
+  { th: "Pro Max Miomi", en: "Pro Max Miomi" },
+];
+
+const ME_SETTINGS_VOICE: WarmPhrase[] = [
+  { th: "เสียง (หนูพูด)", en: "Voice (Miomi speaks)" },
+  { th: "ให้หนูพูด", en: "Miomi speaks aloud" },
+];
+
+const ME_SETTINGS_LANGUAGE: WarmPhrase[] = [
+  { th: "ภาษา", en: "Language" },
+  { th: "ภาษาที่ใช้", en: "App language" },
+];
+
+const ME_SETTINGS_NOTIFICATIONS: WarmPhrase[] = [
+  { th: "การแจ้งเตือน", en: "Notifications" },
+  { th: "แจ้งเตือน", en: "Alerts" },
+];
+
+const ME_ROW_VOICE_TOKENS: WarmPhrase[] = [
+  { th: "โทเค็นเสียง", en: "Voice tokens" },
+  { th: "เสียงคงเหลือ", en: "Voice balance" },
+];
+
+const ME_LINK_HELP: WarmPhrase[] = [
+  { th: "ศูนย์ช่วยเหลือ", en: "Help center" },
+  { th: "ช่วยเหลือ", en: "Help" },
+];
+
+const ME_LINK_PRIVACY: WarmPhrase[] = [
+  { th: "ความเป็นส่วนตัว", en: "Privacy" },
+];
+
+const ME_LINK_TERMS: WarmPhrase[] = [
+  { th: "ข้อกำหนด", en: "Terms" },
+];
+
+const ME_LINK_CONTACT: WarmPhrase[] = [
+  { th: "ติดต่อ", en: "Contact" },
+];
+
+const ME_MEMORY_CALLS_YOU: WarmPhrase[] = [
+  { th: "เรียกคุณว่า {name}", en: "Calls you {name}" },
+  { th: "หนูเรียกคุณว่า {name}", en: "I call you {name}" },
+];
+
+const ME_MEMORY_LEARNING: WarmPhrase[] = [
+  { th: "เรียน {lang}", en: "Learning {lang}" },
+  { th: "กำลังเรียน {lang}", en: "Studying {lang}" },
+];
+
+const ME_MEMORY_LIVES_IN: WarmPhrase[] = [
+  { th: "อยู่ที่ {location}", en: "Lives in {location}" },
+  { th: "อาศัยอยู่ {location}", en: "Based in {location}" },
+];
+
+function pickMeVector(
+  storageKey: string,
+  vector: WarmPhrase[],
+  lang: Language,
+): string {
+  if (vector.length === 0) return "";
+  if (typeof window === "undefined") return vector[0]![lang];
+  const lastIdx = parseInt(window.localStorage.getItem(storageKey) ?? "-1", 10);
+  let next = Math.floor(Math.random() * vector.length);
+  if (next === lastIdx) next = (next + 1) % vector.length;
+  window.localStorage.setItem(storageKey, String(next));
+  return vector[next]![lang];
+}
+
+function pickMeWith(
+  storageKey: string,
+  vector: WarmPhrase[],
+  lang: Language,
+  placeholders: Record<string, string | number>,
+): string {
+  let phrase = pickMeVector(storageKey, vector, lang);
+  for (const [key, value] of Object.entries(placeholders)) {
+    phrase = phrase.replaceAll(`{${key}}`, String(value));
+  }
+  return phrase;
+}
+
+export interface MeGrowthParams {
+  days: number;
+  memoriesCount: number;
+  wordsLearned: number;
+}
+
+/** /me warmth selectors — all user-facing chrome on the relationship surface. */
+export const me = {
+  identity: {
+    pickWelcomeBack(lang: Language): string {
+      return pickMeVector("miomika.last_me_welcome", ME_WELCOME_BACK, lang);
+    },
+  },
+  growthStory(params: MeGrowthParams, lang: Language): string {
+    return pickMeWith("miomika.last_me_growth", ME_GROWTH_STORY, lang, {
+      days: params.days,
+      memories: params.memoriesCount,
+      words: params.wordsLearned,
+    });
+  },
+  section: {
+    pickSubscription(lang: Language): string {
+      return pickMeVector("miomika.last_me_sec_sub", ME_SECTION_SUBSCRIPTION, lang);
+    },
+    pickMemory(lang: Language): string {
+      return pickMeVector("miomika.last_me_sec_mem", ME_SECTION_MEMORY, lang);
+    },
+    pickVoice(lang: Language): string {
+      return pickMeVector("miomika.last_me_sec_voice", ME_SECTION_VOICE, lang);
+    },
+    pickSettings(lang: Language): string {
+      return pickMeVector("miomika.last_me_sec_set", ME_SECTION_SETTINGS, lang);
+    },
+    pickHelp(lang: Language): string {
+      return pickMeVector("miomika.last_me_sec_help", ME_SECTION_HELP, lang);
+    },
+  },
+  cta: {
+    pickUpgrade(lang: Language): string {
+      return pickMeVector("miomika.last_me_cta_up", ME_CTA_UPGRADE, lang);
+    },
+    pickManage(lang: Language): string {
+      return pickMeVector("miomika.last_me_cta_mgmt", ME_CTA_MANAGE, lang);
+    },
+    pickEditMemory(lang: Language): string {
+      return pickMeVector("miomika.last_me_cta_mem", ME_CTA_EDIT_MEMORY, lang);
+    },
+    pickTopupVoice(lang: Language): string {
+      return pickMeVector("miomika.last_me_cta_voice", ME_CTA_TOPUP_VOICE, lang);
+    },
+  },
+  empty: {
+    pickMemory(lang: Language): string {
+      return pickMeVector("miomika.last_me_empty_mem", ME_EMPTY_MEMORY, lang);
+    },
+  },
+  logout: {
+    pick(lang: Language): string {
+      return pickMeVector("miomika.last_me_logout", ME_LOGOUT, lang);
+    },
+  },
+  badge: {
+    pickPro(lang: Language): string {
+      return pickMeVector("miomika.last_me_badge_pro", ME_BADGE_PRO, lang);
+    },
+    pickProMax(lang: Language): string {
+      return pickMeVector("miomika.last_me_badge_pmax", ME_BADGE_PRO_MAX, lang);
+    },
+  },
+  settings: {
+    pickVoice(lang: Language): string {
+      return pickMeVector("miomika.last_me_set_voice", ME_SETTINGS_VOICE, lang);
+    },
+    pickLanguage(lang: Language): string {
+      return pickMeVector("miomika.last_me_set_lang", ME_SETTINGS_LANGUAGE, lang);
+    },
+    pickNotifications(lang: Language): string {
+      return pickMeVector("miomika.last_me_set_notif", ME_SETTINGS_NOTIFICATIONS, lang);
+    },
+  },
+  row: {
+    pickVoiceTokens(lang: Language): string {
+      return pickMeVector("miomika.last_me_row_vtok", ME_ROW_VOICE_TOKENS, lang);
+    },
+  },
+  link: {
+    pickHelp(lang: Language): string {
+      return pickMeVector("miomika.last_me_link_help", ME_LINK_HELP, lang);
+    },
+    pickPrivacy(lang: Language): string {
+      return pickMeVector("miomika.last_me_link_priv", ME_LINK_PRIVACY, lang);
+    },
+    pickTerms(lang: Language): string {
+      return pickMeVector("miomika.last_me_link_terms", ME_LINK_TERMS, lang);
+    },
+    pickContact(lang: Language): string {
+      return pickMeVector("miomika.last_me_link_contact", ME_LINK_CONTACT, lang);
+    },
+  },
+  memory: {
+    pickCallsYou(name: string, lang: Language): string {
+      return pickMeWith("miomika.last_me_mem_name", ME_MEMORY_CALLS_YOU, lang, { name });
+    },
+    pickLearning(langName: string, lang: Language): string {
+      return pickMeWith("miomika.last_me_mem_learn", ME_MEMORY_LEARNING, lang, { lang: langName });
+    },
+    pickLivesIn(location: string, lang: Language): string {
+      return pickMeWith("miomika.last_me_mem_loc", ME_MEMORY_LIVES_IN, lang, { location });
+    },
   },
 } as const;
-
-export function pickMePhrase(category: keyof typeof ME_SCREEN_PHRASES): { th: string; en: string } {
-  const value = ME_SCREEN_PHRASES[category];
-  if (Array.isArray(value)) {
-    return value[Math.floor(Math.random() * value.length)]!;
-  }
-  return value as { th: string; en: string };
-}
