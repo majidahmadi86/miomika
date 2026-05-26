@@ -7,10 +7,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Bell,
+  BookOpen,
   Brain,
   ChevronLeft,
   ChevronRight,
   Download,
+  Flame,
   Globe,
   Heart,
   HelpCircle,
@@ -90,9 +92,12 @@ function readWarmthLabel(
   return me.bond.warmthOptions.balanced(lang);
 }
 
-function formatStat(value: number | null | undefined, hasField: boolean): string {
-  if (!hasField) return "—";
-  return String(value ?? 0);
+function statValue(
+  hasField: boolean,
+  raw: number | null | undefined,
+): number {
+  if (!hasField) return 0;
+  return raw ?? 0;
 }
 
 function buildFeedbackMailto(displayName: string, tier: string): string {
@@ -138,15 +143,10 @@ export default function MePage() {
   const hasConvosField = profile != null && "conversation_count" in profile;
   const hasVoiceCreditsField = profile != null && "premium_voice_credits" in profile;
 
-  const wordsStat = hasWordsField
-    ? formatStat(profile?.words_mastered_count, true)
-    : "—";
-  const streakStat = hasStreakField
-    ? formatStat(profile?.streak_days, true)
-    : "—";
-  const convosStat = hasConvosField
-    ? formatStat(profile?.conversation_count, true)
-    : "—";
+  // Phase 3B: wire real progress data from vocabulary_user_state + conversations table.
+  const wordsValue = statValue(hasWordsField, profile?.words_mastered_count);
+  const streakValue = statValue(hasStreakField, profile?.streak_days);
+  const convosValue = statValue(hasConvosField, profile?.conversation_count);
   const voiceCredits = hasVoiceCreditsField ? (profile?.premium_voice_credits ?? 0) : 0;
   const starsBalance = profile?.miomi_stars ?? 0;
   const uiLangLabel = profile?.ui_language === "en" ? "English" : "ไทย";
@@ -415,9 +415,24 @@ export default function MePage() {
               gap: "12px",
             }}
           >
-            <StatColumn value={wordsStat} label={me.progress.statWords(uiLang)} />
-            <StatColumn value={streakStat} label={me.progress.statStreak(uiLang)} />
-            <StatColumn value={convosStat} label={me.progress.statConvos(uiLang)} />
+            <StatColumn
+              value={wordsValue}
+              icon={BookOpen}
+              labelDefault={me.progress.statWords(uiLang)}
+              labelEmpty={me.progress.statWordsEmpty(uiLang)}
+            />
+            <StatColumn
+              value={streakValue}
+              icon={Flame}
+              labelDefault={me.progress.statStreak(uiLang)}
+              labelEmpty={me.progress.statStreakEmpty(uiLang)}
+            />
+            <StatColumn
+              value={convosValue}
+              icon={MessageCircle}
+              labelDefault={me.progress.statConvos(uiLang)}
+              labelEmpty={me.progress.statConvosEmpty(uiLang)}
+            />
           </div>
 
           <button
@@ -806,33 +821,64 @@ function RowDivider() {
   return <div style={{ height: "1px", background: COLORS.borderLight }} />;
 }
 
-function StatColumn({ value, label }: { value: string; label: string }) {
+function StatColumn({
+  value,
+  icon: Icon,
+  labelDefault,
+  labelEmpty,
+}: {
+  value: number;
+  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  labelDefault: string;
+  labelEmpty: string;
+}) {
+  const populated = value > 0;
   return (
-    <div style={{ flex: 1, textAlign: "center" }}>
-      <p
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        textAlign: "center",
+      }}
+    >
+      <div
         style={{
-          margin: 0,
-          fontFamily: "'Quicksand', sans-serif",
-          fontSize: "20px",
-          lineHeight: "28px",
-          fontWeight: 600,
-          color: COLORS.textPrimary,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "52px",
         }}
       >
-        {value}
-      </p>
-      <p
+        {populated ? (
+          <span
+            style={{
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "20px",
+              fontWeight: 600,
+              color: COLORS.textPrimary,
+              lineHeight: "28px",
+            }}
+          >
+            {value}
+          </span>
+        ) : (
+          <Icon size={24} strokeWidth={1.75} color={COLORS.textSubtle} />
+        )}
+      </div>
+      <span
         style={{
-          margin: "4px 0 0",
           fontFamily: "'Quicksand', sans-serif",
           fontSize: "12px",
-          lineHeight: "16px",
           fontWeight: 500,
           color: COLORS.textMuted,
+          lineHeight: "16px",
+          marginTop: "4px",
         }}
       >
-        {label}
-      </p>
+        {populated ? labelDefault : labelEmpty}
+      </span>
     </div>
   );
 }

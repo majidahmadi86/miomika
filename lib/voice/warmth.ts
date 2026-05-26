@@ -356,6 +356,24 @@ const ME_PROGRESS_STAT_CONVOS: WarmPhrase[] = [
   { th: "ครั้งที่คุยกัน", en: "Chats together" },
 ];
 
+const ME_PROGRESS_STAT_WORDS_EMPTY: WarmPhrase[] = [
+  { th: "เรียนคำแรกเลย~", en: "Learn your first" },
+  { th: "มาเรียนคำแรกกัน~", en: "Learn your first word~" },
+  { th: "เริ่มจากคำแรกนะคะ~", en: "Start with your first word~" },
+];
+
+const ME_PROGRESS_STAT_STREAK_EMPTY: WarmPhrase[] = [
+  { th: "เริ่มวันนี้", en: "Start today" },
+  { th: "เริ่มต้นวันนี้เลย~", en: "Begin today~" },
+  { th: "วันนี้เป็นวันแรกไหม~", en: "Start today~" },
+];
+
+const ME_PROGRESS_STAT_CONVOS_EMPTY: WarmPhrase[] = [
+  { th: "ทักทายหนูสิ~", en: "Say hi to me" },
+  { th: "มาคุยกับหนูสักหน่อย~", en: "Come say hi~" },
+  { th: "หนูรอฟังอยู่นะคะ~", en: "Say hi to me~" },
+];
+
 const ME_PROGRESS_CTA: WarmPhrase[] = [
   { th: "ดูทั้งหมด", en: "See everything" },
   { th: "ดูความก้าวหน้าทั้งหมด", en: "See all progress" },
@@ -639,6 +657,15 @@ export const me = {
     },
     statConvos(lang: Language): string {
       return pickMeVector("miomika.last_me_prog_conv", ME_PROGRESS_STAT_CONVOS, lang);
+    },
+    statWordsEmpty(lang: Language): string {
+      return pickMeVector("miomika.last_me_prog_words_e", ME_PROGRESS_STAT_WORDS_EMPTY, lang);
+    },
+    statStreakEmpty(lang: Language): string {
+      return pickMeVector("miomika.last_me_prog_streak_e", ME_PROGRESS_STAT_STREAK_EMPTY, lang);
+    },
+    statConvosEmpty(lang: Language): string {
+      return pickMeVector("miomika.last_me_prog_conv_e", ME_PROGRESS_STAT_CONVOS_EMPTY, lang);
     },
     cta(lang: Language): string {
       return pickMeVector("miomika.last_me_prog_cta", ME_PROGRESS_CTA, lang);
