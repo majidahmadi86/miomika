@@ -5,6 +5,9 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Coffee, Heart, Zap, type LucideIcon } from "lucide-react";
+import { useUILanguage } from "@/lib/i18n/client";
+import { home } from "@/lib/voice/warmth";
+import { detectLang, speak } from "@/lib/voice/tts";
 import {
   useCallback,
   useEffect,
@@ -38,14 +41,6 @@ const DAILY_CHALLENGE = {
 
 const tapFeedback =
   "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A96E]";
-
-const TAP_BUBBLE_CYCLE = [
-  { th: "วันนี้โพสต์อะไรดีคะ คิดถึงเลยค่า", en: "What are we posting today? I missed you~" },
-  { th: "อยากให้หนูช่วยอะไร บอกได้เลยนะคะ", en: "Tell me what you need — I'm all ears~" },
-  { th: "มาอยู่ข้างๆ แบบนี้ก็อบอุ่นดีนะคะ", en: "Having you here with me feels warm~" },
-  { th: "หนูพร้อมฟังทุกเรื่องของคุณเลยค่า", en: "I'm ready to hear everything~" },
-  { th: "พักสายตาแล้วมาคุยกับหนูหน่อยไหมคะ", en: "Rest your eyes and chat with me a bit~" },
-] as const;
 
 const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
 const FEED_BUBBLE = { th: "อิ่มแล้วค่า~", en: "All full now~" };
@@ -189,9 +184,12 @@ function CelebrationTrigger() {
   return null;
 }
 
+type HeartParticle = { id: number; x: number };
+
 export default function HomePage() {
   const reduceMotion = useReducedMotion();
-  const { isGuest, authReady, openSoftSignupPrompt, dismissGuestInvite } = useGuestExploration();
+  const uiLang = useUILanguage();
+  const { isGuest, authReady, dismissGuestInvite } = useGuestExploration();
 
   const [miomiX, setMiomiX] = useState(0);
   const [sleeping, setSleeping] = useState(false);
@@ -200,6 +198,8 @@ export default function HomePage() {
   const [expressionFlip, setExpressionFlip] = useState<"idle" | "happy">("idle");
   const [tapBounceKey, setTapBounceKey] = useState(0);
   const [tapSpinKey, setTapSpinKey] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [heartParticles, setHeartParticles] = useState<HeartParticle[]>([]);
   const [feedAnimKey, setFeedAnimKey] = useState(0);
   const [playAnimKey, setPlayAnimKey] = useState(0);
   const [levelUpAnimKey, setLevelUpAnimKey] = useState(0);
@@ -213,14 +213,37 @@ export default function HomePage() {
   // Block A1 — hydration-safe mounted guard + shouldShowWelcome decision).
   const openCompanion = useCompanionStore((s) => s.open);
 
-  const tapCycleIndexRef = useRef(0);
   const lastActivityRef = useRef(0);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const pointerDownRef = useRef<{ t: number; x: number; y: number } | null>(null);
+  const didDragRef = useRef(false);
+  const bubbleHideRef = useRef<number | null>(null);
+  const reactMoodTimeoutRef = useRef<number | null>(null);
+  const [dragConstraints, setDragConstraints] = useState({
+    left: -120,
+    right: 120,
+    top: -40,
+    bottom: 40,
+  });
 
   useLayoutEffect(() => {
     lastActivityRef.current = Date.now();
     const loaded = loadPetStats();
     queueMicrotask(() => { setPet(loaded); setPetReady(true); });
   }, []);
+
+  useLayoutEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    setDragConstraints({
+      left: -w * 0.3,
+      right: w * 0.3,
+      top: -h * 0.15,
+      bottom: h * 0.15,
+    });
+  }, [petReady]);
 
 
   useEffect(() => {
@@ -253,27 +276,95 @@ export default function HomePage() {
     return true;
   }, [authReady, isGuest]);
 
-  const scheduleHappyEnd = useCallback(() => {
+  const scheduleHappyEnd = useCallback((ms = 2000) => {
     if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current);
     happyTimeoutRef.current = window.setTimeout(() => {
       happyTimeoutRef.current = null;
-      if (Date.now() >= happyUntilRef.current) setExpressionFlip("idle");
-    }, 2000);
+      if (Date.now() >= happyUntilRef.current && !isDragging) setExpressionFlip("idle");
+    }, ms);
+  }, [isDragging]);
+
+  const showReactBubble = useCallback(
+    (phrase: string, autoHideMs = 3200) => {
+      setBubble(
+        uiLang === "th" ? { th: phrase, en: "" } : { th: "", en: phrase },
+      );
+      setBubbleVisible(true);
+      if (bubbleHideRef.current) window.clearTimeout(bubbleHideRef.current);
+      bubbleHideRef.current = window.setTimeout(() => {
+        bubbleHideRef.current = null;
+        setBubbleVisible(false);
+      }, autoHideMs);
+    },
+    [uiLang],
+  );
+
+  const maybeSpeakPhrase = useCallback((phrase: string) => {
+    if (typeof window === "undefined") return;
+    if (window.localStorage.getItem("miomika.tts_on") !== "1") return;
+    void speak(phrase, detectLang(phrase));
   }, []);
 
-  const triggerPetTap = useCallback(() => {
-    dismissGuestInvite(); markActivity(); wakeFromSleep();
-    const i = tapCycleIndexRef.current % TAP_BUBBLE_CYCLE.length;
-    tapCycleIndexRef.current += 1;
-    const phrase = TAP_BUBBLE_CYCLE[i]!;
-    setBubble({ th: phrase.th, en: phrase.en });
-    setBubbleVisible(true);
+  const scheduleReactMoodEnd = useCallback(
+    (ms: number) => {
+      if (reactMoodTimeoutRef.current) window.clearTimeout(reactMoodTimeoutRef.current);
+      reactMoodTimeoutRef.current = window.setTimeout(() => {
+        reactMoodTimeoutRef.current = null;
+        if (!isDragging) setExpressionFlip("idle");
+      }, ms);
+    },
+    [isDragging],
+  );
+
+  const spawnHeartParticles = useCallback(() => {
+    const batch: HeartParticle[] = Array.from({ length: 3 }, (_, i) => ({
+      id: Date.now() + i,
+      x: (Math.random() - 0.5) * 60,
+    }));
+    setHeartParticles((prev) => [...prev, ...batch]);
+  }, []);
+
+  const handleMiomiTap = useCallback(() => {
+    dismissGuestInvite();
+    markActivity();
+    wakeFromSleep();
+    const phrase = home.react.tap(uiLang);
+    showReactBubble(phrase, 3200);
+    maybeSpeakPhrase(phrase);
     setTapBounceKey((k) => k + 1);
     setTapSpinKey((k) => k + 1);
-    happyUntilRef.current = Date.now() + 2000;
+    spawnHeartParticles();
+    happyUntilRef.current = Date.now() + 1600;
     setExpressionFlip("happy");
-    scheduleHappyEnd();
-  }, [dismissGuestInvite, markActivity, wakeFromSleep, scheduleHappyEnd]);
+    scheduleHappyEnd(1600);
+    scheduleReactMoodEnd(1600);
+  }, [
+    dismissGuestInvite,
+    markActivity,
+    wakeFromSleep,
+    uiLang,
+    showReactBubble,
+    maybeSpeakPhrase,
+    spawnHeartParticles,
+    scheduleHappyEnd,
+    scheduleReactMoodEnd,
+  ]);
+
+  const handleDragRelease = useCallback(() => {
+    const phrase = home.react.drag(uiLang);
+    showReactBubble(phrase, 3200);
+    maybeSpeakPhrase(phrase);
+    happyUntilRef.current = Date.now() + 1200;
+    setExpressionFlip("happy");
+    scheduleHappyEnd(1200);
+    scheduleReactMoodEnd(1200);
+  }, [
+    uiLang,
+    showReactBubble,
+    maybeSpeakPhrase,
+    scheduleHappyEnd,
+    scheduleReactMoodEnd,
+  ]);
 
   const triggerLevelUpCelebration = useCallback(() => {
     window.setTimeout(() => {
@@ -324,7 +415,7 @@ export default function HomePage() {
       return stats;
     });
     setXpTick((t) => t + 1);
-  }, [markActivity, wakeFromSleep, triggerLevelUpCelebration, showGuestSignupIfFirst]);
+  }, [markActivity, wakeFromSleep, scheduleHappyEnd, triggerLevelUpCelebration, showGuestSignupIfFirst]);
 
   const handleGuestCreatePress = useCallback(() => {
     showGuestSignupIfFirst();
@@ -342,26 +433,78 @@ export default function HomePage() {
   const handleStagePointerDown = useCallback(() => {
     markActivity();
     if (sleeping) {
-      dismissGuestInvite(); wakeFromSleep();
-      setTapBounceKey((k) => k + 1);
-      happyUntilRef.current = Date.now() + 2000;
-      setExpressionFlip("happy");
-      const i = tapCycleIndexRef.current % TAP_BUBBLE_CYCLE.length;
-      tapCycleIndexRef.current += 1;
-      const phrase = TAP_BUBBLE_CYCLE[i]!;
-      setBubble({ th: phrase.th, en: phrase.en });
-      setBubbleVisible(true);
-      setTapSpinKey((k) => k + 1);
-      scheduleHappyEnd();
+      dismissGuestInvite();
+      wakeFromSleep();
+      handleMiomiTap();
     }
-  }, [dismissGuestInvite, markActivity, sleeping, wakeFromSleep, scheduleHappyEnd]);
+  }, [dismissGuestInvite, markActivity, sleeping, wakeFromSleep, handleMiomiTap]);
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
-      setBubble(WELCOME_BUBBLE); setBubbleVisible(true);
-    }, reduceMotion ? 0 : 1200);
-    return () => window.clearTimeout(id);
-  }, [reduceMotion]);
+    if (!authReady || isGuest) return;
+    const showDelay = reduceMotion ? 0 : 1200;
+    const showId = window.setTimeout(() => {
+      setBubble(WELCOME_BUBBLE);
+      setBubbleVisible(true);
+    }, showDelay);
+    const hideId = window.setTimeout(() => {
+      setBubbleVisible(false);
+    }, showDelay + 4000);
+    return () => {
+      window.clearTimeout(showId);
+      window.clearTimeout(hideId);
+    };
+  }, [reduceMotion, isGuest, authReady]);
+
+  const handleMiomiPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      pointerDownRef.current = { t: Date.now(), x: e.clientX, y: e.clientY };
+      didDragRef.current = false;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    [],
+  );
+
+  const handleMiomiPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      const down = pointerDownRef.current;
+      if (!down || didDragRef.current) return;
+      const dx = e.clientX - down.x;
+      const dy = e.clientY - down.y;
+      if (Math.hypot(dx, dy) < 8) return;
+      if (Date.now() - down.t < 300) return;
+      didDragRef.current = true;
+      setIsDragging(true);
+      markActivity();
+      wakeFromSleep();
+    },
+    [markActivity, wakeFromSleep],
+  );
+
+  const handleMiomiPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      const down = pointerDownRef.current;
+      pointerDownRef.current = null;
+      if (!down) return;
+
+      if (isDragging || didDragRef.current) return;
+
+      handleMiomiTap();
+    },
+    [handleMiomiTap, isDragging],
+  );
+
+  const handleMiomiPointerCancel = useCallback(() => {
+    pointerDownRef.current = null;
+    if (isDragging) {
+      setIsDragging(false);
+      didDragRef.current = true;
+      handleDragRelease();
+    }
+  }, [handleDragRelease, isDragging]);
 
   useEffect(() => {
     if (reduceMotion || sleeping) {
@@ -397,7 +540,11 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    return () => { if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current); };
+    return () => {
+      if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current);
+      if (bubbleHideRef.current) window.clearTimeout(bubbleHideRef.current);
+      if (reactMoodTimeoutRef.current) window.clearTimeout(reactMoodTimeoutRef.current);
+    };
   }, []);
 
   const triggerFuelParticle = useCallback((buttonEl: HTMLElement, color: string) => {
@@ -488,7 +635,12 @@ export default function HomePage() {
 
   const bubbleTh = bubble.th;
   const bubbleEn = bubble.en;
-  const miomiExpression = sleeping ? "idle" : expressionFlip;
+  const miomiExpression = sleeping
+    ? "idle"
+    : isDragging
+      ? "thinking"
+      : expressionFlip;
+  const guestPillCopy = home.guest.pill(uiLang);
 
   return (
     <>
@@ -512,11 +664,27 @@ export default function HomePage() {
           <div className="flex h-full flex-col overflow-hidden bg-white md:hidden">
             {/* Miomi stage */}
             <div
+              ref={stageRef}
               className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
               style={{ background: "#FAFAF6" }}
               onPointerDown={handleStagePointerDown}
             >
               <AmbientBackground mode="ambient" />
+
+              {authReady && isGuest ? (
+                <div className="pointer-events-none absolute inset-x-4 top-4 z-40 flex justify-center">
+                  <Link
+                    href="/signup"
+                    className={cn(
+                      "pointer-events-auto max-w-[92%] rounded-full border border-[#EDE8E0] bg-white/92 px-4 py-2 text-center text-sm font-medium leading-[1.6] text-[#1A1A18] shadow-sm backdrop-blur-sm",
+                      tapFeedback,
+                    )}
+                  >
+                    {guestPillCopy}
+                  </Link>
+                </div>
+              ) : null}
+
               <motion.div className="absolute inset-0 bottom-12 z-10 flex min-h-0 items-end justify-center px-2">
                 <motion.div
                   className="flex h-full max-h-full items-end justify-center"
@@ -526,15 +694,44 @@ export default function HomePage() {
                 >
                   <motion.div
                     className="flex h-full max-h-full items-end justify-center"
-                    animate={reduceMotion ? { x: 0 } : { x: miomiX }}
+                    animate={reduceMotion || isDragging ? { x: 0 } : { x: miomiX }}
                     transition={WALK_TRANSITION}
                   >
-                    <motion.div className={cn("origin-bottom", sleeping && "rotate-[6deg]")}>
+                    <motion.div
+                      className={cn("origin-bottom", sleeping && "rotate-[6deg]")}
+                      drag={isDragging}
+                      dragConstraints={dragConstraints}
+                      dragElastic={0.2}
+                      dragMomentum={false}
+                      onDragEnd={() => {
+                        if (!didDragRef.current) {
+                          didDragRef.current = true;
+                          handleDragRelease();
+                        }
+                        setIsDragging(false);
+                      }}
+                      animate={
+                        isDragging
+                          ? undefined
+                          : { x: 0, y: 0 }
+                      }
+                      transition={{
+                        type: "spring",
+                        stiffness: 280,
+                        damping: 13,
+                      }}
+                    >
                       <motion.button
+                        key={`tap-bounce-${tapBounceKey}`}
                         type="button"
                         aria-label="Tap Miomi"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={triggerPetTap}
+                        onPointerDown={handleMiomiPointerDown}
+                        onPointerMove={handleMiomiPointerMove}
+                        onPointerUp={handleMiomiPointerUp}
+                        onPointerCancel={handleMiomiPointerCancel}
+                        initial={false}
+                        animate={tapBounceKey > 0 ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                        transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
                         className="relative block cursor-pointer appearance-none border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-accent"
                       >
                         <MiomiCharacter
@@ -543,7 +740,7 @@ export default function HomePage() {
                           feedAnimKey={feedAnimKey}
                           playAnimKey={playAnimKey}
                           levelUpAnimKey={levelUpAnimKey}
-                          breathe={!reduceMotion && !sleeping}
+                          breathe={!reduceMotion && !sleeping && !isDragging}
                         />
                       </motion.button>
                     </motion.div>
@@ -551,8 +748,34 @@ export default function HomePage() {
                 </motion.div>
               </motion.div>
 
-              {/* Speech bubble */}
-              <motion.div className="pointer-events-none absolute right-4 top-4 z-30 max-w-[65%]">
+              {heartParticles.map((p) => (
+                <motion.div
+                  key={p.id}
+                  className="pointer-events-none absolute left-1/2 z-20"
+                  style={{ bottom: "42%", marginLeft: p.x }}
+                  initial={{ y: 0, opacity: 1, scale: 0.8 }}
+                  animate={{ y: -40, opacity: 0, scale: 1.2 }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                  onAnimationComplete={() => {
+                    setHeartParticles((prev) => prev.filter((x) => x.id !== p.id));
+                  }}
+                >
+                  <Heart
+                    size={14}
+                    fill="#F9A8D4"
+                    stroke="#DB2777"
+                    strokeWidth={2}
+                  />
+                </motion.div>
+              ))}
+
+              {/* Speech bubble — greeting suppressed for guests (guest pill only) */}
+              <motion.div
+                className={cn(
+                  "pointer-events-none absolute right-4 z-30 max-w-[65%]",
+                  authReady && isGuest ? "top-16" : "top-4",
+                )}
+              >
                 <motion.div
                   className="pointer-events-auto rounded-2xl border border-[#EAD0DB] bg-white/92 px-3 py-2.5 shadow-sm backdrop-blur-sm"
                   initial={false}
@@ -596,18 +819,6 @@ export default function HomePage() {
                   <Coffee style={{ width: "14px", height: "14px", color: "#7DD3C0", flexShrink: 0, marginLeft: "6px" }} strokeWidth={2} />
                   <div style={{ flex: 1, height: "6px", background: "#F0E0E8", borderRadius: "999px", overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${pet.hunger}%`, background: "#7DD3C0", borderRadius: "999px", transition: "width 0.5s ease-out" }} />
-                  </div>
-                  <div style={{ marginLeft: "8px", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
-                    <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 700, color: "#C9A96E", lineHeight: 1 }}>
-                      Lv.{pet.level}
-                    </span>
-                    <div style={{ width: "32px", height: "3px", background: "#F0E0E8", borderRadius: "999px", overflow: "hidden" }}>
-                      <div
-                        key={`xp-${pet.xp}-${xpTick}`}
-                        className="miomi-xp-tick"
-                        style={{ height: "100%", width: `${pet.xp}%`, background: "#C9A96E", borderRadius: "999px", transition: "width 0.5s ease-out" }}
-                      />
-                    </div>
                   </div>
                 </div>
               </div>
