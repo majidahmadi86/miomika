@@ -36,6 +36,8 @@ import { useUILanguage } from "@/lib/i18n/client";
 import { createClient } from "@/lib/supabase/client";
 import { COLORS, CTA_GRADIENT } from "@/lib/design/colors";
 import { loadTalkConfig, MODE_META } from "@/lib/talk/modes";
+import { AvatarEditSheet } from "@/components/me/AvatarEditSheet";
+import { NameEditSheet } from "@/components/me/NameEditSheet";
 import { me } from "@/lib/voice/warmth";
 
 const CARD_SHADOW =
@@ -126,6 +128,8 @@ export default function MePage() {
     return window.localStorage.getItem(SOUNDS_KEY) === "1";
   });
   const [notificationsOn, setNotificationsOn] = useState(false);
+  const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
+  const [nameSheetOpen, setNameSheetOpen] = useState(false);
 
   const displayName =
     profile?.display_name ??
@@ -251,13 +255,20 @@ export default function MePage() {
           alignItems: "center",
         }}
       >
-        <div
+        <button
+          type="button"
+          onClick={() => setAvatarSheetOpen(true)}
+          aria-label={me.avatar.title(uiLang)}
           style={{
             width: "80px",
             height: "80px",
             borderRadius: "999px",
             overflow: "hidden",
             boxShadow: AVATAR_SHADOW,
+            padding: 0,
+            border: "none",
+            cursor: "pointer",
+            background: "transparent",
           }}
         >
           <Image
@@ -271,7 +282,7 @@ export default function MePage() {
             style={{ objectFit: "cover", width: "80px", height: "80px" }}
             priority
           />
-        </div>
+        </button>
 
         <h1
           style={{
@@ -608,9 +619,7 @@ export default function MePage() {
             icon={<User size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
             label={me.bond.callYou(uiLang)}
             value={displayName}
-            onClick={() => {
-              /* stub: display name editor */
-            }}
+            onClick={() => setNameSheetOpen(true)}
           />
         </GlassCard>
       </div>
@@ -745,6 +754,19 @@ export default function MePage() {
           <ChevronRow label={me.legal.about(uiLang)} onClick={() => router.push("/legal/about")} />
         </GlassCard>
       </div>
+
+      <AvatarEditSheet
+        open={avatarSheetOpen}
+        userId={profile.id}
+        onClose={() => setAvatarSheetOpen(false)}
+      />
+      <NameEditSheet
+        key={nameSheetOpen ? displayName : "closed"}
+        open={nameSheetOpen}
+        userId={profile.id}
+        currentName={displayName}
+        onClose={() => setNameSheetOpen(false)}
+      />
 
       {/* Logout */}
       <button

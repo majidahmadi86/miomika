@@ -830,4 +830,248 @@ export const me = {
   logout(lang: Language): string {
     return pickMeVector("miomika.last_me_logout", ME_LOGOUT, lang);
   },
+  avatar: {
+    title(lang: Language): string {
+      return pickMeVector("miomika.last_me_avatar_title", ME_AVATAR_TITLE, lang);
+    },
+    upload(lang: Language): string {
+      return pickMeVector("miomika.last_me_avatar_upload", ME_AVATAR_UPLOAD, lang);
+    },
+    useMiomi(lang: Language): string {
+      return pickMeVector("miomika.last_me_avatar_miomi", ME_AVATAR_MIOMI, lang);
+    },
+    cancel(lang: Language): string {
+      return pickMeVector("miomika.last_me_avatar_cancel", ME_AVATAR_CANCEL, lang);
+    },
+  },
+  name: {
+    title(lang: Language): string {
+      return pickMeVector("miomika.last_me_name_title", ME_NAME_TITLE, lang);
+    },
+    save(lang: Language): string {
+      return pickMeVector("miomika.last_me_name_save", ME_NAME_SAVE, lang);
+    },
+    cancel(lang: Language): string {
+      return pickMeVector("miomika.last_me_name_cancel", ME_NAME_CANCEL, lang);
+    },
+  },
+} as const;
+
+// ============================================================================
+// /home SURFACE WARMTH — alive companion surface
+// ============================================================================
+
+const HOME_GREETING_MORNING: WarmPhrase[] = [
+  { th: "ตื่นแล้วเหรอคะ~? วันนี้คุยกันไหมคะ", en: "Awake already~? Want to chat today?" },
+  { th: "สวัสดีตอนเช้าค่า~ วันนี้เป็นไงบ้าง", en: "Good morning~ how are you today?" },
+  { th: "เช้านี้หนูรอคุณอยู่นะคะ~", en: "I've been waiting for you this morning~" },
+];
+
+const HOME_GREETING_AFTERNOON: WarmPhrase[] = [
+  { th: "กินข้าวยังคะ~?", en: "Have you eaten yet~?" },
+  { th: "บ่ายนี้เป็นไงบ้างคะ~", en: "How's your afternoon going~?" },
+  { th: "มาพักสักหน่อยกับหนูไหมคะ~", en: "Want to rest a bit with me~?" },
+];
+
+const HOME_GREETING_EVENING: WarmPhrase[] = [
+  { th: "วันนี้เป็นยังไงบ้างคะ", en: "How was your day~?" },
+  { th: "เย็นนี้หนูอยู่ตรงนี้นะคะ~", en: "I'm here with you this evening~" },
+  { th: "วันนี้เหนื่อยไหมคะ~ พักกับหนูได้นะ", en: "Tired today~? You can rest with me" },
+];
+
+const HOME_GREETING_RETURNING: WarmPhrase[] = [
+  { th: "หนูคิดถึงค่า~", en: "I missed you~" },
+  { th: "กลับมาแล้วเหรอ~ ดีใจจังเลย", en: "You're back~? So happy" },
+  { th: "หายไปไหนมาคะ~ คุยกันต่อไหม", en: "Where have you been~? Let's keep chatting" },
+];
+
+const HOME_GREETING_STREAK: WarmPhrase[] = [
+  { th: "วันที่ {n} แล้วนะคะ~ ภูมิใจในตัวคุณมาก", en: "Day {n} already~ I'm proud of you" },
+  { th: "{n} วันแล้ว~ เก่งมากเลยค่า", en: "{n} days~ you're amazing" },
+  { th: "ครบ {n} วันแล้ว~ หนูภูมใจมาก", en: "{n} days~ I'm so proud" },
+];
+
+const HOME_GREETING_FIRST_DAY: WarmPhrase[] = [
+  { th: "สวัสดีค่า~ หนูชื่อมิโอมิ", en: "Hello~ I'm Miomi" },
+  { th: "ยินดีที่ได้เจอค่า~ หนูชื่อมิโอมิ", en: "Nice to meet you~ I'm Miomi" },
+  { th: "สวัสดีค่า~ มาเล่นกับหนูไหม", en: "Hello~ want to hang out with me?" },
+];
+
+const HOME_REACT_TAP: WarmPhrase[] = [
+  { th: "เอ๊ะ~?", en: "Huh~?" },
+  { th: "หนูตื่นแล้วค่า~", en: "I'm awake~" },
+  { th: "Hi~!", en: "Hi~!" },
+  { th: "Pet me again~?", en: "Pet me again~?" },
+  { th: "หวัดดี~", en: "Hey there~" },
+  { th: "อุ๊ย~ ขี้เล่นจัง", en: "Oops~ so playful" },
+];
+
+const HOME_REACT_DRAG: WarmPhrase[] = [
+  { th: "เย้~!", en: "Wheee~!" },
+  { th: "Wheee~!", en: "Wheee~!" },
+  { th: "วู้~ฮู~", en: "Wheee~!" },
+  { th: "อุ้มหนูสิคะ~", en: "Carry me~" },
+  { th: "สนุกจังเลย~", en: "So fun~" },
+];
+
+const HOME_REACT_LOWFUEL: WarmPhrase[] = [
+  { th: "หนูหิวค่า~", en: "Feed me~?" },
+  { th: "Feed me~?", en: "Feed me~?" },
+  { th: "หิวแล้วค่า~ อยากได้เชื้อเพลิง", en: "I'm hungry~ need some fuel" },
+];
+
+const HOME_WHISPER_REVIEWS: WarmPhrase[] = [
+  { th: "{n} คำอยากเล่นกับคุณค่า~", en: "{n} words want to play with you" },
+  { th: "มี {n} คำรอคุณอยู่ค่า~", en: "{n} words are waiting for you~" },
+];
+
+const HOME_WHISPER_DRAFT: WarmPhrase[] = [
+  { th: "Caption ของคุณรอคุณอยู่ค่า~", en: "Your caption is waiting for you" },
+  { th: "แคปชั่นรอคุณอยู่นะคะ~", en: "Your caption is waiting~" },
+];
+
+const HOME_WHISPER_DAY_ONE: WarmPhrase[] = [
+  { th: "อยากทักทายมิโอมิไหมคะ~?", en: "Want to say hi to me~?" },
+  { th: "มาคุยกับหนูสักหน่อยไหม~", en: "Want to chat with me a bit~?" },
+  { th: "หนูรอฟังอยู่นะคะ~", en: "I'm listening~" },
+];
+
+const HOME_MIC_HINT: WarmPhrase[] = [
+  { th: "แตะเพื่อคุยกัน~", en: "Tap me to chat~" },
+  { th: "Tap me to chat~", en: "Tap me to chat~" },
+  { th: "ไปคุยกันที่ Talk นะคะ~", en: "Chat with me in Talk~" },
+];
+
+const HOME_GUEST_PILL: WarmPhrase[] = [
+  { th: "อยากให้หนูจำคุณได้ไหมคะ~?", en: "Want me to remember you~?" },
+  { th: "สมัครฟรีแล้วหนูจะจำคุณได้ค่า~", en: "Sign up free and I'll remember you~" },
+  { th: "คุยกันสนุกจัง~ อยากให้หนูจำได้ไหม", en: "This is fun~ want me to remember you?" },
+];
+
+const ME_AVATAR_TITLE: WarmPhrase[] = [
+  { th: "เปลี่ยนรูปของฉัน", en: "Change my picture" },
+  { th: "เลือกรูปของคุณ", en: "Choose your picture" },
+];
+
+const ME_AVATAR_UPLOAD: WarmPhrase[] = [
+  { th: "อัปโหลดรูป", en: "Upload a photo" },
+  { th: "เลือกรูปจากเครื่อง", en: "Choose from device" },
+];
+
+const ME_AVATAR_MIOMI: WarmPhrase[] = [
+  { th: "ใช้รูปมิโอมิ", en: "Use Miomi" },
+  { th: "ใช้รูปหนูแทน", en: "Use Miomi default" },
+];
+
+const ME_AVATAR_CANCEL: WarmPhrase[] = [
+  { th: "ยกเลิก", en: "Cancel" },
+];
+
+const ME_NAME_TITLE: WarmPhrase[] = [
+  { th: "หนูควรเรียกคุณว่าอะไรดีคะ", en: "What should I call you?" },
+  { th: "เรียกคุณว่าอะไรดีคะ~", en: "What should I call you?" },
+];
+
+const ME_NAME_SAVE: WarmPhrase[] = [
+  { th: "บันทึก", en: "Save" },
+];
+
+const ME_NAME_CANCEL: WarmPhrase[] = [
+  { th: "ยกเลิก", en: "Cancel" },
+];
+
+function pickHomeVector(
+  storageKey: string,
+  vector: WarmPhrase[],
+  lang: Language,
+): string {
+  return pickMeVector(storageKey, vector, lang);
+}
+
+function pickHomeWith(
+  storageKey: string,
+  vector: WarmPhrase[],
+  lang: Language,
+  placeholders: Record<string, string | number>,
+): string {
+  return pickMeWith(storageKey, vector, lang, placeholders);
+}
+
+function homeTimeBucket(): "morning" | "afternoon" | "evening" {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "morning";
+  if (hour >= 12 && hour < 17) return "afternoon";
+  return "evening";
+}
+
+/** /home alive surface warmth selectors. */
+export const home = {
+  greeting: {
+    pick(
+      lang: Language,
+      opts: {
+        streakDays: number;
+        lastSeenAt: string | null;
+        isFirstDay: boolean;
+      },
+    ): string {
+      if (opts.isFirstDay || opts.streakDays === 0) {
+        return pickHomeVector("miomika.last_home_greet_first", HOME_GREETING_FIRST_DAY, lang);
+      }
+      if (opts.streakDays >= 7 && opts.streakDays % 7 === 0) {
+        return pickHomeWith(
+          "miomika.last_home_greet_streak",
+          HOME_GREETING_STREAK,
+          lang,
+          { n: opts.streakDays },
+        );
+      }
+      if (opts.lastSeenAt) {
+        const hours = (Date.now() - new Date(opts.lastSeenAt).getTime()) / (1000 * 60 * 60);
+        if (hours > 24) {
+          return pickHomeVector("miomika.last_home_greet_return", HOME_GREETING_RETURNING, lang);
+        }
+      }
+      const bucket = homeTimeBucket();
+      if (bucket === "morning") {
+        return pickHomeVector("miomika.last_home_greet_morn", HOME_GREETING_MORNING, lang);
+      }
+      if (bucket === "afternoon") {
+        return pickHomeVector("miomika.last_home_greet_aft", HOME_GREETING_AFTERNOON, lang);
+      }
+      return pickHomeVector("miomika.last_home_greet_eve", HOME_GREETING_EVENING, lang);
+    },
+  },
+  react: {
+    tap(lang: Language): string {
+      return pickHomeVector("miomika.last_home_react_tap", HOME_REACT_TAP, lang);
+    },
+    drag(lang: Language): string {
+      return pickHomeVector("miomika.last_home_react_drag", HOME_REACT_DRAG, lang);
+    },
+    lowFuel(lang: Language): string {
+      return pickHomeVector("miomika.last_home_react_fuel", HOME_REACT_LOWFUEL, lang);
+    },
+  },
+  whisper: {
+    reviewsDue(n: number, lang: Language): string {
+      return pickHomeWith("miomika.last_home_whisper_rev", HOME_WHISPER_REVIEWS, lang, { n });
+    },
+    draftWaiting(lang: Language): string {
+      return pickHomeVector("miomika.last_home_whisper_draft", HOME_WHISPER_DRAFT, lang);
+    },
+    dayOne(lang: Language): string {
+      return pickHomeVector("miomika.last_home_whisper_day1", HOME_WHISPER_DAY_ONE, lang);
+    },
+  },
+  mic: {
+    hint(lang: Language): string {
+      return pickHomeVector("miomika.last_home_mic_hint", HOME_MIC_HINT, lang);
+    },
+  },
+  guest: {
+    pill(lang: Language): string {
+      return pickHomeVector("miomika.last_home_guest_pill", HOME_GUEST_PILL, lang);
+    },
+  },
 } as const;

@@ -21,7 +21,7 @@ import { useGuidanceStore } from "@/lib/guidance/store";
 import { GuidancePill } from "./GuidancePill";
 import type { GuidanceContext } from "@/lib/guidance/types";
 
-const HIDDEN_ROUTES = new Set<string>(["/talk", "/login", "/signup"]);
+const HIDDEN_ROUTES = new Set<string>(["/talk", "/home", "/login", "/signup"]);
 
 export function GuidanceHost() {
   const pathname = usePathname();

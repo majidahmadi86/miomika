@@ -1,745 +1,406 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { motion, useReducedMotion } from "framer-motion";
-import { Coffee, Heart, Zap, type LucideIcon } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Flame, Hand, Heart, Mic, Sparkles, Zap } from "lucide-react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
+import { MiomiBubble } from "@/components/miomi/MiomiBubble";
+import { MiomiStage, type MiomiMood } from "@/components/miomi/MiomiStage";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
-import { AppShell } from "@/components/layout/AppShell";
-import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
-import { cn } from "@/lib/utils";
-import { useCompanionStore } from "@/lib/companion/store";
-import dynamic from "next/dynamic";
+import { useProfile } from "@/lib/auth/use-profile";
+import { useHomeWhisper } from "@/lib/guidance/use-home-whisper";
+import { useSessionState } from "@/lib/ai/use-session-state";
+import { useUILanguage } from "@/lib/i18n/client";
+import { home } from "@/lib/voice/warmth";
+import { speak } from "@/lib/voice/tts";
 
-const AmbientBackground = dynamic(
-  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
-  { ssr: false }
-);
+const CARD_SHADOW =
+  "0 1px 2px rgba(26, 26, 24, 0.04), 0 4px 16px rgba(26, 26, 24, 0.06), 0 0 0 1px rgba(237, 232, 224, 0.6)";
 
-const WELCOME_BUBBLE = {
-  th: "สวัสดีค่า~ วันนี้อยากพูด English เก่งขึ้นไหมคะ?",
-  en: "Hi~ Want to speak better English today?",
-};
+const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
 
-const DAILY_CHALLENGE = {
-  phrase: "I'm up for it",
-  th: "ฉันพร้อมแล้ว — ใช้ตอบตกลงทำอะไรด้วยกัน",
-  meaning: 'แปลว่า "เอาล่ะ ทำได้" หรือ "ฉันพร้อมแล้ว" ไม่ใช่แค่ตื่นนอนนะคะ',
-};
-
-const tapFeedback =
-  "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A96E]";
-
-const TAP_BUBBLE_CYCLE = [
-  { th: "วันนี้โพสต์อะไรดีคะ คิดถึงเลยค่า", en: "What are we posting today? I missed you~" },
-  { th: "อยากให้หนูช่วยอะไร บอกได้เลยนะคะ", en: "Tell me what you need — I'm all ears~" },
-  { th: "มาอยู่ข้างๆ แบบนี้ก็อบอุ่นดีนะคะ", en: "Having you here with me feels warm~" },
-  { th: "หนูพร้อมฟังทุกเรื่องของคุณเลยค่า", en: "I'm ready to hear everything~" },
-  { th: "พักสายตาแล้วมาคุยกับหนูหน่อยไหมคะ", en: "Rest your eyes and chat with me a bit~" },
-] as const;
-
-const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
-const FEED_BUBBLE = { th: "อิ่มแล้วค่า~", en: "All full now~" };
-const PLAY_BUBBLE = { th: "เย้~ สนุกจัง!", en: "Yay~ so fun~" };
-const GUEST_SIGNUP_BUBBLE = {
-  th: "อยากให้หนูจำชื่อคุณได้ไหมคะ~ จะได้เรียกคุณว่าที่รักได้นะคะ",
-  en: "Do you want me to remember your name? So I can call you my darling~",
-};
-const GUEST_SIGNUP_STORAGE_KEY = "miomika-guest-signup-moment-v1";
-const LEVEL_UP_BUBBLE = { th: "เลเวลอัพแล้วค่า~!", en: "You leveled up~!" };
-
-const PET_STORAGE_KEY = "miomika-home-pet-v1";
-const DECAY_INTERVAL_MS = 10 * 60 * 1000;
-const DECAY_AMOUNT = 5;
-const MIN_STAT = 10;
-
-type PetStats = {
-  mood: number;
-  energy: number;
-  hunger: number;
-  level: number;
-  xp: number;
-  lastUpdated: number;
-};
-
-const DEFAULT_PET: PetStats = {
-  mood: 45,
-  energy: 30,
-  hunger: 20,
-  level: 1,
-  xp: 0,
-  lastUpdated: 0,
-};
-
-function clampStat(value: number) {
-  return Math.min(100, Math.max(MIN_STAT, value));
+function readGuestExchanges(): number {
+  if (typeof window === "undefined") return 0;
+  const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
+  const parsed = stored ? parseInt(stored, 10) : 0;
+  return !isNaN(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function applyDecay(stats: PetStats): PetStats {
-  const now = Date.now();
-  if (!stats.lastUpdated) return { ...stats, lastUpdated: now };
-  const ticks = Math.floor((now - stats.lastUpdated) / DECAY_INTERVAL_MS);
-  if (ticks <= 0) return stats;
-  return {
-    mood: clampStat(stats.mood - ticks * DECAY_AMOUNT),
-    energy: clampStat(stats.energy - ticks * DECAY_AMOUNT),
-    hunger: clampStat(stats.hunger - ticks * DECAY_AMOUNT),
-    level: stats.level,
-    xp: stats.xp,
-    lastUpdated: now,
-  };
-}
-
-function loadPetStats(): PetStats {
-  try {
-    const raw = localStorage.getItem(PET_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_PET, lastUpdated: Date.now() };
-    const parsed = JSON.parse(raw) as Partial<PetStats>;
-    return applyDecay({
-      mood: clampStat(parsed.mood ?? DEFAULT_PET.mood),
-      energy: clampStat(parsed.energy ?? DEFAULT_PET.energy),
-      hunger: clampStat(parsed.hunger ?? DEFAULT_PET.hunger),
-      level: parsed.level ?? DEFAULT_PET.level,
-      xp: parsed.xp ?? DEFAULT_PET.xp,
-      lastUpdated: parsed.lastUpdated ?? Date.now(),
-    });
-  } catch {
-    return { ...DEFAULT_PET, lastUpdated: Date.now() };
-  }
-}
-
-function addXp(stats: PetStats, amount: number): { stats: PetStats; leveledUp: boolean } {
-  let { level, xp } = stats;
-  let leveledUp = false;
-  xp += amount;
-  while (xp >= 100) { xp -= 100; level += 1; leveledUp = true; }
-  return { stats: { ...stats, level, xp, lastUpdated: Date.now() }, leveledUp };
-}
-
-const WALK_TRANSITION = { duration: 1.5, ease: "easeInOut" as const };
-
-function StatPill({ icon: Icon, percent, iconClass, ariaLabel }: {
-  icon: LucideIcon; percent: number; iconClass: string; ariaLabel: string;
-}) {
-  return (
-    <div
-      className={cn("flex items-center gap-1.5 rounded-full border border-[#EAD0DB] bg-white/90 px-3 py-1.5 text-[11px] font-medium text-[#1A1A1A] shadow-sm backdrop-blur-sm", tapFeedback)}
-      role="img"
-      aria-label={ariaLabel}
-    >
-      <Icon className={cn("h-3.5 w-3.5", iconClass)} strokeWidth={2.5} />
-      <span>{Math.round(percent)}%</span>
-    </div>
-  );
-}
-
-const CELEBRATION_STORAGE_KEY = "miomika-signup-celebrated-v1";
-const CELEBRATION_DURATION_MS = 2400;
-
-/** Reads ?celebrate=signup from URL and fires the burst animation. Only fires once per signup.
- *  Storage flag is set AFTER the burst completes so a failed render never blocks a future replay. */
-function CelebrationTrigger() {
-  const searchParams = useSearchParams();
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (searchParams.get("celebrate") !== "signup") return;
-    try {
-      if (localStorage.getItem(CELEBRATION_STORAGE_KEY) === "1") return;
-    } catch {
-      // private mode — proceed anyway
-    }
-
-    console.log("[home] celebration trigger detected");
-
-    const url = new URL(window.location.href);
-    url.searchParams.delete("celebrate");
-    window.history.replaceState({}, "", url.toString());
-
-    import("@/lib/celebration/burst")
-      .then(({ triggerCelebration }) => {
-        triggerCelebration({
-          intensity: "high",
-          miomi_state: "excited",
-          duration_ms: CELEBRATION_DURATION_MS,
-        });
-      })
-      .catch(() => {
-        // Burst module failed to load — don't set flag so next visit retries.
-      });
-
-    const timeout = window.setTimeout(() => {
-      try {
-        localStorage.setItem(CELEBRATION_STORAGE_KEY, "1");
-      } catch {
-        // private mode — best effort only
-      }
-    }, CELEBRATION_DURATION_MS);
-
-    return () => window.clearTimeout(timeout);
-  }, [searchParams]);
-  return null;
+function daysSince(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return 0;
+  return Math.max(0, Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24)));
 }
 
 export default function HomePage() {
-  const reduceMotion = useReducedMotion();
-  const { isGuest, authReady, openSoftSignupPrompt, dismissGuestInvite } = useGuestExploration();
+  const router = useRouter();
+  const uiLang = useUILanguage();
+  const { isGuest, authReady } = useGuestExploration();
+  const { profile } = useProfile();
+  const session = useSessionState();
+  const whisper = useHomeWhisper();
 
-  const [miomiX, setMiomiX] = useState(0);
-  const [sleeping, setSleeping] = useState(false);
-  const [bubble, setBubble] = useState({ th: "", en: "" });
+  const [bubbleText, setBubbleText] = useState("");
   const [bubbleVisible, setBubbleVisible] = useState(false);
-  const [expressionFlip, setExpressionFlip] = useState<"idle" | "happy">("idle");
-  const [tapBounceKey, setTapBounceKey] = useState(0);
-  const [tapSpinKey, setTapSpinKey] = useState(0);
-  const [feedAnimKey, setFeedAnimKey] = useState(0);
-  const [playAnimKey, setPlayAnimKey] = useState(0);
-  const [levelUpAnimKey, setLevelUpAnimKey] = useState(0);
-  const [xpTick, setXpTick] = useState(0);
-  const [pet, setPet] = useState<PetStats>(DEFAULT_PET);
-  const [petReady, setPetReady] = useState(false);
-  const [guestSignupMoment, setGuestSignupMoment] = useState(false);
-  const [meaningExpanded, setMeaningExpanded] = useState(false);
+  const [guestExchanges] = useState(readGuestExchanges);
+  const greetedRef = useRef(false);
+  const ttsMountedRef = useRef(true);
 
-  // Welcome screen self-gates via the WelcomeScreen component (Phase 2,
-  // Block A1 — hydration-safe mounted guard + shouldShowWelcome decision).
-  const openCompanion = useCompanionStore((s) => s.open);
+  const streakDays = profile?.streak ?? session.streak_days ?? 0;
+  const heartFuel = session.fuel.heart ?? 0;
+  const zapFuel = session.fuel.zap ?? 0;
+  const brainFuel = session.fuel.brain ?? 0;
+  const isFirstDay =
+    daysSince(profile?.onboarding_completed_at ?? null) === 0 && streakDays === 0;
 
-  const tapCycleIndexRef = useRef(0);
-  const lastActivityRef = useRef(0);
-
-  useLayoutEffect(() => {
-    lastActivityRef.current = Date.now();
-    const loaded = loadPetStats();
-    queueMicrotask(() => { setPet(loaded); setPetReady(true); });
-  }, []);
-
-
-  useEffect(() => {
-    if (!petReady) return;
-    localStorage.setItem(PET_STORAGE_KEY, JSON.stringify(pet));
-  }, [pet, petReady]);
-
-  const happyUntilRef = useRef(0);
-  const happyTimeoutRef = useRef<number | null>(null);
-  const walkTimeoutRef = useRef<number | null>(null);
-
-  const markActivity = useCallback(() => { lastActivityRef.current = Date.now(); }, []);
-
-  const wakeFromSleep = useCallback(() => {
-    setSleeping((s) => {
-      if (s) { setBubble(WELCOME_BUBBLE); setBubbleVisible(true); return false; }
-      return s;
-    });
-  }, []);
-
-  const showGuestSignupIfFirst = useCallback(() => {
-    if (!authReady || !isGuest) return false;
-    try {
-      if (localStorage.getItem(GUEST_SIGNUP_STORAGE_KEY)) return false;
-      localStorage.setItem(GUEST_SIGNUP_STORAGE_KEY, "1");
-    } catch { return false; }
-    setGuestSignupMoment(true);
-    setBubble(GUEST_SIGNUP_BUBBLE);
-    setBubbleVisible(true);
-    return true;
-  }, [authReady, isGuest]);
-
-  const scheduleHappyEnd = useCallback(() => {
-    if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current);
-    happyTimeoutRef.current = window.setTimeout(() => {
-      happyTimeoutRef.current = null;
-      if (Date.now() >= happyUntilRef.current) setExpressionFlip("idle");
-    }, 2000);
-  }, []);
-
-  const triggerPetTap = useCallback(() => {
-    dismissGuestInvite(); markActivity(); wakeFromSleep();
-    const i = tapCycleIndexRef.current % TAP_BUBBLE_CYCLE.length;
-    tapCycleIndexRef.current += 1;
-    const phrase = TAP_BUBBLE_CYCLE[i]!;
-    setBubble({ th: phrase.th, en: phrase.en });
-    setBubbleVisible(true);
-    setTapBounceKey((k) => k + 1);
-    setTapSpinKey((k) => k + 1);
-    happyUntilRef.current = Date.now() + 2000;
-    setExpressionFlip("happy");
-    scheduleHappyEnd();
-  }, [dismissGuestInvite, markActivity, wakeFromSleep, scheduleHappyEnd]);
-
-  const triggerLevelUpCelebration = useCallback(() => {
-    window.setTimeout(() => {
-      setLevelUpAnimKey((k) => k + 1);
-      setBubble(LEVEL_UP_BUBBLE);
-      setBubbleVisible(true);
-      setExpressionFlip("happy");
-      happyUntilRef.current = Date.now() + 3000;
-      scheduleHappyEnd();
-    }, 450);
-  }, [scheduleHappyEnd]);
-
-  const handleFeedPress = useCallback(() => {
-    markActivity(); wakeFromSleep();
-    const firstGuest = showGuestSignupIfFirst();
-    setFeedAnimKey((k) => k + 1);
-    // Delay reaction to sync with particle arrival at Miomi (420ms)
-    window.setTimeout(() => {
-      if (!firstGuest) { setBubble(FEED_BUBBLE); setBubbleVisible(true); }
-      happyUntilRef.current = Date.now() + 2000;
-      setExpressionFlip("happy");
-      scheduleHappyEnd();
-    }, 400);
-    setPet((prev) => {
-      const withHunger = { ...prev, hunger: clampStat(prev.hunger + 15) };
-      const { stats, leveledUp } = addXp(withHunger, 10);
-      if (leveledUp) triggerLevelUpCelebration();
-      return stats;
-    });
-    setXpTick((t) => t + 1);
-  }, [markActivity, wakeFromSleep, scheduleHappyEnd, triggerLevelUpCelebration, showGuestSignupIfFirst]);
-
-  const handlePlayPress = useCallback(() => {
-    markActivity(); wakeFromSleep();
-    const firstGuest = showGuestSignupIfFirst();
-    setPlayAnimKey((k) => k + 1);
-    // Delay reaction to sync with particle arrival at Miomi (420ms)
-    window.setTimeout(() => {
-      if (!firstGuest) { setBubble(PLAY_BUBBLE); setBubbleVisible(true); }
-      happyUntilRef.current = Date.now() + 2000;
-      setExpressionFlip("happy");
-      scheduleHappyEnd();
-    }, 400);
-    setPet((prev) => {
-      const withEnergy = { ...prev, energy: clampStat(prev.energy + 15) };
-      const { stats, leveledUp } = addXp(withEnergy, 10);
-      if (leveledUp) triggerLevelUpCelebration();
-      return stats;
-    });
-    setXpTick((t) => t + 1);
-  }, [markActivity, wakeFromSleep, triggerLevelUpCelebration, showGuestSignupIfFirst]);
-
-  const handleGuestCreatePress = useCallback(() => {
-    showGuestSignupIfFirst();
-    window.location.href = "/create";
-  }, [showGuestSignupIfFirst]);
-
-  // Home "Talk to Miomi" CTA opens the ambient companion sheet rather than
-  // routing to /talk. /talk is reachable from the Fullscreen button inside
-  // the sheet OR the Learn tab in the bottom nav. Phase-2 §8 Block A5.
-  const handleTalkCTA = useCallback(() => {
-    markActivity();
-    openCompanion();
-  }, [markActivity, openCompanion]);
-
-  const handleStagePointerDown = useCallback(() => {
-    markActivity();
-    if (sleeping) {
-      dismissGuestInvite(); wakeFromSleep();
-      setTapBounceKey((k) => k + 1);
-      happyUntilRef.current = Date.now() + 2000;
-      setExpressionFlip("happy");
-      const i = tapCycleIndexRef.current % TAP_BUBBLE_CYCLE.length;
-      tapCycleIndexRef.current += 1;
-      const phrase = TAP_BUBBLE_CYCLE[i]!;
-      setBubble({ th: phrase.th, en: phrase.en });
-      setBubbleVisible(true);
-      setTapSpinKey((k) => k + 1);
-      scheduleHappyEnd();
+  /* eslint-disable react-hooks/purity -- time-relative mood derived from profile */
+  const derivedMood: MiomiMood = useMemo(() => {
+    if (isGuest && guestExchanges >= 4) return "low-fuel";
+    if (profile?.last_seen_at) {
+      const hours =
+        (Date.now() - new Date(profile.last_seen_at).getTime()) / (1000 * 60 * 60);
+      if (hours > 24) return "missing-user";
     }
-  }, [dismissGuestInvite, markActivity, sleeping, wakeFromSleep, scheduleHappyEnd]);
+    if (streakDays >= 7 && streakDays % 7 === 0) return "excited";
+    return "idle";
+  }, [isGuest, guestExchanges, profile?.last_seen_at, streakDays]);
+  /* eslint-enable react-hooks/purity */
+
+  const maybeSpeak = useCallback(
+    (text: string) => {
+      if (typeof window === "undefined") return;
+      if (window.localStorage.getItem("miomika.tts_on") !== "1") return;
+      void speak(text, uiLang, {
+        onEnd: () => {},
+        onError: () => {},
+      });
+    },
+    [uiLang],
+  );
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
-      setBubble(WELCOME_BUBBLE); setBubbleVisible(true);
-    }, reduceMotion ? 0 : 1200);
-    return () => window.clearTimeout(id);
-  }, [reduceMotion]);
-
-  useEffect(() => {
-    if (reduceMotion || sleeping) {
-      if (walkTimeoutRef.current) { window.clearTimeout(walkTimeoutRef.current); walkTimeoutRef.current = null; }
-      return;
-    }
-    const scheduleWalk = () => {
-      walkTimeoutRef.current = window.setTimeout(() => {
-        setMiomiX(-60 + Math.random() * 120);
-        scheduleWalk();
-      }, 4000 + Math.random() * 2000);
+    ttsMountedRef.current = true;
+    return () => {
+      ttsMountedRef.current = false;
     };
-    scheduleWalk();
-    return () => { if (walkTimeoutRef.current) window.clearTimeout(walkTimeoutRef.current); walkTimeoutRef.current = null; };
-  }, [reduceMotion, sleeping]);
-
-  useEffect(() => {
-    if (reduceMotion || sleeping) return;
-    const id = window.setInterval(() => {
-      if (Date.now() < happyUntilRef.current) return;
-      setExpressionFlip(() => (Math.random() < 0.15 ? "happy" : "idle"));
-    }, 8000);
-    return () => clearInterval(id);
-  }, [reduceMotion, sleeping]);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (Date.now() - lastActivityRef.current >= 60000) {
-        setSleeping(true); setBubble(SLEEP_BUBBLE); setBubbleVisible(true); setMiomiX(0);
-      }
-    }, 500);
-    return () => clearInterval(id);
   }, []);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- session greeting on mount */
   useEffect(() => {
-    return () => { if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current); };
-  }, []);
+    if (!authReady || greetedRef.current) return;
+    if (isGuest) return;
+    greetedRef.current = true;
+    const text = home.greeting.pick(uiLang, {
+      streakDays,
+      lastSeenAt: profile?.last_seen_at ?? null,
+      isFirstDay,
+    });
+    setBubbleText(text);
+    setBubbleVisible(true);
+  }, [authReady, isGuest, uiLang, streakDays, profile?.last_seen_at, isFirstDay]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  const triggerFuelParticle = useCallback((buttonEl: HTMLElement, color: string) => {
-    const buttonRect = buttonEl.getBoundingClientRect();
-    const startX = buttonRect.left + buttonRect.width / 2;
-    const startY = buttonRect.top + buttonRect.height / 2;
+  const showBubble = useCallback(
+    (text: string, speakIt = true) => {
+      setBubbleText(text);
+      setBubbleVisible(true);
+      if (speakIt) maybeSpeak(text);
+    },
+    [maybeSpeak],
+  );
 
-    // Find Miomi center — roughly center-top of viewport
-    const targetX = window.innerWidth / 2;
-    const targetY = window.innerHeight * 0.38;
+  const handleTap = useCallback(() => {
+    if (isGuest) return;
+    showBubble(home.react.tap(uiLang));
+  }, [isGuest, showBubble, uiLang]);
 
-    // Create particle element
-    const particle = document.createElement("div");
-    particle.style.cssText = `
-      position: fixed;
-      left: ${startX}px;
-      top: ${startY}px;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: ${color};
-      pointer-events: none;
-      z-index: 9999;
-      transform: translate(-50%, -50%) scale(1);
-      transition: none;
-      box-shadow: 0 0 8px ${color};
-    `;
-    document.body.appendChild(particle);
+  const handleDragEnd = useCallback(() => {
+    if (isGuest) return;
+    showBubble(home.react.drag(uiLang));
+  }, [isGuest, showBubble, uiLang]);
 
-    // Animate along bezier curve toward Miomi
-    const duration = 420;
-    const start = performance.now();
-    const dx = targetX - startX;
-    const dy = targetY - startY;
-    // Control point for arc (goes up and toward center)
-    const cpX = startX + dx * 0.3;
-    const cpY = startY + dy * 0.1 - 80;
+  const handleFuelTap = useCallback(() => {
+    if (isGuest) return;
+    const low = heartFuel < 25 || zapFuel < 25 || brainFuel < 25;
+    showBubble(low ? home.react.lowFuel(uiLang) : home.react.tap(uiLang));
+  }, [brainFuel, heartFuel, isGuest, showBubble, uiLang, zapFuel]);
 
-    function animate(now: number) {
-      const t = Math.min((now - start) / duration, 1);
-      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-
-      // Quadratic bezier
-      const x = (1 - ease) * (1 - ease) * startX + 2 * (1 - ease) * ease * cpX + ease * ease * targetX;
-      const y = (1 - ease) * (1 - ease) * startY + 2 * (1 - ease) * ease * cpY + ease * ease * targetY;
-      const scale = 1 - ease * 0.4;
-
-      particle.style.left = `${x}px`;
-      particle.style.top = `${y}px`;
-      particle.style.transform = `translate(-50%, -50%) scale(${scale})`;
-      particle.style.opacity = `${1 - ease * 0.3}`;
-
-      if (t < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        // Burst at Miomi — create 5 small burst particles
-        particle.remove();
-        for (let i = 0; i < 5; i++) {
-          const burst = document.createElement("div");
-          const angle = (i / 5) * Math.PI * 2;
-          const distance = 20 + Math.random() * 20;
-          burst.style.cssText = `
-            position: fixed;
-            left: ${targetX}px;
-            top: ${targetY}px;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: ${color};
-            pointer-events: none;
-            z-index: 9999;
-            transform: translate(-50%, -50%);
-            transition: all 0.4s ease-out;
-            opacity: 1;
-          `;
-          document.body.appendChild(burst);
-          requestAnimationFrame(() => {
-            burst.style.transform = `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0)`;
-            burst.style.opacity = "0";
-          });
-          setTimeout(() => burst.remove(), 400);
-        }
-      }
-    }
-
-    requestAnimationFrame(animate);
-  }, []);
-
-  const bubbleTh = bubble.th;
-  const bubbleEn = bubble.en;
-  const miomiExpression = sleeping ? "idle" : expressionFlip;
+  const handleWhisperTap = useCallback(() => {
+    if (!whisper) return;
+    router.push(whisper.href);
+  }, [router, whisper]);
 
   return (
     <>
-      <Suspense fallback={null}><CelebrationTrigger /></Suspense>
       <WelcomeScreen />
-      <AppShell>
-        <div className="flex h-full max-h-full flex-col overflow-hidden">
-          <style>{`
-            @keyframes miomi-xp-tick {
-              0% { transform: scale(1); opacity: 1; }
-              40% { transform: scale(1.2); opacity: 1; }
-              100% { transform: scale(1); opacity: 1; }
-            }
-            .miomi-xp-tick {
-              display: inline-block;
-              animation: miomi-xp-tick 0.5s ease-out;
-              transition: color 0.5s ease-out;
-            }
-          `}</style>
-
-          <div className="flex h-full flex-col overflow-hidden bg-white md:hidden">
-            {/* Miomi stage */}
-            <div
-              className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
-              style={{ background: "#FAFAF6" }}
-              onPointerDown={handleStagePointerDown}
-            >
-              <AmbientBackground mode="ambient" />
-              <motion.div className="absolute inset-0 bottom-12 z-10 flex min-h-0 items-end justify-center px-2">
-                <motion.div
-                  className="flex h-full max-h-full items-end justify-center"
-                  initial={reduceMotion ? { y: 0, scale: 1, opacity: 1 } : { y: 96, scale: 0.88, opacity: 0 }}
-                  animate={{ y: 0, scale: 1, opacity: 1 }}
-                  transition={{ duration: 1.2, ease: "easeOut" }}
-                >
-                  <motion.div
-                    className="flex h-full max-h-full items-end justify-center"
-                    animate={reduceMotion ? { x: 0 } : { x: miomiX }}
-                    transition={WALK_TRANSITION}
-                  >
-                    <motion.div className={cn("origin-bottom", sleeping && "rotate-[6deg]")}>
-                      <motion.button
-                        type="button"
-                        aria-label="Tap Miomi"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={triggerPetTap}
-                        className="relative block cursor-pointer appearance-none border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-accent"
-                      >
-                        <MiomiCharacter
-                          expression={miomiExpression}
-                          sleeping={sleeping}
-                          feedAnimKey={feedAnimKey}
-                          playAnimKey={playAnimKey}
-                          levelUpAnimKey={levelUpAnimKey}
-                          breathe={!reduceMotion && !sleeping}
-                        />
-                      </motion.button>
-                    </motion.div>
-                  </motion.div>
-                </motion.div>
-              </motion.div>
-
-              {/* Speech bubble */}
-              <motion.div className="pointer-events-none absolute right-4 top-4 z-30 max-w-[65%]">
-                <motion.div
-                  className="pointer-events-auto rounded-2xl border border-[#EAD0DB] bg-white/92 px-3 py-2.5 shadow-sm backdrop-blur-sm"
-                  initial={false}
-                  animate={{ opacity: bubbleVisible ? 1 : 0, y: bubbleVisible ? 0 : 6 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
-                >
-                  <p className="text-sm font-medium leading-[1.6] text-[#1A1A1A]">{bubbleTh}</p>
-                  {bubbleEn ? (
-                    <p className="mt-1 text-[11px] leading-[1.6] text-[#666666]">{bubbleEn}</p>
-                  ) : null}
-                  {guestSignupMoment ? (
-                    <Link
-                      href="/signup"
-                      className={cn("mt-2 flex w-full flex-col items-center rounded-full border border-[#EDE8E0] bg-[#FFF8F2] px-3 py-2 text-center", tapFeedback)}
-                    >
-                      <span className="text-[10px] font-medium text-[#C9A96E]">จำชื่อฉันนะคะ</span>
-                      <span className="text-[11px] font-normal leading-[1.6] text-[#666666]">Remember my name</span>
-                    </Link>
-                  ) : null}
-                </motion.div>
-              </motion.div>
-
-              {/* Fuel strip */}
-              <div className="pointer-events-none absolute inset-x-4 bottom-3 z-20">
-                <div
+      <div
+        style={{
+          minHeight: "100svh",
+          height: "100%",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          background: "linear-gradient(180deg, #FEFCF7 0%, #FDFAF2 100%)",
+          paddingBottom: "80px",
+        }}
+      >
+        {/* Region 1 — Sky */}
+        <div
+          style={{
+            height: "56px",
+            padding: "16px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ minWidth: "48px" }}>
+            {!isGuest && streakDays >= 2 ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <Flame size={16} strokeWidth={2} color="#C9A96E" />
+                <span
                   style={{
-                    display: "flex", alignItems: "center", gap: "8px",
-                    background: "rgba(255,255,255,0.88)", backdropFilter: "blur(8px)",
-                    borderRadius: "20px", padding: "8px 14px",
-                    border: "1px solid rgba(232,229,223,0.8)",
+                    fontFamily: "'Quicksand', sans-serif",
+                    fontSize: "13px",
+                    lineHeight: "18px",
+                    fontWeight: 600,
+                    color: "#1A1A18",
                   }}
                 >
-                  <Heart style={{ width: "14px", height: "14px", color: "#D4537E", flexShrink: 0 }} strokeWidth={2} />
-                  <div style={{ flex: 1, height: "6px", background: "#F0E0E8", borderRadius: "999px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pet.mood}%`, background: "#D4537E", borderRadius: "999px", transition: "width 0.5s ease-out" }} />
-                  </div>
-                  <Zap style={{ width: "14px", height: "14px", color: "#C9A96E", flexShrink: 0, marginLeft: "6px" }} strokeWidth={2} />
-                  <div style={{ flex: 1, height: "6px", background: "#F0E0E8", borderRadius: "999px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pet.energy}%`, background: "#C9A96E", borderRadius: "999px", transition: "width 0.5s ease-out" }} />
-                  </div>
-                  <Coffee style={{ width: "14px", height: "14px", color: "#7DD3C0", flexShrink: 0, marginLeft: "6px" }} strokeWidth={2} />
-                  <div style={{ flex: 1, height: "6px", background: "#F0E0E8", borderRadius: "999px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pet.hunger}%`, background: "#7DD3C0", borderRadius: "999px", transition: "width 0.5s ease-out" }} />
-                  </div>
-                  <div style={{ marginLeft: "8px", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
-                    <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 700, color: "#C9A96E", lineHeight: 1 }}>
-                      Lv.{pet.level}
-                    </span>
-                    <div style={{ width: "32px", height: "3px", background: "#F0E0E8", borderRadius: "999px", overflow: "hidden" }}>
-                      <div
-                        key={`xp-${pet.xp}-${xpTick}`}
-                        className="miomi-xp-tick"
-                        style={{ height: "100%", width: `${pet.xp}%`, background: "#C9A96E", borderRadius: "999px", transition: "width 0.5s ease-out" }}
-                      />
-                    </div>
-                  </div>
-                </div>
+                  {streakDays}
+                </span>
               </div>
-            </div>
+            ) : null}
+          </div>
 
-            {/* MIOMI'S PICK — collapsed by default */}
-            <button
-              type="button"
-              onClick={() => setMeaningExpanded((v) => !v)}
+          {authReady && isGuest ? (
+            <Link
+              href="/signup"
               style={{
-                display: "flex", alignItems: "center", gap: "10px",
-                height: meaningExpanded ? "auto" : "44px", minHeight: "44px",
-                flexShrink: 0, background: "#FDF8EE",
-                borderLeft: "3px solid #C9A96E",
-                padding: meaningExpanded ? "10px 16px" : "0 16px",
-                textAlign: "left", cursor: "pointer",
-                transition: "height 0.25s ease", width: "100%",
-                borderTop: "none", borderRight: "none", borderBottom: "none",
+                flex: 1,
+                margin: "0 12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "8px 16px",
+                background: "rgba(255, 255, 255, 0.85)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid #EDE8E0",
+                borderRadius: "16px",
+                boxShadow: CARD_SHADOW,
+                textDecoration: "none",
               }}
             >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.10em", color: "#C9A96E", textTransform: "uppercase", flexShrink: 0 }}>
-                    ✦ MIOMI&apos;S PICK
-                  </span>
-                  <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {DAILY_CHALLENGE.phrase}
-                  </span>
-                  <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#9A8B73", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }}>
-                    — {DAILY_CHALLENGE.th}
-                  </span>
-                </div>
-                {meaningExpanded && (
-                  <div style={{ marginTop: "8px" }}>
-                    <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#6B7280", lineHeight: 1.6, marginBottom: "10px" }}>
-                      {DAILY_CHALLENGE.meaning}
-                    </p>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      {authReady && isGuest ? (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleGuestCreatePress(); }}
-                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", border: "none", cursor: "pointer" }}
-                        >
-                          ฝึกเลย
-                        </button>
-                      ) : (
-                        <Link
-                          href="/create"
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", textDecoration: "none" }}
-                        >
-                          ฝึกเลย
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", color: "#C9A96E", flexShrink: 0, transition: "transform 0.25s ease", transform: meaningExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
-                ▾
+              <span
+                style={{
+                  fontFamily: "'Kanit', 'Quicksand', sans-serif",
+                  fontSize: "13px",
+                  lineHeight: "18px",
+                  fontWeight: 500,
+                  color: "#1A1A18",
+                }}
+              >
+                {home.guest.pill(uiLang)}
               </span>
-            </button>
-
-            {/* Action row */}
-            <div style={{ display: "grid", gridTemplateColumns: "48px 48px 1fr", gap: "10px", padding: "10px 16px 12px", flexShrink: 0, alignItems: "center" }}>
+            </Link>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
               <button
                 type="button"
-                onClick={handleFeedPress}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  triggerFuelParticle(e.currentTarget, "#D4537E");
+                onClick={handleFuelTap}
+                aria-label="Heart fuel"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
                 }}
-                className={tapFeedback}
-                style={{ width: "48px", height: "48px", borderRadius: "50%", border: "1.5px solid #EAD0DB", background: "#FBEAF0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
               >
-                <motion.div
-                  animate={pet.mood < 50 ? { y: [0,-5,0], scale: [1,1.2,1] } : {}}
-                  transition={{ duration: 0.6, ease: "easeInOut", repeat: Infinity, repeatDelay: 4, delay: 0 }}
+                <Heart size={16} strokeWidth={2} color="#DB2777" />
+                <span
+                  style={{
+                    fontFamily: "'Quicksand', sans-serif",
+                    fontSize: "13px",
+                    lineHeight: "18px",
+                    fontWeight: 600,
+                    color: "#1A1A18",
+                  }}
                 >
-                  <Heart style={{ width: "20px", height: "20px", color: "#D4537E" }} strokeWidth={2} />
-                </motion.div>
+                  {Math.round(heartFuel)}
+                </span>
               </button>
-
               <button
                 type="button"
-                onClick={handlePlayPress}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  triggerFuelParticle(e.currentTarget, "#C9A96E");
+                onClick={handleFuelTap}
+                aria-label="Zap fuel"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
                 }}
-                className={tapFeedback}
-                style={{ width: "48px", height: "48px", borderRadius: "50%", border: "1.5px solid #EAD0DB", background: "#FBEAF0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
               >
-                <motion.div
-                  animate={pet.energy < 50 ? { y: [0,-5,0], scale: [1,1.2,1] } : {}}
-                  transition={{ duration: 0.6, ease: "easeInOut", repeat: Infinity, repeatDelay: 4, delay: 2 }}
+                <Zap size={16} strokeWidth={2} color="#C9A96E" />
+                <span
+                  style={{
+                    fontFamily: "'Quicksand', sans-serif",
+                    fontSize: "13px",
+                    lineHeight: "18px",
+                    fontWeight: 600,
+                    color: "#1A1A18",
+                  }}
                 >
-                  <Zap style={{ width: "20px", height: "20px", color: "#C9A96E" }} strokeWidth={2} />
-                </motion.div>
+                  {Math.round(zapFuel)}
+                </span>
               </button>
-
               <button
                 type="button"
-                onClick={handleTalkCTA}
-                className={tapFeedback}
-                style={{ height: "52px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: "0 4px 16px -4px rgba(201,169,110,0.40)" }}
+                onClick={handleFuelTap}
+                aria-label="Brain fuel"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
               >
-                <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "15px", fontWeight: 500, color: "#FFFFFF", lineHeight: 1.3 }}>คุยกับมิโอมิ</span>
-                <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.80)", letterSpacing: "0.06em" }}>Talk to Miomi</span>
+                <Sparkles size={16} strokeWidth={2} color="#7DD3C0" />
+                <span
+                  style={{
+                    fontFamily: "'Quicksand', sans-serif",
+                    fontSize: "13px",
+                    lineHeight: "18px",
+                    fontWeight: 600,
+                    color: "#1A1A18",
+                  }}
+                >
+                  {Math.round(brainFuel)}
+                </span>
               </button>
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Desktop */}
-          <div className="hidden flex-col gap-4 md:flex">
-            <motion.div className="rounded-2xl border border-[#EAD0DB] bg-white p-5">
-              <p className="text-base font-medium leading-[1.6] text-[#1A1A1A]">{WELCOME_BUBBLE.th}</p>
-              <p className="mt-1 text-xs leading-[1.6] text-[#666666]">{WELCOME_BUBBLE.en}</p>
-            </motion.div>
-            <motion.div className="rounded-2xl border-l-4 border-[#C9A96E] bg-[#FDF8EE] p-5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-[#C9A96E]">MIOMI&apos;S PICK · วันนี้</p>
-              <p className="mt-2 text-lg font-medium leading-[1.6] text-[#1A1A1A]">{DAILY_CHALLENGE.phrase}</p>
-              <p className="mt-1 text-sm leading-[1.6] text-[#1A1A1A]">{DAILY_CHALLENGE.th}</p>
-              <p className="mt-2 text-xs leading-[1.6] text-[#666666]">{DAILY_CHALLENGE.meaning}</p>
-              <Link href="/create" className={cn("mt-4 inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)" }}>
-                ฝึกเลย
-              </Link>
-            </motion.div>
+        {/* Region 2 — Stage */}
+        <div
+          style={{
+            flex: 1,
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 0,
+            maxHeight: "480px",
+            height: "55svh",
+          }}
+        >
+          <div style={{ position: "relative" }}>
+            <MiomiStage
+              size={280}
+              mood={derivedMood}
+              onTap={handleTap}
+              onDragEnd={handleDragEnd}
+            />
+            {!isGuest ? (
+              <MiomiBubble
+                text={bubbleText}
+                visible={bubbleVisible}
+                position="top-right"
+                autoHideMs={4000}
+                onHide={() => setBubbleVisible(false)}
+              />
+            ) : null}
           </div>
         </div>
-      </AppShell>
+
+        {/* Region 3 — Whisper */}
+        {whisper ? (
+          <div
+            style={{
+              margin: "0 24px 16px",
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleWhisperTap}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                maxWidth: "280px",
+                width: "100%",
+                padding: "12px 16px",
+                background: "rgba(255, 255, 255, 0.7)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(237, 232, 224, 0.6)",
+                borderRadius: "12px",
+                boxShadow: CARD_SHADOW,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              <Hand size={18} strokeWidth={1.75} color="#C9A96E" />
+              <span
+                style={{
+                  fontFamily: "'Kanit', 'Quicksand', sans-serif",
+                  fontSize: "14px",
+                  lineHeight: "20px",
+                  fontWeight: 600,
+                  color: "#1A1A18",
+                }}
+              >
+                {whisper.text}
+              </span>
+            </button>
+          </div>
+        ) : null}
+
+        {/* Region 4 — Mic hint */}
+        <div
+          style={{
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+            flexShrink: 0,
+          }}
+        >
+          <Mic size={14} color="#9A8B73" strokeWidth={1.75} />
+          <span
+            style={{
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "12px",
+              lineHeight: "16px",
+              fontWeight: 500,
+              color: "#9A8B73",
+            }}
+          >
+            {home.mic.hint(uiLang)}
+          </span>
+        </div>
+      </div>
     </>
   );
 }

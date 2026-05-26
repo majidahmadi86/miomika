@@ -14,7 +14,7 @@ import { CompanionButton } from "@/components/companion/CompanionButton";
 import { CompanionSheet } from "@/components/companion/CompanionSheet";
 import { CompanionPanel } from "@/components/companion/CompanionPanel";
 
-const HIDDEN_ROUTES = new Set<string>(["/talk", "/me"]);
+const HIDDEN_ROUTES = new Set<string>(["/talk", "/home", "/me"]);
 
 export function AmbientCompanion() {
   const pathname = usePathname();
