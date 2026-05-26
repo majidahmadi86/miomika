@@ -948,6 +948,14 @@ const HOME_GUEST_PILL: WarmPhrase[] = [
   { th: "คุยกันสนุกจัง~ อยากให้หนูจำได้ไหม", en: "This is fun~ want me to remember you?" },
 ];
 
+const HOME_FUEL_CAPTION: WarmPhrase[] = [
+  { th: "หนูสบายดีค่า~", en: "I'm feeling good today~" },
+  { th: "พร้อมเล่นกับคุณค่า~", en: "Ready to play with you~" },
+  { th: "วันนี้พลังเต็มเลยนะคะ", en: "I'm full of energy today~" },
+  { th: "อยู่ด้วยกันสิคะ~", en: "Let's hang out~" },
+  { th: "หนูมีความสุขมากเลยค่า~", en: "I'm so happy today~" },
+];
+
 const ME_AVATAR_TITLE: WarmPhrase[] = [
   { th: "เปลี่ยนรูปของฉัน", en: "Change my picture" },
   { th: "เลือกรูปของคุณ", en: "Choose your picture" },
@@ -1072,6 +1080,11 @@ export const home = {
   guest: {
     pill(lang: Language): string {
       return pickHomeVector("miomika.last_home_guest_pill", HOME_GUEST_PILL, lang);
+    },
+  },
+  fuel: {
+    caption(lang: Language): string {
+      return pickHomeVector("miomika.last_home_fuel_caption", HOME_FUEL_CAPTION, lang);
     },
   },
 } as const;

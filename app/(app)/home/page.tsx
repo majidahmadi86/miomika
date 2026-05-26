@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useDragControls, useReducedMotion } from "framer-motion";
 import { Coffee, Heart, Zap, type LucideIcon } from "lucide-react";
 import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -16,8 +17,12 @@ import { useGuestExploration } from "@/components/guest/GuestExplorationContext"
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
+import { useProfile } from "@/lib/auth/use-profile";
 import { cn } from "@/lib/utils";
 import { useCompanionStore } from "@/lib/companion/store";
+import { home } from "@/lib/voice/warmth";
+import { detectLang, speak } from "@/lib/voice/tts";
+import type { Language } from "@/lib/i18n/server";
 import dynamic from "next/dynamic";
 
 const AmbientBackground = dynamic(
@@ -50,10 +55,6 @@ const TAP_BUBBLE_CYCLE = [
 const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
 const FEED_BUBBLE = { th: "อิ่มแล้วค่า~", en: "All full now~" };
 const PLAY_BUBBLE = { th: "เย้~ สนุกจัง!", en: "Yay~ so fun~" };
-const GUEST_SIGNUP_BUBBLE = {
-  th: "อยากให้หนูจำชื่อคุณได้ไหมคะ~ จะได้เรียกคุณว่าที่รักได้นะคะ",
-  en: "Do you want me to remember your name? So I can call you my darling~",
-};
 const GUEST_SIGNUP_STORAGE_KEY = "miomika-guest-signup-moment-v1";
 const LEVEL_UP_BUBBLE = { th: "เลเวลอัพแล้วค่า~!", en: "You leveled up~!" };
 
@@ -126,6 +127,22 @@ function addXp(stats: PetStats, amount: number): { stats: PetStats; leveledUp: b
 }
 
 const WALK_TRANSITION = { duration: 1.5, ease: "easeInOut" as const };
+const BUBBLE_CARD_SHADOW =
+  "0 1px 2px rgba(26, 26, 24, 0.04), 0 4px 16px rgba(26, 26, 24, 0.06), 0 0 0 1px rgba(237, 232, 224, 0.6)";
+
+type MiomiMood = "idle" | "happy" | "thinking";
+type HeartParticle = { id: number; x: number; y: number };
+
+function readUiLang(): Language {
+  if (typeof navigator !== "undefined" && navigator.language.startsWith("en")) return "en";
+  return "th";
+}
+
+function maybeSpeak(text: string): void {
+  if (typeof window === "undefined") return;
+  if (window.localStorage.getItem("miomika.tts_on") !== "1") return;
+  void speak(text, detectLang(text));
+}
 
 function StatPill({ icon: Icon, percent, iconClass, ariaLabel }: {
   icon: LucideIcon; percent: number; iconClass: string; ariaLabel: string;
@@ -191,36 +208,75 @@ function CelebrationTrigger() {
 
 export default function HomePage() {
   const reduceMotion = useReducedMotion();
-  const { isGuest, authReady, openSoftSignupPrompt, dismissGuestInvite } = useGuestExploration();
+  const { isGuest, authReady, dismissGuestInvite } = useGuestExploration();
+  const { profile } = useProfile();
+
+  const uiLang = useMemo<Language>(() => {
+    if (profile?.ui_language === "en" || profile?.ui_language === "th") return profile.ui_language;
+    return readUiLang();
+  }, [profile?.ui_language]);
 
   const [miomiX, setMiomiX] = useState(0);
   const [sleeping, setSleeping] = useState(false);
   const [bubble, setBubble] = useState({ th: "", en: "" });
+  const [bubbleText, setBubbleText] = useState("");
   const [bubbleVisible, setBubbleVisible] = useState(false);
-  const [expressionFlip, setExpressionFlip] = useState<"idle" | "happy">("idle");
-  const [tapBounceKey, setTapBounceKey] = useState(0);
-  const [tapSpinKey, setTapSpinKey] = useState(0);
+  const [miomiMood, setMiomiMood] = useState<MiomiMood>("idle");
+  const [tapBouncing, setTapBouncing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [particles, setParticles] = useState<HeartParticle[]>([]);
+  const [bubbleOnLeft, setBubbleOnLeft] = useState(false);
   const [feedAnimKey, setFeedAnimKey] = useState(0);
   const [playAnimKey, setPlayAnimKey] = useState(0);
   const [levelUpAnimKey, setLevelUpAnimKey] = useState(0);
   const [xpTick, setXpTick] = useState(0);
   const [pet, setPet] = useState<PetStats>(DEFAULT_PET);
   const [petReady, setPetReady] = useState(false);
-  const [guestSignupMoment, setGuestSignupMoment] = useState(false);
   const [meaningExpanded, setMeaningExpanded] = useState(false);
+  const [dragConstraints, setDragConstraints] = useState({
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  });
 
-  // Welcome screen self-gates via the WelcomeScreen component (Phase 2,
-  // Block A1 — hydration-safe mounted guard + shouldShowWelcome decision).
   const openCompanion = useCompanionStore((s) => s.open);
 
   const tapCycleIndexRef = useRef(0);
   const lastActivityRef = useRef(0);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const pointerDownAtRef = useRef(0);
+  const pointerStartPosRef = useRef({ x: 0, y: 0 });
+  const isDragModeRef = useRef(false);
+  const bubbleHideTimeoutRef = useRef<number | null>(null);
+  const greetingShownRef = useRef(false);
+  const dragControls = useDragControls();
 
   useLayoutEffect(() => {
     lastActivityRef.current = Date.now();
     const loaded = loadPetStats();
     queueMicrotask(() => { setPet(loaded); setPetReady(true); });
   }, []);
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const update = () => {
+      const w = stage.offsetWidth;
+      const h = stage.offsetHeight;
+      setDragConstraints({
+        left: -w * 0.3,
+        right: w * 0.3,
+        top: -h * 0.15,
+        bottom: h * 0.15,
+      });
+      setBubbleOnLeft(miomiX > w * 0.08);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(stage);
+    return () => ro.disconnect();
+  }, [miomiX]);
 
 
   useEffect(() => {
@@ -234,12 +290,47 @@ export default function HomePage() {
 
   const markActivity = useCallback(() => { lastActivityRef.current = Date.now(); }, []);
 
+  const clearBubbleHide = useCallback(() => {
+    if (bubbleHideTimeoutRef.current) {
+      window.clearTimeout(bubbleHideTimeoutRef.current);
+      bubbleHideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleBubbleHide = useCallback((ms: number) => {
+    clearBubbleHide();
+    bubbleHideTimeoutRef.current = window.setTimeout(() => {
+      bubbleHideTimeoutRef.current = null;
+      setBubbleVisible(false);
+    }, ms);
+  }, [clearBubbleHide]);
+
+  const showBubble = useCallback((
+    text: string,
+    opts?: { th?: string; en?: string; reactive?: boolean; autoHideMs?: number },
+  ) => {
+    setBubbleText(text);
+    if (opts?.th !== undefined) setBubble({ th: opts.th, en: opts.en ?? "" });
+    setBubbleVisible(true);
+    scheduleBubbleHide(opts?.autoHideMs ?? (opts?.reactive ? 3200 : 4000));
+  }, [scheduleBubbleHide]);
+
   const wakeFromSleep = useCallback(() => {
     setSleeping((s) => {
-      if (s) { setBubble(WELCOME_BUBBLE); setBubbleVisible(true); return false; }
+      if (s) {
+        if (!isGuest) {
+          const text = home.greeting.pick(uiLang, {
+            streakDays: profile?.streak ?? 0,
+            lastSeenAt: profile?.last_seen_at ?? null,
+            isFirstDay: !profile?.last_seen_at,
+          });
+          showBubble(text, { autoHideMs: 4000 });
+        }
+        return false;
+      }
       return s;
     });
-  }, []);
+  }, [isGuest, uiLang, profile?.streak, profile?.last_seen_at, showBubble]);
 
   const showGuestSignupIfFirst = useCallback(() => {
     if (!authReady || !isGuest) return false;
@@ -247,54 +338,68 @@ export default function HomePage() {
       if (localStorage.getItem(GUEST_SIGNUP_STORAGE_KEY)) return false;
       localStorage.setItem(GUEST_SIGNUP_STORAGE_KEY, "1");
     } catch { return false; }
-    setGuestSignupMoment(true);
-    setBubble(GUEST_SIGNUP_BUBBLE);
-    setBubbleVisible(true);
     return true;
   }, [authReady, isGuest]);
 
-  const scheduleHappyEnd = useCallback(() => {
+  const scheduleHappyEnd = useCallback((delayMs = 2000) => {
     if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current);
     happyTimeoutRef.current = window.setTimeout(() => {
       happyTimeoutRef.current = null;
-      if (Date.now() >= happyUntilRef.current) setExpressionFlip("idle");
-    }, 2000);
+      if (Date.now() >= happyUntilRef.current) setMiomiMood("idle");
+    }, delayMs);
   }, []);
 
-  const triggerPetTap = useCallback(() => {
-    dismissGuestInvite(); markActivity(); wakeFromSleep();
-    const i = tapCycleIndexRef.current % TAP_BUBBLE_CYCLE.length;
-    tapCycleIndexRef.current += 1;
-    const phrase = TAP_BUBBLE_CYCLE[i]!;
-    setBubble({ th: phrase.th, en: phrase.en });
-    setBubbleVisible(true);
-    setTapBounceKey((k) => k + 1);
-    setTapSpinKey((k) => k + 1);
-    happyUntilRef.current = Date.now() + 2000;
-    setExpressionFlip("happy");
-    scheduleHappyEnd();
-  }, [dismissGuestInvite, markActivity, wakeFromSleep, scheduleHappyEnd]);
+  const handleMiomiTap = useCallback(() => {
+    dismissGuestInvite();
+    markActivity();
+    wakeFromSleep();
+    const text = home.react.tap(uiLang);
+    showBubble(text, { reactive: true, autoHideMs: 3200 });
+    setTapBouncing(true);
+    window.setTimeout(() => setTapBouncing(false), 280);
+    setParticles((prev) => [
+      ...prev,
+      ...Array.from({ length: 3 }, (_, i) => ({
+        id: Date.now() + i,
+        x: (Math.random() - 0.5) * 50,
+        y: 0,
+      })),
+    ]);
+    happyUntilRef.current = Date.now() + 1600;
+    setMiomiMood("happy");
+    maybeSpeak(text);
+    scheduleHappyEnd(1600);
+  }, [dismissGuestInvite, markActivity, wakeFromSleep, uiLang, showBubble, scheduleHappyEnd]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+    isDragModeRef.current = false;
+    const text = home.react.drag(uiLang);
+    if (!isGuest) showBubble(text, { reactive: true, autoHideMs: 3200 });
+    happyUntilRef.current = Date.now() + 1200;
+    setMiomiMood("happy");
+    maybeSpeak(text);
+    scheduleHappyEnd(1200);
+  }, [isGuest, uiLang, showBubble, scheduleHappyEnd]);
 
   const triggerLevelUpCelebration = useCallback(() => {
     window.setTimeout(() => {
       setLevelUpAnimKey((k) => k + 1);
-      setBubble(LEVEL_UP_BUBBLE);
-      setBubbleVisible(true);
-      setExpressionFlip("happy");
+      if (!isGuest) showBubble(LEVEL_UP_BUBBLE.th, { th: LEVEL_UP_BUBBLE.th, en: LEVEL_UP_BUBBLE.en });
+      setMiomiMood("happy");
       happyUntilRef.current = Date.now() + 3000;
-      scheduleHappyEnd();
+      scheduleHappyEnd(3000);
     }, 450);
-  }, [scheduleHappyEnd]);
+  }, [isGuest, showBubble, scheduleHappyEnd]);
 
   const handleFeedPress = useCallback(() => {
     markActivity(); wakeFromSleep();
     const firstGuest = showGuestSignupIfFirst();
     setFeedAnimKey((k) => k + 1);
-    // Delay reaction to sync with particle arrival at Miomi (420ms)
     window.setTimeout(() => {
-      if (!firstGuest) { setBubble(FEED_BUBBLE); setBubbleVisible(true); }
+      if (!firstGuest && !isGuest) showBubble(FEED_BUBBLE.th, { th: FEED_BUBBLE.th, en: FEED_BUBBLE.en });
       happyUntilRef.current = Date.now() + 2000;
-      setExpressionFlip("happy");
+      setMiomiMood("happy");
       scheduleHappyEnd();
     }, 400);
     setPet((prev) => {
@@ -304,17 +409,16 @@ export default function HomePage() {
       return stats;
     });
     setXpTick((t) => t + 1);
-  }, [markActivity, wakeFromSleep, scheduleHappyEnd, triggerLevelUpCelebration, showGuestSignupIfFirst]);
+  }, [markActivity, wakeFromSleep, scheduleHappyEnd, triggerLevelUpCelebration, showGuestSignupIfFirst, isGuest, showBubble]);
 
   const handlePlayPress = useCallback(() => {
     markActivity(); wakeFromSleep();
     const firstGuest = showGuestSignupIfFirst();
     setPlayAnimKey((k) => k + 1);
-    // Delay reaction to sync with particle arrival at Miomi (420ms)
     window.setTimeout(() => {
-      if (!firstGuest) { setBubble(PLAY_BUBBLE); setBubbleVisible(true); }
+      if (!firstGuest && !isGuest) showBubble(PLAY_BUBBLE.th, { th: PLAY_BUBBLE.th, en: PLAY_BUBBLE.en });
       happyUntilRef.current = Date.now() + 2000;
-      setExpressionFlip("happy");
+      setMiomiMood("happy");
       scheduleHappyEnd();
     }, 400);
     setPet((prev) => {
@@ -324,7 +428,7 @@ export default function HomePage() {
       return stats;
     });
     setXpTick((t) => t + 1);
-  }, [markActivity, wakeFromSleep, triggerLevelUpCelebration, showGuestSignupIfFirst]);
+  }, [markActivity, wakeFromSleep, triggerLevelUpCelebration, showGuestSignupIfFirst, isGuest, showBubble, scheduleHappyEnd]);
 
   const handleGuestCreatePress = useCallback(() => {
     showGuestSignupIfFirst();
@@ -342,26 +446,67 @@ export default function HomePage() {
   const handleStagePointerDown = useCallback(() => {
     markActivity();
     if (sleeping) {
-      dismissGuestInvite(); wakeFromSleep();
-      setTapBounceKey((k) => k + 1);
+      dismissGuestInvite();
+      wakeFromSleep();
+      setTapBouncing(true);
+      window.setTimeout(() => setTapBouncing(false), 280);
       happyUntilRef.current = Date.now() + 2000;
-      setExpressionFlip("happy");
-      const i = tapCycleIndexRef.current % TAP_BUBBLE_CYCLE.length;
-      tapCycleIndexRef.current += 1;
-      const phrase = TAP_BUBBLE_CYCLE[i]!;
-      setBubble({ th: phrase.th, en: phrase.en });
-      setBubbleVisible(true);
-      setTapSpinKey((k) => k + 1);
+      setMiomiMood("happy");
+      if (!isGuest) {
+        const i = tapCycleIndexRef.current % TAP_BUBBLE_CYCLE.length;
+        tapCycleIndexRef.current += 1;
+        const phrase = TAP_BUBBLE_CYCLE[i]!;
+        showBubble(phrase.th, { th: phrase.th, en: phrase.en, reactive: true });
+      }
       scheduleHappyEnd();
     }
-  }, [dismissGuestInvite, markActivity, sleeping, wakeFromSleep, scheduleHappyEnd]);
+  }, [dismissGuestInvite, markActivity, sleeping, wakeFromSleep, scheduleHappyEnd, isGuest, showBubble]);
+
+  const handleMiomiPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    pointerDownAtRef.current = Date.now();
+    pointerStartPosRef.current = { x: e.clientX, y: e.clientY };
+    isDragModeRef.current = false;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }, []);
+
+  const handleMiomiPointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (sleeping) return;
+    const elapsed = Date.now() - pointerDownAtRef.current;
+    const dx = e.clientX - pointerStartPosRef.current.x;
+    const dy = e.clientY - pointerStartPosRef.current.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 8 && elapsed > 300 && !isDragModeRef.current) {
+      isDragModeRef.current = true;
+      setIsDragging(true);
+      setMiomiMood("thinking");
+      dragControls.start(e);
+    }
+  }, [sleeping, dragControls]);
+
+  const handleMiomiPointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    const elapsed = Date.now() - pointerDownAtRef.current;
+    const dx = e.clientX - pointerStartPosRef.current.x;
+    const dy = e.clientY - pointerStartPosRef.current.y;
+    const dist = Math.hypot(dx, dy);
+    if (isDragModeRef.current) return;
+    if (elapsed < 300 && dist < 8) handleMiomiTap();
+  }, [handleMiomiTap]);
 
   useEffect(() => {
+    if (!authReady || isGuest || greetingShownRef.current) return;
+    greetingShownRef.current = true;
     const id = window.setTimeout(() => {
-      setBubble(WELCOME_BUBBLE); setBubbleVisible(true);
+      const text = home.greeting.pick(uiLang, {
+        streakDays: profile?.streak ?? 0,
+        lastSeenAt: profile?.last_seen_at ?? null,
+        isFirstDay: !profile?.last_seen_at,
+      });
+      showBubble(text, { autoHideMs: 4000 });
     }, reduceMotion ? 0 : 1200);
     return () => window.clearTimeout(id);
-  }, [reduceMotion]);
+  }, [authReady, isGuest, reduceMotion, uiLang, profile?.streak, profile?.last_seen_at, showBubble]);
 
   useEffect(() => {
     if (reduceMotion || sleeping) {
@@ -382,7 +527,7 @@ export default function HomePage() {
     if (reduceMotion || sleeping) return;
     const id = window.setInterval(() => {
       if (Date.now() < happyUntilRef.current) return;
-      setExpressionFlip(() => (Math.random() < 0.15 ? "happy" : "idle"));
+      setMiomiMood(() => (Math.random() < 0.15 ? "happy" : "idle"));
     }, 8000);
     return () => clearInterval(id);
   }, [reduceMotion, sleeping]);
@@ -390,15 +535,20 @@ export default function HomePage() {
   useEffect(() => {
     const id = window.setInterval(() => {
       if (Date.now() - lastActivityRef.current >= 60000) {
-        setSleeping(true); setBubble(SLEEP_BUBBLE); setBubbleVisible(true); setMiomiX(0);
+        setSleeping(true);
+        if (!isGuest) showBubble(SLEEP_BUBBLE.th, { th: SLEEP_BUBBLE.th, en: SLEEP_BUBBLE.en });
+        setMiomiX(0);
       }
     }, 500);
     return () => clearInterval(id);
-  }, []);
+  }, [isGuest, showBubble]);
 
   useEffect(() => {
-    return () => { if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current); };
-  }, []);
+    return () => {
+      if (happyTimeoutRef.current) window.clearTimeout(happyTimeoutRef.current);
+      clearBubbleHide();
+    };
+  }, [clearBubbleHide]);
 
   const triggerFuelParticle = useCallback((buttonEl: HTMLElement, color: string) => {
     const buttonRect = buttonEl.getBoundingClientRect();
@@ -486,9 +636,10 @@ export default function HomePage() {
     requestAnimationFrame(animate);
   }, []);
 
-  const bubbleTh = bubble.th;
-  const bubbleEn = bubble.en;
-  const miomiExpression = sleeping ? "idle" : expressionFlip;
+  const bubbleTh = bubbleText || bubble.th;
+  const bubbleEn = bubbleText ? "" : bubble.en;
+  const miomiExpression = sleeping ? "idle" : miomiMood;
+  const resolvedFuelCaption = useMemo(() => home.fuel.caption(uiLang), [uiLang]);
 
   return (
     <>
@@ -512,11 +663,41 @@ export default function HomePage() {
           <div className="flex h-full flex-col overflow-hidden bg-white md:hidden">
             {/* Miomi stage */}
             <div
+              ref={stageRef}
               className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
               style={{ background: "#FAFAF6" }}
               onPointerDown={handleStagePointerDown}
             >
               <AmbientBackground mode="ambient" />
+
+              {authReady && isGuest ? (
+                <div className="pointer-events-none absolute inset-x-4 top-4 z-30 flex justify-center">
+                  <Link
+                    href="/signup"
+                    className={cn(
+                      "pointer-events-auto max-w-[90%] rounded-full border border-[#EDE8E0] px-4 py-2 text-center backdrop-blur-[14px]",
+                      tapFeedback,
+                    )}
+                    style={{
+                      background: "rgba(255,255,255,0.88)",
+                      boxShadow: BUBBLE_CARD_SHADOW,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: uiLang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        lineHeight: "20px",
+                        color: "#1A1A18",
+                      }}
+                    >
+                      {home.guest.pill(uiLang)}
+                    </span>
+                  </Link>
+                </div>
+              ) : null}
+
               <motion.div className="absolute inset-0 bottom-12 z-10 flex min-h-0 items-end justify-center px-2">
                 <motion.div
                   className="flex h-full max-h-full items-end justify-center"
@@ -529,49 +710,143 @@ export default function HomePage() {
                     animate={reduceMotion ? { x: 0 } : { x: miomiX }}
                     transition={WALK_TRANSITION}
                   >
-                    <motion.div className={cn("origin-bottom", sleeping && "rotate-[6deg]")}>
-                      <motion.button
-                        type="button"
-                        aria-label="Tap Miomi"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={triggerPetTap}
-                        className="relative block cursor-pointer appearance-none border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-accent"
+                    <motion.div
+                      className={cn("origin-bottom", sleeping && "rotate-[6deg]")}
+                      drag
+                      dragControls={dragControls}
+                      dragListener={false}
+                      dragConstraints={dragConstraints}
+                      dragElastic={0.2}
+                      dragMomentum={false}
+                      onDragEnd={handleDragEnd}
+                      animate={!isDragging ? { x: 0, y: 0 } : undefined}
+                      transition={{ type: "spring", stiffness: 280, damping: 13 }}
+                    >
+                      <motion.div
+                        animate={tapBouncing ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                        transition={
+                          tapBouncing
+                            ? { duration: 0.28, type: "spring", stiffness: 280, damping: 13 }
+                            : undefined
+                        }
+                        className="origin-bottom"
                       >
-                        <MiomiCharacter
-                          expression={miomiExpression}
-                          sleeping={sleeping}
-                          feedAnimKey={feedAnimKey}
-                          playAnimKey={playAnimKey}
-                          levelUpAnimKey={levelUpAnimKey}
-                          breathe={!reduceMotion && !sleeping}
-                        />
-                      </motion.button>
+                        <div className="relative">
+                          {!isGuest && bubbleVisible ? (
+                            <motion.div
+                              className="pointer-events-none absolute z-20"
+                              style={{
+                                top: "8%",
+                                ...(bubbleOnLeft
+                                  ? { right: "100%", marginRight: "12px" }
+                                  : { left: "100%", marginLeft: "12px" }),
+                                maxWidth: "200px",
+                              }}
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{
+                                opacity: bubbleVisible ? 1 : 0,
+                                y: bubbleVisible ? 0 : -4,
+                              }}
+                              transition={{
+                                duration: bubbleVisible ? 0.24 : 0.36,
+                                ease: bubbleVisible ? [0.4, 0, 0.2, 1] : "easeIn",
+                              }}
+                            >
+                              <div
+                                className="relative rounded-2xl border border-[#EDE8E0] px-[14px] py-[10px] backdrop-blur-[14px]"
+                                style={{
+                                  background: "rgba(255,255,255,0.88)",
+                                  boxShadow: BUBBLE_CARD_SHADOW,
+                                }}
+                              >
+                                <p
+                                  style={{
+                                    fontFamily: uiLang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif",
+                                    fontSize: "14px",
+                                    fontWeight: 500,
+                                    lineHeight: "20px",
+                                    color: "#1A1A18",
+                                  }}
+                                >
+                                  {bubbleTh}
+                                </p>
+                                {bubbleEn ? (
+                                  <p
+                                    style={{
+                                      marginTop: "4px",
+                                      fontFamily: "'Quicksand', sans-serif",
+                                      fontSize: "12px",
+                                      fontWeight: 500,
+                                      lineHeight: "16px",
+                                      color: "#9A8B73",
+                                    }}
+                                  >
+                                    {bubbleEn}
+                                  </p>
+                                ) : null}
+                                <div
+                                  aria-hidden
+                                  style={{
+                                    position: "absolute",
+                                    top: "24px",
+                                    ...(bubbleOnLeft
+                                      ? { right: "-8px", borderLeft: "8px solid rgba(255,255,255,0.88)" }
+                                      : { left: "-8px", borderRight: "8px solid rgba(255,255,255,0.88)" }),
+                                    width: 0,
+                                    height: 0,
+                                    borderTop: "8px solid transparent",
+                                    borderBottom: "8px solid transparent",
+                                  }}
+                                />
+                              </div>
+                            </motion.div>
+                          ) : null}
+
+                          <div className="pointer-events-none absolute inset-0 z-10">
+                            {particles.map((p) => (
+                              <motion.div
+                                key={p.id}
+                                className="absolute left-1/2 top-[20%]"
+                                style={{ marginLeft: p.x }}
+                                initial={{ y: p.y, opacity: 1, scale: 0.8 }}
+                                animate={{ y: p.y - 40, opacity: 0, scale: 1.2 }}
+                                transition={{ duration: 0.6, ease: "easeOut" }}
+                                onAnimationComplete={() =>
+                                  setParticles((prev) => prev.filter((x) => x.id !== p.id))
+                                }
+                              >
+                                <Heart
+                                  size={14}
+                                  fill="#F9A8D4"
+                                  stroke="#DB2777"
+                                  strokeWidth={2}
+                                />
+                              </motion.div>
+                            ))}
+                          </div>
+
+                          <motion.button
+                            type="button"
+                            aria-label="Tap Miomi"
+                            onPointerDown={handleMiomiPointerDown}
+                            onPointerMove={handleMiomiPointerMove}
+                            onPointerUp={handleMiomiPointerUp}
+                            onPointerCancel={handleMiomiPointerUp}
+                            className="relative block cursor-pointer appearance-none border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-accent"
+                          >
+                            <MiomiCharacter
+                              expression={miomiExpression}
+                              sleeping={sleeping}
+                              feedAnimKey={feedAnimKey}
+                              playAnimKey={playAnimKey}
+                              levelUpAnimKey={levelUpAnimKey}
+                              breathe={!reduceMotion && !sleeping && !isDragging}
+                            />
+                          </motion.button>
+                        </div>
+                      </motion.div>
                     </motion.div>
                   </motion.div>
-                </motion.div>
-              </motion.div>
-
-              {/* Speech bubble */}
-              <motion.div className="pointer-events-none absolute right-4 top-4 z-30 max-w-[65%]">
-                <motion.div
-                  className="pointer-events-auto rounded-2xl border border-[#EAD0DB] bg-white/92 px-3 py-2.5 shadow-sm backdrop-blur-sm"
-                  initial={false}
-                  animate={{ opacity: bubbleVisible ? 1 : 0, y: bubbleVisible ? 0 : 6 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
-                >
-                  <p className="text-sm font-medium leading-[1.6] text-[#1A1A1A]">{bubbleTh}</p>
-                  {bubbleEn ? (
-                    <p className="mt-1 text-[11px] leading-[1.6] text-[#666666]">{bubbleEn}</p>
-                  ) : null}
-                  {guestSignupMoment ? (
-                    <Link
-                      href="/signup"
-                      className={cn("mt-2 flex w-full flex-col items-center rounded-full border border-[#EDE8E0] bg-[#FFF8F2] px-3 py-2 text-center", tapFeedback)}
-                    >
-                      <span className="text-[10px] font-medium text-[#C9A96E]">จำชื่อฉันนะคะ</span>
-                      <span className="text-[11px] font-normal leading-[1.6] text-[#666666]">Remember my name</span>
-                    </Link>
-                  ) : null}
                 </motion.div>
               </motion.div>
 
@@ -610,6 +885,19 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
+                <p
+                  style={{
+                    marginTop: "8px",
+                    textAlign: "center",
+                    fontFamily: "'Quicksand', sans-serif",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    lineHeight: "16px",
+                    color: "#9A8B73",
+                  }}
+                >
+                  {resolvedFuelCaption}
+                </p>
               </div>
             </div>
 
