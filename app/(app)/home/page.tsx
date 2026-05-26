@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { motion, useDragControls, useReducedMotion } from "framer-motion";
+import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
 import { Coffee, Heart, Zap, type LucideIcon } from "lucide-react";
 import {
   useCallback,
@@ -126,9 +126,12 @@ function addXp(stats: PetStats, amount: number): { stats: PetStats; leveledUp: b
   return { stats: { ...stats, level, xp, lastUpdated: Date.now() }, leveledUp };
 }
 
-const WALK_TRANSITION = { duration: 1.5, ease: "easeInOut" as const };
 const BUBBLE_CARD_SHADOW =
   "0 1px 2px rgba(26, 26, 24, 0.04), 0 4px 16px rgba(26, 26, 24, 0.06), 0 0 0 1px rgba(237, 232, 224, 0.6)";
+const WANDER_EASE = [0.42, 0, 0.58, 1] as const;
+const MIOMI_ANCHOR_TOP = "36%";
+const PLACED_LINGER_MS = 5000;
+const WANDER_RESUME_AFTER_REACTION_MS = 2000;
 
 type MiomiMood = "idle" | "happy" | "thinking";
 type HeartParticle = { id: number; x: number; y: number };
@@ -216,7 +219,8 @@ export default function HomePage() {
     return readUiLang();
   }, [profile?.ui_language]);
 
-  const [miomiX, setMiomiX] = useState(0);
+  const posX = useMotionValue(0);
+  const posY = useMotionValue(0);
   const [sleeping, setSleeping] = useState(false);
   const [bubble, setBubble] = useState({ th: "", en: "" });
   const [bubbleText, setBubbleText] = useState("");
@@ -224,6 +228,9 @@ export default function HomePage() {
   const [miomiMood, setMiomiMood] = useState<MiomiMood>("idle");
   const [tapBouncing, setTapBouncing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isPlaced, setIsPlaced] = useState(false);
+  const [placedAt, setPlacedAt] = useState<number | null>(null);
+  const [isWandering, setIsWandering] = useState(false);
   const [particles, setParticles] = useState<HeartParticle[]>([]);
   const [bubbleOnLeft, setBubbleOnLeft] = useState(false);
   const [feedAnimKey, setFeedAnimKey] = useState(0);
@@ -251,6 +258,13 @@ export default function HomePage() {
   const bubbleHideTimeoutRef = useRef<number | null>(null);
   const greetingShownRef = useRef(false);
   const dragControls = useDragControls();
+  const wanderTimeoutRef = useRef<number | null>(null);
+  const wanderPausedUntilRef = useRef(0);
+  const isDraggingRef = useRef(false);
+  const isPlacedRef = useRef(false);
+  const placedAtRef = useRef<number | null>(null);
+  const miomiMoodRef = useRef<MiomiMood>("idle");
+  const wanderAnimStopRef = useRef<(() => void) | null>(null);
 
   useLayoutEffect(() => {
     lastActivityRef.current = Date.now();
@@ -270,13 +284,20 @@ export default function HomePage() {
         top: -h * 0.15,
         bottom: h * 0.15,
       });
-      setBubbleOnLeft(miomiX > w * 0.08);
+      setBubbleOnLeft(posX.get() > w * 0.08);
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(stage);
-    return () => ro.disconnect();
-  }, [miomiX]);
+    const unsubX = posX.on("change", (v) => {
+      const w = stage.offsetWidth;
+      setBubbleOnLeft(v > w * 0.08);
+    });
+    return () => {
+      ro.disconnect();
+      unsubX();
+    };
+  }, [posX]);
 
 
   useEffect(() => {
@@ -286,7 +307,32 @@ export default function HomePage() {
 
   const happyUntilRef = useRef(0);
   const happyTimeoutRef = useRef<number | null>(null);
-  const walkTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
+  useEffect(() => { isPlacedRef.current = isPlaced; }, [isPlaced]);
+  useEffect(() => { placedAtRef.current = placedAt; }, [placedAt]);
+  useEffect(() => { miomiMoodRef.current = miomiMood; }, [miomiMood]);
+
+  const pickWanderTarget = useCallback((stageW: number, stageH: number) => ({
+    x: (Math.random() - 0.5) * stageW * 0.5,
+    y: (Math.random() - 0.5) * stageH * 0.3,
+  }), []);
+
+  const runWanderTo = useCallback((targetX: number, targetY: number) => {
+    wanderAnimStopRef.current?.();
+    setIsWandering(true);
+    const duration = 3 + Math.random();
+    const cx = animate(posX, targetX, { duration, ease: WANDER_EASE });
+    const cy = animate(posY, targetY, { duration, ease: WANDER_EASE });
+    wanderAnimStopRef.current = () => {
+      cx.stop();
+      cy.stop();
+    };
+    void Promise.all([cx, cy]).finally(() => {
+      wanderAnimStopRef.current = null;
+      setIsWandering(false);
+    });
+  }, [posX, posY]);
 
   const markActivity = useCallback(() => { lastActivityRef.current = Date.now(); }, []);
 
@@ -366,6 +412,7 @@ export default function HomePage() {
       })),
     ]);
     happyUntilRef.current = Date.now() + 1600;
+    wanderPausedUntilRef.current = Date.now() + 1600 + WANDER_RESUME_AFTER_REACTION_MS;
     setMiomiMood("happy");
     maybeSpeak(text);
     scheduleHappyEnd(1600);
@@ -374,9 +421,15 @@ export default function HomePage() {
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
     isDragModeRef.current = false;
+    setIsPlaced(true);
+    const now = Date.now();
+    setPlacedAt(now);
+    placedAtRef.current = now;
+    isPlacedRef.current = true;
     const text = home.react.drag(uiLang);
     if (!isGuest) showBubble(text, { reactive: true, autoHideMs: 3200 });
-    happyUntilRef.current = Date.now() + 1200;
+    happyUntilRef.current = now + 1200;
+    wanderPausedUntilRef.current = now + 1200 + WANDER_RESUME_AFTER_REACTION_MS;
     setMiomiMood("happy");
     maybeSpeak(text);
     scheduleHappyEnd(1200);
@@ -477,6 +530,9 @@ export default function HomePage() {
     const dy = e.clientY - pointerStartPosRef.current.y;
     const dist = Math.hypot(dx, dy);
     if (dist > 8 && elapsed > 300 && !isDragModeRef.current) {
+      wanderAnimStopRef.current?.();
+      wanderAnimStopRef.current = null;
+      setIsWandering(false);
       isDragModeRef.current = true;
       setIsDragging(true);
       setMiomiMood("thinking");
@@ -510,18 +566,62 @@ export default function HomePage() {
 
   useEffect(() => {
     if (reduceMotion || sleeping) {
-      if (walkTimeoutRef.current) { window.clearTimeout(walkTimeoutRef.current); walkTimeoutRef.current = null; }
+      if (wanderTimeoutRef.current) {
+        window.clearTimeout(wanderTimeoutRef.current);
+        wanderTimeoutRef.current = null;
+      }
       return;
     }
-    const scheduleWalk = () => {
-      walkTimeoutRef.current = window.setTimeout(() => {
-        setMiomiX(-60 + Math.random() * 120);
-        scheduleWalk();
-      }, 4000 + Math.random() * 2000);
+
+    const scheduleNextWander = () => {
+      const delay = 6000 + Math.random() * 6000;
+      wanderTimeoutRef.current = window.setTimeout(() => {
+        wanderTimeoutRef.current = null;
+        const stage = stageRef.current;
+        if (!stage || reduceMotion || sleeping) {
+          scheduleNextWander();
+          return;
+        }
+        if (isDraggingRef.current) {
+          scheduleNextWander();
+          return;
+        }
+        if (Date.now() < wanderPausedUntilRef.current) {
+          scheduleNextWander();
+          return;
+        }
+        if (miomiMoodRef.current !== "idle" && Date.now() < happyUntilRef.current) {
+          scheduleNextWander();
+          return;
+        }
+        const placed = placedAtRef.current;
+        if (isPlacedRef.current && placed !== null && Date.now() - placed < PLACED_LINGER_MS) {
+          scheduleNextWander();
+          return;
+        }
+        if (isPlacedRef.current && placed !== null && Date.now() - placed >= PLACED_LINGER_MS) {
+          setIsPlaced(false);
+          isPlacedRef.current = false;
+          setPlacedAt(null);
+          placedAtRef.current = null;
+        }
+
+        const w = stage.offsetWidth;
+        const h = stage.offsetHeight;
+        const target = pickWanderTarget(w, h);
+        runWanderTo(target.x, target.y);
+        scheduleNextWander();
+      }, delay);
     };
-    scheduleWalk();
-    return () => { if (walkTimeoutRef.current) window.clearTimeout(walkTimeoutRef.current); walkTimeoutRef.current = null; };
-  }, [reduceMotion, sleeping]);
+
+    scheduleNextWander();
+    return () => {
+      if (wanderTimeoutRef.current) {
+        window.clearTimeout(wanderTimeoutRef.current);
+        wanderTimeoutRef.current = null;
+      }
+    };
+  }, [reduceMotion, sleeping, pickWanderTarget, runWanderTo]);
 
   useEffect(() => {
     if (reduceMotion || sleeping) return;
@@ -537,11 +637,16 @@ export default function HomePage() {
       if (Date.now() - lastActivityRef.current >= 60000) {
         setSleeping(true);
         if (!isGuest) showBubble(SLEEP_BUBBLE.th, { th: SLEEP_BUBBLE.th, en: SLEEP_BUBBLE.en });
-        setMiomiX(0);
+        posX.set(0);
+        posY.set(0);
+        setIsPlaced(false);
+        isPlacedRef.current = false;
+        setPlacedAt(null);
+        placedAtRef.current = null;
       }
     }, 500);
     return () => clearInterval(id);
-  }, [isGuest, showBubble]);
+  }, [isGuest, showBubble, posX, posY]);
 
   useEffect(() => {
     return () => {
@@ -698,30 +803,32 @@ export default function HomePage() {
                 </div>
               ) : null}
 
-              <motion.div className="absolute inset-0 bottom-12 z-10 flex min-h-0 items-end justify-center px-2">
+              <motion.div
+                className="absolute inset-x-0 z-10 px-2"
+                style={{ top: 0, bottom: 48 }}
+              >
                 <motion.div
-                  className="flex h-full max-h-full items-end justify-center"
+                  className="absolute left-1/2"
+                  style={{ top: MIOMI_ANCHOR_TOP, x: "-50%" }}
                   initial={reduceMotion ? { y: 0, scale: 1, opacity: 1 } : { y: 96, scale: 0.88, opacity: 0 }}
                   animate={{ y: 0, scale: 1, opacity: 1 }}
                   transition={{ duration: 1.2, ease: "easeOut" }}
                 >
                   <motion.div
-                    className="flex h-full max-h-full items-end justify-center"
-                    animate={reduceMotion ? { x: 0 } : { x: miomiX }}
-                    transition={WALK_TRANSITION}
+                    className={cn("origin-bottom", sleeping && "rotate-[6deg]")}
+                    style={{
+                      x: posX,
+                      y: posY,
+                      willChange: isDragging || isWandering ? "transform" : undefined,
+                    }}
+                    drag
+                    dragControls={dragControls}
+                    dragListener={false}
+                    dragConstraints={dragConstraints}
+                    dragElastic={0.2}
+                    dragMomentum={false}
+                    onDragEnd={handleDragEnd}
                   >
-                    <motion.div
-                      className={cn("origin-bottom", sleeping && "rotate-[6deg]")}
-                      drag
-                      dragControls={dragControls}
-                      dragListener={false}
-                      dragConstraints={dragConstraints}
-                      dragElastic={0.2}
-                      dragMomentum={false}
-                      onDragEnd={handleDragEnd}
-                      animate={!isDragging ? { x: 0, y: 0 } : undefined}
-                      transition={{ type: "spring", stiffness: 280, damping: 13 }}
-                    >
                       <motion.div
                         animate={tapBouncing ? { scale: [1, 1.08, 1] } : { scale: 1 }}
                         transition={
@@ -847,7 +954,6 @@ export default function HomePage() {
                       </motion.div>
                     </motion.div>
                   </motion.div>
-                </motion.div>
               </motion.div>
 
               {/* Fuel strip */}
