@@ -129,9 +129,12 @@ function addXp(stats: PetStats, amount: number): { stats: PetStats; leveledUp: b
 const BUBBLE_CARD_SHADOW =
   "0 1px 2px rgba(26, 26, 24, 0.04), 0 4px 16px rgba(26, 26, 24, 0.06), 0 0 0 1px rgba(237, 232, 224, 0.6)";
 const WANDER_EASE = [0.42, 0, 0.58, 1] as const;
-const MIOMI_ANCHOR_TOP = "36%";
+const MIOMI_ANCHOR_TOP = "32%";
 const PLACED_LINGER_MS = 5000;
 const WANDER_RESUME_AFTER_REACTION_MS = 2000;
+const DRAG_MOVE_THRESHOLD_PX = 12;
+const TAP_MOVE_THRESHOLD_PX = 12;
+const LONG_PRESS_MS = 200;
 
 type MiomiMood = "idle" | "happy" | "thinking";
 type HeartParticle = { id: number; x: number; y: number };
@@ -233,6 +236,7 @@ export default function HomePage() {
   const [isWandering, setIsWandering] = useState(false);
   const [particles, setParticles] = useState<HeartParticle[]>([]);
   const [bubbleOnLeft, setBubbleOnLeft] = useState(false);
+  const [bubbleAbove, setBubbleAbove] = useState(false);
   const [feedAnimKey, setFeedAnimKey] = useState(0);
   const [playAnimKey, setPlayAnimKey] = useState(0);
   const [levelUpAnimKey, setLevelUpAnimKey] = useState(0);
@@ -284,6 +288,7 @@ export default function HomePage() {
         top: -h * 0.15,
         bottom: h * 0.15,
       });
+      setBubbleAbove(w < 380);
       setBubbleOnLeft(posX.get() > w * 0.08);
     };
     update();
@@ -515,7 +520,7 @@ export default function HomePage() {
     }
   }, [dismissGuestInvite, markActivity, sleeping, wakeFromSleep, scheduleHappyEnd, isGuest, showBubble]);
 
-  const handleMiomiPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+  const handleMiomiPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     pointerDownAtRef.current = Date.now();
     pointerStartPosRef.current = { x: e.clientX, y: e.clientY };
@@ -523,31 +528,35 @@ export default function HomePage() {
     e.currentTarget.setPointerCapture(e.pointerId);
   }, []);
 
-  const handleMiomiPointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    if (sleeping) return;
+  const enterDragMode = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    wanderAnimStopRef.current?.();
+    wanderAnimStopRef.current = null;
+    setIsWandering(false);
+    isDragModeRef.current = true;
+    setIsDragging(true);
+    setMiomiMood("thinking");
+    dragControls.start(e);
+  }, [dragControls]);
+
+  const handleMiomiPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (sleeping || isDragModeRef.current) return;
     const elapsed = Date.now() - pointerDownAtRef.current;
     const dx = e.clientX - pointerStartPosRef.current.x;
     const dy = e.clientY - pointerStartPosRef.current.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 8 && elapsed > 300 && !isDragModeRef.current) {
-      wanderAnimStopRef.current?.();
-      wanderAnimStopRef.current = null;
-      setIsWandering(false);
-      isDragModeRef.current = true;
-      setIsDragging(true);
-      setMiomiMood("thinking");
-      dragControls.start(e);
+    if (dist > DRAG_MOVE_THRESHOLD_PX || (dist > 8 && elapsed > LONG_PRESS_MS)) {
+      enterDragMode(e);
     }
-  }, [sleeping, dragControls]);
+  }, [sleeping, enterDragMode]);
 
-  const handleMiomiPointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+  const handleMiomiPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.releasePointerCapture(e.pointerId);
     const elapsed = Date.now() - pointerDownAtRef.current;
     const dx = e.clientX - pointerStartPosRef.current.x;
     const dy = e.clientY - pointerStartPosRef.current.y;
     const dist = Math.hypot(dx, dy);
     if (isDragModeRef.current) return;
-    if (elapsed < 300 && dist < 8) handleMiomiTap();
+    if (elapsed < LONG_PRESS_MS && dist < TAP_MOVE_THRESHOLD_PX) handleMiomiTap();
   }, [handleMiomiTap]);
 
   useEffect(() => {
@@ -815,10 +824,11 @@ export default function HomePage() {
                   transition={{ duration: 1.2, ease: "easeOut" }}
                 >
                   <motion.div
-                    className={cn("origin-bottom", sleeping && "rotate-[6deg]")}
+                    className={cn("origin-bottom touch-none", sleeping && "rotate-[6deg]")}
                     style={{
                       x: posX,
                       y: posY,
+                      touchAction: "none",
                       willChange: isDragging || isWandering ? "transform" : undefined,
                     }}
                     drag
@@ -828,6 +838,10 @@ export default function HomePage() {
                     dragElastic={0.2}
                     dragMomentum={false}
                     onDragEnd={handleDragEnd}
+                    onPointerDown={handleMiomiPointerDown}
+                    onPointerMove={handleMiomiPointerMove}
+                    onPointerUp={handleMiomiPointerUp}
+                    onPointerCancel={handleMiomiPointerUp}
                   >
                       <motion.div
                         animate={tapBouncing ? { scale: [1, 1.08, 1] } : { scale: 1 }}
@@ -838,17 +852,34 @@ export default function HomePage() {
                         }
                         className="origin-bottom"
                       >
-                        <div className="relative">
+                        <div className="relative mx-auto w-fit">
                           {!isGuest && bubbleVisible ? (
                             <motion.div
                               className="pointer-events-none absolute z-20"
-                              style={{
-                                top: "8%",
-                                ...(bubbleOnLeft
-                                  ? { right: "100%", marginRight: "12px" }
-                                  : { left: "100%", marginLeft: "12px" }),
-                                maxWidth: "200px",
-                              }}
+                              style={
+                                bubbleAbove
+                                  ? {
+                                      bottom: "100%",
+                                      left: "50%",
+                                      marginBottom: "12px",
+                                      maxWidth: "180px",
+                                      width: "max-content",
+                                    }
+                                  : bubbleOnLeft
+                                    ? {
+                                        top: "10%",
+                                        right: "105%",
+                                        marginRight: "12px",
+                                        maxWidth: "180px",
+                                      }
+                                    : {
+                                        top: "10%",
+                                        left: "105%",
+                                        marginLeft: "12px",
+                                        maxWidth: "180px",
+                                      }
+                              }
+                              {...(bubbleAbove ? { x: "-50%" } : {})}
                               initial={{ opacity: 0, y: 8 }}
                               animate={{
                                 opacity: bubbleVisible ? 1 : 0,
@@ -893,17 +924,31 @@ export default function HomePage() {
                                 ) : null}
                                 <div
                                   aria-hidden
-                                  style={{
-                                    position: "absolute",
-                                    top: "24px",
-                                    ...(bubbleOnLeft
-                                      ? { right: "-8px", borderLeft: "8px solid rgba(255,255,255,0.88)" }
-                                      : { left: "-8px", borderRight: "8px solid rgba(255,255,255,0.88)" }),
-                                    width: 0,
-                                    height: 0,
-                                    borderTop: "8px solid transparent",
-                                    borderBottom: "8px solid transparent",
-                                  }}
+                                  style={
+                                    bubbleAbove
+                                      ? {
+                                          position: "absolute",
+                                          bottom: "-8px",
+                                          left: "50%",
+                                          marginLeft: "-8px",
+                                          width: 0,
+                                          height: 0,
+                                          borderLeft: "8px solid transparent",
+                                          borderRight: "8px solid transparent",
+                                          borderTop: "8px solid rgba(255,255,255,0.88)",
+                                        }
+                                      : {
+                                          position: "absolute",
+                                          top: "24px",
+                                          ...(bubbleOnLeft
+                                            ? { right: "-8px", borderLeft: "8px solid rgba(255,255,255,0.88)" }
+                                            : { left: "-8px", borderRight: "8px solid rgba(255,255,255,0.88)" }),
+                                          width: 0,
+                                          height: 0,
+                                          borderTop: "8px solid transparent",
+                                          borderBottom: "8px solid transparent",
+                                        }
+                                  }
                                 />
                               </div>
                             </motion.div>
@@ -935,10 +980,6 @@ export default function HomePage() {
                           <motion.button
                             type="button"
                             aria-label="Tap Miomi"
-                            onPointerDown={handleMiomiPointerDown}
-                            onPointerMove={handleMiomiPointerMove}
-                            onPointerUp={handleMiomiPointerUp}
-                            onPointerCancel={handleMiomiPointerUp}
                             className="relative block cursor-pointer appearance-none border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-accent"
                           >
                             <MiomiCharacter

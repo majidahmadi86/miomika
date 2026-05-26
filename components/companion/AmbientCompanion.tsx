@@ -15,6 +15,8 @@ import { CompanionSheet } from "@/components/companion/CompanionSheet";
 import { CompanionPanel } from "@/components/companion/CompanionPanel";
 
 const HIDDEN_ROUTES = new Set<string>(["/talk", "/me"]);
+/** Full-size Miomi on stage replaces the floating orb on Home. */
+const COMPANION_BUTTON_HIDDEN = new Set<string>(["/home"]);
 
 export function AmbientCompanion() {
   const pathname = usePathname();
@@ -23,7 +25,7 @@ export function AmbientCompanion() {
   }
   return (
     <>
-      <CompanionButton />
+      {!COMPANION_BUTTON_HIDDEN.has(pathname) && <CompanionButton />}
       <CompanionSheet />
       <CompanionPanel />
     </>

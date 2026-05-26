@@ -1496,12 +1496,40 @@ Per-moment phrase libraries (5–12 variants each): CTAs, errors, transitions, l
 
 Nightly promotion cron, weekly degradation cron, Mike-only admin UI. Trigger: Phase 4.
 
+### 9.10 Phase 7+ ambient companion expansion (deferred — locked May 26 2026)
+
+Locked vision: Miomi as a cross-app pet that lives on the user's phone, not just inside the Miomika web app. Deferred until Phase 7 Rive integration and Phase 8 React Native shipping.
+
+**What's deferred (DO NOT BUILD until phases reached):**
+- Native iOS/Android home-screen widget rendering Miomi (Phase 8 — React Native required)
+- Lock-screen Miomi widget (Phase 8)
+- Always-on-display Miomi (Phase 8, Android only)
+- Miomi as a system-wide floating overlay (Phase 8+, requires Accessibility Service permissions on Android, not possible on iOS)
+- PWA install promotion as a path toward native (currently gated off /home; surfaces on /me + /dashboard only)
+
+**What's shipped in /home v3 (May 26 2026):**
+- Miomi visible at full size with breath animation
+- Autonomous wander (random drift across stage every 6–12s)
+- Long-press + drag (user can grab and place her within stage)
+- Stay-where-placed (she stays where dropped; wander resumes from new spot after 5s)
+- Tap reaction (PNG swap, scale bounce, heart particles, reactive bubble, TTS)
+- Greeting bubble anchored to her sprite (not page-level banner)
+- Fuel bars display-only (consumption logic ships with system brain)
+- /home companion button hidden (Miomi-at-full-size is the companion)
+- /home PWA install banner hidden (redundant with on-screen Miomi)
+
+**Phase 7 Rive prerequisites (do NOT attempt yet):**
+- Replace static PNG with Rive runtime when Rive artist delivers .riv file
+- Mood state machine wired to Rive inputs
+- Mike to commission/find Rive artist before Phase 7 begins
+
 ---
 
 ## 10. State Log (update at end of every session)
 
 | Date | Session | Phase | Shipped | Broken | Next |
 |------|---------|-------|---------|--------|------|
+| 2026-05-26 | Claude UI/UX architect chat — /home v3 LOCKED | /home v3 | Companion surface shipped with full DESIGN-RULES compliance: greeting bubble anchored to Miomi sprite (`w-fit` container + side/above fallback on narrow viewport), Miomi positioned upper-middle stage (32% anchor), autonomous wander loop (6–12s random drift), grab-and-place drag (stays where dropped, wander resumes after 5s), tap reaction (PNG swap + bounce + 3 heart particles + reactive bubble + TTS), fuel bars display-only with warm caption from `warmth.home.fuel.caption`, /home companion button hidden (`AmbientCompanion` + `CompanionButton`), /home PWA install banner hidden (`layout.tsx` pathname gate). Mobile drag: `touch-action: none`, 200ms/12px threshold, pointer handlers on drag wrapper. Phase 7+ cross-app native widget vision documented in §9.10. SCREENS.md §Surface 1 LOCKED. | Fuel consumption wiring deferred to system-brain phase. Native home-screen widget deferred to Phase 8 React Native. Cross-app overlay Phase 8+. Drag on real A52 — Mike to verify. | System brain (next big work) — engine that owns fuel consumption, conversation routing, journey-stage adaptation. |
 | 2026-05-26 | Cursor Composer 2.5 — /home ambient v2 | /home ambient v2 | Miomi anchor repositioned to upper 36% of stage (clear of fuel bars + CTA). Autonomous wander via `useMotionValue` + `animate()` every 6–12s, ±25%/±15% bounds, 3–4s easeInOut drift. Grab-and-place: drag end keeps position (spring-back removed); wander resumes after 5s stillness + 2s post-reaction pause. Tap/drag reactions, breath, fuel, bubbles untouched. tsc: PASS, lint: PASS (23 warnings), build: PASS. | — | Mike rates; if ≥9 → /home locked, system brain. |
 | 2026-05-26 | Cursor Sonnet 4.5 — /home polish (bubble + ambient + fuel caption) | /home polish | Double-bubble fix: greeting gated on `!isGuest`, guest-CTA pill from `warmth.home.guest.pill()` at stage top; speech bubble repositioned beside Miomi head with 8px tail + glass styling + 4s/3.2s auto-fade. Ambient interactivity: tap → `home.react.tap()` + happy PNG + 280ms scale bounce + 3 heart particles + TTS; long-press 300ms + 8px move → thinking PNG + FM drag (±30%/±15%) + spring return + `home.react.drag()`. Fuel bars preserved; warm caption from new `home.fuel.caption()`. PNGs: full-body `/miomi/idle.png`, `happy.png`, `thinking.png`. tsc: PASS, lint: PASS (23 warnings), build: PASS. | — | Mike A52 smoke: guest pill only / logged-in greeting beside head + tap + drag. |
 | 2026-05-26 | Cursor Sonnet 4.5 — /home polish v1 + /me verify | /home polish | Surgical `/home` on restored 7/10 page: guest greeting suppressed (`!isGuest` + 4s fade for logged-in); guest-CTA pill from `warmth.home.guest.pill()`; tap Miomi → `home.react.tap()` + happy PNG + scale bounce + 3 heart particles + TTS if `miomika.tts_on`; long-press 300ms + 8px drag → thinking PNG + FM drag within stage ±30%/±15% + spring back + `home.react.drag()`; fake local Lv/XP bar removed from fuel strip (localStorage pet stats only). `/me` identity sheets already wired (avatar + name row). warmth `home.react.*` already present — no duplicate. PNGs: `/miomi/idle.png`, `happy.png`, `thinking.png`. tsc: PASS, lint: PASS (26 warnings), build: PASS. | Pet level-up logic still runs internally but Lv UI removed. | Mike A52 smoke: guest pill only / logged-in greeting + tap + drag. |

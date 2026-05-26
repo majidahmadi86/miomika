@@ -349,7 +349,7 @@ function AppLayoutInner({
           {children}
         </SwipeNavigator>
         <BottomNav />
-        {pathname !== "/talk" && <InstallPrompt />}
+        {pathname !== "/talk" && pathname !== "/home" && <InstallPrompt />}
         <AmbientCompanion />
         <GuidanceHost />
       </div>
