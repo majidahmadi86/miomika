@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
+import { motion, useDragControls, useMotionValue, useReducedMotion, animate, AnimatePresence } from "framer-motion";
 import { Coffee, Heart, Zap, type LucideIcon } from "lucide-react";
 import {
   useCallback,
@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils";
 import { useCompanionStore } from "@/lib/companion/store";
 import { home } from "@/lib/voice/warmth";
 import { detectLang, speak } from "@/lib/voice/tts";
+import { useHomeWhisper } from "@/lib/guidance/use-home-whisper";
+import { useInstallBannerStore } from "@/lib/ui/install-banner-store";
 import type { Language } from "@/lib/i18n/server";
 import dynamic from "next/dynamic";
 
@@ -754,6 +756,10 @@ export default function HomePage() {
   const bubbleEn = bubbleText ? "" : bubble.en;
   const miomiExpression = sleeping ? "idle" : miomiMood;
   const resolvedFuelCaption = useMemo(() => home.fuel.caption(uiLang), [uiLang]);
+  const installBannerVisible = useInstallBannerStore((s) => s.visible);
+  const homeWhisper = useHomeWhisper();
+  const showWhisperCard = !installBannerVisible;
+  const whisperPhrase = homeWhisper?.text ?? DAILY_CHALLENGE.phrase;
 
   return (
     <>
@@ -1048,64 +1054,75 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* MIOMI'S PICK — collapsed by default */}
-            <button
-              type="button"
-              onClick={() => setMeaningExpanded((v) => !v)}
-              style={{
-                display: "flex", alignItems: "center", gap: "10px",
-                height: meaningExpanded ? "auto" : "44px", minHeight: "44px",
-                flexShrink: 0, background: "#FDF8EE",
-                borderLeft: "3px solid #C9A96E",
-                padding: meaningExpanded ? "10px 16px" : "0 16px",
-                textAlign: "left", cursor: "pointer",
-                transition: "height 0.25s ease", width: "100%",
-                borderTop: "none", borderRight: "none", borderBottom: "none",
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.10em", color: "#C9A96E", textTransform: "uppercase", flexShrink: 0 }}>
-                    ✦ MIOMI&apos;S PICK
-                  </span>
-                  <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {DAILY_CHALLENGE.phrase}
-                  </span>
-                  <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#9A8B73", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }}>
-                    — {DAILY_CHALLENGE.th}
-                  </span>
-                </div>
-                {meaningExpanded && (
-                  <div style={{ marginTop: "8px" }}>
-                    <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#6B7280", lineHeight: 1.6, marginBottom: "10px" }}>
-                      {DAILY_CHALLENGE.meaning}
-                    </p>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      {authReady && isGuest ? (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleGuestCreatePress(); }}
-                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", border: "none", cursor: "pointer" }}
-                        >
-                          ฝึกเลย
-                        </button>
-                      ) : (
-                        <Link
-                          href="/create"
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", textDecoration: "none" }}
-                        >
-                          ฝึกเลย
-                        </Link>
-                      )}
+            {/* MIOMI'S PICK — whisper card; hidden while install banner is visible */}
+            <AnimatePresence initial={false}>
+              {showWhisperCard ? (
+                <motion.button
+                  key="home-whisper-card"
+                  type="button"
+                  onClick={() => setMeaningExpanded((v) => !v)}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12, transition: { duration: 0.36, ease: "easeIn" } }}
+                  transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "10px",
+                    height: meaningExpanded ? "auto" : "44px", minHeight: "44px",
+                    flexShrink: 0, background: "#FDF8EE",
+                    borderLeft: "3px solid #C9A96E",
+                    padding: meaningExpanded ? "10px 16px" : "0 16px",
+                    textAlign: "left", cursor: "pointer",
+                    width: "100%",
+                    borderTop: "none", borderRight: "none", borderBottom: "none",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.10em", color: "#C9A96E", textTransform: "uppercase", flexShrink: 0 }}>
+                        ✦ MIOMI&apos;S PICK
+                      </span>
+                      <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {whisperPhrase}
+                      </span>
+                      {!homeWhisper ? (
+                        <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#9A8B73", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }}>
+                          — {DAILY_CHALLENGE.th}
+                        </span>
+                      ) : null}
                     </div>
+                    {meaningExpanded && !homeWhisper ? (
+                      <div style={{ marginTop: "8px" }}>
+                        <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#6B7280", lineHeight: 1.6, marginBottom: "10px" }}>
+                          {DAILY_CHALLENGE.meaning}
+                        </p>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          {authReady && isGuest ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleGuestCreatePress(); }}
+                              style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", border: "none", cursor: "pointer" }}
+                            >
+                              ฝึกเลย
+                            </button>
+                          ) : (
+                            <Link
+                              href="/create"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", textDecoration: "none" }}
+                            >
+                              ฝึกเลย
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                )}
-              </div>
-              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", color: "#C9A96E", flexShrink: 0, transition: "transform 0.25s ease", transform: meaningExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
-                ▾
-              </span>
-            </button>
+                  <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", color: "#C9A96E", flexShrink: 0, transition: "transform 0.25s ease", transform: meaningExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
+                    ▾
+                  </span>
+                </motion.button>
+              ) : null}
+            </AnimatePresence>
 
             {/* Action row */}
             <div style={{ display: "grid", gridTemplateColumns: "48px 48px 1fr", gap: "10px", padding: "10px 16px 12px", flexShrink: 0, alignItems: "center" }}>
