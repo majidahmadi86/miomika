@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Flame, Hand, Heart, Mic, Sparkles, Zap } from "lucide-react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
+import { MiomiAlive } from "@/components/miomi/MiomiAlive";
 import { MiomiBubble } from "@/components/miomi/MiomiBubble";
-import { MiomiStage, type MiomiMood } from "@/components/miomi/MiomiStage";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { useProfile } from "@/lib/auth/use-profile";
-import { useHomeWhisper } from "@/lib/guidance/use-home-whisper";
 import { useSessionState } from "@/lib/ai/use-session-state";
+import { useHomeWhisper } from "@/lib/guidance/use-home-whisper";
 import { useUILanguage } from "@/lib/i18n/client";
 import { home } from "@/lib/voice/warmth";
 import { speak } from "@/lib/voice/tts";
@@ -18,20 +18,53 @@ import { speak } from "@/lib/voice/tts";
 const CARD_SHADOW =
   "0 1px 2px rgba(26, 26, 24, 0.04), 0 4px 16px rgba(26, 26, 24, 0.06), 0 0 0 1px rgba(237, 232, 224, 0.6)";
 
-const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
-
-function readGuestExchanges(): number {
-  if (typeof window === "undefined") return 0;
-  const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
-  const parsed = stored ? parseInt(stored, 10) : 0;
-  return !isNaN(parsed) && parsed > 0 ? parsed : 0;
-}
-
-function daysSince(iso: string | null | undefined): number {
+function daysSinceSignup(iso: string | null | undefined): number {
   if (!iso) return 0;
   const t = new Date(iso).getTime();
   if (!Number.isFinite(t)) return 0;
   return Math.max(0, Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24)));
+}
+
+function GlassChip({
+  children,
+  onClick,
+  ariaLabel,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  ariaLabel?: string;
+}) {
+  const shell: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    background: "rgba(255, 255, 255, 0.6)",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    border: "1px solid #EDE8E0",
+    borderRadius: 999,
+    padding: "4px 10px",
+    boxShadow: CARD_SHADOW,
+  };
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={ariaLabel}
+        style={{ ...shell, cursor: "pointer", padding: "4px 10px" }}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return <div style={shell}>{children}</div>;
+}
+
+function chipValue(raw: number | undefined): number {
+  return Math.round(raw ?? 100);
 }
 
 export default function HomePage() {
@@ -42,89 +75,77 @@ export default function HomePage() {
   const session = useSessionState();
   const whisper = useHomeWhisper();
 
+  const [miomiSize, setMiomiSize] = useState(280);
   const [bubbleText, setBubbleText] = useState("");
   const [bubbleVisible, setBubbleVisible] = useState(false);
-  const [guestExchanges] = useState(readGuestExchanges);
+  const [bubbleAutoHideMs, setBubbleAutoHideMs] = useState(4000);
   const greetedRef = useRef(false);
-  const ttsMountedRef = useRef(true);
 
   const streakDays = profile?.streak ?? session.streak_days ?? 0;
-  const heartFuel = session.fuel.heart ?? 0;
-  const zapFuel = session.fuel.zap ?? 0;
-  const brainFuel = session.fuel.brain ?? 0;
-  const isFirstDay =
-    daysSince(profile?.onboarding_completed_at ?? null) === 0 && streakDays === 0;
+  const heartFuel = session.fuel.heart;
+  const zapFuel = session.fuel.zap;
+  const brainFuel = session.fuel.brain;
+  const isFirstDay = daysSinceSignup(profile?.onboarding_completed_at ?? null) === 0;
 
-  /* eslint-disable react-hooks/purity -- time-relative mood derived from profile */
-  const derivedMood: MiomiMood = useMemo(() => {
-    if (isGuest && guestExchanges >= 4) return "low-fuel";
-    if (profile?.last_seen_at) {
-      const hours =
-        (Date.now() - new Date(profile.last_seen_at).getTime()) / (1000 * 60 * 60);
-      if (hours > 24) return "missing-user";
-    }
-    if (streakDays >= 7 && streakDays % 7 === 0) return "excited";
-    return "idle";
-  }, [isGuest, guestExchanges, profile?.last_seen_at, streakDays]);
-  /* eslint-enable react-hooks/purity */
+  useEffect(() => {
+    const update = () => setMiomiSize(window.innerWidth >= 400 ? 320 : 280);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const maybeSpeak = useCallback(
     (text: string) => {
       if (typeof window === "undefined") return;
       if (window.localStorage.getItem("miomika.tts_on") !== "1") return;
-      void speak(text, uiLang, {
-        onEnd: () => {},
-        onError: () => {},
-      });
+      void speak(text, uiLang, { onEnd: () => {}, onError: () => {} });
     },
     [uiLang],
   );
 
-  useEffect(() => {
-    ttsMountedRef.current = true;
-    return () => {
-      ttsMountedRef.current = false;
-    };
-  }, []);
-
-  /* eslint-disable react-hooks/set-state-in-effect -- session greeting on mount */
-  useEffect(() => {
-    if (!authReady || greetedRef.current) return;
-    if (isGuest) return;
-    greetedRef.current = true;
-    const text = home.greeting.pick(uiLang, {
-      streakDays,
-      lastSeenAt: profile?.last_seen_at ?? null,
-      isFirstDay,
-    });
-    setBubbleText(text);
-    setBubbleVisible(true);
-  }, [authReady, isGuest, uiLang, streakDays, profile?.last_seen_at, isFirstDay]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
   const showBubble = useCallback(
-    (text: string, speakIt = true) => {
+    (text: string, hideMs: number, speakIt = true) => {
       setBubbleText(text);
+      setBubbleAutoHideMs(hideMs);
       setBubbleVisible(true);
       if (speakIt) maybeSpeak(text);
     },
     [maybeSpeak],
   );
 
+  useEffect(() => {
+    if (!authReady || greetedRef.current || isGuest || !profile) return;
+    const id = window.setTimeout(() => {
+      greetedRef.current = true;
+      const text = home.greeting.pick(uiLang, {
+        streakDays,
+        lastSeenAt: profile.last_seen_at ?? null,
+        isFirstDay,
+      });
+      setBubbleText(text);
+      setBubbleAutoHideMs(4000);
+      setBubbleVisible(true);
+    }, 800);
+    return () => window.clearTimeout(id);
+  }, [authReady, isGuest, profile, uiLang, streakDays, isFirstDay]);
+
   const handleTap = useCallback(() => {
     if (isGuest) return;
-    showBubble(home.react.tap(uiLang));
+    showBubble(home.react.tap(uiLang), 3200);
   }, [isGuest, showBubble, uiLang]);
 
   const handleDragEnd = useCallback(() => {
     if (isGuest) return;
-    showBubble(home.react.drag(uiLang));
+    showBubble(home.react.drag(uiLang), 3200);
   }, [isGuest, showBubble, uiLang]);
 
   const handleFuelTap = useCallback(() => {
     if (isGuest) return;
-    const low = heartFuel < 25 || zapFuel < 25 || brainFuel < 25;
-    showBubble(low ? home.react.lowFuel(uiLang) : home.react.tap(uiLang));
+    const low =
+      chipValue(heartFuel) < 25 ||
+      chipValue(zapFuel) < 25 ||
+      chipValue(brainFuel) < 25;
+    showBubble(low ? home.react.lowFuel(uiLang) : home.react.tap(uiLang), 3200);
   }, [brainFuel, heartFuel, isGuest, showBubble, uiLang, zapFuel]);
 
   const handleWhisperTap = useCallback(() => {
@@ -138,33 +159,42 @@ export default function HomePage() {
       <div
         style={{
           minHeight: "100svh",
-          height: "100%",
+          height: "100svh",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
           background: "linear-gradient(180deg, #FEFCF7 0%, #FDFAF2 100%)",
-          paddingBottom: "80px",
         }}
       >
+        <style>{`
+          @keyframes miomi-mic-pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+          }
+          .miomi-mic-pulse {
+            animation: miomi-mic-pulse 2.4s ease-in-out infinite;
+          }
+        `}</style>
+
         {/* Region 1 — Sky */}
         <div
           style={{
-            height: "56px",
-            padding: "16px 24px",
+            height: 56,
+            padding: "12px 20px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexShrink: 0,
           }}
         >
-          <div style={{ minWidth: "48px" }}>
+          <div style={{ minWidth: 48 }}>
             {!isGuest && streakDays >= 2 ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                <Flame size={16} strokeWidth={2} color="#C9A96E" />
+              <GlassChip>
+                <Flame size={14} strokeWidth={2} color="#C9A96E" />
                 <span
                   style={{
                     fontFamily: "'Quicksand', sans-serif",
-                    fontSize: "13px",
+                    fontSize: 13,
                     lineHeight: "18px",
                     fontWeight: 600,
                     color: "#1A1A18",
@@ -172,7 +202,7 @@ export default function HomePage() {
                 >
                   {streakDays}
                 </span>
-              </div>
+              </GlassChip>
             ) : null}
           </div>
 
@@ -181,120 +211,71 @@ export default function HomePage() {
               href="/signup"
               style={{
                 flex: 1,
-                margin: "0 12px",
+                marginLeft: 12,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                padding: "8px 16px",
-                background: "rgba(255, 255, 255, 0.85)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid #EDE8E0",
-                borderRadius: "16px",
-                boxShadow: CARD_SHADOW,
                 textDecoration: "none",
               }}
             >
-              <span
-                style={{
-                  fontFamily: "'Kanit', 'Quicksand', sans-serif",
-                  fontSize: "13px",
-                  lineHeight: "18px",
-                  fontWeight: 500,
-                  color: "#1A1A18",
-                }}
-              >
-                {home.guest.pill(uiLang)}
-              </span>
+              <GlassChip>
+                <span
+                  style={{
+                    fontFamily: "'Kanit', 'Quicksand', sans-serif",
+                    fontSize: 13,
+                    lineHeight: "18px",
+                    fontWeight: 500,
+                    color: "#1A1A18",
+                  }}
+                >
+                  {home.guest.pill(uiLang)}
+                </span>
+              </GlassChip>
             </Link>
           ) : (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <button
-                type="button"
-                onClick={handleFuelTap}
-                aria-label="Heart fuel"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                <Heart size={16} strokeWidth={2} color="#DB2777" />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <GlassChip onClick={handleFuelTap} ariaLabel="Heart fuel">
+                <Heart size={14} strokeWidth={2} color="#DB2777" />
                 <span
                   style={{
                     fontFamily: "'Quicksand', sans-serif",
-                    fontSize: "13px",
+                    fontSize: 13,
                     lineHeight: "18px",
                     fontWeight: 600,
                     color: "#1A1A18",
                   }}
                 >
-                  {Math.round(heartFuel)}
+                  {chipValue(heartFuel)}
                 </span>
-              </button>
-              <button
-                type="button"
-                onClick={handleFuelTap}
-                aria-label="Zap fuel"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                <Zap size={16} strokeWidth={2} color="#C9A96E" />
+              </GlassChip>
+              <GlassChip onClick={handleFuelTap} ariaLabel="Zap fuel">
+                <Zap size={14} strokeWidth={2} color="#C9A96E" />
                 <span
                   style={{
                     fontFamily: "'Quicksand', sans-serif",
-                    fontSize: "13px",
+                    fontSize: 13,
                     lineHeight: "18px",
                     fontWeight: 600,
                     color: "#1A1A18",
                   }}
                 >
-                  {Math.round(zapFuel)}
+                  {chipValue(zapFuel)}
                 </span>
-              </button>
-              <button
-                type="button"
-                onClick={handleFuelTap}
-                aria-label="Brain fuel"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                <Sparkles size={16} strokeWidth={2} color="#7DD3C0" />
+              </GlassChip>
+              <GlassChip onClick={handleFuelTap} ariaLabel="Brain fuel">
+                <Sparkles size={14} strokeWidth={2} color="#7DD3C0" />
                 <span
                   style={{
                     fontFamily: "'Quicksand', sans-serif",
-                    fontSize: "13px",
+                    fontSize: 13,
                     lineHeight: "18px",
                     fontWeight: 600,
                     color: "#1A1A18",
                   }}
                 >
-                  {Math.round(brainFuel)}
+                  {chipValue(brainFuel)}
                 </span>
-              </button>
+              </GlassChip>
             </div>
           )}
         </div>
@@ -307,15 +288,13 @@ export default function HomePage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            overflow: "visible",
             minHeight: 0,
-            maxHeight: "480px",
-            height: "55svh",
           }}
         >
           <div style={{ position: "relative" }}>
-            <MiomiStage
-              size={280}
-              mood={derivedMood}
+            <MiomiAlive
+              size={miomiSize}
               onTap={handleTap}
               onDragEnd={handleDragEnd}
             />
@@ -323,8 +302,8 @@ export default function HomePage() {
               <MiomiBubble
                 text={bubbleText}
                 visible={bubbleVisible}
-                position="top-right"
-                autoHideMs={4000}
+                autoHideMs={bubbleAutoHideMs}
+                offsetSide="right"
                 onHide={() => setBubbleVisible(false)}
               />
             ) : null}
@@ -335,7 +314,7 @@ export default function HomePage() {
         {whisper ? (
           <div
             style={{
-              margin: "0 24px 16px",
+              margin: "0 24px",
               display: "flex",
               justifyContent: "center",
             }}
@@ -346,15 +325,15 @@ export default function HomePage() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "12px",
-                maxWidth: "280px",
+                gap: 10,
+                maxWidth: 280,
                 width: "100%",
                 padding: "12px 16px",
                 background: "rgba(255, 255, 255, 0.7)",
                 backdropFilter: "blur(20px)",
                 WebkitBackdropFilter: "blur(20px)",
                 border: "1px solid rgba(237, 232, 224, 0.6)",
-                borderRadius: "12px",
+                borderRadius: 12,
                 boxShadow: CARD_SHADOW,
                 cursor: "pointer",
                 textAlign: "left",
@@ -364,7 +343,7 @@ export default function HomePage() {
               <span
                 style={{
                   fontFamily: "'Kanit', 'Quicksand', sans-serif",
-                  fontSize: "14px",
+                  fontSize: 14,
                   lineHeight: "20px",
                   fontWeight: 600,
                   color: "#1A1A18",
@@ -379,26 +358,40 @@ export default function HomePage() {
         {/* Region 4 — Mic hint */}
         <div
           style={{
-            marginBottom: "16px",
+            height: 80,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "6px",
+            paddingBottom: 12,
             flexShrink: 0,
           }}
         >
-          <Mic size={14} color="#9A8B73" strokeWidth={1.75} />
-          <span
+          <div
             style={{
-              fontFamily: "'Quicksand', sans-serif",
-              fontSize: "12px",
-              lineHeight: "16px",
-              fontWeight: 500,
-              color: "#9A8B73",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              pointerEvents: "none",
             }}
           >
-            {home.mic.hint(uiLang)}
-          </span>
+            <Mic
+              size={14}
+              color="#9A8B73"
+              strokeWidth={1.75}
+              className="miomi-mic-pulse"
+            />
+            <span
+              style={{
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: 12,
+                lineHeight: "16px",
+                fontWeight: 500,
+                color: "#9A8B73",
+              }}
+            >
+              {home.mic.hint(uiLang)}
+            </span>
+          </div>
         </div>
       </div>
     </>

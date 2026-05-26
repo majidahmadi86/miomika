@@ -9,27 +9,27 @@ const CARD_SHADOW =
 interface MiomiBubbleProps {
   text: string;
   visible: boolean;
-  position?: "top-left" | "top-right";
   autoHideMs?: number;
   onHide?: () => void;
+  offsetTop?: number;
+  offsetSide?: "left" | "right";
 }
 
 export function MiomiBubble({
   text,
   visible,
-  position = "top-right",
   autoHideMs = 4000,
   onHide,
+  offsetTop = 24,
+  offsetSide = "right",
 }: MiomiBubbleProps) {
   useEffect(() => {
     if (!visible || autoHideMs <= 0) return;
-    const id = window.setTimeout(() => {
-      onHide?.();
-    }, autoHideMs);
+    const id = window.setTimeout(() => onHide?.(), autoHideMs);
     return () => window.clearTimeout(id);
   }, [visible, autoHideMs, onHide, text]);
 
-  const isLeft = position === "top-left";
+  const tailOnRight = offsetSide === "right";
 
   return (
     <AnimatePresence>
@@ -41,13 +41,13 @@ export function MiomiBubble({
           exit={{ opacity: 0, y: -4 }}
           transition={{
             duration: 0.24,
-            ease: [0, 0, 0.2, 1],
+            ease: [0.4, 0, 0.2, 1],
           }}
           style={{
             position: "absolute",
-            top: "8px",
-            ...(isLeft ? { left: "8px" } : { right: "8px" }),
-            maxWidth: "220px",
+            top: offsetTop,
+            ...(tailOnRight ? { right: 0 } : { left: 0 }),
+            maxWidth: 220,
             zIndex: 20,
             pointerEvents: "none",
           }}
@@ -55,19 +55,34 @@ export function MiomiBubble({
           <div
             style={{
               position: "relative",
-              background: "rgba(255, 255, 255, 0.85)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
+              background: "rgba(255, 255, 255, 0.88)",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
               border: "1px solid #EDE8E0",
-              borderRadius: "16px",
-              padding: "12px 16px",
+              borderRadius: 16,
+              padding: "10px 14px",
               boxShadow: CARD_SHADOW,
             }}
           >
+            <span
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: 16,
+                ...(tailOnRight ? { right: -8 } : { left: -8 }),
+                width: 0,
+                height: 0,
+                borderTop: "6px solid transparent",
+                borderBottom: "6px solid transparent",
+                ...(tailOnRight
+                  ? { borderLeft: "8px solid rgba(255, 255, 255, 0.88)" }
+                  : { borderRight: "8px solid rgba(255, 255, 255, 0.88)" }),
+              }}
+            />
             <p
               style={{
                 fontFamily: "'Kanit', 'Quicksand', sans-serif",
-                fontSize: "14px",
+                fontSize: 14,
                 lineHeight: "20px",
                 fontWeight: 500,
                 color: "#1A1A18",
@@ -76,20 +91,6 @@ export function MiomiBubble({
             >
               {text}
             </p>
-            <span
-              aria-hidden
-              style={{
-                position: "absolute",
-                bottom: "-8px",
-                ...(isLeft ? { left: "24px" } : { right: "24px" }),
-                width: 0,
-                height: 0,
-                borderLeft: "8px solid transparent",
-                borderRight: "8px solid transparent",
-                borderTop: "8px solid rgba(255, 255, 255, 0.85)",
-                filter: "drop-shadow(0 1px 0 #EDE8E0)",
-              }}
-            />
           </div>
         </motion.div>
       ) : null}
