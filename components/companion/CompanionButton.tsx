@@ -14,7 +14,6 @@ import Image from "next/image";
 import { motion, useAnimate } from "framer-motion";
 import { useEffect, useCallback } from "react";
 import { useCompanionStore } from "@/lib/companion/store";
-import { useInstallBannerStore } from "@/lib/ui/install-banner-store";
 import { useUILanguage } from "@/lib/i18n/client";
 import { tr } from "@/lib/i18n/strings";
 import type { MiomiAnimationState } from "@/lib/companion/types";
@@ -44,7 +43,6 @@ export function CompanionButton() {
   const isOpen = useCompanionStore((s) => s.isOpen);
   const open = useCompanionStore((s) => s.open);
   const hasUnread = useCompanionStore((s) => s.hasUnread);
-  const installBannerVisible = useInstallBannerStore((s) => s.visible);
   const lang = useUILanguage();
   const [scope, animate] = useAnimate();
 
@@ -114,45 +112,39 @@ export function CompanionButton() {
   const dot = DOT_COLOR[state];
 
   return (
-    <motion.div
-      animate={{ y: installBannerVisible ? -80 : 0 }}
-      transition={{ type: "spring", stiffness: 240, damping: 16 }}
+    <motion.button
+      ref={scope}
+      type="button"
+      onClick={open}
+      aria-label={tr("companion_aria", lang)}
+      whileTap={{ scale: 0.94 }}
       style={{
         position: "fixed",
         right: "16px",
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
+        bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)",
         zIndex: 60,
-      }}
-    >
-      <motion.button
-        ref={scope}
-        type="button"
-        onClick={open}
-        aria-label={tr("companion_aria", lang)}
-        whileTap={{ scale: 0.94 }}
-        style={{
-          width: "56px",
-          height: "56px",
-          padding: 0,
-          borderRadius: "50%",
-          background: "#FFFFFF",
-          border: "none",
-          boxShadow: `
+        width: "56px",
+        height: "56px",
+        padding: 0,
+        borderRadius: "50%",
+        background: "#FFFFFF",
+        border: "none",
+        boxShadow: `
           0 10px 24px -4px rgba(26,26,24,0.18),
           0 4px 8px -2px rgba(26,26,24,0.08),
           0 0 0 1px rgba(255,255,255,0.85),
           inset 0 0 0 1px rgba(237,232,224,0.6)
         `,
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "visible",
-          transform: "translateZ(0)",
-        }}
-      >
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "visible",
+        transform: "translateZ(0)",
+      }}
+    >
       <span
         style={{
           display: "flex",
@@ -200,7 +192,6 @@ export function CompanionButton() {
           />
         </>
       ) : null}
-      </motion.button>
-    </motion.div>
+    </motion.button>
   );
 }

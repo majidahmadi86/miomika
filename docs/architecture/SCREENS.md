@@ -21,41 +21,26 @@ Talk is the AI brain. Every other surface either feeds into Talk (Dashboard gene
 
 ## Surface 1: HOME
 
-**Status: LOCKED at v3 — May 26 2026.** Do not modify without explicit founder approval.
-
 **What it is (Mike's words):** A place users can play, feed, relax, take, track what they need to do.
 
 **Primary feeling:** warm, alive, "she's happy I'm here."
 
-### Mandatory anatomy (shipped v3)
-
-- **Miomi sprite** — full-body PNG at upper-middle stage (~32% from top), breath animation, autonomous wander (6–12s random drift), grab-and-place drag (stays where dropped; wander resumes after 5s)
-- **Greeting / reactive bubble** — anchored to Miomi sprite (beside head on wide viewport; above head on narrow 375px), tail pointing at her; from `lib/voice/warmth.ts` `home.greeting.*` / `home.react.*`
-- **Guest CTA pill** — guests only, top of stage (`home.guest.pill()`); no greeting bubble for guests
-- **Fuel bars** — heart / energy / hunger display-only + warm caption (`home.fuel.caption()`)
-- **MIOMI'S PICK whisper card** — collapsed daily phrase strip
-- **Bottom Talk-to-Miomi CTA** — honey-gold pill opens companion sheet (not /talk route)
-- **Companion floating button HIDDEN** — full-size stage Miomi is the companion
-- **PWA install prompt HIDDEN** — redundant with on-screen Miomi; surfaces on /me + /dashboard only
-
-### What lives here (behavioral)
-
-- Tap Miomi → happy PNG, scale bounce, heart particles, reactive bubble, TTS if on
-- Long-press + drag → thinking PNG, grab-and-place within stage bounds
-- Idle wander when not dragged or reacting
-- Ambient background particles (unchanged)
+**What lives here:**
+- Persistent Miomi character (large, animated, mood-driven)
+- Daily greeting from Miomi (ice-breaker from `lib/voice/warmth.ts`)
+- Light "what's waiting for you today" affordances (NOT a dashboard — just gentle reminders: "3 words to practice", "1 draft pending")
+- Quick-action verbs as soft tiles users can ignore (Teach, Translate, Write, Just-chat)
+- Streak indicator (subtle, celebratory, never punitive)
+- Companion idle behaviors (breathing, occasional reactions, ambient presence)
 
 **What MUST NOT be here:**
-
-- Dashboard-style stats dominant in layout
+- Dashboard-style stats
+- Fuel bars dominant in layout (those move to Profile or appear contextually)
+- Verb tiles dominant in layout — Miomi must be the dominant element
 - Pricing pressure
-- Floating 56px companion orb (hidden)
-- PWA "Add to home screen" banner (hidden)
 - Cold metrics
 
 **Conversion role:** Day 1-3 sessions live here. Build the bond. No money pressure.
-
-**Phase 7+ deferred:** Native home-screen widget, lock-screen widget, always-on Miomi, system-wide overlay — see `/MIOMIKA.md` §9.10. Rive runtime replaces PNG in Phase 7. Fuel consumption wiring deferred to system-brain phase.
 
 ---
 
