@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { log, logError } from "@/lib/debug/log";
+import {
+  clearRedirectTo,
+  readRedirectTo,
+} from "@/lib/auth/redirect-to";
 
 /**
  * Celebration screen shown immediately after sign-up.
@@ -84,11 +88,33 @@ export default function OnboardingPage() {
         window.dispatchEvent(new Event("miomika:profile-refresh"));
       }
 
-      // 5. Hold the celebration for 3 seconds, then route to /home.
-      window.setTimeout(() => {
+      // 5. Hold the celebration for 3 seconds, then route onward.
+      window.setTimeout(async () => {
         if (cancelled) return;
-        log("onboarding", "celebration done, routing to /home");
-        router.replace("/home?celebrate=signup");
+        const storedRedirect = readRedirectTo();
+        let destination = "/home?celebrate=signup";
+
+        if (storedRedirect) {
+          destination = storedRedirect;
+          clearRedirectTo();
+        } else {
+          try {
+            const res = await fetch("/api/auth/post-signup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({}),
+            });
+            if (res.ok) {
+              const data = (await res.json()) as { redirect_to?: string };
+              if (data.redirect_to) destination = data.redirect_to;
+            }
+          } catch (e) {
+            logError("onboarding", "post-signup fetch failed", e);
+          }
+        }
+
+        log("onboarding", "celebration done, routing", { destination });
+        router.replace(destination);
       }, 3000);
     }
 

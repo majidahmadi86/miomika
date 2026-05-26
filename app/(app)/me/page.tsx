@@ -5,20 +5,35 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   Bell,
+  Brain,
   ChevronLeft,
   ChevronRight,
-  Edit2,
+  Download,
   Globe,
-  MapPin,
+  Heart,
+  HelpCircle,
+  MessageCircle,
+  MessageSquare,
   Mic,
+  Newspaper,
+  Palette,
+  RefreshCcw,
+  Sparkle,
   Sparkles,
+  Star,
+  User,
   Volume2,
 } from "lucide-react";
 import { useProfile } from "@/lib/auth/use-profile";
+import {
+  storeRedirectTo,
+} from "@/lib/auth/redirect-to";
 import { useUILanguage } from "@/lib/i18n/client";
 import { createClient } from "@/lib/supabase/client";
 import { COLORS, CTA_GRADIENT } from "@/lib/design/colors";
+import { loadTalkConfig, MODE_META } from "@/lib/talk/modes";
 import { me } from "@/lib/voice/warmth";
 
 const CARD_SHADOW =
@@ -28,20 +43,19 @@ const CTA_SHADOW =
 const AVATAR_SHADOW =
   "0 4px 16px rgba(26, 26, 24, 0.06), 0 0 0 1px rgba(237, 232, 224, 1)";
 const FONT = "'Kanit', 'Quicksand', sans-serif";
+const SOUNDS_KEY = "miomika.sounds_on";
 
-type JourneyStage = "tourist" | "student" | "worker" | "resident" | "entrepreneur" | "unspecified";
-
-function capitalizeStage(stage: string): string {
-  if (!stage || stage === "unspecified") return "Student";
-  return stage.charAt(0).toUpperCase() + stage.slice(1);
-}
-
-function daysWithMiomi(onboardingAt: string | null, lastSeenAt: string | null): number {
-  const start = onboardingAt ?? lastSeenAt;
-  if (!start) return 0;
-  const diff = Date.now() - new Date(start).getTime();
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
-}
+// Phase 3B: wire real progress data from vocabulary_user_state + conversations table.
+type ExtendedProfile = ReturnType<typeof useProfile>["profile"] & {
+  avatar_url?: string | null;
+  cefr_level?: string | null;
+  cefr_progress_pct?: number | null;
+  words_mastered_count?: number | null;
+  streak_days?: number | null;
+  conversation_count?: number | null;
+  premium_voice_credits?: number | null;
+  miomi_warmth?: "soft" | "balanced" | "playful" | null;
+};
 
 function tierLabel(tier: string): string {
   if (tier === "pro_max") return "Miomika Pro Max";
@@ -49,91 +63,117 @@ function tierLabel(tier: string): string {
   return "Miomika Free";
 }
 
-function tierSummary(tier: string): string {
-  if (tier === "pro_max") return "Premium engine, unlimited memory";
-  if (tier === "pro") return "Priority AI, 20 sessions memory";
-  return "Unlimited library, daily fuel limits";
+function planSummary(tier: string, lang: "th" | "en"): string {
+  if (tier === "pro_max") return me.plan.promax.summary(lang);
+  if (tier === "pro") return me.plan.pro.summary(lang);
+  return me.plan.free.summary(lang);
+}
+
+function daysTogether(onboardingAt: string | null): number {
+  if (!onboardingAt) return 0;
+  const diff = Date.now() - new Date(onboardingAt).getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
+function readTalkModeLabel(lang: "th" | "en"): string {
+  const config = loadTalkConfig();
+  const meta = MODE_META[config.mode];
+  return lang === "en" ? meta.en : meta.th;
+}
+
+function readWarmthLabel(
+  warmth: ExtendedProfile["miomi_warmth"],
+  lang: "th" | "en",
+): string {
+  if (warmth === "soft") return me.bond.warmthOptions.soft(lang);
+  if (warmth === "playful") return me.bond.warmthOptions.playful(lang);
+  return me.bond.warmthOptions.balanced(lang);
+}
+
+function formatStat(value: number | null | undefined, hasField: boolean): string {
+  if (!hasField) return "—";
+  return String(value ?? 0);
+}
+
+function buildFeedbackMailto(displayName: string, tier: string): string {
+  const subject = encodeURIComponent(`Feedback from /me — ${displayName}`);
+  const body = encodeURIComponent(
+    `Tier: ${tier}\nUser agent: ${typeof navigator !== "undefined" ? navigator.userAgent : "unknown"}\n\n`,
+  );
+  return `mailto:hello@miomika.com?subject=${subject}&body=${body}`;
+}
+
+function buildSupportMailto(): string {
+  return "mailto:hello@miomika.com?subject=" + encodeURIComponent("Support request");
 }
 
 export default function MePage() {
   const router = useRouter();
   const uiLang = useUILanguage();
-  const { profile, authReady } = useProfile();
+  const { profile: rawProfile, authReady } = useProfile();
+  const profile = rawProfile as ExtendedProfile | null;
+
   const [canGoBack] = useState(
     () => typeof window !== "undefined" && window.history.length > 1,
   );
-  const [ttsOn, setTtsOn] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const ttsStored = window.localStorage.getItem("miomika.tts_on");
-    return ttsStored === null ? true : ttsStored === "1";
+  const [soundsOn, setSoundsOn] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(SOUNDS_KEY) === "1";
   });
   const [notificationsOn, setNotificationsOn] = useState(false);
 
   const displayName =
-    profile?.display_name ?? profile?.email?.split("@")[0] ?? (uiLang === "en" ? "Friend" : "เพื่อน");
+    profile?.display_name ??
+    profile?.email?.split("@")[0] ??
+    (uiLang === "en" ? "Friend" : "เพื่อน");
   const tier = profile?.tier ?? "free";
   const isFree = tier === "free" || tier === "guest";
   const showProBadge = tier === "pro" || tier === "pro_max";
-  const journeyStage = (profile?.journey_stage ?? "student") as JourneyStage;
-  const days = daysWithMiomi(profile?.onboarding_completed_at ?? null, profile?.last_seen_at ?? null);
-  const wordsLearned = profile?.level != null ? profile.level * 10 : 0;
-  const learningLang = "English";
-  const location = "Thailand";
-  const voiceCredits = 0;
+  const days = daysTogether(profile?.onboarding_completed_at ?? null);
+  const memoryCount = 0;
+
+  const hasCefr = profile != null && "cefr_level" in profile && profile.cefr_level != null;
+  const hasWordsField = profile != null && "words_mastered_count" in profile;
+  const hasStreakField = profile != null && "streak_days" in profile;
+  const hasConvosField = profile != null && "conversation_count" in profile;
+  const hasVoiceCreditsField = profile != null && "premium_voice_credits" in profile;
+
+  const wordsStat = hasWordsField
+    ? formatStat(profile?.words_mastered_count, true)
+    : "—";
+  const streakStat = hasStreakField
+    ? formatStat(profile?.streak_days, true)
+    : "—";
+  const convosStat = hasConvosField
+    ? formatStat(profile?.conversation_count, true)
+    : "—";
+  const voiceCredits = hasVoiceCreditsField ? (profile?.premium_voice_credits ?? 0) : 0;
+  const starsBalance = profile?.miomi_stars ?? 0;
   const uiLangLabel = profile?.ui_language === "en" ? "English" : "ไทย";
-  const hasMemoryRows = Boolean(profile?.display_name);
-  const memoriesCount = hasMemoryRows ? 3 : 0;
+  const talkModeLabel = readTalkModeLabel(uiLang);
+  const warmthLabel = readWarmthLabel(profile?.miomi_warmth ?? null, uiLang);
+  const voiceLabel =
+    voiceCredits > 0 ? me.bond.voicePremium(uiLang) : me.bond.voiceFree(uiLang);
 
   const copy = useMemo(
     () => ({
-      sectionSub: me.section.pickSubscription(uiLang),
-      sectionMem: me.section.pickMemory(uiLang),
-      sectionVoice: me.section.pickVoice(uiLang),
-      sectionSettings: me.section.pickSettings(uiLang),
-      sectionHelp: me.section.pickHelp(uiLang),
-      ctaUpgrade: me.cta.pickUpgrade(uiLang),
-      ctaManage: me.cta.pickManage(uiLang),
-      ctaEditMemory: me.cta.pickEditMemory(uiLang),
-      ctaTopupVoice: me.cta.pickTopupVoice(uiLang),
-      emptyMemory: me.empty.pickMemory(uiLang),
-      logoutLabel: me.logout.pick(uiLang),
-      badgePro: me.badge.pickPro(uiLang),
-      badgeProMax: me.badge.pickProMax(uiLang),
-      settingsVoice: me.settings.pickVoice(uiLang),
-      settingsLanguage: me.settings.pickLanguage(uiLang),
-      settingsNotifications: me.settings.pickNotifications(uiLang),
-      rowVoiceTokens: me.row.pickVoiceTokens(uiLang),
-      linkHelp: me.link.pickHelp(uiLang),
-      linkPrivacy: me.link.pickPrivacy(uiLang),
-      linkTerms: me.link.pickTerms(uiLang),
-      linkContact: me.link.pickContact(uiLang),
-      growthStory:
-        days < 2
-          ? me.identity.pickWelcomeBack(uiLang)
-          : me.growthStory({ days, memoriesCount, wordsLearned }, uiLang),
-      memCallsYou: hasMemoryRows ? me.memory.pickCallsYou(displayName, uiLang) : "",
-      memLearning: hasMemoryRows ? me.memory.pickLearning(learningLang, uiLang) : "",
-      memLivesIn: hasMemoryRows ? me.memory.pickLivesIn(location, uiLang) : "",
+      progressTitle: me.progress.title(uiLang),
+      planTitle: me.plan.title(uiLang),
+      bondTitle: me.bond.title(uiLang),
+      appTitle: me.app.title(uiLang),
+      privacyTitle: me.privacy.title(uiLang),
+      helpTitle: me.help.title(uiLang),
+      legalTitle: me.legal.title(uiLang),
+      logoutLabel: me.logout(uiLang),
     }),
-    [uiLang, days, memoriesCount, wordsLearned, hasMemoryRows, displayName],
-  );
-
-  const memoryRows = useMemo(
-    () =>
-      hasMemoryRows
-        ? [
-            { id: "name", label: copy.memCallsYou },
-            { id: "lang", label: copy.memLearning },
-            { id: "loc", label: copy.memLivesIn },
-          ]
-        : [],
-    [hasMemoryRows, copy.memCallsYou, copy.memLearning, copy.memLivesIn],
+    [uiLang],
   );
 
   useEffect(() => {
     if (!authReady) return;
-    if (!profile && typeof window !== "undefined") {
-      router.replace("/login");
+    if (!profile) {
+      storeRedirectTo("/me");
+      router.replace("/login?redirect_to=%2Fme");
     }
   }, [authReady, profile, router]);
 
@@ -151,6 +191,7 @@ export default function MePage() {
     return (
       <div
         style={{
+          height: "100%",
           minHeight: "100svh",
           background: "linear-gradient(180deg, #FEFCF7 0%, #FDFAF2 100%)",
         }}
@@ -162,11 +203,14 @@ export default function MePage() {
   return (
     <div
       style={{
+        height: "100%",
         minHeight: "100svh",
+        overflowY: "auto",
+        overflowX: "hidden",
         background: "linear-gradient(180deg, #FEFCF7 0%, #FDFAF2 100%)",
         padding: "16px 24px 96px",
-        overflowX: "hidden",
         width: "100%",
+        WebkitOverflowScrolling: "touch",
       }}
     >
       {/* Transparent top bar */}
@@ -198,7 +242,7 @@ export default function MePage() {
         )}
       </div>
 
-      {/* Identity hero — no card */}
+      {/* Hero */}
       <section
         style={{
           marginTop: "24px",
@@ -217,7 +261,10 @@ export default function MePage() {
           }}
         >
           <Image
-            src="/characters/miomi/companion/companion-idle.png"
+            src={
+              profile.avatar_url ??
+              "/characters/miomi/companion/companion-idle.png"
+            }
             alt=""
             width={80}
             height={80}
@@ -240,7 +287,7 @@ export default function MePage() {
           {displayName}
         </h1>
 
-        {showProBadge && (
+        {showProBadge ? (
           <span
             style={{
               display: "inline-flex",
@@ -258,174 +305,132 @@ export default function MePage() {
             }}
           >
             <Sparkles size={14} strokeWidth={2} color="#FFFFFF" />
-            {tier === "pro_max" ? copy.badgeProMax : copy.badgePro}
+            {tierLabel(tier)}
+          </span>
+        ) : (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              height: "24px",
+              padding: "0 10px",
+              marginTop: "8px",
+              borderRadius: "999px",
+              background: "rgba(255, 255, 255, 0.7)",
+              border: `1px solid ${COLORS.borderLight}`,
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: COLORS.textMuted,
+            }}
+          >
+            {tierLabel(tier)}
           </span>
         )}
-
-        <button
-          type="button"
-          onClick={() => {
-            /* TODO: journey stage picker bottom sheet — Phase 3B */
-          }}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "4px",
-            height: "24px",
-            padding: "0 10px",
-            marginTop: "8px",
-            borderRadius: "999px",
-            background: "rgba(255, 255, 255, 0.7)",
-            border: `1px solid ${COLORS.borderLight}`,
-            fontFamily: "'Quicksand', sans-serif",
-            fontSize: "12px",
-            fontWeight: 600,
-            color: COLORS.textPrimary,
-            cursor: "pointer",
-          }}
-        >
-          <MapPin size={14} strokeWidth={2} color={COLORS.textMuted} />
-          {capitalizeStage(journeyStage)}
-        </button>
       </section>
 
-      {/* Growth story — no card */}
-      {copy.growthStory && (
-        <p
-          style={{
-            marginTop: "32px",
-            maxWidth: "280px",
-            marginLeft: "auto",
-            marginRight: "auto",
-            textAlign: "center",
-            fontFamily: FONT,
-            fontSize: "16px",
-            lineHeight: "24px",
-            fontWeight: 500,
-            color: COLORS.textMuted,
-          }}
-        >
-          {copy.growthStory}
-        </p>
-      )}
-
-      {/* Subscription card */}
-      <div style={{ marginTop: "48px" }}>
-        <SectionHeader label={copy.sectionSub} />
+      {/* Card 1 — Progress */}
+      <div style={{ marginTop: "32px" }}>
+        <SectionHeader label={copy.progressTitle} />
         <GlassCard style={{ marginTop: "8px" }}>
-        <p
-          style={{
-            fontFamily: FONT,
-            fontSize: "17px",
-            lineHeight: "24px",
-            fontWeight: 600,
-            color: COLORS.textPrimary,
-            margin: 0,
-          }}
-        >
-          {tierLabel(tier)}
-        </p>
-        <p
-          style={{
-            fontFamily: "'Quicksand', sans-serif",
-            fontSize: "13px",
-            lineHeight: "18px",
-            fontWeight: 500,
-            color: COLORS.textMuted,
-            margin: "8px 0 0",
-          }}
-        >
-          {tierSummary(tier)}
-        </p>
-        <div style={{ marginTop: "16px" }}>
-          {isFree ? (
-            <Link
-              href="/marketplace"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                height: "52px",
-                width: "100%",
-                borderRadius: "999px",
-                background: CTA_GRADIENT,
-                color: COLORS.ctaTextColor,
-                fontFamily: FONT,
-                fontSize: "16px",
-                fontWeight: 600,
-                textDecoration: "none",
-                boxShadow: CTA_SHADOW,
-              }}
-            >
-              <Sparkles size={18} strokeWidth={1.75} />
-              {copy.ctaUpgrade}
-            </Link>
-          ) : (
-            <Link
-              href="/me/billing"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "44px",
-                width: "100%",
-                borderRadius: "999px",
-                background: "rgba(255, 255, 255, 0.6)",
-                border: `1px solid ${COLORS.borderMedium}`,
-                color: COLORS.textPrimary,
-                fontFamily: FONT,
-                fontSize: "15px",
-                fontWeight: 600,
-                textDecoration: "none",
-                backdropFilter: "blur(10px)",
-              }}
-            >
-              {copy.ctaManage}
-            </Link>
-          )}
-        </div>
-        </GlassCard>
-      </div>
-
-      {/* Memory editor card */}
-      <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.sectionMem} />
-        <GlassCard style={{ marginTop: "8px" }}>
-          {memoryRows.length > 0 ? (
-            memoryRows.map((row, index) => (
-              <div key={row.id}>
-                {index > 0 && <RowDivider />}
-                <MemoryRow label={row.label} />
+          <p
+            style={{
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "13px",
+              lineHeight: "18px",
+              fontWeight: 600,
+              color: COLORS.textMuted,
+              margin: 0,
+            }}
+          >
+            {me.progress.cefrLabel(uiLang)}
+          </p>
+          {hasCefr ? (
+            <>
+              <p
+                style={{
+                  fontFamily: FONT,
+                  fontSize: "24px",
+                  lineHeight: "32px",
+                  fontWeight: 600,
+                  color: COLORS.textPrimary,
+                  margin: "8px 0 0",
+                }}
+              >
+                {profile.cefr_level}
+              </p>
+              <div
+                style={{
+                  marginTop: "8px",
+                  height: "4px",
+                  borderRadius: "999px",
+                  background: COLORS.borderLight,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${profile.cefr_progress_pct ?? 0}%`,
+                    background: COLORS.ctaSolid,
+                    borderRadius: "999px",
+                  }}
+                />
               </div>
-            ))
+            </>
           ) : (
             <p
               style={{
                 fontFamily: FONT,
-                fontSize: "16px",
-                lineHeight: "24px",
-                fontWeight: 500,
-                color: COLORS.textMuted,
-                textAlign: "center",
-                margin: "12px 0",
+                fontSize: "24px",
+                lineHeight: "32px",
+                fontWeight: 600,
+                color: COLORS.textPrimary,
+                margin: "8px 0 0",
               }}
             >
-              {copy.emptyMemory}
+              {me.progress.cefrEmpty(uiLang)}
             </p>
           )}
+
+          {days >= 2 && (
+            <p
+              style={{
+                marginTop: "16px",
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "14px",
+                lineHeight: "20px",
+                fontWeight: 500,
+                color: COLORS.textMuted,
+              }}
+            >
+              {me.progress.daysTogether(days, uiLang)}
+            </p>
+          )}
+
+          <div
+            style={{
+              marginTop: "16px",
+              display: "flex",
+              gap: "12px",
+            }}
+          >
+            <StatColumn value={wordsStat} label={me.progress.statWords(uiLang)} />
+            <StatColumn value={streakStat} label={me.progress.statStreak(uiLang)} />
+            <StatColumn value={convosStat} label={me.progress.statConvos(uiLang)} />
+          </div>
+
           <button
             type="button"
-            onClick={() => {
-              /* TODO: full memory editor — Phase 3B */
-            }}
+            onClick={() => router.push("/dashboard")}
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              gap: "8px",
               height: "44px",
               width: "100%",
-              marginTop: "12px",
+              marginTop: "16px",
               borderRadius: "999px",
               background: "rgba(255, 255, 255, 0.6)",
               border: `1px solid ${COLORS.borderMedium}`,
@@ -437,148 +442,292 @@ export default function MePage() {
               backdropFilter: "blur(10px)",
             }}
           >
-            {copy.ctaEditMemory}
+            {me.progress.cta(uiLang)}
+            <ChevronRight size={18} color={COLORS.textSubtle} strokeWidth={1.75} />
           </button>
         </GlassCard>
       </div>
 
-      {/* Premium Voice tokens card */}
+      {/* Card 2 — Plan & credits */}
       <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.sectionVoice} />
+        <SectionHeader label={copy.planTitle} />
         <GlassCard style={{ marginTop: "8px" }}>
-          <div
+          <p
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              minHeight: "44px",
+              fontFamily: FONT,
+              fontSize: "17px",
+              lineHeight: "24px",
+              fontWeight: 600,
+              color: COLORS.textPrimary,
+              margin: 0,
             }}
           >
-            <Mic size={20} color={COLORS.textMuted} strokeWidth={1.75} />
-            <span
-              style={{
-                flex: 1,
-                fontFamily: FONT,
-                fontSize: "16px",
-                color: COLORS.textPrimary,
-              }}
-            >
-              {copy.rowVoiceTokens}
-            </span>
-            <span
-              style={{
-                fontFamily: "'Quicksand', sans-serif",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: COLORS.textMuted,
-                padding: "4px 10px",
-                borderRadius: "999px",
-                background: "rgba(255, 255, 255, 0.7)",
-                border: `1px solid ${COLORS.borderLight}`,
-              }}
-            >
-              {voiceCredits}
-            </span>
-            <Link
-              href="/marketplace"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                height: "32px",
-                padding: "0 12px",
-                borderRadius: "999px",
-                background: "rgba(255, 255, 255, 0.6)",
-                border: `1px solid ${COLORS.borderMedium}`,
-                color: COLORS.textPrimary,
-                fontFamily: FONT,
-                fontSize: "13px",
-                fontWeight: 600,
-                textDecoration: "none",
-                backdropFilter: "blur(10px)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {copy.ctaTopupVoice}
-            </Link>
+            {tierLabel(tier)}
+          </p>
+          <p
+            style={{
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "13px",
+              lineHeight: "18px",
+              fontWeight: 500,
+              color: COLORS.textMuted,
+              margin: "8px 0 0",
+            }}
+          >
+            {planSummary(tier, uiLang)}
+          </p>
+
+          <div style={{ height: "1px", background: COLORS.borderLight, margin: "12px 0" }} />
+
+          <PlanRow
+            icon={<Star size={20} color={COLORS.ctaSolid} strokeWidth={1.75} />}
+            label={me.plan.stars(uiLang)}
+            value={String(starsBalance)}
+            pillLabel={me.plan.topup(uiLang)}
+            onPill={() => router.push("/marketplace")}
+          />
+          <RowDivider />
+          <PlanRow
+            icon={<Mic size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.plan.voice(uiLang)}
+            value={String(voiceCredits)}
+            pillLabel={me.plan.topup(uiLang)}
+            onPill={() => router.push("/marketplace")}
+          />
+
+          <div style={{ marginTop: "16px" }}>
+            {isFree ? (
+              <button
+                type="button"
+                onClick={() => router.push("/marketplace")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  height: "52px",
+                  width: "100%",
+                  borderRadius: "999px",
+                  background: CTA_GRADIENT,
+                  color: COLORS.ctaTextColor,
+                  fontFamily: FONT,
+                  fontSize: "16px",
+                  fontWeight: 600,
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: CTA_SHADOW,
+                }}
+              >
+                <Sparkles size={18} strokeWidth={1.75} />
+                {me.plan.cta.upgrade(uiLang)}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push("/me/billing")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "44px",
+                  width: "100%",
+                  borderRadius: "999px",
+                  background: "rgba(255, 255, 255, 0.6)",
+                  border: `1px solid ${COLORS.borderMedium}`,
+                  color: COLORS.textPrimary,
+                  fontFamily: FONT,
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  backdropFilter: "blur(10px)",
+                }}
+              >
+                {me.plan.cta.manage(uiLang)}
+              </button>
+            )}
           </div>
         </GlassCard>
       </div>
 
-      {/* Settings card */}
+      {/* Card 3a — Relationship with Miomi */}
       <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.sectionSettings} />
+        <SectionHeader label={copy.bondTitle} />
         <GlassCard style={{ marginTop: "8px" }}>
-          <ToggleRow
-            label={copy.settingsVoice}
-            checked={ttsOn}
-            onChange={(v) => {
-              setTtsOn(v);
-              window.localStorage.setItem("miomika.tts_on", v ? "1" : "0");
+          <ChevronRow
+            icon={<Heart size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.bond.name(uiLang)}
+            value="Miomi"
+            onClick={() => {
+              /* stub: Miomi name picker — Phase 3B */
             }}
           />
           <RowDivider />
-          <button
-            type="button"
+          <ChevronRow
+            icon={<Mic size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.bond.voice(uiLang)}
+            value={voiceLabel}
             onClick={() => {
-              /* TODO: language preference sheet */
+              /* stub: voice picker */
             }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              padding: "12px 0",
-              minHeight: "44px",
-              width: "100%",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            <Globe size={20} color={COLORS.textMuted} strokeWidth={1.75} />
-            <span
-              style={{
-                flex: 1,
-                fontFamily: FONT,
-                fontSize: "16px",
-                color: COLORS.textPrimary,
-              }}
-            >
-              {copy.settingsLanguage}
-            </span>
-            <span
-              style={{
-                fontFamily: "'Quicksand', sans-serif",
-                fontSize: "13px",
-                color: COLORS.textMuted,
-                marginRight: "8px",
-              }}
-            >
-              {uiLangLabel}
-            </span>
-            <ChevronRight size={18} color={COLORS.textSubtle} strokeWidth={1.75} />
-          </button>
+          />
           <RowDivider />
-          <ToggleRow
-            icon={Bell}
-            label={copy.settingsNotifications}
-            checked={notificationsOn}
-            onChange={setNotificationsOn}
+          <ChevronRow
+            icon={<MessageCircle size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.bond.style(uiLang)}
+            value={talkModeLabel}
+            onClick={() => {
+              /* stub: talk mode picker */
+            }}
+          />
+          <RowDivider />
+          <ChevronRow
+            icon={<Sparkle size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.bond.warmth(uiLang)}
+            value={warmthLabel}
+            onClick={() => {
+              /* stub: warmth picker */
+            }}
+          />
+          <RowDivider />
+          <ChevronRow
+            icon={<User size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.bond.callYou(uiLang)}
+            value={displayName}
+            onClick={() => {
+              /* stub: display name editor */
+            }}
           />
         </GlassCard>
       </div>
 
-      {/* Help & legal card */}
+      {/* Card 3b — App preferences */}
       <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.sectionHelp} />
+        <SectionHeader label={copy.appTitle} />
+        <GlassCard style={{ marginTop: "8px" }}>
+          <ChevronRow
+            icon={<Palette size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.app.theme(uiLang)}
+            value={me.app.themeOptions.light(uiLang)}
+            onClick={() => {
+              /* stub: theme picker */
+            }}
+          />
+          <RowDivider />
+          <ToggleRow
+            icon={Volume2}
+            label={me.app.sounds(uiLang)}
+            checked={soundsOn}
+            onChange={(v) => {
+              setSoundsOn(v);
+              window.localStorage.setItem(SOUNDS_KEY, v ? "1" : "0");
+            }}
+          />
+          <RowDivider />
+          <ToggleRow
+            icon={Bell}
+            label={me.app.notifications(uiLang)}
+            checked={notificationsOn}
+            onChange={setNotificationsOn}
+          />
+          <RowDivider />
+          <ChevronRow
+            icon={<Globe size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.app.uiLang(uiLang)}
+            value={uiLangLabel}
+            onClick={() => {
+              /* stub: language picker */
+            }}
+          />
+        </GlassCard>
+      </div>
+
+      {/* Card 4 — Privacy */}
+      {/* Phase 3B: wire memory editor backend. Phase 6: wire data export + account reset. */}
+      <div style={{ marginTop: "24px" }}>
+        <SectionHeader label={copy.privacyTitle} />
+        <GlassCard style={{ marginTop: "8px" }}>
+          <ChevronRow
+            icon={<Brain size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.privacy.learned(memoryCount, uiLang)}
+            onClick={() => {
+              /* stub: memory list */
+            }}
+          />
+          {memoryCount === 0 && (
+            <p
+              style={{
+                margin: 0,
+                paddingLeft: "32px",
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "12px",
+                lineHeight: "16px",
+                color: COLORS.textSubtle,
+              }}
+            >
+              {me.privacy.learnedEmpty(uiLang)}
+            </p>
+          )}
+          <RowDivider />
+          <ChevronRow
+            icon={<Download size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.privacy.download(uiLang)}
+            onClick={() => {
+              /* stub: data export — Phase 6 */
+            }}
+          />
+          <RowDivider />
+          <ChevronRow
+            icon={<RefreshCcw size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.privacy.forget(uiLang)}
+            onClick={() => {
+              /* stub: account reset — Phase 6 */
+            }}
+          />
+        </GlassCard>
+      </div>
+
+      {/* Card 5 — Help & feedback */}
+      <div style={{ marginTop: "24px" }}>
+        <SectionHeader label={copy.helpTitle} />
+        <GlassCard style={{ marginTop: "8px" }}>
+          <ChevronRow
+            icon={<AlertCircle size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.help.problem(uiLang)}
+            href={buildFeedbackMailto(displayName, tier)}
+            external
+          />
+          <RowDivider />
+          <ChevronRow
+            icon={<HelpCircle size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.help.center(uiLang)}
+            onClick={() => router.push("/help")}
+          />
+          <RowDivider />
+          <ChevronRow
+            icon={<MessageSquare size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.help.contact(uiLang)}
+            href={buildSupportMailto()}
+            external
+          />
+          <RowDivider />
+          <ChevronRow
+            icon={<Newspaper size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={me.help.changelog(uiLang)}
+            href={buildSupportMailto()}
+            external
+          />
+        </GlassCard>
+      </div>
+
+      {/* Card 6 — Legal */}
+      <div style={{ marginTop: "24px" }}>
+        <SectionHeader label={copy.legalTitle} />
         <GlassCard tight style={{ marginTop: "8px" }}>
-          <NavRow label={copy.linkHelp} href="/help" />
+          <ChevronRow label={me.legal.privacy(uiLang)} onClick={() => router.push("/legal/privacy")} />
           <RowDivider />
-          <NavRow label={copy.linkPrivacy} href="/legal/privacy" />
+          <ChevronRow label={me.legal.terms(uiLang)} onClick={() => router.push("/legal/terms")} />
           <RowDivider />
-          <NavRow label={copy.linkTerms} href="/legal/terms" />
-          <RowDivider />
-          <NavRow label={copy.linkContact} href="mailto:hello@miomika.com" external />
+          <ChevronRow label={me.legal.about(uiLang)} onClick={() => router.push("/legal/about")} />
         </GlassCard>
       </div>
 
@@ -587,8 +736,12 @@ export default function MePage() {
         type="button"
         onClick={() => void handleLogout()}
         style={{
-          display: "block",
-          margin: "48px auto 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          minHeight: "44px",
+          margin: "48px 0 24px",
           background: "transparent",
           border: "none",
           cursor: "pointer",
@@ -653,42 +806,98 @@ function RowDivider() {
   return <div style={{ height: "1px", background: COLORS.borderLight }} />;
 }
 
-function MemoryRow({ label }: { label: string }) {
+function StatColumn({ value, label }: { value: string; label: string }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "12px 0",
-        minHeight: "44px",
-      }}
-    >
-      <span
+    <div style={{ flex: 1, textAlign: "center" }}>
+      <p
         style={{
-          flex: 1,
-          fontFamily: FONT,
-          fontSize: "16px",
+          margin: 0,
+          fontFamily: "'Quicksand', sans-serif",
+          fontSize: "20px",
+          lineHeight: "28px",
+          fontWeight: 600,
           color: COLORS.textPrimary,
         }}
       >
+        {value}
+      </p>
+      <p
+        style={{
+          margin: "4px 0 0",
+          fontFamily: "'Quicksand', sans-serif",
+          fontSize: "12px",
+          lineHeight: "16px",
+          fontWeight: 500,
+          color: COLORS.textMuted,
+        }}
+      >
         {label}
-      </span>
-      <Edit2 size={18} color={COLORS.textSubtle} strokeWidth={1.75} aria-hidden />
+      </p>
     </div>
   );
 }
 
-function NavRow({
+function ValueChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        fontFamily: "'Quicksand', sans-serif",
+        fontSize: "13px",
+        fontWeight: 600,
+        color: COLORS.textMuted,
+        padding: "4px 10px",
+        borderRadius: "999px",
+        background: "rgba(255, 255, 255, 0.7)",
+        border: `1px solid ${COLORS.borderLight}`,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function TopUpPill({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        height: "28px",
+        padding: "0 12px",
+        borderRadius: "999px",
+        background: "rgba(255, 255, 255, 0.6)",
+        border: `1px solid ${COLORS.borderMedium}`,
+        color: COLORS.textPrimary,
+        fontFamily: FONT,
+        fontSize: "13px",
+        fontWeight: 600,
+        cursor: "pointer",
+        backdropFilter: "blur(10px)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function PlanRow({
+  icon,
   label,
-  href,
-  external,
+  value,
+  pillLabel,
+  onPill,
 }: {
+  icon: React.ReactNode;
   label: string;
-  href: string;
-  external?: boolean;
+  value: string;
+  pillLabel: string;
+  onPill: () => void;
 }) {
-  const inner = (
+  return (
     <div
       style={{
         display: "flex",
@@ -698,6 +907,7 @@ function NavRow({
         minHeight: "44px",
       }}
     >
+      {icon}
       <span
         style={{
           flex: 1,
@@ -708,21 +918,90 @@ function NavRow({
       >
         {label}
       </span>
-      <ChevronRight size={18} color={COLORS.textSubtle} strokeWidth={1.75} />
+      <span
+        style={{
+          fontFamily: "'Quicksand', sans-serif",
+          fontSize: "16px",
+          lineHeight: "24px",
+          fontWeight: 600,
+          color: COLORS.textPrimary,
+          marginRight: "8px",
+        }}
+      >
+        {value}
+      </span>
+      <TopUpPill label={pillLabel} onClick={onPill} />
     </div>
   );
+}
 
-  if (external) {
+function ChevronRow({
+  icon,
+  label,
+  value,
+  onClick,
+  href,
+  external,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value?: string;
+  onClick?: () => void;
+  href?: string;
+  external?: boolean;
+}) {
+  const inner = (
+    <>
+      {icon}
+      <span
+        style={{
+          flex: 1,
+          fontFamily: FONT,
+          fontSize: "16px",
+          color: COLORS.textPrimary,
+        }}
+      >
+        {label}
+      </span>
+      {value ? <ValueChip>{value}</ValueChip> : null}
+      <ChevronRight size={18} color={COLORS.textSubtle} strokeWidth={1.75} />
+    </>
+  );
+
+  const rowStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "12px 0",
+    minHeight: "44px",
+    width: "100%",
+    background: "transparent",
+    border: "none",
+    cursor: onClick || href ? "pointer" : "default",
+    textAlign: "left",
+    textDecoration: "none",
+    color: "inherit",
+  };
+
+  if (href) {
+    if (external) {
+      return (
+        <a href={href} style={rowStyle}>
+          {inner}
+        </a>
+      );
+    }
     return (
-      <a href={href} style={{ textDecoration: "none", color: "inherit" }}>
+      <Link href={href} style={rowStyle}>
         {inner}
-      </a>
+      </Link>
     );
   }
+
   return (
-    <Link href={href} style={{ textDecoration: "none", color: "inherit" }}>
+    <button type="button" onClick={onClick} style={rowStyle}>
       {inner}
-    </Link>
+    </button>
   );
 }
 

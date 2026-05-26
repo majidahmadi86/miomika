@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { pickLanguageFromAcceptLanguage } from "@/lib/i18n/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
+import { isValidAppRedirect } from "@/lib/auth/redirect-to";
 import { log, logError } from "@/lib/debug/log";
 
 /**
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest) {
   });
 
   let redirectTo: string;
-  if (nextOverride && nextOverride.startsWith("/")) {
+  if (nextOverride && isValidAppRedirect(nextOverride)) {
     redirectTo = nextOverride;
   } else if (!profile) {
     redirectTo = "/home";

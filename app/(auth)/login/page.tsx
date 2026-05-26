@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  clearRedirectTo,
+  resolveRedirectTarget,
+} from "@/lib/auth/redirect-to";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +18,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  function getPostLoginPath(): string {
+    const search =
+      typeof window !== "undefined" ? window.location.search : "";
+    return resolveRedirectTarget(search) ?? "/home";
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -29,7 +39,9 @@ export default function LoginPage() {
         setError("อีเมลหรือรหัสผ่านไม่ถูกต้องค่า");
         return;
       }
-      router.push("/home");
+      const destination = getPostLoginPath();
+      clearRedirectTo();
+      router.push(destination);
       router.refresh();
     } finally {
       setLoading(false);
@@ -43,10 +55,11 @@ export default function LoginPage() {
       const supabase = createClient();
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
+      const next = encodeURIComponent(getPostLoginPath());
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${origin}/auth/callback?next=/home`,
+          redirectTo: `${origin}/auth/callback?next=${next}`,
           queryParams: {
             prompt: "select_account",
             access_type: "offline",
