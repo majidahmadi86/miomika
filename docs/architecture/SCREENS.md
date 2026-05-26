@@ -145,6 +145,8 @@ Reasoning: Talk's mode carousel works because all five modes are equivalent verb
 │ E-books, outfits         │
 └──────────────────────────┘
 
+> **Note on emojis in this wireframe:** The 🎁 / ✨ / 🛍️ symbols above are wireframe shorthand to communicate what each section is about. They are NOT a directive to ship emojis in the UI. Real implementation uses lucide-react icons (e.g. `Gift`, `Sparkles`, `ShoppingBag` or equivalents) per `/docs/architecture/DESIGN-RULES.md` §A.6. Emojis in UI chrome are forbidden.
+
 ### Section 1: Stars wallet (top, persistent context)
 - Current balance
 - Top-up packs button (buy Stars with real money; bonus tiers for larger purchases)

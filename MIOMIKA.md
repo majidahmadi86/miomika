@@ -504,7 +504,7 @@ Most non-`/talk` screens were designed **before** `/talk` reached its quality ba
 | **Home** | `/(app)/home` | Launcher — any verb, fuel bars, companion CTA | All | 90% — needs realignment to `/talk` quality |
 | **Talk** | `/(app)/talk` | Open room — voice-first, any verb | All (mode picker) | **SEALED** — reference quality |
 | **Learn** | `/(app)/learn` *(planned)* | Teach brain focused study | Teach | Designed pre-/talk; alignment needed |
-| **Me** | `/(app)/profile` | Identity + memory + settings | Remember | Audit needed |
+| **Me** | `/(app)/me` | Identity + memory + settings (UI label: "Profile") | Remember | Audit needed |
 | **Growth** | `/(app)/dashboard` | Progress, streaks, mastery | Teach + Remember | 40% — static data |
 | **Invite** | `/(app)/invite` | Referral | — | 0% |
 | **Welcome** | `components/WelcomeScreen.tsx` + onboarding | First-time user journey | Be-with-me | Exists; celebration at `/home?celebrate=signup` |
@@ -940,7 +940,7 @@ AUTHENTICATED (companion button visible on all of these)
   /(app)/home                → 90%
   /(app)/talk                → 60%, deep-focus conversation mode
   /(app)/dashboard           → 40%, needs real data wiring
-  /(app)/profile             → audit needed
+  /(app)/me                  → relationship surface (UI label: "Profile")
   /(app)/invite              → 0% (referral)
   /(app)/marketplace         → Phase 7 (characters, e-books, outfits)
   /(app)/wallet              → Phase 5 (stars, transaction history)
@@ -1250,7 +1250,7 @@ Every future Claude or Cursor session reads this first. It is the authoritative 
 
 | Table | Purpose | Read by |
 |---|---|---|
-| `public.profiles` | All user profile data (tier, journey_stage, stars, language, gender, xp, level, streak, mood, legacy fields) | lib/auth/use-profile.ts, lib/welcome/actions.ts, app/api/miomi/session-init/route.ts, app/(app)/profile/page.tsx, app/onboarding/page.tsx |
+| `public.profiles` | All user profile data (tier, journey_stage, stars, language, gender, xp, level, streak, mood, legacy fields) | lib/auth/use-profile.ts, lib/welcome/actions.ts, app/api/miomi/session-init/route.ts, app/(app)/me/page.tsx, app/onboarding/page.tsx |
 | `public.vocabulary_bank` | Reference vocabulary (1,134+ rows) | lib/ai/vocabulary.ts, lib/library/resolver.ts |
 | `public.phrases_bank` | Reference phrases (not yet wired to engine — Phase 3B) | (none yet) |
 | `public.library_entries` | Cached AI responses promoted to library | lib/library/supabase-matcher.ts, app/api/miomi/route.ts |
@@ -1279,7 +1279,7 @@ Every future Claude or Cursor session reads this first. It is the authoritative 
 | `/onboarding` | `app/onboarding/page.tsx` | auth | Journey-stage question. Final redirect: `/home?celebrate=signup` |
 | `/home` | `app/(app)/home/page.tsx` | auth | Main app screen with Miomi, fuel bars, CTA |
 | `/talk` | `app/(app)/talk/page.tsx` | auth | Deep-focus conversation mode |
-| `/profile` | `app/(app)/profile/page.tsx` | auth | User profile, tier, settings |
+| `/me` | `app/(app)/me/page.tsx` | auth | Relationship surface — identity, subscription, memory editor, settings (UI label: "Profile") |
 | `/dashboard` | `app/(app)/dashboard/page.tsx` | auth | Stats and progress (Phase 3+ wires real data) |
 | `/api/auth/callback` | `app/api/auth/callback/route.ts` | — | OAuth exchange-code endpoint |
 | `/api/miomi` | `app/api/miomi/route.ts` | auth | Main engine endpoint (library matcher + AI fallback) |
