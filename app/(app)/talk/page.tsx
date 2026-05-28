@@ -17,8 +17,6 @@ import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
-import { matchLibrary } from "@/lib/library/matcher";
-import { resolveWordCard } from "@/lib/library/resolver";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
 import { speak, stopTts, detectLang, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
 import { pickIceBreaker } from "@/lib/voice/warmth";
@@ -214,43 +212,6 @@ export default function TalkPage() {
 
       if (isGuest) setGuestExchanges((p) => p + 1);
 
-      const template = matchLibrary(text.trim(), { wordsIntroduced });
-      if (template) {
-        setItems((prev) => [
-          ...prev,
-          { id: crypto.randomUUID(), kind: "mini_cat", textTh: template.response.speech_th, textEn: template.response.speech_en },
-        ]);
-        if (ttsOn) {
-          const lang = conversationLangRef.current;
-          const speakText = lang === "th" ? template.response.speech_th : template.response.speech_en;
-          if (speakText) {
-            setMicState("speaking");
-            void speak(speakText, lang, {
-              onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
-              onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
-            });
-          }
-        }
-        if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
-          window.setTimeout(() => setShowGuestSheet(true), 800);
-        }
-        if (template.follow_up?.type === "word_card" && template.follow_up.payload_resolver) {
-          const word = await resolveWordCard(
-            template.follow_up.payload_resolver,
-            (template.follow_up.payload_params ?? {}) as Record<string, unknown>,
-            text.trim(),
-            wordsIntroduced,
-          );
-          if (word) {
-            setWordsIntroduced((p) => [...p, word.word_en]);
-            window.setTimeout(() => {
-              setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "practice", word, position: wordsIntroduced.length + 1, total: 3, topic: undefined }]);
-            }, 600);
-          }
-        }
-        return;
-      }
-
       try {
         const res = await fetch("/api/miomi", {
           method: "POST",
@@ -271,7 +232,7 @@ export default function TalkPage() {
           }),
         });
         if (!res.ok) throw new Error("api failed");
-        const data = (await res.json()) as { content?: string };
+        const data = (await res.json()) as { content?: string; servedVia?: string };
         const content = data.content ?? "";
         const lang = conversationLangRef.current;
         // When lang is forced, the AI returned a single-language reply.
@@ -289,7 +250,9 @@ export default function TalkPage() {
             onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
           });
         }
-        if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
+        if (data.servedVia === "guest_limit") {
+          setShowGuestSheet(true);
+        } else if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
           window.setTimeout(() => setShowGuestSheet(true), 800);
         }
       } catch {
