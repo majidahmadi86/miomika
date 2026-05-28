@@ -14,6 +14,7 @@
  * MIOMIKA.md §6.2.
  */
 
+import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 
 export type Intent =
@@ -269,8 +270,8 @@ export async function logInteraction(params: {
   aiCostUsd: number;
 }) {
   try {
-    const supabase = await createClient();
-    await supabase.from("library_interactions").insert({
+    const supabase = await createServiceClient();
+    const { error } = await supabase.from("library_interactions").insert({
       session_id: params.sessionId,
       exchange_number: params.exchangeNumber,
       user_id: params.userId,
@@ -281,8 +282,15 @@ export async function logInteraction(params: {
       match_confidence: params.matchConfidence,
       ai_cost_usd: params.aiCostUsd,
     });
+    if (error) {
+      console.error(
+        "[logInteraction] insert failed:",
+        error.message,
+        error.details,
+      );
+    }
   } catch (err) {
-    console.error("Log interaction error:", err);
+    console.error("[logInteraction] insert failed:", err);
   }
 }
 
