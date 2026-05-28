@@ -17,13 +17,21 @@ function mapVoice(lang: Lang, voice: VoicePref): { voiceName: string; languageCo
   if (lang === "th") {
     return {
       languageCode: "th-TH",
-      voiceName: voice === "male" ? "th-TH-Neural2-D" : "th-TH-Neural2-C",
+      voiceName: voice === "male" ? "th-TH-Chirp3-HD-Charon" : "th-TH-Chirp3-HD-Zephyr",
     };
   }
   return {
     languageCode: "en-US",
-    voiceName: voice === "male" ? "en-US-Neural2-D" : "en-US-Neural2-F",
+    voiceName: voice === "male" ? "en-US-Chirp3-HD-Charon" : "en-US-Chirp3-HD-Zephyr",
   };
+}
+
+/** Best-effort spoken-text tweaks for brand pronunciation — remove when Chirp3 improves. */
+function fixPronunciation(text: string): string {
+  return text
+    .replace(/มิโอมิ/g, "มิ โอะ มิ")
+    .replace(/\bMiomi\b/g, "Mee-oh-mee")
+    .replace(/\bmiomi\b/g, "mee-oh-mee");
 }
 
 function buildCacheKey(normalizedText: string, lang: Lang, voiceName: string): string {
@@ -32,40 +40,9 @@ function buildCacheKey(normalizedText: string, lang: Lang, voiceName: string): s
 }
 
 /**
- * GET /api/talk/speak — temporary: list Thai Google TTS voices for selection.
- */
-export async function GET() {
-  const credentialsJson = process.env.GOOGLE_TTS_CREDENTIALS;
-  if (!credentialsJson) {
-    log("voice.speak", "GOOGLE_TTS_CREDENTIALS missing");
-    return NextResponse.json({ error: "list_failed" }, { status: 500 });
-  }
-
-  try {
-    const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
-    const client = new TextToSpeechClient({ credentials });
-
-    const [response] = await client.listVoices({ languageCode: "th-TH" });
-
-    const voices = (response.voices ?? [])
-      .map((v) => ({
-        name: v.name ?? "",
-        ssmlGender: v.ssmlGender ?? "SSML_VOICE_GENDER_UNSPECIFIED",
-        naturalSampleRateHertz: v.naturalSampleRateHertz ?? 0,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    return NextResponse.json(voices);
-  } catch (e) {
-    logError("voice.speak", "list voices failed", e);
-    return NextResponse.json({ error: "list_failed" }, { status: 500 });
-  }
-}
-
-/**
  * POST /api/talk/speak
  *
- * Accepts JSON { text, lang, voice? }. Returns { audio: base64, cached: boolean }.
+ * Accepts JSON { text, lang, voice?, voiceName?, speakingRate? }. Returns { audio: base64, cached: boolean }.
  * 3-strike cache: MP3 stored only after the 3rd request for the same phrase.
  */
 export async function POST(request: NextRequest) {
@@ -77,7 +54,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "tts_not_configured" }, { status: 500 });
   }
 
-  let body: { text?: unknown; lang?: unknown; voice?: unknown };
+  let body: {
+    text?: unknown;
+    lang?: unknown;
+    voice?: unknown;
+    voiceName?: unknown;
+    speakingRate?: unknown;
+  };
   try {
     body = await request.json();
   } catch (e) {
@@ -98,7 +81,20 @@ export async function POST(request: NextRequest) {
   const voicePref: VoicePref =
     body.voice === "male" ? "male" : "female";
 
-  const { voiceName, languageCode } = mapVoice(lang, voicePref);
+  const mapped = mapVoice(lang, voicePref);
+  const explicitVoiceName =
+    typeof body.voiceName === "string" ? body.voiceName.trim() : "";
+  const voiceName = explicitVoiceName || mapped.voiceName;
+  const languageCode = mapped.languageCode;
+
+  const defaultSpeakingRate = lang === "th" ? 0.77 : 0.95;
+  const speakingRate =
+    typeof body.speakingRate === "number" &&
+    body.speakingRate >= 0.5 &&
+    body.speakingRate <= 1.5
+      ? body.speakingRate
+      : defaultSpeakingRate;
+
   const cacheKey = buildCacheKey(text, lang, voiceName);
 
   let supabase;
@@ -142,13 +138,15 @@ export async function POST(request: NextRequest) {
     const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
     const client = new TextToSpeechClient({ credentials });
 
+    const spokenText = fixPronunciation(text);
+
     const [response] = await client.synthesizeSpeech({
-      input: { text },
+      input: { text: spokenText },
       voice: { languageCode, name: voiceName },
       audioConfig: {
         audioEncoding: "MP3",
-        speakingRate: lang === "th" ? 0.95 : 1.0,
-        pitch: 0,
+        speakingRate,
+        // Chirp3-HD voices reject pitch — omit entirely.
       },
     });
 
