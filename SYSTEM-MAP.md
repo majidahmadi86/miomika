@@ -3,7 +3,7 @@
 > This file describes what the code ACTUALLY does today. If a doc disagrees with
 > this file about what is BUILT, this file wins. If a doc describes a DESIGN
 > (tokens, screens, soul), that doc wins.
-> Last verified against repo: 2026-05-28 (commit f61e58c) via full file read.
+> Last verified against repo: 2026-05-28 (guest gate, library log, two-matcher).
 > Update the "Last verified" line + the status tags every time code ships.
 
 ---
@@ -90,15 +90,11 @@ never promoted back into the library, so the "moat" doesn't compound yet).
 
 ---
 
-## 4. THE TWO-MATCHER PROBLEM (active tech debt)
+## 4. THE TWO-MATCHER PROBLEM
 
-```
-/talk/page.tsx --> matchLibrary()        (lib/library/matcher.ts — template, in-browser)
-/api/miomi     --> matchLibraryFromDB()  (lib/library/supabase-matcher.ts — DB)
-```
-Phase 2 claimed to consolidate these. It did not. They have diverged. A message
-answered client-side on /talk and the same message hitting the engine can differ.
-Fix before brain work.
+**RESOLVED** — /talk template shortcut removed; all messages go through /api/miomi.
+`matchLibrary` no longer used in /talk. Engine path: `matchLibraryFromDB()` only
+(`lib/library/supabase-matcher.ts`).
 
 ---
 
@@ -134,6 +130,8 @@ APPLIED-state of 0009-0012 in live Supabase: UNVERIFIED from repo. Mike must con
 | MASTER-HANDOFF.md | Mike's story, communication style | Build state (was stale; fixed) |
 | SCREENS.md | Five-nav, per-screen purpose | Engine/brain |
 | DESIGN-RULES.md | Visual law, warmth law | Engine/brain |
+| PRODUCT-DECISIONS.md | What we're building + why (confident speaking, revenue, voice, teaching) | engine internals |
+| LAUNCH-CHECKLIST.md | Every launch essential + status | design/soul |
 
 ---
 
