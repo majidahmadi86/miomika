@@ -272,6 +272,10 @@ User picks a verb (mode on `/talk`, or surface like `/learn`). The right brain w
 
 ### 2.4 Library-first principle
 
+STATUS: MATCH + LOG are built. PROMOTE (cluster/score/cron/admin/talk_completions)
+is NOT built. The 0.85 cosine/embedding step is NOT built — current matcher is
+keyword/template. See SYSTEM-MAP.md section 3.
+
 Every brain accumulates a library. **AI is the fallback, not the default.**
 
 ```
@@ -1027,6 +1031,10 @@ types/                shared TS types
 
 ### 4.6 AI provider strategy (the most important engineering decision)
 
+STATUS: TARGET DESIGN, NOT BUILT. Today the router is Groq -> Gemini -> failover
+(free only). No Anthropic, no tier routing, no cost caps, no kill switches. See
+SYSTEM-MAP.md sections 2-3.
+
 **Current:** Groq → Gemini → library failover. All free tiers.
 
 **Decision matrix:**
@@ -1162,7 +1170,7 @@ Canonical:    www.miomika.com
 ### 6.2 HIGH PRIORITY (Phase 2)
 
 11. **lucide-react ^1.14.0 is wrong** — that version is from 2020, missing most modern icons. Bump to latest stable (`^0.46x`).
-12. **Two matchers exist** — consolidate `lib/ai/matcher.ts` and `lib/library/matcher.ts`.
+12. **Two matchers exist** — consolidate `lib/ai/matcher.ts` and `lib/library/matcher.ts`. STILL OPEN as of 2026-05-28: /talk uses template matchLibrary, /api/miomi uses matchLibraryFromDB. Not consolidated. See SYSTEM-MAP.md section 4.
 13. **Samsung Internet voice broken** — show fallback text-mode prompt.
 14. **`phrases_bank` is unused** — wire into engine.
 15. **Markdown stripper too aggressive** — fine now, will eat JSON output later.
@@ -1258,7 +1266,9 @@ Every future Claude or Cursor session reads this first. It is the authoritative 
 | `public.library_promotions_queue` | Pipeline for AI→library promotion (service_role only) | server-only |
 | `public.user_sessions` | Per-user session state | app/api/miomi/session-init/route.ts |
 | `public.vocabulary_user_state` | Per-user word mastery + spiral schedule (Phase 1) | (wired in Phase 3B) |
-| `public.users_legacy_backup` | RENAMED OLD TABLE — historical reference only, do not write | (no code should read this) |
+
+The repo contains no CREATE TABLE for these (except vocabulary_user_state in
+0008). Live Supabase is the schema source of truth. See SYSTEM-MAP.md section 5.
 
 ### 11.2 Hook inventory
 
@@ -1331,7 +1341,7 @@ Every future Claude or Cursor session reads this first. It is the authoritative 
 | 0002_vocabulary_rpcs.sql | ✓ | vocabulary RPCs |
 | 0003_user_sessions_state.sql | ✓ | user_sessions table |
 | 0004-0006 | (skipped) | Were OPUS pipeline; deferred to Phase 4 |
-| 0007_user_extended.sql | ✓ (via inline SQL block) | profiles table + handle_new_user trigger |
+| 0007_user_extended.sql | ✓ (via inline SQL block) | profiles table + handle_new_user trigger. NOTE: 0007 contains a public.users block that conflicts with section 11.8 (users is GONE). Treat public.profiles as the only user table. The users block is dead — annotate or remove in a future code pass (tracked in SYSTEM-MAP.md section 5). |
 | 0008_vocabulary_user_state.sql | ✓ | per-user mastery tracking |
 | 0009_rls_lockdown.sql | needs apply | RLS policies audit |
 | 0010_profile_ui_language.sql | needs apply | profiles.ui_language column |

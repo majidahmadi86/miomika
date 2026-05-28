@@ -1,7 +1,7 @@
 # MIOMIKA — MASTER HANDOFF DOCUMENT
 > **For any new Claude or Cursor session. Read this FIRST.**
 > **Complements `/MIOMIKA.md` (engineering contract).**
-> Last updated: May 22, 2026 — RESET-1 foundation rewrite
+> Last updated: 2026-05-28 — synced to v6 + SYSTEM-MAP
 
 ---
 
@@ -9,7 +9,7 @@
 
 If you are a future Claude or Cursor: this is your single most important context. Mike has been building Miomika for ~3 weeks. He's burned credits on sessions that didn't have full context. Don't be one of them.
 
-Read this fully. Then `/MIOMIKA.md`. Then `/docs/architecture/SCREENS.md`. Only then propose actions.
+Read /SYSTEM-MAP.md FIRST (ground truth), then this file, then /MIOMIKA.md v6.
 
 ---
 
@@ -121,25 +121,10 @@ Characters (K-pop Bunny, Anime Hero, Wise Fox), e-books, outfits, exam packs —
 
 ---
 
-## 5. CURRENT BUILD STATE (after RESET-1)
+## 5. CURRENT BUILD STATE
 
-### Foundation locked
-
-- Migration `0012_brutal_reset.sql` drops `users_legacy_backup` permanently
-- `getServerProfile()` is single source of truth for user identity
-- `/api/auth/post-signup` canonical "where does this user go next?" route
-- Honey-gold replaces pink as primary CTA color across the codebase
-- Documentation v4 reflects reality (`/docs/SCHEMA.md`, `/docs/AUTH-FLOW.md`, `/docs/COLOR-SYSTEM.md`)
-
-### Known issues remaining (RESET-2 addresses these)
-
-- MicButton needs full rewrite — Android Chrome voice still broken on Samsung A52
-- Profile page needs rebuild — versions have drifted over time
-- Polish pass on every CTA verification
-
-### Then Phase 3B = Real teaching brain (Opus 4.7)
-
-Mike's "I see light in this project" rating after Phase 3B will determine whether he opens up the next $50 of credits for Phase 4–7.
+Build state is no longer tracked here — see /SYSTEM-MAP.md section 3 (single
+source of truth) and MIOMIKA.md section 10 state log.
 
 ---
 
@@ -216,10 +201,12 @@ git add -A && git commit -m "Phase N: ..." && git push
 
 ## 8. WHAT THE NEXT SESSION SHOULD DO
 
-1. Read this fully. Then `/MIOMIKA.md` v4.
-2. Confirm context: "I've read MASTER-HANDOFF v4 + MIOMIKA.md v4. Current state: end of RESET-1. Ready for RESET-2?"
-3. Run RESET-2 (MicButton + profile rewrites).
-4. After RESET-2 verified, Phase 3B (real teaching brain, Opus 4.7).
+1. Read `/SYSTEM-MAP.md` first (ground truth: what is built vs not built).
+2. Read `/MIOMIKA.md` v6 (the destination: soul, design, build plan).
+3. Current phase is the brain system (Phase 4). The engine described in
+   SYSTEM-MAP.md section 2 is what becomes the brain — evolve it, do not rebuild it.
+4. Before any code: confirm with Mike which migrations (0009-0012) are actually
+   applied in live Supabase, since the repo cannot verify this.
 
 ---
 
