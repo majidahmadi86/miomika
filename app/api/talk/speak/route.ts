@@ -32,6 +32,37 @@ function buildCacheKey(normalizedText: string, lang: Lang, voiceName: string): s
 }
 
 /**
+ * GET /api/talk/speak — temporary: list Thai Google TTS voices for selection.
+ */
+export async function GET() {
+  const credentialsJson = process.env.GOOGLE_TTS_CREDENTIALS;
+  if (!credentialsJson) {
+    log("voice.speak", "GOOGLE_TTS_CREDENTIALS missing");
+    return NextResponse.json({ error: "list_failed" }, { status: 500 });
+  }
+
+  try {
+    const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
+    const client = new TextToSpeechClient({ credentials });
+
+    const [response] = await client.listVoices({ languageCode: "th-TH" });
+
+    const voices = (response.voices ?? [])
+      .map((v) => ({
+        name: v.name ?? "",
+        ssmlGender: v.ssmlGender ?? "SSML_VOICE_GENDER_UNSPECIFIED",
+        naturalSampleRateHertz: v.naturalSampleRateHertz ?? 0,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return NextResponse.json(voices);
+  } catch (e) {
+    logError("voice.speak", "list voices failed", e);
+    return NextResponse.json({ error: "list_failed" }, { status: 500 });
+  }
+}
+
+/**
  * POST /api/talk/speak
  *
  * Accepts JSON { text, lang, voice? }. Returns { audio: base64, cached: boolean }.
