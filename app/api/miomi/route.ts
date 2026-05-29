@@ -245,10 +245,17 @@ export async function POST(req: NextRequest) {
       masteryEvent = { type: "none" };
     }
 
+    // Teaching only when user is FLOWING and not asking a question. Better to skip than to interrupt.
     const shouldPickWord =
       move === "teach" &&
-      state.exchangeNumber % 3 === 0 &&
-      masteryEvent.type === "none";
+      state.exchangeNumber % 4 === 0 &&
+      state.exchangeNumber >= 4 &&
+      masteryEvent.type === "none" &&
+      !userInput.includes("?") &&
+      userInput.trim().length > 15 &&
+      brainState.emotionalSignal !== "stuck" &&
+      brainState.emotionalSignal !== "sad" &&
+      brainState.intent !== "want_to_learn";
 
     if (shouldPickWord) {
       try {

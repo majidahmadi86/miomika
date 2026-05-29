@@ -26,15 +26,6 @@ function mapVoice(lang: Lang, voice: VoicePref): { voiceName: string; languageCo
   };
 }
 
-/** Lengthen sentence-final warmth markers — spoken audio warmth, not cache keys. */
-function warmEnding(text: string): string {
-  // Only at sentence-end. Order: นะคะ (longer) before ค่ะ to avoid partial match.
-  return text
-    .replace(/นะคะ([\s.!?~]*)$/u, "นะค่าาา$1")
-    .replace(/ค่ะ([\s.!?~]*)$/u, "ค่าาา$1")
-    .replace(/เลย([\s.!?~]*)$/u, "เลยยย$1");
-}
-
 function buildCacheKey(normalizedText: string, lang: Lang, voiceName: string): string {
   const raw = `${normalizedText}|${lang}|${voiceName}`;
   return createHash("sha256").update(raw, "utf8").digest("hex");
@@ -139,9 +130,8 @@ export async function POST(request: NextRequest) {
     const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
     const client = new TextToSpeechClient({ credentials });
 
-    const spokenText = warmEnding(text);
     const [response] = await client.synthesizeSpeech({
-      input: { text: spokenText },
+      input: { text },
       voice: { languageCode, name: voiceName },
       audioConfig: {
         audioEncoding: "MP3",
