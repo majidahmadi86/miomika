@@ -44,7 +44,8 @@ const ENGLISH_VOICE_PRIORITY = [
 
 const RETRY_DELAYS_MS = [0, 250, 400];
 
-let speakInFlight: AbortController | null = null;
+let speakGeneration = 0;
+let activeGeneration = 0;
 
 function pickVoice(voices: SpeechSynthesisVoice[], lang: TtsLang): SpeechSynthesisVoice | undefined {
   const priority = lang === "th" ? THAI_VOICE_PRIORITY : ENGLISH_VOICE_PRIORITY;
@@ -101,35 +102,30 @@ export function stopTts(): void {
   }
   activeUtterance = null;
   window.speechSynthesis?.cancel();
+  activeGeneration = speakGeneration + 1;
 }
 
-async function fetchServerAudio(
+async function fetchServerAudioNoSignal(
   text: string,
   lang: TtsLang,
-  signal: AbortSignal,
   speakingRate?: number,
 ): Promise<string | null> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (signal.aborted) return null;
     const delay = RETRY_DELAYS_MS[attempt] ?? 800;
     if (delay > 0) {
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
-    if (signal.aborted) return null;
     try {
       const body: { text: string; lang: TtsLang; speakingRate?: number } = { text, lang };
-      if (speakingRate !== undefined) {
-        body.speakingRate = speakingRate;
-      }
+      if (speakingRate !== undefined) body.speakingRate = speakingRate;
       const res = await fetch("/api/talk/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal,
       });
       if (!res.ok) {
-        const body = await res.text().catch(() => "(no body)");
-        console.error(`[tts] server returned ${res.status}:`, body);
+        const errBody = await res.text().catch(() => "(no body)");
+        console.error(`[tts] server returned ${res.status}:`, errBody);
         continue;
       }
       const data = (await res.json()) as { audio?: unknown };
@@ -137,54 +133,35 @@ async function fetchServerAudio(
         return data.audio;
       }
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return null;
+      console.error("[tts] fetch threw:", e);
     }
   }
   return null;
 }
 
-async function trySpeakViaServer(
-  text: string,
-  lang: TtsLang,
-  signal: AbortSignal,
+async function playAudioBase64(
+  audioBase64: string,
+  myGen: number,
   callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
-  speakingRate?: number,
-): Promise<boolean> {
-  const audioBase64 = await fetchServerAudio(text, lang, signal, speakingRate);
-  if (!audioBase64 || signal.aborted) return false;
-
+): Promise<void> {
   return new Promise((resolve) => {
     const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
     activeAudio = el;
-
-    const fail = () => {
-      el.pause();
-      el.currentTime = 0;
-      activeAudio = null;
-      resolve(false);
-    };
-
-    const onAbort = () => {
-      el.pause();
-      el.currentTime = 0;
-      activeAudio = null;
-      resolve(false);
-    };
-
-    signal.addEventListener("abort", onAbort, { once: true });
-
     el.onended = () => {
-      signal.removeEventListener("abort", onAbort);
       activeAudio = null;
-      if (!signal.aborted) callbacks?.onEnd?.();
-      resolve(!signal.aborted);
+      if (myGen === activeGeneration) callbacks?.onEnd?.();
+      resolve();
     };
     el.onerror = () => {
-      signal.removeEventListener("abort", onAbort);
-      fail();
+      activeAudio = null;
+      if (myGen === activeGeneration) callbacks?.onError?.();
+      resolve();
     };
-
-    void el.play().catch(fail);
+    void el.play().catch(() => {
+      activeAudio = null;
+      if (myGen === activeGeneration) callbacks?.onError?.();
+      resolve();
+    });
   });
 }
 
@@ -235,33 +212,39 @@ export async function speak(
     return;
   }
 
-  if (speakInFlight) {
-    speakInFlight.abort();
-    speakInFlight = null;
+  speakGeneration += 1;
+  const myGen = speakGeneration;
+  activeGeneration = myGen;
+
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio.currentTime = 0;
+    activeAudio = null;
   }
-  stopTts();
+  if (typeof window !== "undefined" && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
 
-  const ctrl = new AbortController();
-  speakInFlight = ctrl;
-  const { signal } = ctrl;
   const speakingRate = options?.speakingRate;
-
   callbacks?.onStart?.();
 
   try {
-    const serverOk = await trySpeakViaServer(text, lang, signal, callbacks, speakingRate);
-    if (signal.aborted) return;
-    if (serverOk) return;
+    const audioBase64 = await fetchServerAudioNoSignal(text, lang, speakingRate);
 
+    if (myGen !== activeGeneration) return;
+
+    if (audioBase64) {
+      await playAudioBase64(audioBase64, myGen, callbacks);
+      return;
+    }
+
+    if (myGen !== activeGeneration) return;
     console.warn("[tts] FALLBACK FIRED — server failed after retries. Browser voice will play.");
     await speakViaBrowser(text, lang, callbacks, speakingRate);
   } catch (e) {
-    if (e instanceof Error && e.name === "AbortError") return;
+    if (myGen !== activeGeneration) return;
+    console.error("[tts] speak error:", e);
     callbacks?.onError?.();
-  } finally {
-    if (speakInFlight === ctrl) {
-      speakInFlight = null;
-    }
   }
 }
 
