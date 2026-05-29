@@ -73,10 +73,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_form" }, { status: 400 });
   }
 
+  const langHint = typeof clientLang === "string" ? clientLang : null;
   const explicitLang: "th" | "en" | null =
-    clientLang === "th" || clientLang === "th-TH"
+    langHint === "th" || langHint === "th-TH"
       ? "th"
-      : clientLang === "en" || clientLang === "en-US"
+      : langHint === "en" || langHint === "en-US"
         ? "en"
         : null;
   log("voice.transcribe", "lang mode", { explicit: explicitLang ?? "auto-bilingual" });

@@ -99,7 +99,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       try {
         const form = new FormData();
         form.append("audio", wavBlob, "utterance.wav");
-        form.append("language", language);
+        form.append("language", "auto");
         const res = await fetch("/api/talk/transcribe", { method: "POST", body: form, credentials: "include", cache: "no-store" });
         if (!mountedRef.current) return;
         if (!userIntentRef.current) {
@@ -127,7 +127,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         if (mountedRef.current) onStateChange("idle");
       }
     },
-    [language, trace, onStateChange, onTranscript],
+    [trace, onStateChange, onTranscript],
   );
 
   const killVAD = useCallback(() => {
@@ -290,6 +290,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
   }, [disabled, locked, onLockedTap, state, onStateChange, startVAD]);
 
   const onPointerDown = useCallback(() => {
+    try { new Audio().play().catch(() => {}); } catch { /* ignore */ }
     longPressTimerRef.current = window.setTimeout(() => {
       setDebugVisible((v) => !v);
     }, 800);

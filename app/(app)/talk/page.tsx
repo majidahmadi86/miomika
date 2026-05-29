@@ -22,7 +22,7 @@ import {
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
-import { speak, stopTts, detectLang, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
+import { speak, stopTts, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
 import { pickIceBreaker, pickMasteryAdvanced, pickMasteryCelebration } from "@/lib/voice/warmth";
 
 type IntroducedWordPayload = {
@@ -86,14 +86,16 @@ function makeOpenerItem(): CanvasItem {
   return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
 }
 
-/** Dominant language from message text; keeps previous when undecidable. */
+/** Dominant language from this message's text; previous only when undecidable. */
 function resolveMessageLang(text: string, previous: TtsLang): TtsLang {
   const switchCmd = detectLangSwitchCommand(text);
   if (switchCmd) return switchCmd;
   const thaiCount = text.match(/[\u0E00-\u0E7F]/g)?.length ?? 0;
   const latinCount = text.match(/[a-zA-Z]/g)?.length ?? 0;
   if (thaiCount === 0 && latinCount === 0) return previous;
-  return detectLang(text);
+  if (thaiCount >= 3 && thaiCount > latinCount) return "th";
+  if (latinCount >= 3 && latinCount > thaiCount) return "en";
+  return previous;
 }
 
 export default function TalkPage() {
@@ -167,15 +169,17 @@ export default function TalkPage() {
   useEffect(() => {
     if (items.length > 0 || !authReady) return;
     const iceBreaker = pickIceBreaker();
-    const openerLang: TtsLang =
-      profile?.ui_language === "en" || profile?.ui_language === "th"
-        ? profile.ui_language
-        : uiLang;
+    const navIsTh =
+      typeof window !== "undefined" && (navigator.language || "th").startsWith("th");
+    const isThaiLeadUser =
+      profile?.ui_language === "th" ||
+      (profile?.ui_language !== "en" && navIsTh);
+    const openerLang: TtsLang = isThaiLeadUser ? "th" : "en";
     updateConversationLang(openerLang);
     setItems([{ id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en }]);
     // Speak the ice-breaker if TTS is on. Small delay so voices have time to load.
     if (ttsOn) {
-      const speakText = openerLang === "th" ? iceBreaker.th : iceBreaker.en;
+      const speakText = isThaiLeadUser ? iceBreaker.th : iceBreaker.en;
       window.setTimeout(() => {
         if (!mountedRefForTts.current) return;
         setMicState("speaking");
@@ -257,7 +261,13 @@ export default function TalkPage() {
       if (!text.trim()) return;
 
       const trimmed = text.trim();
-      const messageLang = resolveMessageLang(trimmed, conversationLangRef.current);
+      const langFallback: TtsLang =
+        profile?.ui_language === "en" || profile?.ui_language === "th"
+          ? profile.ui_language
+          : uiLang === "en"
+            ? "en"
+            : "th";
+      const messageLang = resolveMessageLang(trimmed, langFallback);
       updateConversationLang(messageLang);
 
       const userItemId = crypto.randomUUID();
@@ -408,7 +418,7 @@ export default function TalkPage() {
         ]);
       }
     },
-    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, updateConversationLang],
+    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, updateConversationLang, profile, uiLang],
   );
 
   const toggleExpand = useCallback((id: string) => {
