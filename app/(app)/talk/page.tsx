@@ -107,10 +107,10 @@ export default function TalkPage() {
     const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
     const parsed = stored ? parseInt(stored, 10) : 0;
     if (!isNaN(parsed) && parsed > 0) setGuestExchangesRaw(parsed);
-    updateConversationLang("th");
-    const lang = navigator.language || "th";
-    const isEnglishUser = lang.startsWith("en");
+    const navLang = navigator.language || "th";
+    const isEnglishUser = navLang.startsWith("en");
     if (isEnglishUser) setUiLang("en");
+    updateConversationLang(isEnglishUser ? "en" : "th");
     const ttsStored = window.localStorage.getItem("miomika.tts_on");
     if (ttsStored !== null) setTtsOn(ttsStored === "1");
     void preloadTtsVoices();
@@ -125,24 +125,28 @@ export default function TalkPage() {
 
   /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
   useEffect(() => {
-    if (items.length > 0) return;
+    if (items.length > 0 || !authReady) return;
     const iceBreaker = pickIceBreaker();
+    const openerLang: TtsLang =
+      profile?.ui_language === "en" || profile?.ui_language === "th"
+        ? profile.ui_language
+        : uiLang;
+    updateConversationLang(openerLang);
     setItems([{ id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en }]);
     // Speak the ice-breaker if TTS is on. Small delay so voices have time to load.
     if (ttsOn) {
-      const lang = conversationLangRef.current;
-      const speakText = lang === "th" ? iceBreaker.th : iceBreaker.en;
+      const speakText = openerLang === "th" ? iceBreaker.th : iceBreaker.en;
       window.setTimeout(() => {
         if (!mountedRefForTts.current) return;
         setMicState("speaking");
-        void speak(speakText, lang, {
+        void speak(speakText, openerLang, {
           onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
           onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
         });
       }, 1200);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length]);
+  }, [items.length, authReady, profile?.ui_language, uiLang]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset + auto-raise CTA on limit */
