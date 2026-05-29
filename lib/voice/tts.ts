@@ -42,7 +42,7 @@ const ENGLISH_VOICE_PRIORITY = [
   "en-GB",
 ];
 
-const RETRY_DELAYS_MS = [0, 250, 400, 600, 800];
+const RETRY_DELAYS_MS = [0, 250, 400];
 
 let speakInFlight: AbortController | null = null;
 
@@ -109,7 +109,7 @@ async function fetchServerAudio(
   signal: AbortSignal,
   speakingRate?: number,
 ): Promise<string | null> {
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     if (signal.aborted) return null;
     const delay = RETRY_DELAYS_MS[attempt] ?? 800;
     if (delay > 0) {
@@ -127,7 +127,11 @@ async function fetchServerAudio(
         body: JSON.stringify(body),
         signal,
       });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        const body = await res.text().catch(() => "(no body)");
+        console.error(`[tts] server returned ${res.status}:`, body);
+        continue;
+      }
       const data = (await res.json()) as { audio?: unknown };
       if (typeof data.audio === "string" && data.audio.length > 0) {
         return data.audio;
@@ -249,16 +253,8 @@ export async function speak(
     if (signal.aborted) return;
     if (serverOk) return;
 
-    if (process.env.NEXT_PUBLIC_TTS_ALLOW_BROWSER_FALLBACK === "true") {
-      console.error(
-        "[tts] FALLBACK FIRED — server voice failed after 5 tries. text:",
-        text.slice(0, 40),
-      );
-      await speakViaBrowser(text, lang, callbacks, speakingRate);
-    } else {
-      console.error("[tts] FALLBACK SUPPRESSED — server failed 5x, staying silent");
-      callbacks?.onError?.();
-    }
+    console.warn("[tts] FALLBACK FIRED — server failed after retries. Browser voice will play.");
+    await speakViaBrowser(text, lang, callbacks, speakingRate);
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") return;
     callbacks?.onError?.();

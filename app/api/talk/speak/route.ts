@@ -154,10 +154,12 @@ export async function POST(request: NextRequest) {
     }
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
+    const stack =
+      e instanceof Error && e.stack ? e.stack.slice(0, 200) : String(e).slice(0, 200);
     console.error("[tts.speak] google synth failed:", detail, e);
     logError("voice.speak", "google tts failed", e);
     Sentry.captureException(e, { tags: { stage: "google.tts" } });
-    return NextResponse.json({ error: "tts_failed", detail }, { status: 500 });
+    return NextResponse.json({ error: "tts_failed", detail, stack }, { status: 500 });
   }
 
   // --- 3-strike cache write ---
