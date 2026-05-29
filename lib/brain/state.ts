@@ -1,0 +1,211 @@
+// SERVER ONLY. Reads user situation before generating a reply — no AI calls.
+
+import { getServerProfile } from "@/lib/auth/get-server-profile";
+import { createServiceClient } from "@/lib/supabase/service";
+import { getRecentExchanges } from "@/lib/brain/memory";
+
+export type EmotionalSignal =
+  | "warm"
+  | "stuck"
+  | "sad"
+  | "excited"
+  | "curious"
+  | "neutral";
+
+export type Intent =
+  | "chat"
+  | "want_to_learn"
+  | "practice"
+  | "struggling"
+  | "venting"
+  | "greeting"
+  | "goodbye";
+
+export type DetectedLang = "th" | "en" | "mixed";
+
+export interface BrainState {
+  profile: {
+    id: string | null;
+    displayName: string | null;
+    uiLanguage: "th" | "en";
+    learningTarget: "th" | "en" | null;
+    journeyStage: string | null;
+    tier: "guest" | "free" | "pro" | "pro_max";
+    cefrLevel: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null;
+    catName: string | null;
+  };
+  memory: Array<{ role: "user" | "miomi"; content: string }>;
+  masteredWords: string[];
+  introducedWords: string[];
+  nowLanguage: DetectedLang;
+  emotionalSignal: EmotionalSignal;
+  intent: Intent;
+  isFirstExchange: boolean;
+  exchangeNumber: number;
+  isGuest: boolean;
+}
+
+export async function readBrainState(args: {
+  userInput: string;
+  sessionId: string;
+  exchangeNumber: number;
+}): Promise<BrainState> {
+  const { userInput, exchangeNumber } = args;
+
+  const profile = await getServerProfile();
+  const isGuest = !profile;
+
+  let catName: string | null = null;
+  const masteredWords: string[] = [];
+  const introducedWords: string[] = [];
+  let memory: Array<{ role: "user" | "miomi"; content: string }> = [];
+
+  const uiLanguage = profile?.ui_language ?? "th";
+  const learningTarget = normalizeLearningTarget(
+    profile?.learning_target_language ?? null,
+  );
+
+  if (profile) {
+    try {
+      const supabase = await createServiceClient();
+
+      const [exchanges, profileRow, vocabRows] = await Promise.all([
+        getRecentExchanges(profile.id, 10),
+        supabase
+          .from("profiles")
+          .select("cat_name")
+          .eq("id", profile.id)
+          .maybeSingle(),
+        supabase
+          .from("vocabulary_user_state")
+          .select("word_en, mastered_at")
+          .eq("user_id", profile.id),
+      ]);
+
+      memory = exchanges
+        .filter(
+          (row): row is { role: "user" | "miomi"; content: string; created_at: string } =>
+            row.role === "user" || row.role === "miomi",
+        )
+        .map(({ role, content }) => ({ role, content }));
+
+      if (profileRow.error) {
+        console.error(
+          "[brain.readBrainState] profile extras failed:",
+          profileRow.error.message,
+          profileRow.error.details,
+        );
+      } else {
+        catName = (profileRow.data?.cat_name as string | null) ?? null;
+      }
+
+      if (vocabRows.error) {
+        console.error(
+          "[brain.readBrainState] vocabulary query failed:",
+          vocabRows.error.message,
+          vocabRows.error.details,
+        );
+      } else {
+        for (const row of vocabRows.data ?? []) {
+          const word = (row.word_en as string | null) ?? null;
+          if (!word) continue;
+          if (row.mastered_at) {
+            masteredWords.push(word);
+          } else {
+            introducedWords.push(word);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[brain.readBrainState] DB read failed:", err);
+    }
+  }
+
+  const nowLanguage = detectLanguage(userInput, uiLanguage);
+  const emotionalSignal = detectEmotionalSignal(userInput);
+  const intent = detectIntent(userInput, emotionalSignal);
+  const isFirstExchange = exchangeNumber <= 1 && memory.length === 0;
+
+  return {
+    profile: {
+      id: profile?.id ?? null,
+      displayName: profile?.display_name ?? null,
+      uiLanguage,
+      learningTarget,
+      journeyStage: profile?.journey_stage ?? null,
+      tier: profile?.tier ?? "guest",
+      cefrLevel: null,
+      catName,
+    },
+    memory,
+    masteredWords,
+    introducedWords,
+    nowLanguage,
+    emotionalSignal,
+    intent,
+    isFirstExchange,
+    exchangeNumber,
+    isGuest,
+  };
+}
+
+function normalizeLearningTarget(raw: string | null): "th" | "en" | null {
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  if (lower.startsWith("th") || lower === "thai") return "th";
+  if (lower.startsWith("en") || lower === "english") return "en";
+  return null;
+}
+
+function detectLanguage(userInput: string, fallback: "th" | "en"): DetectedLang {
+  const thaiMatches = userInput.match(/[\u0E00-\u0E7F]/g);
+  const latinMatches = userInput.match(/[a-zA-Z]/g);
+  const thai = thaiMatches?.length ?? 0;
+  const latin = latinMatches?.length ?? 0;
+
+  if (thai > latin * 2) return "th";
+  if (latin > thai * 2) return "en";
+  if (thai >= 3 && latin >= 3) return "mixed";
+  return fallback;
+}
+
+function detectEmotionalSignal(userInput: string): EmotionalSignal {
+  if (/sad|tired|cry|hate|เหนื่อย|เศร้า|เบื่อ|ท้อ/i.test(userInput)) {
+    return "sad";
+  }
+  if (/don'?t (understand|know|get it)|ไม่เข้าใจ|งง|ยาก|hard|difficult/i.test(userInput)) {
+    return "stuck";
+  }
+  if (/!|love|wow|เย่|เก่ง|ดีจัง|cool|amazing/i.test(userInput)) {
+    return "excited";
+  }
+  if (/\?|why|how|what|ทำไม|ยังไง|อะไร/.test(userInput)) {
+    return "curious";
+  }
+  if (/thank|ขอบ|รัก|happy|good/i.test(userInput)) {
+    return "warm";
+  }
+  return "neutral";
+}
+
+function detectIntent(userInput: string, emotionalSignal: EmotionalSignal): Intent {
+  if (/^(hi|hello|hey|สวัสดี|หวัด|หวัดดี)/i.test(userInput.trim())) {
+    return "greeting";
+  }
+  if (/(bye|goodbye|บาย|ลาก่อน|เจอกัน)/i.test(userInput)) {
+    return "goodbye";
+  }
+  if (/(teach|learn|สอน|เรียน)/i.test(userInput)) {
+    return "want_to_learn";
+  }
+  if (/(practice|ฝึก|roleplay|conversation)/i.test(userInput)) {
+    return "practice";
+  }
+  if (emotionalSignal === "stuck") {
+    return "struggling";
+  }
+  if (emotionalSignal === "sad") {
+    return "venting";
+  }
+  return "chat";
+}
