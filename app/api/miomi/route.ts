@@ -5,7 +5,6 @@ import {
   logInteraction,
   type MatchContext,
 } from "@/lib/library/supabase-matcher";
-import { createClient } from "@/lib/supabase/server";
 import {
   createSessionState,
   updateSessionWithIntent,
@@ -14,7 +13,7 @@ import {
 } from "@/lib/ai/session";
 import { classifyIntentAdvanced } from "@/lib/ai/intents";
 import { buildClarificationPrompt } from "@/lib/ai/prompt";
-import { cefrToLevel, getWordForSession } from "@/lib/ai/vocabulary";
+import { cefrToLevel } from "@/lib/ai/vocabulary";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
 import {
   pickPhrase,
@@ -26,12 +25,19 @@ import { saveExchange } from "@/lib/brain/memory";
 import { readBrainState, type BrainState } from "@/lib/brain/state";
 import { chooseMove, type Move } from "@/lib/brain/move";
 import { buildBrainPrompt } from "@/lib/brain/prompt";
+import {
+  detectReuseAndAdvance,
+  introduceWord,
+  pickWordToIntroduce,
+  type IntroducedWord,
+  type MasteryEvent,
+} from "@/lib/brain/teaching";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 type MiomiResponse = {
   content: string;
-  wordCard: unknown | null;
+  wordCard: IntroducedWord | null;
   phraseCard: unknown | null;
   creatorAsset: unknown | null;
   sessionContext: Partial<SessionState>;
@@ -40,6 +46,7 @@ type MiomiResponse = {
   intent: string | null;
   sessionMode: string;
   needsClarification: boolean;
+  masteryEvent: MasteryEvent | null;
 };
 
 const BRAIN_PROMPT_FALLBACK =
@@ -114,6 +121,7 @@ export async function POST(req: NextRequest) {
         intent: null,
         sessionMode: state.sessionMode,
         needsClarification: false,
+        masteryEvent: null,
       } satisfies MiomiResponse);
     }
 
@@ -185,6 +193,7 @@ export async function POST(req: NextRequest) {
         intent: "social_emotion_negative",
         sessionMode: state.sessionMode,
         needsClarification: false,
+        masteryEvent: null,
       } satisfies MiomiResponse);
     }
 
@@ -210,7 +219,55 @@ export async function POST(req: NextRequest) {
         intent: "meta_clarification_needed",
         sessionMode: state.sessionMode,
         needsClarification: true,
+        masteryEvent: null,
       } satisfies MiomiResponse);
+    }
+
+    // ── BRAIN STEP 4: mastery detect + optional word introduce ───────────────
+    const introducedWordKeys = [
+      ...new Set([...brainState.introducedWords, ...state.wordsIntroduced]),
+    ];
+    const masteredWordKeys = [
+      ...new Set([...brainState.masteredWords, ...state.wordsUsedCorrectly]),
+    ];
+
+    let masteryEvent: MasteryEvent = { type: "none" };
+    let wordToIntroduce: IntroducedWord | null = null;
+
+    try {
+      masteryEvent = await detectReuseAndAdvance({
+        userId: serverUserId,
+        userText: userInput,
+        introducedWords: brainState.introducedWords,
+      });
+    } catch (err) {
+      console.error("[brain] detectReuseAndAdvance failed:", err);
+      masteryEvent = { type: "none" };
+    }
+
+    const shouldPickWord =
+      move === "teach" &&
+      state.exchangeNumber % 3 === 0 &&
+      masteryEvent.type === "none";
+
+    if (shouldPickWord) {
+      try {
+        wordToIntroduce = await pickWordToIntroduce({
+          userId: serverUserId,
+          cefrLevel: brainState.profile.cefrLevel,
+          learningTarget: brainState.profile.learningTarget,
+          alreadyIntroducedWords: introducedWordKeys,
+          alreadyMasteredWords: masteredWordKeys,
+          tier: brainState.profile.tier,
+        });
+      } catch (err) {
+        console.error("[brain] pickWordToIntroduce failed:", err);
+        wordToIntroduce = null;
+      }
+    }
+
+    if (wordToIntroduce) {
+      adaptivePrompt += `\n\nTEACHING HINT: Naturally weave the word "${wordToIntroduce.word_en}" (${wordToIntroduce.word_th}) into your reply ONE time. Use it in context, don't define it formally — like a friend dropping it into conversation. The system will show the user a card after your reply.`;
     }
 
     // ── STAGE 7: Check library with brain-enriched context ───────────────────
@@ -224,23 +281,7 @@ export async function POST(req: NextRequest) {
       emotionalMomentum: brainState.emotionalSignal,
     };
 
-    const supabase = await createClient();
     const matchResult = await matchLibraryFromDB(userInput, matchContext);
-
-    // ── STAGE 8: Get word to introduce ───────────────────────────────────────
-    const shouldIntroduceWord =
-      (state.exchangeNumber === 2 || state.exchangeNumber === 5) &&
-      state.sessionMode === "learning" &&
-      intentResult.family !== "creating";
-
-    let wordToIntroduce = null;
-    if (shouldIntroduceWord) {
-      wordToIntroduce = await getWordForSession(
-        state.estimatedLevel,
-        state.wordsIntroduced,
-        supabase
-      );
-    }
 
     // ── STAGE 10: Serve from library or AI ───────────────────────────────────
     let content: string;
@@ -310,8 +351,23 @@ export async function POST(req: NextRequest) {
       move,
     });
 
+    if (wordToIntroduce) {
+      void introduceWord({ userId: serverUserId, word: wordToIntroduce });
+    }
+
+    if (wordToIntroduce) {
+      servedVia += "__taught";
+    }
+    if (masteryEvent.type === "mastered") {
+      servedVia += "__mastered";
+    } else if (masteryEvent.type === "advanced") {
+      servedVia += "__advanced";
+    }
+
     // ── STAGE 11: Extract teaching artifacts ─────────────────────────────────
     const wordCard = wordToIntroduce ?? null;
+    const responseMasteryEvent =
+      masteryEvent.type === "none" ? null : masteryEvent;
 
     // Creator asset — if intent is creator family, save the output
     const creatorAsset = intentResult.family === "creating"
@@ -327,8 +383,7 @@ export async function POST(req: NextRequest) {
     if (wordToIntroduce) {
       state = {
         ...state,
-        wordsIntroduced: [...state.wordsIntroduced, wordToIntroduce.word],
-        currentTargetWord: wordToIntroduce,
+        wordsIntroduced: [...state.wordsIntroduced, wordToIntroduce.word_en],
       };
     }
 
@@ -357,6 +412,7 @@ export async function POST(req: NextRequest) {
       intent: intentResult.primary.intent,
       sessionMode: state.sessionMode,
       needsClarification: false,
+      masteryEvent: responseMasteryEvent,
     } satisfies MiomiResponse);
 
   } catch (error: unknown) {
@@ -375,6 +431,7 @@ export async function POST(req: NextRequest) {
         intent: null,
         sessionMode: "learning",
         needsClarification: false,
+        masteryEvent: null,
       } satisfies MiomiResponse,
       { status: 200 }
     );
