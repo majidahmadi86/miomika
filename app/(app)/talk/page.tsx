@@ -118,9 +118,9 @@ export default function TalkPage() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
-    if (profile?.ui_language) {
-      updateConversationLang(profile.ui_language);
-    }
+    if (!profile?.ui_language) return;
+    const lang = profile.ui_language;
+    queueMicrotask(() => updateConversationLang(lang));
   }, [profile?.ui_language, updateConversationLang]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
