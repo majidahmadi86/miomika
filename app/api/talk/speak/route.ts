@@ -26,11 +26,13 @@ function mapVoice(lang: Lang, voice: VoicePref): { voiceName: string; languageCo
   };
 }
 
-/** Lengthen sentence-final ค่ะ only — spoken audio warmth, not cache keys. */
+/** Lengthen sentence-final warmth markers — spoken audio warmth, not cache keys. */
 function warmEnding(text: string): string {
-  // Only at sentence-end. Lengthen ค่ะ → ค่าาา. Do NOT touch ค่ะ mid-sentence.
-  // Do not modify any other word.
-  return text.replace(/ค่ะ([\s.!?~]*)$/u, "ค่าาา$1");
+  // Only at sentence-end. Order: นะคะ (longer) before ค่ะ to avoid partial match.
+  return text
+    .replace(/นะคะ([\s.!?~]*)$/u, "นะค่าาา$1")
+    .replace(/ค่ะ([\s.!?~]*)$/u, "ค่าาา$1")
+    .replace(/เลย([\s.!?~]*)$/u, "เลยยย$1");
 }
 
 function buildCacheKey(normalizedText: string, lang: Lang, voiceName: string): string {
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
   const voiceName = explicitVoiceName || mapped.voiceName;
   const languageCode = mapped.languageCode;
 
-  const defaultSpeakingRate = 0.9;
+  const defaultSpeakingRate = 0.93;
   const speakingRate =
     typeof body.speakingRate === "number" &&
     body.speakingRate >= 0.5 &&
