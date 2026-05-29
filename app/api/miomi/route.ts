@@ -43,6 +43,7 @@ import {
   GUIDANCE_GUEST_LIMIT_HIT,
 } from "@/lib/voice/warmth";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
+import { saveExchange } from "@/lib/brain/memory";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -110,8 +111,15 @@ export async function POST(req: NextRequest) {
     // ── SERVER-SIDE GUEST LIMIT (never trust client) ──────────────────────────
     if (serverIsGuest && state.exchangeNumber >= GUEST_EXCHANGE_LIMIT) {
       const lang = state.primaryLanguage === "english" ? "en" : "th";
+      const guestLimitContent = pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang });
+      persistExchangePair({
+        userId: serverUserId,
+        state,
+        userInput,
+        miomiContent: guestLimitContent,
+      });
       return NextResponse.json({
-        content: pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang }),
+        content: guestLimitContent,
         wordCard: null,
         phraseCard: null,
         creatorAsset: null,
@@ -141,8 +149,17 @@ export async function POST(req: NextRequest) {
     // Never teach when user is frustrated. Face-saving is enforced.
     if (intentResult.family === "social" && intentResult.primary.intent === "social_emotion_negative") {
       const lang = state.primaryLanguage === "english" ? "en" : "th";
+      const recoveryContent = pickPhrase(RECOVERY_STRUGGLE, { lang });
+      persistExchangePair({
+        userId: serverUserId,
+        state,
+        userInput,
+        miomiContent: recoveryContent,
+        intent: "social_emotion_negative",
+        emotionalSignal: "negative",
+      });
       return NextResponse.json({
-        content: pickPhrase(RECOVERY_STRUGGLE, { lang }),
+        content: recoveryContent,
         wordCard: null,
         phraseCard: null,
         creatorAsset: null,
@@ -158,6 +175,13 @@ export async function POST(req: NextRequest) {
     // ── STAGE 5: Handle clarification needed ─────────────────────────────────
     if (intentResult.needsClarification) {
       const clarification = buildClarificationPrompt(state.primaryLanguage);
+      persistExchangePair({
+        userId: serverUserId,
+        state,
+        userInput,
+        miomiContent: clarification,
+        intent: "meta_clarification_needed",
+      });
       return NextResponse.json({
         content: clarification,
         wordCard: null,
@@ -234,6 +258,8 @@ export async function POST(req: NextRequest) {
     let servedVia: string;
     let wasFailover = false;
 
+    let aiCostUsd = 0;
+
     if (matchResult.type === "library") {
       const { match } = matchResult;
       const thPart = match.follow_up_question_th
@@ -270,6 +296,7 @@ export async function POST(req: NextRequest) {
       content = result.content;
       servedVia = `ai_${result.engine}`;
       wasFailover = result.wasFailover;
+      aiCostUsd = result.engine === "groq" ? 0 : 0.0008;
 
       void logInteraction({
         sessionId: state.sessionId,
@@ -280,9 +307,18 @@ export async function POST(req: NextRequest) {
         servedVia,
         libraryEntryId: null,
         matchConfidence: null,
-        aiCostUsd: result.engine === "groq" ? 0 : 0.0008,
+        aiCostUsd,
       });
     }
+
+    persistExchangePair({
+      userId: serverUserId,
+      state,
+      userInput,
+      miomiContent: content,
+      aiCostUsd,
+      intent: intentResult.primary.intent,
+    });
 
     // ── STAGE 11: Extract teaching artifacts ─────────────────────────────────
     const wordCard = wordToIntroduce ?? null;
@@ -396,6 +432,49 @@ function detectPlatform(message: string): string {
   if (/(youtube|ยูทูบ)/.test(lower)) return "YouTube";
   if (/(line|ไลน์)/.test(lower)) return "LINE";
   return "general";
+}
+
+function persistExchangePair(params: {
+  userId: string | null;
+  state: SessionState;
+  userInput: string;
+  miomiContent: string;
+  aiCostUsd?: number;
+  intent?: string | null;
+  emotionalSignal?: string | null;
+  move?: string | null;
+}): void {
+  const {
+    userId,
+    state,
+    userInput,
+    miomiContent,
+    aiCostUsd,
+    intent,
+    emotionalSignal,
+    move,
+  } = params;
+
+  void saveExchange({
+    userId,
+    sessionId: state.sessionId,
+    exchangeNumber: state.exchangeNumber,
+    role: "user",
+    content: userInput,
+    language: state.primaryLanguage,
+  });
+  void saveExchange({
+    userId,
+    sessionId: state.sessionId,
+    exchangeNumber: state.exchangeNumber,
+    role: "miomi",
+    content: miomiContent,
+    language: state.primaryLanguage,
+    aiCostUsd,
+    intent: intent ?? null,
+    emotionalSignal: emotionalSignal ?? null,
+    move: move ?? null,
+  });
 }
 
 async function updateTimesServed(entryId: string) {
