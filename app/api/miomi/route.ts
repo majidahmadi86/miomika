@@ -54,6 +54,8 @@ type MiomiResponse = {
   needsClarification: boolean;
   masteryEvent: MasteryEvent | null;
   pronunciationLesson: PronunciationLesson | null;
+  replyLanguage: "th" | "en";
+  userSpeaksLanguage: "th" | "en";
 };
 
 const BRAIN_PROMPT_FALLBACK =
@@ -117,6 +119,7 @@ export async function POST(req: NextRequest) {
         userInput,
         miomiContent: guestLimitContent,
       });
+      const guestReplyLang = lang;
       return NextResponse.json({
         content: guestLimitContent,
         wordCard: null,
@@ -130,6 +133,8 @@ export async function POST(req: NextRequest) {
         needsClarification: false,
         masteryEvent: null,
         pronunciationLesson: null,
+        replyLanguage: guestReplyLang,
+        userSpeaksLanguage: guestReplyLang,
       } satisfies MiomiResponse);
     }
 
@@ -156,7 +161,7 @@ export async function POST(req: NextRequest) {
           if (lesson) {
             const replyTh = `ดีเลยค่า~ มาฝึกออกเสียงกันค่ะ คำว่า "${lesson.word_th || lesson.word}" แปลว่า ${lesson.meaning_th}. ลองพูดตามหนูทีละพยางค์นะคะ — ${lesson.syllables.join(" · ")}. พร้อมแล้วลองพูดให้หนูฟังได้เลยค่า~`;
             const replyEn = `Let's practice~ The word "${lesson.word}" means ${lesson.meaning_en}. Try saying it with me, one syllable at a time — ${lesson.syllables.join(" · ")}. When you're ready, say it back to me~`;
-            const useLang = brainState.nowLanguage === "th" ? "th" : "en";
+            const useLang = brainState.userSpeaksLanguage;
             const content = useLang === "th" ? replyTh : replyEn;
 
             persistExchangePair({
@@ -169,6 +174,7 @@ export async function POST(req: NextRequest) {
 
             state = { ...state, exchangeNumber: state.exchangeNumber + 1 };
 
+            const pronReplyLang = brainState.userSpeaksLanguage;
             return NextResponse.json({
               content,
               wordCard: null,
@@ -182,6 +188,8 @@ export async function POST(req: NextRequest) {
               needsClarification: false,
               masteryEvent: null,
               pronunciationLesson: lesson,
+              replyLanguage: pronReplyLang,
+              userSpeaksLanguage: pronReplyLang,
             } satisfies MiomiResponse);
           }
         }
@@ -189,6 +197,11 @@ export async function POST(req: NextRequest) {
 
       move = chooseMove(brainState);
       adaptivePrompt = buildBrainPrompt({ state: brainState, move, userInput });
+      if (brainState.isPracticeAttempt && brainState.learningTargetLanguage) {
+        const speaks = brainState.userSpeaksLanguage;
+        const target = brainState.learningTargetLanguage;
+        adaptivePrompt += `\n\nPRACTICE MODE: The user just spoke '${userInput}' in ${target} as practice. Stay in ${speaks}. Echo their attempt, give one warm piece of feedback, invite repeat or progression.`;
+      }
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
       }
@@ -203,7 +216,7 @@ export async function POST(req: NextRequest) {
       adaptivePrompt = BRAIN_PROMPT_FALLBACK;
     }
 
-    // ── Language from brain (replaces detectPrimaryLanguage flow) ────────────
+    // ── Sticky speaking language for memory + session ───────────────────────
     state = {
       ...state,
       primaryLanguage: brainLanguageToSession(brainState),
@@ -233,6 +246,7 @@ export async function POST(req: NextRequest) {
         emotionalSignal: "negative",
         move,
       });
+      const recoveryReplyLang = brainReplyLang(brainState);
       return NextResponse.json({
         content: recoveryContent,
         wordCard: null,
@@ -246,6 +260,8 @@ export async function POST(req: NextRequest) {
         needsClarification: false,
         masteryEvent: null,
         pronunciationLesson: null,
+        replyLanguage: recoveryReplyLang,
+        userSpeaksLanguage: brainState.userSpeaksLanguage,
       } satisfies MiomiResponse);
     }
 
@@ -260,6 +276,7 @@ export async function POST(req: NextRequest) {
         intent: "meta_clarification_needed",
         move,
       });
+      const clarifyReplyLang = brainReplyLang(brainState);
       return NextResponse.json({
         content: clarification,
         wordCard: null,
@@ -273,6 +290,8 @@ export async function POST(req: NextRequest) {
         needsClarification: true,
         masteryEvent: null,
         pronunciationLesson: null,
+        replyLanguage: clarifyReplyLang,
+        userSpeaksLanguage: brainState.userSpeaksLanguage,
       } satisfies MiomiResponse);
     }
 
@@ -464,6 +483,7 @@ export async function POST(req: NextRequest) {
       lastUserSignal: userInput.slice(0, 100),
     };
 
+    const replyLanguage = brainState.userSpeaksLanguage;
     return NextResponse.json({
       content,
       wordCard,
@@ -477,6 +497,8 @@ export async function POST(req: NextRequest) {
       needsClarification: false,
       masteryEvent: responseMasteryEvent,
       pronunciationLesson: null,
+      replyLanguage,
+      userSpeaksLanguage: brainState.userSpeaksLanguage,
     } satisfies MiomiResponse);
 
   } catch (error: unknown) {
@@ -497,6 +519,8 @@ export async function POST(req: NextRequest) {
         needsClarification: false,
         masteryEvent: null,
         pronunciationLesson: null,
+        replyLanguage: "th",
+        userSpeaksLanguage: "th",
       } satisfies MiomiResponse,
       { status: 200 }
     );
@@ -506,14 +530,11 @@ export async function POST(req: NextRequest) {
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function brainReplyLang(brainState: BrainState): "th" | "en" {
-  if (brainState.nowLanguage === "mixed") {
-    return brainState.profile.uiLanguage;
-  }
-  return brainState.nowLanguage;
+  return brainState.userSpeaksLanguage;
 }
 
 function brainLanguageToSession(brainState: BrainState): SessionState["primaryLanguage"] {
-  return brainReplyLang(brainState) === "en" ? "english" : "thai";
+  return brainState.userSpeaksLanguage === "en" ? "english" : "thai";
 }
 
 function createDefaultBrainState(args: {
@@ -536,6 +557,9 @@ function createDefaultBrainState(args: {
     masteredWords: [],
     introducedWords: [],
     nowLanguage: "th",
+    userSpeaksLanguage: "th",
+    learningTargetLanguage: null,
+    isPracticeAttempt: false,
     emotionalSignal: "neutral",
     frustrationSignal: false,
     repetitionDetected: false,

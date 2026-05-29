@@ -22,7 +22,7 @@ import {
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
-import { speak, stopTts, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
+import { speak, stopTts, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
 import { pickIceBreaker, pickMasteryAdvanced, pickMasteryCelebration } from "@/lib/voice/warmth";
 
 type IntroducedWordPayload = {
@@ -46,6 +46,8 @@ type MiomiApiResponse = {
   wordCard?: IntroducedWordPayload | null;
   masteryEvent?: MasteryEventPayload;
   pronunciationLesson?: PronunciationLessonPayload | null;
+  replyLanguage?: "th" | "en";
+  userSpeaksLanguage?: "th" | "en";
 };
 
 type CanvasItem =
@@ -94,18 +96,6 @@ function toVocabularyEntry(word: IntroducedWordPayload): VocabularyEntry {
 function makeOpenerItem(): CanvasItem {
   const iceBreaker = pickIceBreaker();
   return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
-}
-
-/** Dominant language from this message's text; previous only when undecidable. */
-function resolveMessageLang(text: string, previous: TtsLang): TtsLang {
-  const switchCmd = detectLangSwitchCommand(text);
-  if (switchCmd) return switchCmd;
-  const thaiCount = text.match(/[\u0E00-\u0E7F]/g)?.length ?? 0;
-  const latinCount = text.match(/[a-zA-Z]/g)?.length ?? 0;
-  if (thaiCount === 0 && latinCount === 0) return previous;
-  if (thaiCount >= 3 && thaiCount > latinCount) return "th";
-  if (latinCount >= 3 && latinCount > thaiCount) return "en";
-  return previous;
 }
 
 export default function TalkPage() {
@@ -271,8 +261,7 @@ export default function TalkPage() {
       if (!text.trim()) return;
 
       const trimmed = text.trim();
-      const messageLang = resolveMessageLang(trimmed, conversationLangRef.current);
-      updateConversationLang(messageLang);
+      const speakLang = conversationLangRef.current;
 
       const userItemId = crypto.randomUUID();
       setItems((prev) => {
@@ -298,7 +287,7 @@ export default function TalkPage() {
             messages: [{ role: "user", content: trimmed }],
             sessionInstruction: (() => {
               const lengthRule = respLength === "short" ? "Under 25 words." : respLength === "detailed" ? "60-100 words, thorough." : "Under 50 words.";
-              const userLang = messageLang;
+              const userLang = speakLang;
               const langRule = userLang === "th"
                 ? "The user spoke in Thai. Respond in Thai ONLY. Be warm and natural."
                 : "The user spoke in English. Respond in English ONLY. Be warm and natural. Do NOT add Thai unless they ask to learn Thai.";
@@ -311,18 +300,21 @@ export default function TalkPage() {
         });
         if (!res.ok) throw new Error("api failed");
         const data = (await res.json()) as MiomiApiResponse;
+        const replyLang: TtsLang = data.replyLanguage ?? data.userSpeaksLanguage ?? speakLang;
+        updateConversationLang(replyLang);
+
         const content = data.content ?? "";
         const parts = content.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
         const primary = parts[0] ?? content;
         const secondary = parts[1] ?? "";
-        let textTh = messageLang === "th" ? primary : secondary;
-        let textEn = messageLang === "en" ? primary : secondary;
+        let textTh = replyLang === "th" ? primary : secondary;
+        let textEn = replyLang === "en" ? primary : secondary;
 
         const mastery = data.masteryEvent;
         if (mastery?.type === "advanced" && mastery.word) {
           const advTh = pickMasteryAdvanced(mastery.word, "th");
           const advEn = pickMasteryAdvanced(mastery.word, "en");
-          if (messageLang === "th") {
+          if (replyLang === "th") {
             textTh = [primary, advTh].filter(Boolean).join("\n\n");
           } else {
             textEn = [primary, advEn].filter(Boolean).join("\n\n");
@@ -401,11 +393,11 @@ export default function TalkPage() {
           }, 600);
         }
 
-        const rawSpeakText = messageLang === "th" ? (textTh || primary) : (textEn || primary);
+        const rawSpeakText = replyLang === "th" ? (textTh || primary) : (textEn || primary);
         const speakText = stripForTts(rawSpeakText);
         if (ttsOn && speakText) {
           setMicState("speaking");
-          void speak(speakText, messageLang, {
+          void speak(speakText, replyLang, {
             onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
             onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
           });

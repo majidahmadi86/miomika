@@ -1,6 +1,13 @@
 import type { BrainState } from "@/lib/brain/state";
 
-export type Move = "casual" | "teach" | "listen" | "practice" | "celebrate" | "repair";
+export type Move =
+  | "casual"
+  | "teach"
+  | "listen"
+  | "practice"
+  | "practice_feedback"
+  | "celebrate"
+  | "repair";
 
 export function chooseMove(s: BrainState): Move {
   if (s.frustrationSignal || s.repetitionDetected) {
@@ -11,6 +18,9 @@ export function chooseMove(s: BrainState): Move {
   }
   if (s.emotionalSignal === "stuck" || s.intent === "struggling") {
     return "listen";
+  }
+  if (s.isPracticeAttempt) {
+    return "practice_feedback";
   }
   if (s.intent === "practice") {
     return "practice";
@@ -30,7 +40,12 @@ export function chooseMove(s: BrainState): Move {
   return s.exchangeNumber % 2 === 0 ? "teach" : "casual";
 }
 
-export function moveInstruction(move: Move, lang: "th" | "en"): string {
+export function moveInstruction(move: Move, lang: "th" | "en", state?: BrainState): string {
+  const speaks = state?.userSpeaksLanguage ?? lang;
+  const target = state?.learningTargetLanguage ?? "th";
+  const speaksLabel = speaks === "th" ? "Thai" : "English";
+  const targetLabel = target === "th" ? "Thai" : "English";
+
   const instructions: Record<Move, { th: string; en: string }> = {
     casual: {
       en: "Have a warm, light conversation. Ask a small follow-up. Do NOT teach.",
@@ -55,6 +70,10 @@ export function moveInstruction(move: Move, lang: "th" | "en"): string {
     repair: {
       en: "The user is frustrated or you've been looping. Acknowledge directly and softly: 'You're right, I keep missing what you mean. Tell me again, slowly?' DO NOT teach. DO NOT ask a big question. Just listen and acknowledge. ONE sentence max.",
       th: "คุณกำลังหงุดหงิดหรือรู้สึกว่าหนูพูดวนๆ. ยอมรับโดยตรงและขอโทษเบาๆ บอกว่า 'หนูฟังไม่ดีพอค่า ลองเล่าใหม่ช้าๆ ได้ไหมคะ?' อย่าสอนอะไรเลย. อย่าถามคำถามใหญ่. แค่ฟังและรับรู้.",
+    },
+    practice_feedback: {
+      en: `The user just spoke a target-language word to PRACTICE — they are not switching languages. Stay in their speaking language (${speaksLabel}). Acknowledge what they said in that language, give one small piece of feedback (good attempt / try this softer / say it again slower), and INVITE them to repeat it or move on. Example: 'Lovely try, Mike — your "khwaam-yom" was close. Try once more, a touch softer on the อ — khwaam-yom.' DO NOT switch to ${targetLabel} for general reply.`,
+      th: `ผู้ใช้เพิ่งพูดคำในภาษาเป้าหมายเพื่อฝึก — ไม่ใช่การเปลี่ยนภาษา ตอบเป็นภาษา${speaks === "th" ? "ไทย" : "อังกฤษ"}ของผู้ใช้ (${speaksLabel}) เท่านั้น รับรู้สิ่งที่พวกเขาพูด ให้ฟีดแบ็กสั้นๆ อบอุ่นหนึ่งจุด (พยายามดี / ลองนุ่มขึ้น / พูดช้าอีกครั้ง) แล้วชวนให้พูดซ้ำหรือไปต่อ อย่าเปลี่ยนไปตอบเป็นภาษา${target === "th" ? "ไทย" : "อังกฤษ"} (${targetLabel}) ทั้งประโยค`,
     },
   };
 

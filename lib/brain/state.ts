@@ -38,6 +38,9 @@ export interface BrainState {
   masteredWords: string[];
   introducedWords: string[];
   nowLanguage: DetectedLang;
+  userSpeaksLanguage: "th" | "en";
+  learningTargetLanguage: "th" | "en" | null;
+  isPracticeAttempt: boolean;
   emotionalSignal: EmotionalSignal;
   frustrationSignal: boolean;
   repetitionDetected: boolean;
@@ -124,6 +127,18 @@ export async function readBrainState(args: {
   }
 
   const nowLanguage = detectLanguage(userInput, uiLanguage);
+  const { learningTargetLanguage, userSpeaksLanguage } = resolveLearningLanguages({
+    memory,
+    profileTarget: learningTarget,
+    uiLanguage,
+  });
+  const isPracticeAttempt = detectPracticeAttempt({
+    userInput,
+    nowLanguage,
+    learningTargetLanguage,
+    memory,
+    introducedWords,
+  });
   const emotionalSignal = detectEmotionalSignal(userInput);
   const frustrationSignal = detectFrustrationSignal(userInput);
   const repetitionDetected = detectRepetition(memory);
@@ -145,6 +160,9 @@ export async function readBrainState(args: {
     masteredWords,
     introducedWords,
     nowLanguage,
+    userSpeaksLanguage,
+    learningTargetLanguage,
+    isPracticeAttempt,
     emotionalSignal,
     frustrationSignal,
     repetitionDetected,
@@ -153,6 +171,119 @@ export async function readBrainState(args: {
     exchangeNumber,
     isGuest,
   };
+}
+
+const LEARN_THAI_MARKERS = /teach me thai|i want to learn thai|สอนภาษาไทย/i;
+const LEARN_EN_MARKERS = /teach me english|i want to learn english|สอนภาษาอังกฤษ/i;
+
+function resolveLearningLanguages(args: {
+  memory: Array<{ role: "user" | "miomi"; content: string }>;
+  profileTarget: "th" | "en" | null;
+  uiLanguage: "th" | "en";
+}): { learningTargetLanguage: "th" | "en" | null; userSpeaksLanguage: "th" | "en" } {
+  const { memory, profileTarget, uiLanguage } = args;
+
+  let target: "th" | "en" | null = profileTarget;
+
+  const recentUserMsgs = memory.filter((m) => m.role === "user").slice(-5);
+  for (const msg of recentUserMsgs) {
+    if (LEARN_THAI_MARKERS.test(msg.content)) {
+      target = "th";
+      break;
+    }
+    if (LEARN_EN_MARKERS.test(msg.content)) {
+      target = "en";
+      break;
+    }
+  }
+
+  let speaks: "th" | "en";
+  if (target === "th") {
+    speaks = "en";
+  } else if (target === "en") {
+    speaks = "th";
+  } else {
+    speaks = uiLanguage;
+  }
+
+  if (target) {
+    const nativeFromHistory = inferNativeLanguageFromHistory(memory, target);
+    if (nativeFromHistory) {
+      speaks = nativeFromHistory;
+    }
+  }
+
+  return { learningTargetLanguage: target, userSpeaksLanguage: speaks };
+}
+
+/** If last 3 user messages are non-practice chat in one language, that is their native tongue. */
+function inferNativeLanguageFromHistory(
+  memory: Array<{ role: "user" | "miomi"; content: string }>,
+  target: "th" | "en",
+): "th" | "en" | null {
+  const userMsgs = memory.filter((m) => m.role === "user").slice(-3);
+  if (userMsgs.length < 2) return null;
+
+  const langs = userMsgs.map((m) => messageDominantLang(m.content));
+  const nonTarget = langs.filter((l) => l !== null && l !== target);
+  if (nonTarget.length < 2) return null;
+
+  const allSame = nonTarget.every((l) => l === nonTarget[0]);
+  if (allSame && nonTarget[0]) {
+    return nonTarget[0];
+  }
+  return null;
+}
+
+function messageDominantLang(text: string): "th" | "en" | null {
+  const thai = text.match(/[\u0E00-\u0E7F]/g)?.length ?? 0;
+  const latin = text.match(/[a-zA-Z]/g)?.length ?? 0;
+  if (thai === 0 && latin === 0) return null;
+  if (thai > latin * 2) return "th";
+  if (latin > thai * 2) return "en";
+  return null;
+}
+
+function detectPracticeAttempt(args: {
+  userInput: string;
+  nowLanguage: DetectedLang;
+  learningTargetLanguage: "th" | "en" | null;
+  memory: Array<{ role: "user" | "miomi"; content: string }>;
+  introducedWords: string[];
+}): boolean {
+  const { userInput, nowLanguage, learningTargetLanguage, memory, introducedWords } = args;
+  if (!learningTargetLanguage) return false;
+
+  const spokeTarget =
+    nowLanguage === learningTargetLanguage ||
+    (nowLanguage !== "mixed" && messageDominantLang(userInput) === learningTargetLanguage);
+
+  if (!spokeTarget) return false;
+
+  const wordCount = userInput.trim().split(/\s+/).filter(Boolean).length;
+  const shortTargetUtterance =
+    wordCount <= 5 && messageDominantLang(userInput) === learningTargetLanguage;
+
+  const lastMiomi = [...memory].reverse().find((m) => m.role === "miomi");
+  const targetWords = collectTargetWords(introducedWords, lastMiomi?.content ?? "");
+  const previousHadTarget =
+    !!lastMiomi && targetWords.some((w) => lastMiomi.content.toLowerCase().includes(w.toLowerCase()));
+
+  if (previousHadTarget) return true;
+  if (shortTargetUtterance) return true;
+  return false;
+}
+
+function collectTargetWords(introducedWords: string[], miomiContent: string): string[] {
+  const words = new Set(introducedWords.map((w) => w.toLowerCase()));
+  const pronMatch = miomiContent.match(/คำว่า\s*["']?([^"'\s]+)["']?|word\s*["']([^"']+)["']/gi);
+  if (pronMatch) {
+    for (const m of pronMatch) {
+      const inner = m.replace(/คำว่า\s*|word\s*["']?|["']/gi, "").trim();
+      if (inner) words.add(inner.toLowerCase());
+    }
+  }
+  return [...words];
 }
 
 function normalizeLearningTarget(raw: string | null): "th" | "en" | null {
