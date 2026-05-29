@@ -2,6 +2,10 @@
 
 export type TtsLang = "th" | "en";
 
+export type SpeakOptions = {
+  speakingRate?: number;
+};
+
 const VOICE_CACHE: { th?: SpeechSynthesisVoice; en?: SpeechSynthesisVoice; loaded?: boolean } = {};
 
 // Ranked by perceived naturalness on real devices (Android Chrome, iOS Safari, Desktop Chrome).
@@ -38,22 +42,23 @@ const ENGLISH_VOICE_PRIORITY = [
   "en-GB",
 ];
 
+const RETRY_DELAYS_MS = [0, 250, 400, 600, 800];
+
+let speakInFlight: AbortController | null = null;
+
 function pickVoice(voices: SpeechSynthesisVoice[], lang: TtsLang): SpeechSynthesisVoice | undefined {
   const priority = lang === "th" ? THAI_VOICE_PRIORITY : ENGLISH_VOICE_PRIORITY;
-  // First pass: exact substring match on the priority list, in order.
   for (const needle of priority) {
     const lowerNeedle = needle.toLowerCase();
     const match = voices.find((v) => v.name.toLowerCase().includes(lowerNeedle));
     if (match) return match;
   }
-  // Second pass: female voices in the right language (sound less robotic on average).
   const femaleHints = ["female", "woman", "aria", "jenny", "samantha", "karen", "ava", "premwadee", "achara"];
   const langVoices = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
   for (const hint of femaleHints) {
     const match = langVoices.find((v) => v.name.toLowerCase().includes(hint));
     if (match) return match;
   }
-  // Third pass: any voice in the right language.
   return langVoices[0];
 }
 
@@ -82,7 +87,6 @@ export async function preloadTtsVoices(): Promise<void> {
   VOICE_CACHE.th = pickVoice(voices, "th");
   VOICE_CACHE.en = pickVoice(voices, "en");
   VOICE_CACHE.loaded = true;
-  // Server warm-up skipped — /api/talk/speak would synthesize audio and cost credits.
 }
 
 let activeAudio: HTMLAudioElement | null = null;
@@ -99,24 +103,37 @@ export function stopTts(): void {
   window.speechSynthesis?.cancel();
 }
 
-async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | null> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+async function fetchServerAudio(
+  text: string,
+  lang: TtsLang,
+  signal: AbortSignal,
+  speakingRate?: number,
+): Promise<string | null> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (signal.aborted) return null;
+    const delay = RETRY_DELAYS_MS[attempt] ?? 800;
+    if (delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
+    if (signal.aborted) return null;
     try {
+      const body: { text: string; lang: TtsLang; speakingRate?: number } = { text, lang };
+      if (speakingRate !== undefined) {
+        body.speakingRate = speakingRate;
+      }
       const res = await fetch("/api/talk/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, lang }),
+        body: JSON.stringify(body),
+        signal,
       });
       if (!res.ok) continue;
       const data = (await res.json()) as { audio?: unknown };
       if (typeof data.audio === "string" && data.audio.length > 0) {
         return data.audio;
       }
-    } catch {
-      // retry below
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return null;
     }
   }
   return null;
@@ -125,10 +142,12 @@ async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | n
 async function trySpeakViaServer(
   text: string,
   lang: TtsLang,
+  signal: AbortSignal,
   callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+  speakingRate?: number,
 ): Promise<boolean> {
-  const audioBase64 = await fetchServerAudio(text, lang);
-  if (!audioBase64) return false;
+  const audioBase64 = await fetchServerAudio(text, lang, signal, speakingRate);
+  if (!audioBase64 || signal.aborted) return false;
 
   return new Promise((resolve) => {
     const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
@@ -141,12 +160,25 @@ async function trySpeakViaServer(
       resolve(false);
     };
 
-    el.onended = () => {
+    const onAbort = () => {
+      el.pause();
+      el.currentTime = 0;
       activeAudio = null;
-      callbacks?.onEnd?.();
-      resolve(true);
+      resolve(false);
     };
-    el.onerror = fail;
+
+    signal.addEventListener("abort", onAbort, { once: true });
+
+    el.onended = () => {
+      signal.removeEventListener("abort", onAbort);
+      activeAudio = null;
+      if (!signal.aborted) callbacks?.onEnd?.();
+      resolve(!signal.aborted);
+    };
+    el.onerror = () => {
+      signal.removeEventListener("abort", onAbort);
+      fail();
+    };
 
     void el.play().catch(fail);
   });
@@ -156,6 +188,7 @@ async function speakViaBrowser(
   text: string,
   lang: TtsLang,
   callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+  speakingRate?: number,
 ): Promise<void> {
   if (typeof window === "undefined" || !window.speechSynthesis) {
     callbacks?.onEnd?.();
@@ -169,8 +202,7 @@ async function speakViaBrowser(
   utter.lang = lang === "th" ? "th-TH" : "en-US";
   const voice = lang === "th" ? VOICE_CACHE.th : VOICE_CACHE.en;
   if (voice) utter.voice = voice;
-  // Tune per-language. Thai needs slightly slower + lower pitch to sound less squeaky.
-  utter.rate = lang === "th" ? 0.92 : 1.0;
+  utter.rate = speakingRate ?? (lang === "th" ? 0.92 : 1.0);
   utter.pitch = lang === "th" ? 1.05 : 1.12;
   utter.volume = 1.0;
 
@@ -192,26 +224,51 @@ export async function speak(
   text: string,
   lang: TtsLang,
   callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+  options?: SpeakOptions,
 ): Promise<void> {
   if (typeof window === "undefined" || !text.trim()) {
     callbacks?.onEnd?.();
     return;
   }
 
+  if (speakInFlight) {
+    speakInFlight.abort();
+    speakInFlight = null;
+  }
   stopTts();
+
+  const ctrl = new AbortController();
+  speakInFlight = ctrl;
+  const { signal } = ctrl;
+  const speakingRate = options?.speakingRate;
+
   callbacks?.onStart?.();
 
-  const serverOk = await trySpeakViaServer(text, lang, callbacks);
-  if (serverOk) return;
+  try {
+    const serverOk = await trySpeakViaServer(text, lang, signal, callbacks, speakingRate);
+    if (signal.aborted) return;
+    if (serverOk) return;
 
-  console.error(
-    "[tts] FALLBACK FIRED — server voice failed after 3 tries. text:",
-    text.slice(0, 40),
-  );
-  await speakViaBrowser(text, lang, callbacks);
+    if (process.env.NEXT_PUBLIC_TTS_ALLOW_BROWSER_FALLBACK === "true") {
+      console.error(
+        "[tts] FALLBACK FIRED — server voice failed after 5 tries. text:",
+        text.slice(0, 40),
+      );
+      await speakViaBrowser(text, lang, callbacks, speakingRate);
+    } else {
+      console.error("[tts] FALLBACK SUPPRESSED — server failed 5x, staying silent");
+      callbacks?.onError?.();
+    }
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") return;
+    callbacks?.onError?.();
+  } finally {
+    if (speakInFlight === ctrl) {
+      speakInFlight = null;
+    }
+  }
 }
 
-// Language detection: Thai unicode block vs Latin.
 export function detectLang(text: string): TtsLang {
   const thaiChars = text.match(/[\u0E00-\u0E7F]/g);
   const latinChars = text.match(/[a-zA-Z]/g);
@@ -221,7 +278,6 @@ export function detectLang(text: string): TtsLang {
   return thaiCount > latinCount ? "th" : "en";
 }
 
-// Detect explicit language switch commands.
 export function detectLangSwitchCommand(text: string): TtsLang | null {
   const lower = text.toLowerCase().trim();
   if (/(พูด|คุย|สอน).*ไทย/.test(text) || /ไทยหน่อย/.test(text)) return "th";

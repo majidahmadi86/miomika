@@ -32,6 +32,12 @@ import {
   type IntroducedWord,
   type MasteryEvent,
 } from "@/lib/brain/teaching";
+import {
+  buildPronunciationLesson,
+  detectPronunciationRequest,
+  resolveContinuationWord,
+  type PronunciationLesson,
+} from "@/lib/brain/pronunciation";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +53,7 @@ type MiomiResponse = {
   sessionMode: string;
   needsClarification: boolean;
   masteryEvent: MasteryEvent | null;
+  pronunciationLesson: PronunciationLesson | null;
 };
 
 const BRAIN_PROMPT_FALLBACK =
@@ -122,6 +129,7 @@ export async function POST(req: NextRequest) {
         sessionMode: state.sessionMode,
         needsClarification: false,
         masteryEvent: null,
+        pronunciationLesson: null,
       } satisfies MiomiResponse);
     }
 
@@ -136,6 +144,49 @@ export async function POST(req: NextRequest) {
         sessionId: state.sessionId,
         exchangeNumber: state.exchangeNumber,
       });
+
+      const pronReq = detectPronunciationRequest(userInput);
+      if (pronReq.isRequest) {
+        let pronWord = pronReq.word;
+        if (!pronWord) {
+          pronWord = await resolveContinuationWord(serverUserId, brainState.memory);
+        }
+        if (pronWord) {
+          const lesson = await buildPronunciationLesson(pronWord);
+          if (lesson) {
+            const replyTh = `ดีเลยค่า~ มาฝึกออกเสียงกันค่ะ คำว่า "${lesson.word_th || lesson.word}" แปลว่า ${lesson.meaning_th}. ลองพูดตามหนูทีละพยางค์นะคะ — ${lesson.syllables.join(" · ")}. พร้อมแล้วลองพูดให้หนูฟังได้เลยค่า~`;
+            const replyEn = `Let's practice~ The word "${lesson.word}" means ${lesson.meaning_en}. Try saying it with me, one syllable at a time — ${lesson.syllables.join(" · ")}. When you're ready, say it back to me~`;
+            const useLang = brainState.nowLanguage === "th" ? "th" : "en";
+            const content = useLang === "th" ? replyTh : replyEn;
+
+            persistExchangePair({
+              userId: serverUserId,
+              state,
+              userInput,
+              miomiContent: content,
+              move: "pronunciation",
+            });
+
+            state = { ...state, exchangeNumber: state.exchangeNumber + 1 };
+
+            return NextResponse.json({
+              content,
+              wordCard: null,
+              phraseCard: null,
+              creatorAsset: null,
+              sessionContext: buildSessionContext(state),
+              servedVia: "pronunciation_lesson",
+              wasFailover: false,
+              intent: null,
+              sessionMode: state.sessionMode,
+              needsClarification: false,
+              masteryEvent: null,
+              pronunciationLesson: lesson,
+            } satisfies MiomiResponse);
+          }
+        }
+      }
+
       move = chooseMove(brainState);
       adaptivePrompt = buildBrainPrompt({ state: brainState, move, userInput });
       if (!adaptivePrompt.trim()) {
@@ -194,6 +245,7 @@ export async function POST(req: NextRequest) {
         sessionMode: state.sessionMode,
         needsClarification: false,
         masteryEvent: null,
+        pronunciationLesson: null,
       } satisfies MiomiResponse);
     }
 
@@ -220,6 +272,7 @@ export async function POST(req: NextRequest) {
         sessionMode: state.sessionMode,
         needsClarification: true,
         masteryEvent: null,
+        pronunciationLesson: null,
       } satisfies MiomiResponse);
     }
 
@@ -234,19 +287,22 @@ export async function POST(req: NextRequest) {
     let masteryEvent: MasteryEvent = { type: "none" };
     let wordToIntroduce: IntroducedWord | null = null;
 
-    try {
-      masteryEvent = await detectReuseAndAdvance({
-        userId: serverUserId,
-        userText: userInput,
-        introducedWords: brainState.introducedWords,
-      });
-    } catch (err) {
-      console.error("[brain] detectReuseAndAdvance failed:", err);
-      masteryEvent = { type: "none" };
+    if (move !== "repair") {
+      try {
+        masteryEvent = await detectReuseAndAdvance({
+          userId: serverUserId,
+          userText: userInput,
+          introducedWords: brainState.introducedWords,
+        });
+      } catch (err) {
+        console.error("[brain] detectReuseAndAdvance failed:", err);
+        masteryEvent = { type: "none" };
+      }
     }
 
     // Teaching only when user is FLOWING and not asking a question. Better to skip than to interrupt.
     const shouldPickWord =
+      move !== "repair" &&
       move === "teach" &&
       state.exchangeNumber % 4 === 0 &&
       state.exchangeNumber >= 4 &&
@@ -420,6 +476,7 @@ export async function POST(req: NextRequest) {
       sessionMode: state.sessionMode,
       needsClarification: false,
       masteryEvent: responseMasteryEvent,
+      pronunciationLesson: null,
     } satisfies MiomiResponse);
 
   } catch (error: unknown) {
@@ -439,6 +496,7 @@ export async function POST(req: NextRequest) {
         sessionMode: "learning",
         needsClarification: false,
         masteryEvent: null,
+        pronunciationLesson: null,
       } satisfies MiomiResponse,
       { status: 200 }
     );
@@ -479,6 +537,8 @@ function createDefaultBrainState(args: {
     introducedWords: [],
     nowLanguage: "th",
     emotionalSignal: "neutral",
+    frustrationSignal: false,
+    repetitionDetected: false,
     intent: "chat",
     isFirstExchange: args.exchangeNumber <= 1,
     exchangeNumber: args.exchangeNumber,

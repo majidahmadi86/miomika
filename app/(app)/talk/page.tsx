@@ -15,6 +15,10 @@ import { MicRow } from "@/components/talk/MicRow";
 import { Toolbox, type ResponseLength } from "@/components/talk/Toolbox";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { PracticeCard } from "@/components/talk/PracticeCard";
+import {
+  PronunciationCardV1,
+  type PronunciationLessonPayload,
+} from "@/components/talk/PronunciationCardV1";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
@@ -41,11 +45,13 @@ type MiomiApiResponse = {
   servedVia?: string;
   wordCard?: IntroducedWordPayload | null;
   masteryEvent?: MasteryEventPayload;
+  pronunciationLesson?: PronunciationLessonPayload | null;
 };
 
 type CanvasItem =
   | { id: string; kind: "mini_cat"; textTh: string; textEn: string }
   | { id: string; kind: "practice"; word: VocabularyEntry; position: number; total: number; topic?: string }
+  | { id: string; kind: "pronunciation"; lesson: PronunciationLessonPayload; heardText?: string | null }
   | { id: string; kind: "user_said"; text: string };
 
 const GUEST_LIMIT = 5;
@@ -112,6 +118,7 @@ export default function TalkPage() {
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [masteryToast, setMasteryToast] = useState<{ th: string; en: string } | null>(null);
+  const activePronunciationIdRef = useRef<string | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false);
@@ -253,7 +260,18 @@ export default function TalkPage() {
       const messageLang = resolveMessageLang(trimmed, conversationLangRef.current);
       updateConversationLang(messageLang);
 
-      setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "user_said", text: trimmed }]);
+      const userItemId = crypto.randomUUID();
+      setItems((prev) => {
+        const next = [...prev, { id: userItemId, kind: "user_said" as const, text: trimmed }];
+        if (activePronunciationIdRef.current) {
+          return next.map((item) =>
+            item.kind === "pronunciation" && item.id === activePronunciationIdRef.current
+              ? { ...item, heardText: trimmed }
+              : item,
+          );
+        }
+        return next;
+      });
       setTextInput("");
 
       if (isGuest) setGuestExchanges((p) => p + 1);
@@ -327,6 +345,26 @@ export default function TalkPage() {
           }, 3200);
         }
 
+        const pronunciationLesson = data.pronunciationLesson;
+        if (
+          pronunciationLesson &&
+          typeof pronunciationLesson.word === "string" &&
+          Array.isArray(pronunciationLesson.syllables)
+        ) {
+          const pronId = crypto.randomUUID();
+          activePronunciationIdRef.current = pronId;
+          const pronItem: CanvasItem = {
+            id: pronId,
+            kind: "pronunciation",
+            lesson: pronunciationLesson,
+            heardText: null,
+          };
+          window.setTimeout(() => {
+            if (!mountedRefForTts.current) return;
+            setItems((prev) => [...prev, pronItem]);
+          }, 500);
+        }
+
         const wordCard = data.wordCard;
         if (
           wordCard &&
@@ -383,6 +421,7 @@ export default function TalkPage() {
   }, []);
 
   const handleClear = useCallback(() => {
+    activePronunciationIdRef.current = null;
     setItems([makeOpenerItem()]);
     setExpandedItems(new Set());
   }, []);
@@ -534,6 +573,17 @@ export default function TalkPage() {
                   onSpeak={() => micRef.current?.start()}
                   onCopy={() => { void navigator.clipboard.writeText(item.word.word_th); }}
                   onNext={() => { /* engine */ }}
+                />
+              );
+            }
+            if (item.kind === "pronunciation") {
+              return (
+                <PronunciationCardV1
+                  key={item.id}
+                  lesson={item.lesson}
+                  uiLang={uiLang}
+                  heardText={item.heardText}
+                  onTrySpeak={() => micRef.current?.start()}
                 />
               );
             }

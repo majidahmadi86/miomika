@@ -39,6 +39,8 @@ export interface BrainState {
   introducedWords: string[];
   nowLanguage: DetectedLang;
   emotionalSignal: EmotionalSignal;
+  frustrationSignal: boolean;
+  repetitionDetected: boolean;
   intent: Intent;
   isFirstExchange: boolean;
   exchangeNumber: number;
@@ -123,6 +125,8 @@ export async function readBrainState(args: {
 
   const nowLanguage = detectLanguage(userInput, uiLanguage);
   const emotionalSignal = detectEmotionalSignal(userInput);
+  const frustrationSignal = detectFrustrationSignal(userInput);
+  const repetitionDetected = detectRepetition(memory);
   const intent = detectIntent(userInput, emotionalSignal);
   const isFirstExchange = exchangeNumber <= 1 && memory.length === 0;
 
@@ -142,6 +146,8 @@ export async function readBrainState(args: {
     introducedWords,
     nowLanguage,
     emotionalSignal,
+    frustrationSignal,
+    repetitionDetected,
     intent,
     isFirstExchange,
     exchangeNumber,
@@ -167,6 +173,50 @@ function detectLanguage(userInput: string, fallback: "th" | "en"): DetectedLang 
   if (latin > thai * 2) return "en";
   if (thai >= 3 && latin >= 3) return "mixed";
   return fallback;
+}
+
+function detectFrustrationSignal(userInput: string): boolean {
+  if (
+    /(you (don'?t|keep) (understand|get|listen)|why are you|stupid|made me ask|again and again|same question|repeating|shut up|annoying)/i.test(
+      userInput,
+    )
+  ) {
+    return true;
+  }
+  if (/(ไม่เข้าใจ|ทำไม.*ถาม|ซ้ำ|งี่เง่า|โง่|รำคาญ)/.test(userInput)) {
+    return true;
+  }
+  return false;
+}
+
+function wordSetJaccard(a: string, b: string): number {
+  const setA = new Set(
+    a
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 2),
+  );
+  const setB = new Set(
+    b
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 2),
+  );
+  if (setA.size === 0 && setB.size === 0) return 0;
+  let intersection = 0;
+  for (const w of setA) {
+    if (setB.has(w)) intersection++;
+  }
+  const union = new Set([...setA, ...setB]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+function detectRepetition(
+  memory: Array<{ role: "user" | "miomi"; content: string }>,
+): boolean {
+  const miomi = memory.filter((m) => m.role === "miomi").slice(-2);
+  if (miomi.length < 2) return false;
+  return wordSetJaccard(miomi[0].content, miomi[1].content) > 0.6;
 }
 
 function detectEmotionalSignal(userInput: string): EmotionalSignal {

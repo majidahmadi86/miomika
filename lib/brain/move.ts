@@ -1,8 +1,11 @@
 import type { BrainState } from "@/lib/brain/state";
 
-export type Move = "casual" | "teach" | "listen" | "practice" | "celebrate";
+export type Move = "casual" | "teach" | "listen" | "practice" | "celebrate" | "repair";
 
 export function chooseMove(s: BrainState): Move {
+  if (s.frustrationSignal || s.repetitionDetected) {
+    return "repair";
+  }
   if (s.emotionalSignal === "sad" || s.intent === "venting") {
     return "listen";
   }
@@ -48,6 +51,10 @@ export function moveInstruction(move: Move, lang: "th" | "en"): string {
     celebrate: {
       en: "The user is doing great. Name the specific thing they did well. Be theatrical with joy. Pull from warmth.ts praise vectors in spirit.",
       th: "ผู้ใช้ทำได้ดีมาก เรียกชื่อสิ่งที่ทำได้ดีอย่างเฉพาะเจาะจง แสดงความยินดีอย่างมีชีวิตชีวา ใช้จิตวิญญาณจาก praise vectors ใน warmth.ts",
+    },
+    repair: {
+      en: "The user is frustrated or you've been looping. Acknowledge directly and softly: 'You're right, I keep missing what you mean. Tell me again, slowly?' DO NOT teach. DO NOT ask a big question. Just listen and acknowledge. ONE sentence max.",
+      th: "คุณกำลังหงุดหงิดหรือรู้สึกว่าหนูพูดวนๆ. ยอมรับโดยตรงและขอโทษเบาๆ บอกว่า 'หนูฟังไม่ดีพอค่า ลองเล่าใหม่ช้าๆ ได้ไหมคะ?' อย่าสอนอะไรเลย. อย่าถามคำถามใหญ่. แค่ฟังและรับรู้.",
     },
   };
 
