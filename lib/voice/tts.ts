@@ -82,22 +82,82 @@ export async function preloadTtsVoices(): Promise<void> {
   VOICE_CACHE.th = pickVoice(voices, "th");
   VOICE_CACHE.en = pickVoice(voices, "en");
   VOICE_CACHE.loaded = true;
+  // Server warm-up skipped — /api/talk/speak would synthesize audio and cost credits.
 }
 
+let activeAudio: HTMLAudioElement | null = null;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
 
 export function stopTts(): void {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  if (typeof window === "undefined") return;
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio.currentTime = 0;
+    activeAudio = null;
+  }
   activeUtterance = null;
-  window.speechSynthesis.cancel();
+  window.speechSynthesis?.cancel();
 }
 
-export async function speak(
+async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    try {
+      const res = await fetch("/api/talk/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, lang }),
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as { audio?: unknown };
+      if (typeof data.audio === "string" && data.audio.length > 0) {
+        return data.audio;
+      }
+    } catch {
+      // retry below
+    }
+  }
+  return null;
+}
+
+async function trySpeakViaServer(
+  text: string,
+  lang: TtsLang,
+  callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+): Promise<boolean> {
+  const audioBase64 = await fetchServerAudio(text, lang);
+  if (!audioBase64) return false;
+
+  return new Promise((resolve) => {
+    const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+    activeAudio = el;
+
+    const fail = () => {
+      el.pause();
+      el.currentTime = 0;
+      activeAudio = null;
+      resolve(false);
+    };
+
+    el.onended = () => {
+      activeAudio = null;
+      callbacks?.onEnd?.();
+      resolve(true);
+    };
+    el.onerror = fail;
+
+    void el.play().catch(fail);
+  });
+}
+
+async function speakViaBrowser(
   text: string,
   lang: TtsLang,
   callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
 ): Promise<void> {
-  if (typeof window === "undefined" || !window.speechSynthesis || !text.trim()) {
+  if (typeof window === "undefined" || !window.speechSynthesis) {
     callbacks?.onEnd?.();
     return;
   }
@@ -126,6 +186,29 @@ export async function speak(
 
   activeUtterance = utter;
   window.speechSynthesis.speak(utter);
+}
+
+export async function speak(
+  text: string,
+  lang: TtsLang,
+  callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+): Promise<void> {
+  if (typeof window === "undefined" || !text.trim()) {
+    callbacks?.onEnd?.();
+    return;
+  }
+
+  stopTts();
+  callbacks?.onStart?.();
+
+  const serverOk = await trySpeakViaServer(text, lang, callbacks);
+  if (serverOk) return;
+
+  console.error(
+    "[tts] FALLBACK FIRED — server voice failed after 3 tries. text:",
+    text.slice(0, 40),
+  );
+  await speakViaBrowser(text, lang, callbacks);
 }
 
 // Language detection: Thai unicode block vs Latin.

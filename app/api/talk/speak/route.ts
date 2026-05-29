@@ -17,21 +17,20 @@ function mapVoice(lang: Lang, voice: VoicePref): { voiceName: string; languageCo
   if (lang === "th") {
     return {
       languageCode: "th-TH",
-      voiceName: voice === "male" ? "th-TH-Chirp3-HD-Charon" : "th-TH-Chirp3-HD-Zephyr",
+      voiceName: voice === "male" ? "th-TH-Chirp3-HD-Charon" : "th-TH-Chirp3-HD-Aoede",
     };
   }
   return {
     languageCode: "en-US",
-    voiceName: voice === "male" ? "en-US-Chirp3-HD-Charon" : "en-US-Chirp3-HD-Zephyr",
+    voiceName: voice === "male" ? "en-US-Chirp3-HD-Charon" : "en-US-Chirp3-HD-Aoede",
   };
 }
 
-/** Best-effort spoken-text tweaks for brand pronunciation — remove when Chirp3 improves. */
-function fixPronunciation(text: string): string {
-  return text
-    .replace(/มิโอมิ/g, "มิ โอะ มิ")
-    .replace(/\bMiomi\b/g, "Mee-oh-mee")
-    .replace(/\bmiomi\b/g, "mee-oh-mee");
+/** Lengthen sentence-final ค่ะ only — spoken audio warmth, not cache keys. */
+function warmEnding(text: string): string {
+  // Only at sentence-end. Lengthen ค่ะ → ค่าาา. Do NOT touch ค่ะ mid-sentence.
+  // Do not modify any other word.
+  return text.replace(/ค่ะ([\s.!?~]*)$/u, "ค่าาา$1");
 }
 
 function buildCacheKey(normalizedText: string, lang: Lang, voiceName: string): string {
@@ -87,7 +86,7 @@ export async function POST(request: NextRequest) {
   const voiceName = explicitVoiceName || mapped.voiceName;
   const languageCode = mapped.languageCode;
 
-  const defaultSpeakingRate = lang === "th" ? 0.77 : 0.95;
+  const defaultSpeakingRate = 0.9;
   const speakingRate =
     typeof body.speakingRate === "number" &&
     body.speakingRate >= 0.5 &&
@@ -138,8 +137,7 @@ export async function POST(request: NextRequest) {
     const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
     const client = new TextToSpeechClient({ credentials });
 
-    const spokenText = fixPronunciation(text);
-
+    const spokenText = warmEnding(text);
     const [response] = await client.synthesizeSpeech({
       input: { text: spokenText },
       voice: { languageCode, name: voiceName },
@@ -159,10 +157,15 @@ export async function POST(request: NextRequest) {
         ? response.audioContent
         : Buffer.from(response.audioContent as string, "base64");
     audioBase64 = Buffer.from(bytes).toString("base64");
+    if (!audioBase64) {
+      throw new Error("Google TTS returned empty base64 audio");
+    }
   } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("[tts.speak] google synth failed:", detail, e);
     logError("voice.speak", "google tts failed", e);
     Sentry.captureException(e, { tags: { stage: "google.tts" } });
-    return NextResponse.json({ error: "tts_failed" }, { status: 500 });
+    return NextResponse.json({ error: "tts_failed", detail }, { status: 500 });
   }
 
   // --- 3-strike cache write ---

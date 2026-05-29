@@ -453,6 +453,7 @@ export default function TalkPage() {
               setShowGuestSheet(true);
               return;
             }
+            console.log("[mic] heard:", JSON.stringify(text));
             await processInput(text);
           }}
           onStateChange={setMicState}
