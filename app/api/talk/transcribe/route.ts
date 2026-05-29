@@ -59,28 +59,27 @@ export async function POST(request: NextRequest) {
   }
 
   let audioBlob: File;
-  let language: string | null = null;
+  let clientLang: FormDataEntryValue | null = null;
   try {
     const form = await request.formData();
     const audio = form.get("audio");
-    const lang = form.get("language");
+    clientLang = form.get("language");
     if (!(audio instanceof File)) {
       return NextResponse.json({ error: "audio_field_missing" }, { status: 400 });
     }
     audioBlob = audio;
-    language = typeof lang === "string" ? lang : null;
   } catch (e) {
     logError("voice.transcribe", "form parse failed", e);
     return NextResponse.json({ error: "invalid_form" }, { status: 400 });
   }
 
-  const chosen: "th" | "en" =
-    language === "en" || language === "en-US"
-      ? "en"
-      : language === "th" || language === "th-TH"
-        ? "th"
-        : "th";
-  log("voice.transcribe", "lang chosen", { lang: chosen });
+  const explicitLang: "th" | "en" | null =
+    clientLang === "th" || clientLang === "th-TH"
+      ? "th"
+      : clientLang === "en" || clientLang === "en-US"
+        ? "en"
+        : null;
+  log("voice.transcribe", "lang mode", { explicit: explicitLang ?? "auto-bilingual" });
 
   if (audioBlob.size > 2_000_000) {
     return NextResponse.json({ error: "audio_too_large" }, { status: 413 });
@@ -94,19 +93,22 @@ export async function POST(request: NextRequest) {
     userId: userId ?? "anon",
     bytes: audioBlob.size,
     type: audioBlob.type,
-    language: chosen,
+    language: explicitLang ?? "auto-bilingual",
   });
 
   const start = Date.now();
   try {
     const groq = new Groq({ apiKey: groqKey });
-    const result = await groq.audio.transcriptions.create({
+    const transcribeOpts: Parameters<Groq["audio"]["transcriptions"]["create"]>[0] = {
       file: audioBlob,
       model: "whisper-large-v3-turbo",
-      language: chosen,
       response_format: "json",
       temperature: 0,
-    });
+      prompt: "บทสนทนาภาษาไทยและภาษาอังกฤษ Thai and English bilingual conversation.",
+    };
+    if (explicitLang) transcribeOpts.language = explicitLang;
+
+    const result = await groq.audio.transcriptions.create(transcribeOpts);
 
     const text = (result.text ?? "").trim();
     const latency = Date.now() - start;

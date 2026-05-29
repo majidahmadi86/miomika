@@ -450,7 +450,13 @@ export default function TalkPage() {
         <MicButton
           ref={micRef}
           state={micState}
-          language={conversationLang === "en" ? "en-US" : "th-TH"}
+          language={
+            profile?.ui_language === "en"
+              ? "en-US"
+              : profile?.ui_language === "th"
+                ? "th-TH"
+                : "auto"
+          }
           onTranscript={async (text, isFinal) => {
             if (!isFinal) return;
             if (isLocked) {
