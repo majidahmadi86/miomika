@@ -58,6 +58,16 @@ const GUEST_LIMIT = 5;
 const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
 const TRANSCRIPT_CLIP = 180;
 
+function stripForTts(text: string): string {
+  return text
+    .replace(/~/g, "")
+    .replace(/\*+/g, "")
+    .replace(/_+/g, "")
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function readGuestExchanges(): number {
   if (typeof window === "undefined") return 0;
   const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
@@ -179,7 +189,7 @@ export default function TalkPage() {
     setItems([{ id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en }]);
     // Speak the ice-breaker if TTS is on. Small delay so voices have time to load.
     if (ttsOn) {
-      const speakText = isThaiLeadUser ? iceBreaker.th : iceBreaker.en;
+      const speakText = stripForTts(isThaiLeadUser ? iceBreaker.th : iceBreaker.en);
       window.setTimeout(() => {
         if (!mountedRefForTts.current) return;
         setMicState("speaking");
@@ -261,13 +271,7 @@ export default function TalkPage() {
       if (!text.trim()) return;
 
       const trimmed = text.trim();
-      const langFallback: TtsLang =
-        profile?.ui_language === "en" || profile?.ui_language === "th"
-          ? profile.ui_language
-          : uiLang === "en"
-            ? "en"
-            : "th";
-      const messageLang = resolveMessageLang(trimmed, langFallback);
+      const messageLang = resolveMessageLang(trimmed, conversationLangRef.current);
       updateConversationLang(messageLang);
 
       const userItemId = crypto.randomUUID();
@@ -308,18 +312,17 @@ export default function TalkPage() {
         if (!res.ok) throw new Error("api failed");
         const data = (await res.json()) as MiomiApiResponse;
         const content = data.content ?? "";
-        const lang = messageLang;
         const parts = content.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
         const primary = parts[0] ?? content;
         const secondary = parts[1] ?? "";
-        let textTh = lang === "th" ? primary : secondary;
-        let textEn = lang === "en" ? primary : secondary;
+        let textTh = messageLang === "th" ? primary : secondary;
+        let textEn = messageLang === "en" ? primary : secondary;
 
         const mastery = data.masteryEvent;
         if (mastery?.type === "advanced" && mastery.word) {
           const advTh = pickMasteryAdvanced(mastery.word, "th");
           const advEn = pickMasteryAdvanced(mastery.word, "en");
-          if (lang === "th") {
+          if (messageLang === "th") {
             textTh = [primary, advTh].filter(Boolean).join("\n\n");
           } else {
             textEn = [primary, advEn].filter(Boolean).join("\n\n");
@@ -398,10 +401,11 @@ export default function TalkPage() {
           }, 600);
         }
 
-        const speakText = lang === "th" ? (textTh || primary) : (textEn || primary);
-        if (ttsOn && speakText.trim()) {
+        const rawSpeakText = messageLang === "th" ? (textTh || primary) : (textEn || primary);
+        const speakText = stripForTts(rawSpeakText);
+        if (ttsOn && speakText) {
           setMicState("speaking");
-          void speak(speakText, lang, {
+          void speak(speakText, messageLang, {
             onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
             onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
           });
@@ -418,7 +422,7 @@ export default function TalkPage() {
         ]);
       }
     },
-    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, updateConversationLang, profile, uiLang],
+    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, updateConversationLang],
   );
 
   const toggleExpand = useCallback((id: string) => {

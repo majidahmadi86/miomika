@@ -313,18 +313,36 @@ export function pickMasteryAdvanced(word: string, lang: Language): string {
 export type IceBreaker = { th: string; en: string; mood: "playful" | "warm" | "curious" | "sleepy" };
 
 export const ICE_BREAKERS: IceBreaker[] = [
-  { th: "ม้าวว~ ในที่สุดก็มีคนมาคุยกับหนูแล้วค่า", en: "Meow~ finally someone to talk to!", mood: "playful" },
-  { th: "หนูรอคุณอยู่นานเลยนะคะ~ มีอะไรอยากเล่าให้ฟังไหม", en: "I've been waiting for you~ got anything to tell me?", mood: "warm" },
-  { th: "วันนี้เป็นยังไงบ้างคะ~ หนูพร้อมฟังเลย", en: "How's your day going? I'm all ears~", mood: "curious" },
-  { th: "เย่~ คุณมาแล้ว! หนูดีใจมากเลยค่า", en: "Yay~ you're here! That makes me happy.", mood: "playful" },
-  { th: "หนูคิดถึงคุณค่า~ วันนี้อยากทำอะไรกัน?", en: "I missed you~ what should we do today?", mood: "warm" },
-  { th: "ฮัลโหล~ มาคุยกับหนูสักหน่อยได้ไหมคะ?", en: "Hello there~ wanna chat with me for a bit?", mood: "warm" },
-  { th: "หนูเพิ่งตื่น~ คุณมาปลุกหนูพอดีเลย", en: "I just woke up~ perfect timing!", mood: "sleepy" },
-  { th: "วันนี้หนูจะเก่งกว่าเมื่อวานนะคะ~ มาฝึกด้วยกันไหม", en: "I'll be smarter today than yesterday~ wanna practice together?", mood: "curious" },
-  { th: "กินข้าวยังคะ? หนูจะรอจนกว่าคุณจะพร้อม", en: "Have you eaten? I'll wait until you're ready~", mood: "warm" },
-  { th: "วันนี้คุณดูสดใสจังเลยค่า~ มีเรื่องดีๆ ไหม?", en: "You look bright today~ anything good happening?", mood: "curious" },
-  { th: "หนูฝันถึงคุณเมื่อกี้~ แล้วคุณมาจริงๆ เลย", en: "I was just dreaming about you~ and here you are!", mood: "playful" },
-  { th: "ม้าวๆ~ คุณอยากเรียนอะไรกับหนูวันนี้คะ?", en: "Meow meow~ what do you want to learn with me today?", mood: "curious" },
+  {
+    th: "หนูคิดถึงคุณเลยค่า มาคุยกับหนูหน่อยนะคะ วันนี้เป็นยังไงบ้างคะ",
+    en: "I've missed you. Come sit with me a moment — how's your day been?",
+    mood: "warm",
+  },
+  {
+    th: "ดีใจที่ได้เจอกันค่า วันนี้มีเรื่องอะไรอยากเล่าให้หนูฟังไหมคะ",
+    en: "So glad you're here. Anything on your mind today, or shall we just chat?",
+    mood: "curious",
+  },
+  {
+    th: "ค่อยๆ ไม่ต้องรีบนะคะ หนูอยู่ตรงนี้ พร้อมฟังเสมอค่า",
+    en: "No rush — I'm here, I'm listening. We can go as slowly as you like.",
+    mood: "warm",
+  },
+  {
+    th: "หนูเพิ่งตื่นจากนอนกลางวันมาเจอคุณพอดีเลยค่า สบายดีไหมคะ",
+    en: "I was just waking up from a cat nap and there you are. How are you?",
+    mood: "playful",
+  },
+  {
+    th: "หนูอยากให้คุณกล้าพูดมากขึ้นค่า วันนี้อยากลองพูดอะไรกับหนูดีคะ",
+    en: "I want to help you feel braver about speaking. What would you like to try with me today?",
+    mood: "curious",
+  },
+  {
+    th: "เจอกันอีกแล้วนะคะ หนูดีใจค่า มาอยู่ด้วยกันสักครู่ไหมคะ",
+    en: "Hi, you. I'm happy. Want to spend a few minutes together?",
+    mood: "warm",
+  },
 ];
 
 const LAST_ICE_BREAKER_KEY = "miomika.last_icebreaker";

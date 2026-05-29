@@ -225,6 +225,8 @@ export async function speak(
     window.speechSynthesis.cancel();
   }
 
+  await new Promise((r) => setTimeout(r, 50));
+
   const speakingRate = options?.speakingRate;
   callbacks?.onStart?.();
 
