@@ -47,6 +47,8 @@ NOTE: Future money areas to revisit ~1 month post-launch (B2B social, etc).
 - Premium voice = Pro CHOICE (pick your teacher's voice). Recorded tutor voices =
   premium packs later. Voice CLONING (ElevenLabs/Inworld) = Pro Max / premium,
   AFTER revenue. NOT a launch blocker.
+- **LOCKED 2026-05-29 at launch:** Google Aoede for free + Pro. ElevenLabs moved
+  to Pro Max only. Auto-detect bilingual via Whisper prompt — no manual toggle.
 
 ## 5. LIBRARY (the moat) — cost truth
 - Library serves ~80% of replies. Library hit = BRAIN cost $0 immediately.

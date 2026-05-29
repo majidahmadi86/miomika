@@ -3,8 +3,8 @@
 > Update as items complete.
 
 ## EXPERIENCE (soft launch, free)
-- [ ] Voice: drop browser TTS, two fixed Google Neural voices, budget alert
-- [ ] Language: Miomi reliably replies in the user's language
+- [x] Voice: drop browser TTS, two fixed Google Neural voices, budget alert
+- [x] Language: Miomi reliably replies in the user's language
 - [ ] Opus guest + free confident-speaking library written + inserted
 - [ ] Teaching loop closed (mastery table wired, dashboard shows real progress)
 - [ ] Beautiful in-chat cards (flashcard/activity) per DESIGN-RULES
@@ -26,3 +26,9 @@
 ## CREDIBILITY
 - [ ] CEFR grading visible and honest
 - [ ] Four skills represented (speaking lead; writing/listening/reading present)
+
+## Voice — perfect later
+- ElevenLabs cute voice for Pro Max
+- Faster response time
+- "naka/nakaa" warmth tuning
+- Opener voice in profile language

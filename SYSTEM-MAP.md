@@ -3,7 +3,7 @@
 > This file describes what the code ACTUALLY does today. If a doc disagrees with
 > this file about what is BUILT, this file wins. If a doc describes a DESIGN
 > (tokens, screens, soul), that doc wins.
-> Last verified against repo: 2026-05-28 (guest gate, library log, two-matcher).
+> Last verified against repo: 2026-05-29 (voice Aoede, bilingual STT, auto language).
 > Update the "Last verified" line + the status tags every time code ships.
 
 ---
@@ -74,7 +74,10 @@ never promoted back into the library, so the "moat" doesn't compound yet).
 | System | Status | Reality |
 |---|---|---|
 | Identity / auth | BUILT | getServerProfile() from cookie. OAuth callback solid. |
-| /talk screen | BUILT | SEALED at 8d030b4. Voice in (Groq STT) + out (browser TTS). |
+| /talk screen | BUILT | SEALED at 8d030b4. Voice in (Groq STT) + out (Google TTS server route). |
+| Voice (TTS) | BUILT | Google Aoede (th-TH-Chirp3-HD-Aoede + en-US), speed 0.93, ค่ะ/นะคะ/เลย warm-lengthen, 3-strike cache, server route, browser fallback only on hard failure. |
+| Voice input (STT) | BUILT | Groq Whisper with bilingual prompt (Thai+English), VAD redemptionFrames raised for natural breath pauses. |
+| Language routing | BUILT | Auto-detected per message via detectLang(). One voice per reply, no manual toggle. Default Thai; profile ui_language overrides. |
 | /me screen | BUILT | Visual LOCKED v2.1. Most destinations are stubs (wiring debt). |
 | /home screen | BUILT | Alive companion surface, ambient Miomi. |
 | Warmth system | BUILT | lib/voice/warmth.ts — large, typed, healthy. The real moat today. |
