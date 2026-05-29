@@ -8,34 +8,13 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import {
   createSessionState,
-  updateSessionWithLanguage,
   updateSessionWithIntent,
-  updateSessionState,
-  getExchangeInstruction,
   getFailoverResponse,
   type SessionState,
 } from "@/lib/ai/session";
-import {
-  classifyIntentAdvanced,
-  getIntentFamily,
-} from "@/lib/ai/intents";
-import {
-  detectPrimaryLanguage,
-  detectLearningDirection,
-  getVoiceRatio,
-} from "@/lib/ai/language";
-import {
-  detectArchetype,
-  buildPersonaPromptSection,
-  buildEmotionalModifier,
-} from "@/lib/ai/persona";
-import {
-  buildAdaptiveSystemPrompt,
-  buildClarificationPrompt,
-  detectSessionMode,
-  type PromptContext,
-} from "@/lib/ai/prompt";
-import { getWordForSession } from "@/lib/ai/vocabulary";
+import { classifyIntentAdvanced } from "@/lib/ai/intents";
+import { buildClarificationPrompt } from "@/lib/ai/prompt";
+import { cefrToLevel, getWordForSession } from "@/lib/ai/vocabulary";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
 import {
   pickPhrase,
@@ -44,6 +23,9 @@ import {
 } from "@/lib/voice/warmth";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 import { saveExchange } from "@/lib/brain/memory";
+import { readBrainState, type BrainState } from "@/lib/brain/state";
+import { chooseMove, type Move } from "@/lib/brain/move";
+import { buildBrainPrompt } from "@/lib/brain/prompt";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +41,9 @@ type MiomiResponse = {
   sessionMode: string;
   needsClarification: boolean;
 };
+
+const BRAIN_PROMPT_FALLBACK =
+  "You are Miomi, a warm Thai cat companion. Reply with one warm sentence in the user's language.";
 
 // ─── MAIN ROUTE ───────────────────────────────────────────────────────────────
 
@@ -132,10 +117,40 @@ export async function POST(req: NextRequest) {
       } satisfies MiomiResponse);
     }
 
-    // ── STAGE 2: Language detection ──────────────────────────────────────────
-    state = updateSessionWithLanguage(state, userInput);
+    // ── BRAIN: read state → choose move → build teacher-persona prompt ───────
+    let brainState: BrainState;
+    let move: Move;
+    let adaptivePrompt: string;
 
-    // ── STAGE 3: Intent classification ───────────────────────────────────────
+    try {
+      brainState = await readBrainState({
+        userInput,
+        sessionId: state.sessionId,
+        exchangeNumber: state.exchangeNumber,
+      });
+      move = chooseMove(brainState);
+      adaptivePrompt = buildBrainPrompt({ state: brainState, move, userInput });
+      if (!adaptivePrompt.trim()) {
+        adaptivePrompt = BRAIN_PROMPT_FALLBACK;
+      }
+    } catch (err) {
+      console.error("[brain] readBrainState failed:", err);
+      brainState = createDefaultBrainState({
+        exchangeNumber: state.exchangeNumber,
+        isGuest: serverIsGuest,
+        userId: serverUserId,
+      });
+      move = chooseMove(brainState);
+      adaptivePrompt = BRAIN_PROMPT_FALLBACK;
+    }
+
+    // ── Language from brain (replaces detectPrimaryLanguage flow) ────────────
+    state = {
+      ...state,
+      primaryLanguage: brainLanguageToSession(brainState),
+    };
+
+    // ── STAGE 3: Intent classification (recovery / clarification safety nets) ─
     const intentResult = classifyIntentAdvanced(
       userInput,
       state.currentTargetWord?.word ?? null,
@@ -148,7 +163,7 @@ export async function POST(req: NextRequest) {
     // ── STAGE 4b: Recovery — negative emotion override ───────────────────────
     // Never teach when user is frustrated. Face-saving is enforced.
     if (intentResult.family === "social" && intentResult.primary.intent === "social_emotion_negative") {
-      const lang = state.primaryLanguage === "english" ? "en" : "th";
+      const lang = brainReplyLang(brainState);
       const recoveryContent = pickPhrase(RECOVERY_STRUGGLE, { lang });
       persistExchangePair({
         userId: serverUserId,
@@ -157,6 +172,7 @@ export async function POST(req: NextRequest) {
         miomiContent: recoveryContent,
         intent: "social_emotion_negative",
         emotionalSignal: "negative",
+        move,
       });
       return NextResponse.json({
         content: recoveryContent,
@@ -181,6 +197,7 @@ export async function POST(req: NextRequest) {
         userInput,
         miomiContent: clarification,
         intent: "meta_clarification_needed",
+        move,
       });
       return NextResponse.json({
         content: clarification,
@@ -196,19 +213,15 @@ export async function POST(req: NextRequest) {
       } satisfies MiomiResponse);
     }
 
-    // ── STAGE 6: Build prompt context ────────────────────────────────────────
-    const cefrMap: Record<string, string> = {
-      beginner: "A1", elementary: "A2", intermediate: "B1", upper: "B2",
-    };
-    const cefrLevel = cefrMap[state.estimatedLevel] ?? "A2";
-
-    // ── STAGE 7: Check library with new intent taxonomy ──────────────────────
+    // ── STAGE 7: Check library with brain-enriched context ───────────────────
     const matchContext: MatchContext = {
-      estimatedLevel: state.estimatedLevel,
+      estimatedLevel: brainState.profile.cefrLevel
+        ? cefrToLevel(brainState.profile.cefrLevel)
+        : state.estimatedLevel,
       sessionArc: state.sessionArc,
       exchangeNumber: state.exchangeNumber,
       currentTargetWord: state.currentTargetWord?.word ?? null,
-      emotionalMomentum: state.emotionalMomentum,
+      emotionalMomentum: brainState.emotionalSignal,
     };
 
     const supabase = await createClient();
@@ -228,30 +241,6 @@ export async function POST(req: NextRequest) {
         supabase
       );
     }
-
-    // ── STAGE 9: Build adaptive prompt ───────────────────────────────────────
-    const promptContext: PromptContext = {
-      primaryLanguage: state.primaryLanguage,
-      learningDirection: state.learningDirection,
-      cefrLevel,
-      voiceRatio: state.voiceRatioTarget,
-      archetype: state.detectedArchetype,
-      archetypeConfidence: state.archetypeConfidence,
-      intent: intentResult.primary.intent,
-      intentFamily: intentResult.family,
-      exchangeNumber: state.exchangeNumber,
-      sessionArc: state.sessionArc,
-      wordsIntroduced: state.wordsIntroduced,
-      currentTargetWord: state.currentTargetWord?.word ?? null,
-      emotionalMomentum: state.emotionalMomentum,
-      isGuest: serverIsGuest,
-      wordToIntroduce: wordToIntroduce?.word ?? null,
-      wordToIntroduceThai: wordToIntroduce?.thai ?? null,
-      shouldCelebrate: false,
-      celebrationText: null,
-    };
-
-    const adaptivePrompt = buildAdaptiveSystemPrompt(promptContext);
 
     // ── STAGE 10: Serve from library or AI ───────────────────────────────────
     let content: string;
@@ -294,7 +283,7 @@ export async function POST(req: NextRequest) {
 
       const result = await getAIResponse(formattedMessages, adaptivePrompt);
       content = result.content;
-      servedVia = `ai_${result.engine}`;
+      servedVia = `ai_${result.engine}__${move}`;
       wasFailover = result.wasFailover;
       aiCostUsd = result.engine === "groq" ? 0 : 0.0008;
 
@@ -318,6 +307,7 @@ export async function POST(req: NextRequest) {
       miomiContent: content,
       aiCostUsd,
       intent: intentResult.primary.intent,
+      move,
     });
 
     // ── STAGE 11: Extract teaching artifacts ─────────────────────────────────
@@ -392,6 +382,45 @@ export async function POST(req: NextRequest) {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+function brainReplyLang(brainState: BrainState): "th" | "en" {
+  if (brainState.nowLanguage === "mixed") {
+    return brainState.profile.uiLanguage;
+  }
+  return brainState.nowLanguage;
+}
+
+function brainLanguageToSession(brainState: BrainState): SessionState["primaryLanguage"] {
+  return brainReplyLang(brainState) === "en" ? "english" : "thai";
+}
+
+function createDefaultBrainState(args: {
+  exchangeNumber: number;
+  isGuest: boolean;
+  userId: string | null;
+}): BrainState {
+  return {
+    profile: {
+      id: args.userId,
+      displayName: null,
+      uiLanguage: "th",
+      learningTarget: null,
+      journeyStage: null,
+      tier: args.isGuest ? "guest" : "free",
+      cefrLevel: null,
+      catName: null,
+    },
+    memory: [],
+    masteredWords: [],
+    introducedWords: [],
+    nowLanguage: "th",
+    emotionalSignal: "neutral",
+    intent: "chat",
+    isFirstExchange: args.exchangeNumber <= 1,
+    exchangeNumber: args.exchangeNumber,
+    isGuest: args.isGuest,
+  };
+}
 
 function buildSessionContext(state: SessionState): Partial<SessionState> {
   return {
