@@ -12,7 +12,7 @@ import { FuelPill } from "@/components/talk/FuelPill";
 import { type OrbState } from "@/components/talk/VoiceOrb";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
 import { MicRow } from "@/components/talk/MicRow";
-import { Toolbox, type ResponseLength, type ResponseLang } from "@/components/talk/Toolbox";
+import { Toolbox, type ResponseLength } from "@/components/talk/Toolbox";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
@@ -48,6 +48,16 @@ function makeOpenerItem(): CanvasItem {
   return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
 }
 
+/** Dominant language from message text; keeps previous when undecidable. */
+function resolveMessageLang(text: string, previous: TtsLang): TtsLang {
+  const switchCmd = detectLangSwitchCommand(text);
+  if (switchCmd) return switchCmd;
+  const thaiCount = text.match(/[\u0E00-\u0E7F]/g)?.length ?? 0;
+  const latinCount = text.match(/[a-zA-Z]/g)?.length ?? 0;
+  if (thaiCount === 0 && latinCount === 0) return previous;
+  return detectLang(text);
+}
+
 export default function TalkPage() {
   const { isGuest, authReady } = useGuestExploration();
   const { profile } = useProfile();
@@ -63,9 +73,9 @@ export default function TalkPage() {
   const [keyboardMode, setKeyboardMode] = useState(false);
   const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
   const [respLength, setRespLength] = useState<ResponseLength>("normal");
-  const [respLang, setRespLang] = useState<ResponseLang>("both");
   const [ttsOn, setTtsOn] = useState(true);
-  const conversationLangRef = useRef<TtsLang>("en");
+  const conversationLangRef = useRef<TtsLang>("th");
+  const [conversationLang, setConversationLang] = useState<TtsLang>("th");
   const [guestExchangesRaw, setGuestExchangesRaw] = useState(readGuestExchanges);
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -83,6 +93,11 @@ export default function TalkPage() {
     };
   }, []);
 
+  const updateConversationLang = useCallback((lang: TtsLang) => {
+    conversationLangRef.current = lang;
+    setConversationLang(lang);
+  }, []);
+
   /* eslint-disable react-hooks/set-state-in-effect -- hydrate localStorage + navigator prefs on mount */
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -92,16 +107,21 @@ export default function TalkPage() {
     const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
     const parsed = stored ? parseInt(stored, 10) : 0;
     if (!isNaN(parsed) && parsed > 0) setGuestExchangesRaw(parsed);
+    updateConversationLang("th");
     const lang = navigator.language || "th";
     const isEnglishUser = lang.startsWith("en");
     if (isEnglishUser) setUiLang("en");
-    conversationLangRef.current = isEnglishUser ? "en" : "th";
-    setRespLang(isEnglishUser ? "en" : "th");
     const ttsStored = window.localStorage.getItem("miomika.tts_on");
     if (ttsStored !== null) setTtsOn(ttsStored === "1");
     void preloadTtsVoices();
-  }, []);
+  }, [updateConversationLang]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (profile?.ui_language) {
+      updateConversationLang(profile.ui_language);
+    }
+  }, [profile?.ui_language, updateConversationLang]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
   useEffect(() => {
@@ -192,22 +212,11 @@ export default function TalkPage() {
       }
       if (!text.trim()) return;
 
-      // Language intelligence: detect explicit switch, else detect from user's text.
-      const switchCmd = detectLangSwitchCommand(text);
-      if (switchCmd) {
-        conversationLangRef.current = switchCmd;
-        setRespLang(switchCmd);
-      } else {
-        const detected = detectLang(text);
-        if (respLang === "both") {
-          conversationLangRef.current = detected;
-          setRespLang(detected);
-        } else {
-          conversationLangRef.current = respLang;
-        }
-      }
+      const trimmed = text.trim();
+      const messageLang = resolveMessageLang(trimmed, conversationLangRef.current);
+      updateConversationLang(messageLang);
 
-      setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "user_said", text: text.trim() }]);
+      setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "user_said", text: trimmed }]);
       setTextInput("");
 
       if (isGuest) setGuestExchanges((p) => p + 1);
@@ -217,10 +226,10 @@ export default function TalkPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            messages: [{ role: "user", content: text.trim() }],
+            messages: [{ role: "user", content: trimmed }],
             sessionInstruction: (() => {
               const lengthRule = respLength === "short" ? "Under 25 words." : respLength === "detailed" ? "60-100 words, thorough." : "Under 50 words.";
-              const userLang = conversationLangRef.current;
+              const userLang = messageLang;
               const langRule = userLang === "th"
                 ? "The user spoke in Thai. Respond in Thai ONLY. Be warm and natural."
                 : "The user spoke in English. Respond in English ONLY. Be warm and natural. Do NOT add Thai unless they ask to learn Thai.";
@@ -234,7 +243,7 @@ export default function TalkPage() {
         if (!res.ok) throw new Error("api failed");
         const data = (await res.json()) as { content?: string; servedVia?: string };
         const content = data.content ?? "";
-        const lang = conversationLangRef.current;
+        const lang = messageLang;
         // When lang is forced, the AI returned a single-language reply.
         // Split on paragraph break: first = primary, second = optional secondary.
         const parts = content.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
@@ -243,9 +252,10 @@ export default function TalkPage() {
         const textTh = lang === "th" ? primary : secondary;
         const textEn = lang === "en" ? primary : secondary;
         setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "mini_cat", textTh: textTh || primary, textEn: textEn || primary }]);
-        if (ttsOn && primary) {
+        const speakText = lang === "th" ? (textTh || primary) : (textEn || primary);
+        if (ttsOn && speakText.trim()) {
           setMicState("speaking");
-          void speak(primary, lang, {
+          void speak(speakText, lang, {
             onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
             onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
           });
@@ -262,7 +272,7 @@ export default function TalkPage() {
         ]);
       }
     },
-    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, respLang, ttsOn],
+    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, updateConversationLang],
   );
 
   const toggleExpand = useCallback((id: string) => {
@@ -362,16 +372,12 @@ export default function TalkPage() {
       <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <Toolbox
           length={respLength}
-          lang={respLang}
+          lang={conversationLang}
           ttsOn={ttsOn}
           keyboardMode={keyboardMode}
           uiLang={uiLang}
           onCycleLength={() => setRespLength((p) => (p === "short" ? "normal" : p === "normal" ? "detailed" : "short"))}
-          onCycleLang={() => setRespLang((p) => {
-            const next = p === "th" ? "en" : p === "en" ? "both" : "th";
-            if (next === "th" || next === "en") conversationLangRef.current = next;
-            return next;
-          })}
+          onCycleLang={() => {}}
           onToggleTts={() => {
             setTtsOn((p) => {
               const next = !p;
@@ -444,7 +450,7 @@ export default function TalkPage() {
         <MicButton
           ref={micRef}
           state={micState}
-          language="auto"
+          language={conversationLang === "en" ? "en-US" : "th-TH"}
           onTranscript={async (text, isFinal) => {
             if (!isFinal) return;
             if (isLocked) {

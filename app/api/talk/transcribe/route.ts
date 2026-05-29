@@ -74,6 +74,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_form" }, { status: 400 });
   }
 
+  const chosen: "th" | "en" =
+    language === "en" || language === "en-US"
+      ? "en"
+      : language === "th" || language === "th-TH"
+        ? "th"
+        : "th";
+  log("voice.transcribe", "lang chosen", { lang: chosen });
+
   if (audioBlob.size > 2_000_000) {
     return NextResponse.json({ error: "audio_too_large" }, { status: 413 });
   }
@@ -86,7 +94,7 @@ export async function POST(request: NextRequest) {
     userId: userId ?? "anon",
     bytes: audioBlob.size,
     type: audioBlob.type,
-    language: language ?? "auto",
+    language: chosen,
   });
 
   const start = Date.now();
@@ -95,7 +103,7 @@ export async function POST(request: NextRequest) {
     const result = await groq.audio.transcriptions.create({
       file: audioBlob,
       model: "whisper-large-v3-turbo",
-      ...(language && language !== "auto" ? { language } : {}),
+      language: chosen,
       response_format: "json",
       temperature: 0,
     });
