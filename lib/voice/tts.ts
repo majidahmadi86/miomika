@@ -6,11 +6,106 @@ export type SpeakOptions = {
   speakingRate?: number;
 };
 
+const VOICE_CACHE: { th?: SpeechSynthesisVoice; en?: SpeechSynthesisVoice; loaded?: boolean } = {};
+
+// Ranked by perceived naturalness on real devices (Android Chrome, iOS Safari, Desktop Chrome).
+// "Google" and "Microsoft Natural/Neural" voices generally sound the most human.
+// "Online" voices (suffix on Microsoft) are higher quality than offline.
+const THAI_VOICE_PRIORITY = [
+  "Google ภาษาไทย",
+  "Microsoft Premwadee Online",
+  "Microsoft Niwat Online",
+  "Microsoft Achara Online",
+  "Premwadee",
+  "Niwat",
+  "Achara",
+  "Kanya",
+  "Narisa",
+  "Thai",
+  "th-TH",
+];
+
+const ENGLISH_VOICE_PRIORITY = [
+  "Google US English",
+  "Google UK English Female",
+  "Microsoft Aria Online",
+  "Microsoft Jenny Online",
+  "Microsoft Ava Online",
+  "Microsoft Emma Online",
+  "Samantha",
+  "Karen",
+  "Allison",
+  "Ava",
+  "Aria",
+  "Jenny",
+  "en-US",
+  "en-GB",
+];
+
 const RETRY_DELAYS_MS = [0, 250, 400];
 
-import { getSharedAudioOrchestrator } from "@/lib/conversation/audio";
+let speakGeneration = 0;
+let activeGeneration = 0;
 
-async function fetchServerAudio(
+function pickVoice(voices: SpeechSynthesisVoice[], lang: TtsLang): SpeechSynthesisVoice | undefined {
+  const priority = lang === "th" ? THAI_VOICE_PRIORITY : ENGLISH_VOICE_PRIORITY;
+  for (const needle of priority) {
+    const lowerNeedle = needle.toLowerCase();
+    const match = voices.find((v) => v.name.toLowerCase().includes(lowerNeedle));
+    if (match) return match;
+  }
+  const femaleHints = ["female", "woman", "aria", "jenny", "samantha", "karen", "ava", "premwadee", "achara"];
+  const langVoices = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
+  for (const hint of femaleHints) {
+    const match = langVoices.find((v) => v.name.toLowerCase().includes(hint));
+    if (match) return match;
+  }
+  return langVoices[0];
+}
+
+function ensureVoicesLoaded(): Promise<SpeechSynthesisVoice[]> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      resolve([]);
+      return;
+    }
+    const existing = window.speechSynthesis.getVoices();
+    if (existing.length > 0) {
+      resolve(existing);
+      return;
+    }
+    const handler = () => {
+      window.speechSynthesis.removeEventListener("voiceschanged", handler);
+      resolve(window.speechSynthesis.getVoices());
+    };
+    window.speechSynthesis.addEventListener("voiceschanged", handler);
+    setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1500);
+  });
+}
+
+export async function preloadTtsVoices(): Promise<void> {
+  const voices = await ensureVoicesLoaded();
+  VOICE_CACHE.th = pickVoice(voices, "th");
+  VOICE_CACHE.en = pickVoice(voices, "en");
+  VOICE_CACHE.loaded = true;
+}
+
+let activeAudio: HTMLAudioElement | null = null;
+let activeUtterance: SpeechSynthesisUtterance | null = null;
+
+export function stopTts(): void {
+  if (typeof window === "undefined") return;
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio.currentTime = 0;
+    activeAudio = null;
+  }
+  activeUtterance = null;
+  window.speechSynthesis?.cancel();
+  activeGeneration = speakGeneration + 1;
+}
+
+async function fetchServerAudioNoSignal(
   text: string,
   lang: TtsLang,
   speakingRate?: number,
@@ -44,13 +139,66 @@ async function fetchServerAudio(
   return null;
 }
 
-export async function preloadTtsVoices(): Promise<void> {
-  const { preloadAudioVoices } = await import("@/lib/conversation/audio");
-  await preloadAudioVoices();
+async function playAudioBase64(
+  audioBase64: string,
+  myGen: number,
+  callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+): Promise<void> {
+  return new Promise((resolve) => {
+    const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+    activeAudio = el;
+    el.onended = () => {
+      activeAudio = null;
+      if (myGen === activeGeneration) callbacks?.onEnd?.();
+      resolve();
+    };
+    el.onerror = () => {
+      activeAudio = null;
+      if (myGen === activeGeneration) callbacks?.onError?.();
+      resolve();
+    };
+    void el.play().catch(() => {
+      activeAudio = null;
+      if (myGen === activeGeneration) callbacks?.onError?.();
+      resolve();
+    });
+  });
 }
 
-export function stopTts(): void {
-  getSharedAudioOrchestrator().killAll();
+async function speakViaBrowser(
+  text: string,
+  lang: TtsLang,
+  callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+  speakingRate?: number,
+): Promise<void> {
+  if (typeof window === "undefined" || !window.speechSynthesis) {
+    callbacks?.onEnd?.();
+    return;
+  }
+  if (!VOICE_CACHE.loaded) await preloadTtsVoices();
+
+  window.speechSynthesis.cancel();
+
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = lang === "th" ? "th-TH" : "en-US";
+  const voice = lang === "th" ? VOICE_CACHE.th : VOICE_CACHE.en;
+  if (voice) utter.voice = voice;
+  utter.rate = speakingRate ?? (lang === "th" ? 0.92 : 1.0);
+  utter.pitch = lang === "th" ? 1.05 : 1.12;
+  utter.volume = 1.0;
+
+  utter.onstart = () => callbacks?.onStart?.();
+  utter.onend = () => {
+    if (activeUtterance === utter) activeUtterance = null;
+    callbacks?.onEnd?.();
+  };
+  utter.onerror = () => {
+    if (activeUtterance === utter) activeUtterance = null;
+    callbacks?.onError?.();
+  };
+
+  activeUtterance = utter;
+  window.speechSynthesis.speak(utter);
 }
 
 export async function speak(
@@ -64,8 +212,18 @@ export async function speak(
     return;
   }
 
-  const audio = getSharedAudioOrchestrator();
-  audio.killAll();
+  speakGeneration += 1;
+  const myGen = speakGeneration;
+  activeGeneration = myGen;
+
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio.currentTime = 0;
+    activeAudio = null;
+  }
+  if (typeof window !== "undefined" && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
 
   await new Promise((r) => setTimeout(r, 50));
 
@@ -73,18 +231,20 @@ export async function speak(
   callbacks?.onStart?.();
 
   try {
-    const audioBase64 = await fetchServerAudio(text, lang, speakingRate);
+    const audioBase64 = await fetchServerAudioNoSignal(text, lang, speakingRate);
+
+    if (myGen !== activeGeneration) return;
 
     if (audioBase64) {
-      await audio.playMp3Base64(audioBase64);
-      callbacks?.onEnd?.();
+      await playAudioBase64(audioBase64, myGen, callbacks);
       return;
     }
 
+    if (myGen !== activeGeneration) return;
     console.warn("[tts] FALLBACK FIRED — server failed after retries. Browser voice will play.");
-    await audio.playBrowserTts(text, lang, speakingRate);
-    callbacks?.onEnd?.();
+    await speakViaBrowser(text, lang, callbacks, speakingRate);
   } catch (e) {
+    if (myGen !== activeGeneration) return;
     console.error("[tts] speak error:", e);
     callbacks?.onError?.();
   }
