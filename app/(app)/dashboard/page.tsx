@@ -11,8 +11,93 @@ import {
   Trophy,
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useUILanguage } from "@/lib/i18n/client";
+import { me } from "@/lib/voice/warmth";
+
+type LearningWord = {
+  word_en: string;
+  word_th: string;
+  mastery_level: number;
+  next_spiral_at: string | null;
+};
+
+type ProgressData = {
+  wordsMastered: number;
+  wordsLearning: number;
+  conversationCount: number;
+  streakDays: number;
+  cefrLevel: string | null;
+  learningWords: LearningWord[];
+};
+
+function masteryChip(level: number, lang: "th" | "en"): string {
+  if (level >= 2) return lang === "en" ? "Almost there" : "ใกล้แล้ว~";
+  if (level === 1) return lang === "en" ? "Step 2 of 3" : "ขั้น 2 จาก 3";
+  return lang === "en" ? "Step 1 of 3" : "ขั้น 1 จาก 3";
+}
+
+function statDisplay(value: number): string {
+  return value > 0 ? String(value) : "0";
+}
 
 export default function DashboardPage() {
+  const uiLang = useUILanguage();
+  const [progress, setProgress] = useState<ProgressData | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/profile/progress")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: ProgressData | null) => {
+        if (cancelled || !data) return;
+        setProgress(data);
+      })
+      .catch(() => {
+        /* warm empty states remain at zero */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const streakDays = progress?.streakDays ?? 0;
+  const wordsMastered = progress?.wordsMastered ?? 0;
+  const conversationCount = progress?.conversationCount ?? 0;
+  const learningWords = progress?.learningWords ?? [];
+  const cefrLevel = progress?.cefrLevel ?? null;
+
+  const gridStats = [
+    {
+      icon: BookOpen,
+      value: statDisplay(wordsMastered),
+      th: "คำศัพท์ที่เรียน",
+      en: "Words learned",
+      empty: wordsMastered === 0,
+    },
+    {
+      icon: Clock,
+      value: "0",
+      th: "นาทีที่ฝึก",
+      en: "Minutes practiced",
+      empty: true,
+    },
+    {
+      icon: MessageCircle,
+      value: statDisplay(conversationCount),
+      th: "เซสชั่นรวม",
+      en: "Total sessions",
+      empty: conversationCount === 0,
+    },
+    {
+      icon: TrendingUp,
+      value: "0%",
+      th: "ความมั่นใจ",
+      en: "Speaking confidence",
+      empty: true,
+    },
+  ] as const;
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white">
       <div className="flex shrink-0 items-center gap-3 border-b border-[#EAD0DB] px-4 py-3">
@@ -32,11 +117,22 @@ export default function DashboardPage() {
             strokeWidth={2}
             aria-hidden
           />
-          <p className="mt-2 text-[36px] font-medium leading-none text-[#B8860B]">
-            7
-          </p>
-          <p className="mt-1 text-[13px] text-[#B8860B]">วันติดต่อกัน</p>
-          <p className="mt-0.5 text-[10px] text-[#888888]">Day streak</p>
+          {streakDays > 0 ? (
+            <>
+              <p className="mt-2 text-[36px] font-medium leading-none text-[#B8860B]">
+                {streakDays}
+              </p>
+              <p className="mt-1 text-[13px] text-[#B8860B]">วันติดต่อกัน</p>
+              <p className="mt-0.5 text-[10px] text-[#888888]">Day streak</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-[13px] font-medium text-[#B8860B]">
+                {me.progress.statStreakEmpty(uiLang)}
+              </p>
+              <p className="mt-0.5 text-[10px] text-[#888888]">Day streak</p>
+            </>
+          )}
         </section>
 
         <section className="rounded-r-xl border-l-[3px] border-[#B8860B] bg-white py-3 pl-3.5 pr-3.5">
@@ -44,52 +140,43 @@ export default function DashboardPage() {
             MIOMI&apos;S OBSERVATION
           </p>
           <p className="mt-1.5 text-[12px] leading-[1.6] text-[#1A1A18]">
-            เริ่มต้นการเรียนรู้กับมิโอมิวันนี้เลยนะคะ~ หนูรอคุณอยู่ค่า
+            {conversationCount > 0
+              ? "หนูเห็นคุณฝึกอย่างสม่ำเสมอเลย~ ภูมิใจในคุณมากค่า"
+              : "เริ่มต้นการเรียนรู้กับมิโอมิวันนี้เลยนะคะ~ หนูรอคุณอยู่ค่า"}
           </p>
           <p className="mt-1 text-[10px] leading-[1.6] text-[#888888]">
-            Start your learning journey with Miomi today~
+            {conversationCount > 0
+              ? "I see you showing up~ I'm proud of you."
+              : "Start your learning journey with Miomi today~"}
           </p>
         </section>
 
         <section className="grid grid-cols-2 gap-3">
-          {[
-            {
-              icon: BookOpen,
-              value: "0",
-              th: "คำศัพท์ที่เรียน",
-              en: "Words learned",
-            },
-            {
-              icon: Clock,
-              value: "0",
-              th: "นาทีที่ฝึก",
-              en: "Minutes practiced",
-            },
-            {
-              icon: MessageCircle,
-              value: "0",
-              th: "เซสชั่นรวม",
-              en: "Total sessions",
-            },
-            {
-              icon: TrendingUp,
-              value: "0%",
-              th: "ความมั่นใจ",
-              en: "Speaking confidence",
-            },
-          ].map(({ icon: Icon, value, th, en }) => (
+          {gridStats.map(({ icon: Icon, value, th, en, empty }) => (
             <div key={th} className="rounded-xl bg-[#FFF8F2] p-3 text-center">
-              <Icon
-                className="mx-auto h-5 w-5 text-[#C9A96E]"
-                strokeWidth={2}
-                aria-hidden
-              />
-              <p className="mt-1 text-xl font-medium text-[#1A1A1A]">{value}</p>
-              <p className="text-[11px] text-[#888888]">{th}</p>
+              {empty ? (
+                <Icon
+                  className="mx-auto h-6 w-6 text-[#EAD0DB]"
+                  strokeWidth={2}
+                  aria-hidden
+                />
+              ) : (
+                <>
+                  <Icon
+                    className="mx-auto h-5 w-5 text-[#C9A96E]"
+                    strokeWidth={2}
+                    aria-hidden
+                  />
+                  <p className="mt-1 text-xl font-medium text-[#1A1A1A]">{value}</p>
+                </>
+              )}
+              <p className={`text-[11px] text-[#888888] ${empty ? "mt-2" : ""}`}>{th}</p>
               <p className="text-[10px] text-[#AAAAAA]">{en}</p>
-              <p className="mt-1 text-[9px] text-[#AAAAAA]">
-                เริ่มเรียนเพื่อดูค่า~
-              </p>
+              {empty && (
+                <p className="mt-1 text-[9px] text-[#AAAAAA]">
+                  เริ่มเรียนเพื่อดูค่า~
+                </p>
+              )}
             </div>
           ))}
         </section>
@@ -99,60 +186,103 @@ export default function DashboardPage() {
             <p className="text-[13px] font-medium text-[#1A1A1A]">
               ระดับปัจจุบัน
             </p>
-            <p className="text-[11px] font-medium text-[#B8860B]">Lv.1</p>
+            <p className="text-[11px] font-medium text-[#B8860B]">
+              {cefrLevel ?? "Lv.1"}
+            </p>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-[#EAD0DB]">
-            <div className="h-2 w-0 rounded-full bg-[#B8860B]" />
+            <div
+              className="h-2 rounded-full bg-[#B8860B]"
+              style={{ width: wordsMastered > 0 ? `${Math.min(100, wordsMastered * 5)}%` : "0%" }}
+            />
           </div>
           <p className="mt-1.5 text-[10px] text-[#888888]">
-            0/100 XP — เริ่มเรียนเพื่อสะสม XP ค่า~
+            {wordsMastered > 0
+              ? `${wordsMastered} ${uiLang === "en" ? "words mastered" : "คำที่จำได้แล้ว"}~`
+              : "0/100 XP — เริ่มเรียนเพื่อสะสม XP ค่า~"}
           </p>
         </section>
 
         <section className="rounded-xl border border-[#EAD0DB] bg-white p-3.5">
           <p className="text-[12px] font-medium text-[#1A1A1A]">
-            คำศัพท์ที่เรียนล่าสุด
+            {uiLang === "en" ? "Words you're learning" : "คำศัพท์ที่กำลังเรียน"}
           </p>
-          <div className="mt-4 flex flex-col items-center text-center">
-            <BookOpen
-              className="h-6 w-6 text-[#EAD0DB]"
-              strokeWidth={2}
-              aria-hidden
-            />
-            <p className="mt-2 text-[11px] text-[#888888]">
-              คำศัพท์ที่เรียนจะปรากฏที่นี่ค่า~
-            </p>
-            <p className="mt-0.5 text-[9px] text-[#AAAAAA]">
-              Words you learn will appear here~
-            </p>
-            <Link
-              href="/create"
-              className="mt-4 inline-flex rounded-full px-6 py-2 text-sm font-medium text-white"
-              style={{ background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)" }}
-            >
-              เริ่มเรียนเลย
-            </Link>
-          </div>
+          {learningWords.length === 0 ? (
+            <div className="mt-4 flex flex-col items-center text-center">
+              <BookOpen
+                className="h-6 w-6 text-[#EAD0DB]"
+                strokeWidth={2}
+                aria-hidden
+              />
+              <p className="mt-2 text-[11px] text-[#888888]">
+                {me.progress.statWordsEmpty(uiLang)}
+              </p>
+              <p className="mt-0.5 text-[9px] text-[#AAAAAA]">
+                Words you learn will appear here~
+              </p>
+              <Link
+                href="/talk"
+                className="mt-4 inline-flex rounded-full px-6 py-2 text-sm font-medium text-white"
+                style={{ background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)" }}
+              >
+                {uiLang === "en" ? "Start learning" : "เริ่มเรียนเลย"}
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {learningWords.map((w) => (
+                <div
+                  key={w.word_en}
+                  className="rounded-xl border border-[#EDE8E0]/60 bg-white/70 p-3 backdrop-blur-[20px]"
+                  style={{
+                    boxShadow:
+                      "0 1px 2px rgba(26,26,24,0.04), 0 4px 16px rgba(26,26,24,0.06)",
+                  }}
+                >
+                  <p
+                    className="text-[16px] font-medium leading-tight text-[#1A1A1A]"
+                    style={{ fontFamily: "'Sarabun', 'Kanit', sans-serif" }}
+                  >
+                    {w.word_th}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[#888888]">{w.word_en}</p>
+                  <span className="mt-2 inline-flex rounded-full bg-[#FDF5E0] px-2 py-0.5 text-[9px] font-medium text-[#B8860B]">
+                    {masteryChip(w.mastery_level, uiLang)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="rounded-xl border border-[#EAD0DB] bg-white p-3.5">
           <p className="text-[12px] font-medium text-[#1A1A1A]">ความสำเร็จ</p>
           <div className="mt-3 flex flex-wrap justify-center gap-2 opacity-40">
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2.5 py-1 text-[10px] font-medium text-[#666666]">
-              <Trophy className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              7 วัน
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2.5 py-1 text-[10px] font-medium text-[#666666]">
-              <BookOpen className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              20 คำ
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2.5 py-1 text-[10px] font-medium text-[#666666]">
-              <Star className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              เซสชั่นแรก
-            </span>
+            {streakDays >= 7 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2.5 py-1 text-[10px] font-medium text-[#666666]">
+                <Trophy className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                7 วัน
+              </span>
+            )}
+            {wordsMastered >= 20 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2.5 py-1 text-[10px] font-medium text-[#666666]">
+                <BookOpen className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                20 คำ
+              </span>
+            )}
+            {conversationCount >= 1 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#EAD0DB] bg-[#FAFAFA] px-2.5 py-1 text-[10px] font-medium text-[#666666]">
+                <Star className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                เซสชั่นแรก
+              </span>
+            )}
           </div>
           <p className="mt-3 text-center text-[10px] text-[#888888]">
-            เรียนให้ครบ 1 เซสชั่นเพื่อปลดล็อคค่า~
+            {conversationCount >= 1
+              ? uiLang === "en"
+                ? "Keep going~ more badges await!"
+                : "ต่อไปเรื่อยๆ นะคะ~ มีเหรียญรออยู่~"
+              : "เรียนให้ครบ 1 เซสชั่นเพื่อปลดล็อคค่า~"}
           </p>
         </section>
 

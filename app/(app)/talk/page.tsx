@@ -19,7 +19,29 @@ import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
 import { speak, stopTts, detectLang, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
-import { pickIceBreaker } from "@/lib/voice/warmth";
+import { pickIceBreaker, pickMasteryAdvanced, pickMasteryCelebration } from "@/lib/voice/warmth";
+
+type IntroducedWordPayload = {
+  word: string;
+  word_th: string;
+  word_en: string;
+  cefr_level: string | null;
+  emoji: string | null;
+  mastery_level?: number;
+};
+
+type MasteryEventPayload = {
+  type: "introduced" | "advanced" | "mastered" | "none";
+  word?: string;
+  newStage?: number;
+} | null;
+
+type MiomiApiResponse = {
+  content?: string;
+  servedVia?: string;
+  wordCard?: IntroducedWordPayload | null;
+  masteryEvent?: MasteryEventPayload;
+};
 
 type CanvasItem =
   | { id: string; kind: "mini_cat"; textTh: string; textEn: string }
@@ -41,6 +63,16 @@ function readUiLang(): "th" | "en" {
   if (typeof window === "undefined") return "th";
   const lang = navigator.language || "th";
   return lang.startsWith("en") ? "en" : "th";
+}
+
+function toVocabularyEntry(word: IntroducedWordPayload): VocabularyEntry {
+  return {
+    id: word.word_en,
+    word_en: word.word_en,
+    word_th: word.word_th,
+    cefr_level: word.cefr_level ?? undefined,
+    emoji: word.emoji ?? undefined,
+  };
 }
 
 function makeOpenerItem(): CanvasItem {
@@ -79,6 +111,7 @@ export default function TalkPage() {
   const [guestExchangesRaw, setGuestExchangesRaw] = useState(readGuestExchanges);
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [masteryToast, setMasteryToast] = useState<{ th: string; en: string } | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false);
@@ -245,17 +278,78 @@ export default function TalkPage() {
           }),
         });
         if (!res.ok) throw new Error("api failed");
-        const data = (await res.json()) as { content?: string; servedVia?: string };
+        const data = (await res.json()) as MiomiApiResponse;
         const content = data.content ?? "";
         const lang = messageLang;
-        // When lang is forced, the AI returned a single-language reply.
-        // Split on paragraph break: first = primary, second = optional secondary.
         const parts = content.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
         const primary = parts[0] ?? content;
         const secondary = parts[1] ?? "";
-        const textTh = lang === "th" ? primary : secondary;
-        const textEn = lang === "en" ? primary : secondary;
-        setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "mini_cat", textTh: textTh || primary, textEn: textEn || primary }]);
+        let textTh = lang === "th" ? primary : secondary;
+        let textEn = lang === "en" ? primary : secondary;
+
+        const mastery = data.masteryEvent;
+        if (mastery?.type === "advanced" && mastery.word) {
+          const advTh = pickMasteryAdvanced(mastery.word, "th");
+          const advEn = pickMasteryAdvanced(mastery.word, "en");
+          if (lang === "th") {
+            textTh = [primary, advTh].filter(Boolean).join("\n\n");
+          } else {
+            textEn = [primary, advEn].filter(Boolean).join("\n\n");
+          }
+        }
+
+        setItems((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            kind: "mini_cat",
+            textTh: textTh || primary,
+            textEn: textEn || primary,
+          },
+        ]);
+
+        if (mastery?.type === "mastered" && mastery.word) {
+          void import("@/lib/celebration/burst")
+            .then(({ triggerCelebration }) => {
+              triggerCelebration({
+                intensity: "high",
+                miomi_state: "excited",
+                duration_ms: 1400,
+              });
+            })
+            .catch(() => {});
+          setMasteryToast({
+            th: `${pickMasteryCelebration(mastery.word, "th")} +5 ✦`,
+            en: `${pickMasteryCelebration(mastery.word, "en")} +5 ✦`,
+          });
+          window.setTimeout(() => {
+            if (mountedRefForTts.current) setMasteryToast(null);
+          }, 3200);
+        }
+
+        const wordCard = data.wordCard;
+        if (
+          wordCard &&
+          typeof wordCard.word_en === "string" &&
+          typeof wordCard.word_th === "string"
+        ) {
+          const position = wordCard.mastery_level ?? 1;
+          const practiceItem: CanvasItem = {
+            id: crypto.randomUUID(),
+            kind: "practice",
+            word: toVocabularyEntry(wordCard),
+            position,
+            total: 3,
+          };
+          window.setTimeout(() => {
+            if (!mountedRefForTts.current) return;
+            setItems((prev) => [...prev, practiceItem]);
+            setWordsIntroduced((prev) =>
+              prev.includes(wordCard.word_en) ? prev : [...prev, wordCard.word_en],
+            );
+          }, 600);
+        }
+
         const speakText = lang === "th" ? (textTh || primary) : (textEn || primary);
         if (ttsOn && speakText.trim()) {
           setMicState("speaking");
@@ -543,6 +637,38 @@ export default function TalkPage() {
           void processInput(promptTh);
         }}
       />
+
+      {masteryToast && (
+        <div
+          style={{
+            position: "fixed",
+            left: "50%",
+            bottom: "calc(120px + env(safe-area-inset-bottom, 0px))",
+            transform: "translateX(-50%)",
+            zIndex: 150,
+            maxWidth: "88%",
+            padding: "10px 16px",
+            borderRadius: "999px",
+            background: "rgba(255,255,255,0.92)",
+            border: "0.5px solid rgba(232,199,122,0.5)",
+            boxShadow: "0 4px 20px rgba(201,169,110,0.25)",
+            pointerEvents: "none",
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontFamily: "'Kanit', sans-serif",
+              fontSize: "13px",
+              fontWeight: 500,
+              color: "#1A1A18",
+              textAlign: "center",
+            }}
+          >
+            {uiLang === "en" ? masteryToast.en : masteryToast.th}
+          </p>
+        </div>
+      )}
 
       {showGuestSheet && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ position: "fixed", inset: 0, background: "rgba(26,26,24,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>

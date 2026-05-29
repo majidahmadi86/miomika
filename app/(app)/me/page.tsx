@@ -49,14 +49,17 @@ const AVATAR_SHADOW =
 const FONT = "'Kanit', 'Quicksand', sans-serif";
 const SOUNDS_KEY = "miomika.sounds_on";
 
-// Phase 3B: wire real progress data from vocabulary_user_state + conversations table.
+type ProgressData = {
+  wordsMastered: number;
+  wordsLearning: number;
+  conversationCount: number;
+  streakDays: number;
+  cefrLevel: string | null;
+};
+
 type ExtendedProfile = ReturnType<typeof useProfile>["profile"] & {
   avatar_url?: string | null;
-  cefr_level?: string | null;
   cefr_progress_pct?: number | null;
-  words_mastered_count?: number | null;
-  streak_days?: number | null;
-  conversation_count?: number | null;
   premium_voice_credits?: number | null;
   miomi_warmth?: "soft" | "balanced" | "playful" | null;
 };
@@ -94,14 +97,6 @@ function readWarmthLabel(
   return me.bond.warmthOptions.balanced(lang);
 }
 
-function statValue(
-  hasField: boolean,
-  raw: number | null | undefined,
-): number {
-  if (!hasField) return 0;
-  return raw ?? 0;
-}
-
 function buildFeedbackMailto(displayName: string, tier: string): string {
   const subject = encodeURIComponent(`Feedback from /me — ${displayName}`);
   const body = encodeURIComponent(
@@ -130,6 +125,7 @@ export default function MePage() {
   const [notificationsOn, setNotificationsOn] = useState(false);
   const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
   const [nameSheetOpen, setNameSheetOpen] = useState(false);
+  const [progress, setProgress] = useState<ProgressData | null>(null);
 
   const displayName =
     profile?.display_name ??
@@ -141,16 +137,13 @@ export default function MePage() {
   const days = daysTogether(profile?.onboarding_completed_at ?? null);
   const memoryCount = 0;
 
-  const hasCefr = profile != null && "cefr_level" in profile && profile.cefr_level != null;
-  const hasWordsField = profile != null && "words_mastered_count" in profile;
-  const hasStreakField = profile != null && "streak_days" in profile;
-  const hasConvosField = profile != null && "conversation_count" in profile;
   const hasVoiceCreditsField = profile != null && "premium_voice_credits" in profile;
 
-  // Phase 3B: wire real progress data from vocabulary_user_state + conversations table.
-  const wordsValue = statValue(hasWordsField, profile?.words_mastered_count);
-  const streakValue = statValue(hasStreakField, profile?.streak_days);
-  const convosValue = statValue(hasConvosField, profile?.conversation_count);
+  const wordsValue = progress?.wordsMastered ?? 0;
+  const streakValue = progress?.streakDays ?? 0;
+  const convosValue = progress?.conversationCount ?? 0;
+  const cefrLevel = progress?.cefrLevel ?? null;
+  const hasCefr = cefrLevel != null && cefrLevel.length > 0;
   const voiceCredits = hasVoiceCreditsField ? (profile?.premium_voice_credits ?? 0) : 0;
   const starsBalance = profile?.miomi_stars ?? 0;
   const uiLangLabel = profile?.ui_language === "en" ? "English" : "ไทย";
@@ -180,6 +173,23 @@ export default function MePage() {
       router.replace("/login?redirect_to=%2Fme");
     }
   }, [authReady, profile, router]);
+
+  useEffect(() => {
+    if (!profile) return;
+    let cancelled = false;
+    void fetch("/api/profile/progress")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: ProgressData | null) => {
+        if (cancelled || !data) return;
+        setProgress(data);
+      })
+      .catch(() => {
+        /* warm empty states remain at zero */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile]);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -368,7 +378,7 @@ export default function MePage() {
                   margin: "8px 0 0",
                 }}
               >
-                {profile.cefr_level}
+                {cefrLevel}
               </p>
               <div
                 style={{

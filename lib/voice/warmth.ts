@@ -265,6 +265,38 @@ export function pickPhraseWith(
   return phrase;
 }
 
+// ─── MASTERY CELEBRATION (/talk teaching surface) ───────────────────────────
+
+const MASTERY_CELEBRATION: WarmPhrase[] = [
+  { th: "คุณจำคำว่า {word} ได้แม่นแล้วค่า~ เก่งมากเลย!", en: "You remembered {word} perfectly~ so clever!" },
+  { th: "เย่~ คำว่า {word} อยู่ในหัวคุณแล้วนะคะ ✦", en: "Yay~ {word} is yours now ✦" },
+  { th: "หนูภูมิใจในคุณมาก~ คำว่า {word} ผ่านแล้วค่า!", en: "I'm so proud~ you mastered {word}!" },
+  { th: "จำได้แม่นเลย~ คำว่า {word} เป็นของคุณแล้วค่า", en: "{word} is locked in~ well done!" },
+  { th: "เก่งมากเลยค่า~ คำว่า {word} ฝังในใจแล้วนะคะ", en: "So good~ {word} lives in your heart now" },
+  { th: "ว้าว~ คุณใช้คำว่า {word} ได้เองเลย! เก่งมากค่า", en: "Wow~ you used {word} on your own! Amazing~" },
+  { th: "หนูยิ้มเลย~ คำว่า {word} ผ่านฉลุยแล้วค่า ✦", en: "That made me smile~ {word} is mastered ✦" },
+  { th: "อีกคำหนึ่งที่คุณเก่งขึ้น~ {word} เรียบร้อยแล้วค่า!", en: "Another win for you~ {word} is done!" },
+];
+
+const MASTERY_ADVANCED: WarmPhrase[] = [
+  { th: "อีกนิดเดียวก็ได้แล้วค่า~ ใกล้จำคำว่า {word} ได้แล้ว", en: "Almost there~ one step closer to {word}" },
+  { th: "เก่งขึ้นอีกนิด~ คำว่า {word} ใกล้เป็นของคุณแล้ว", en: "Getting closer~ {word} is almost yours" },
+  { th: "อีกหนึ่งก้าว~ ใกล้จำคำว่า {word} ได้แม่นแล้วค่า", en: "+1 step toward mastering {word}~" },
+  { th: "ดีขึ้นเรื่อยๆ เลย~ คำว่า {word} กำลังฝังในใจแล้ว", en: "Steady progress~ {word} is sticking~" },
+  { th: "ใกล้แล้ว~ คำว่า {word} อีกนิดเดียวค่า", en: "So close~ {word} is almost there~" },
+  { th: "หนูเห็นความพยายาม~ คำว่า {word} ใกล้แล้วนะคะ", en: "I see you trying~ {word} is getting close~" },
+  { th: "อีกนิด~ คำว่า {word} กำลังจะเป็นของคุณแล้วค่า", en: "One more step~ {word} is nearly mastered" },
+  { th: "ก้าวหน้าอีกขั้น~ ใกล้จำคำว่า {word} ได้แล้วค่า", en: "+1 step toward {word}~" },
+];
+
+export function pickMasteryCelebration(word: string, lang: Language): string {
+  return pickPhraseWith(MASTERY_CELEBRATION, { lang }, { word });
+}
+
+export function pickMasteryAdvanced(word: string, lang: Language): string {
+  return pickPhraseWith(MASTERY_ADVANCED, { lang }, { word });
+}
+
 // ─── FORBIDDEN STRINGS (documented; eslint rule lives in /MIOMIKA.md §4.2) ──
 //
 // Strings that must NEVER appear in code outside this module:
