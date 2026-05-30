@@ -17,12 +17,12 @@ function mapVoice(lang: Lang, voice: VoicePref): { voiceName: string; languageCo
   if (lang === "th") {
     return {
       languageCode: "th-TH",
-      voiceName: voice === "male" ? "th-TH-Chirp3-HD-Charon" : "th-TH-Chirp3-HD-Aoede",
+      voiceName: voice === "male" ? "th-TH-Chirp3-HD-Charon" : "th-TH-Chirp3-HD-Leda",
     };
   }
   return {
     languageCode: "en-US",
-    voiceName: voice === "male" ? "en-US-Chirp3-HD-Charon" : "en-US-Chirp3-HD-Aoede",
+    voiceName: voice === "male" ? "en-US-Chirp3-HD-Charon" : "en-US-Chirp3-HD-Leda",
   };
 }
 
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
   const voiceName = explicitVoiceName || mapped.voiceName;
   const languageCode = mapped.languageCode;
 
-  const defaultSpeakingRate = 0.93;
+  const defaultSpeakingRate = 0.90;
   const speakingRate =
     typeof body.speakingRate === "number" &&
     body.speakingRate >= 0.5 &&

@@ -57,12 +57,21 @@ const GUEST_LIMIT = 5;
 const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
 const TRANSCRIPT_CLIP = 180;
 
-function stripForTts(text: string): string {
+const MIOMI_TTS_NAME: Record<TtsLang, string> = {
+  en: "Mee-oh-mee",
+  th: "มิโอมิ",
+};
+
+function stripForTts(text: string, lang: TtsLang): string {
   return text
-    .replace(/~/g, "")
-    .replace(/\*+/g, "")
-    .replace(/_+/g, "")
+    .replace(/มิโอมิ/g, MIOMI_TTS_NAME[lang])
+    .replace(/miomi/gi, MIOMI_TTS_NAME[lang])
+    .replace(/[~*_`#|<>^=+/\\]/g, " ")
+    .replace(/(\p{L})-(\p{L})/gu, "$1 $2")
+    .replace(/[-–—]/g, " ")
+    .replace(/[()\[\]{}]/g, " ")
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+    .replace(/[\u{2600}-\u{27BF}]/gu, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -254,7 +263,7 @@ export default function TalkPage() {
       if (!mountedRefForTts.current) return;
       logEvent({ kind: "tts", level: "info", message: "speak called (opener)", data: { lang: openerLang, len: speakText.length } });
       setMicState("speaking");
-      void speak(stripForTts(speakText), openerLang, {
+      void speak(stripForTts(speakText, openerLang), openerLang, {
         onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
         onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
       });
@@ -448,7 +457,7 @@ export default function TalkPage() {
             message: "speak called",
             data: { lang: replyLang, len: speakText.length },
           });
-          void speak(stripForTts(speakText), replyLang, {
+          void speak(stripForTts(speakText, replyLang), replyLang, {
             onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
             onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
           });
@@ -540,22 +549,14 @@ export default function TalkPage() {
   }, []);
 
   const handleOrbTap = useCallback(() => {
-    if (isLocked) {
-      setShowGuestSheet(true);
-      return;
-    }
-    if (micState === "speaking") {
+    if (isLocked) { setShowGuestSheet(true); return; }
+    if (micState === "speaking" || micState === "processing" || micState === "listening") {
       stopTts();
+      micRef.current?.stop();
       setMicState("idle");
       return;
     }
-    if (micState === "listening") {
-      micRef.current?.stop();
-      return;
-    }
-    if (micState === "idle") {
-      micRef.current?.start();
-    }
+    micRef.current?.start();
   }, [micState, isLocked]);
 
   return (
