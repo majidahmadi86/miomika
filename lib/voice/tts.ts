@@ -88,7 +88,7 @@ export async function preloadTtsVoices(): Promise<void> {
 // Module-level singleton: only ONE audio source plays at a time.
 let __audioGen = 0;
 let __activeAudio: HTMLAudioElement | null = null;
-let activeUtterance: SpeechSynthesisUtterance | null = null;
+let __supersede: (() => void) | null = null;
 
 // Global "is Miomi audibly speaking right now" flag.
 // Read synchronously by /talk to gate VAD.
@@ -123,6 +123,11 @@ export function killAllAudio(): void {
     }
     __activeAudio = null;
   }
+  if (__supersede) {
+    const s = __supersede;
+    __supersede = null;
+    s();
+  }
   if (typeof window !== "undefined" && window.speechSynthesis) {
     try {
       window.speechSynthesis.cancel();
@@ -136,7 +141,6 @@ export function killAllAudio(): void {
 export function stopTts(): void {
   if (typeof window === "undefined") return;
   killAllAudio();
-  activeUtterance = null;
 }
 
 async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | null> {
@@ -180,73 +184,33 @@ async function trySpeakViaServer(
   return new Promise((resolve) => {
     killAllAudio();
     const myGen = ++__audioGen;
-
     const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
     __activeAudio = el;
+    __supersede = () => {
+      __supersede = null;
+      resolve(true);
+    };
     setSpeaking(true);
-
     const fail = () => {
       if (myGen !== __audioGen) return;
+      __supersede = null;
       el.pause();
       el.currentTime = 0;
       __activeAudio = null;
       setSpeaking(false);
       resolve(false);
     };
-
     el.onended = () => {
       if (myGen !== __audioGen) return;
+      __supersede = null;
       __activeAudio = null;
       setSpeaking(false);
       callbacks?.onEnd?.();
       resolve(true);
     };
     el.onerror = fail;
-
     void el.play().catch(fail);
   });
-}
-
-async function speakViaBrowser(
-  text: string,
-  lang: TtsLang,
-  callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
-): Promise<void> {
-  if (typeof window === "undefined" || !window.speechSynthesis) {
-    callbacks?.onEnd?.();
-    return;
-  }
-  if (!VOICE_CACHE.loaded) await preloadTtsVoices();
-
-  killAllAudio();
-  const myGen = ++__audioGen;
-
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = lang === "th" ? "th-TH" : "en-US";
-  const voice = lang === "th" ? VOICE_CACHE.th : VOICE_CACHE.en;
-  if (voice) utter.voice = voice;
-  // Tune per-language. Thai needs slightly slower + lower pitch to sound less squeaky.
-  utter.rate = lang === "th" ? 0.92 : 1.0;
-  utter.pitch = lang === "th" ? 1.05 : 1.12;
-  utter.volume = 1.0;
-
-  utter.onstart = () => callbacks?.onStart?.();
-  utter.onend = () => {
-    if (myGen !== __audioGen) return;
-    if (activeUtterance === utter) activeUtterance = null;
-    setSpeaking(false);
-    callbacks?.onEnd?.();
-  };
-  utter.onerror = () => {
-    if (myGen !== __audioGen) return;
-    if (activeUtterance === utter) activeUtterance = null;
-    setSpeaking(false);
-    callbacks?.onError?.();
-  };
-
-  activeUtterance = utter;
-  setSpeaking(true);
-  window.speechSynthesis.speak(utter);
 }
 
 export async function speak(
@@ -263,13 +227,10 @@ export async function speak(
   callbacks?.onStart?.();
 
   const serverOk = await trySpeakViaServer(text, lang, callbacks);
-  if (serverOk) return;
-
-  console.error(
-    "[tts] FALLBACK FIRED — server voice failed after 3 tries. text:",
-    text.slice(0, 40),
-  );
-  await speakViaBrowser(text, lang, callbacks);
+  if (!serverOk) {
+    console.warn("[tts] server TTS failed; one-voice policy: staying silent");
+    callbacks?.onEnd?.();
+  }
 }
 
 // Language detection: Thai unicode block vs Latin.

@@ -18,7 +18,7 @@ import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
-import { speak, stopTts, killAllAudio, preloadTtsVoices, subscribeSpeaking, type TtsLang } from "@/lib/voice/tts";
+import { speak, stopTts, preloadTtsVoices, subscribeSpeaking, type TtsLang } from "@/lib/voice/tts";
 import { isLikelyHallucination } from "@/lib/voice/hallucination";
 import { pickIceBreaker, pickMasteryCelebration } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
@@ -490,10 +490,11 @@ export default function TalkPage() {
         setShowGuestSheet(true);
         return;
       }
-      if (micState === "speaking") {
-        killAllAudio();
-        stopTts();
-        setMicState("idle");
+      // Mic capture while Miomi is (or is about to be) speaking is her own echo. Drop it.
+      // No barge-in for now — this is what kills the self-talk loop.
+      if (micState === "speaking" || isSpeakingRef.current) {
+        logEvent({ kind: "transcribe", level: "warn", message: "dropped echo (speaking)", data: { text } });
+        return;
       }
       logEvent({
         kind: "mic",
@@ -703,7 +704,7 @@ export default function TalkPage() {
         <MicButton
           ref={micRef}
           state={micState}
-          speakingActive={isSpeakingState}
+          speakingActive={isSpeakingState || micState === "speaking"}
           language={profile?.ui_language === "th" ? "th-TH" : "en-US"}
           onTranscript={handleMicTranscript}
           onStateChange={setMicState}
