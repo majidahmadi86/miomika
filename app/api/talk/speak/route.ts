@@ -1,7 +1,7 @@
 // Pin to Singapore — closer to Thai users than default iad1.
 export const preferredRegion = ["sin1", "hnd1"];
 export const runtime = "nodejs";
-export const maxDuration = 15;
+export const maxDuration = 25;
 
 import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
     const client = new TextToSpeechClient({ credentials });
 
-    const [response] = await client.synthesizeSpeech({
+    const synthPromise = client.synthesizeSpeech({
       input: { text },
       voice: { languageCode, name: voiceName },
       audioConfig: {
@@ -139,6 +139,10 @@ export async function POST(request: NextRequest) {
         // Chirp3-HD voices reject pitch — omit entirely.
       },
     });
+    const timeoutPromise = new Promise<never>((_, rej) => {
+      setTimeout(() => rej(new Error("synth_timeout")), 9000);
+    });
+    const [response] = await Promise.race([synthPromise, timeoutPromise]);
 
     if (!response.audioContent) {
       throw new Error("Google TTS returned empty audioContent");
@@ -154,6 +158,10 @@ export async function POST(request: NextRequest) {
     }
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
+    if (detail === "synth_timeout") {
+      log("voice.speak", "google timeout (9s)");
+      return NextResponse.json({ error: "synth_timeout" }, { status: 503 });
+    }
     const stack =
       e instanceof Error && e.stack ? e.stack.slice(0, 200) : String(e).slice(0, 200);
     console.error("[tts.speak] google synth failed:", detail, e);

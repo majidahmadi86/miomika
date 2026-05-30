@@ -30,6 +30,8 @@ interface MicButtonProps {
   disabled?: boolean;
   locked?: boolean;
   onLockedTap?: () => void;
+  /** When true (Miomi speaking), VAD stays paused to avoid speaker echo. */
+  speakingActive?: boolean;
 }
 
 type MicVADInstance = {
@@ -48,30 +50,34 @@ export interface MicButtonHandle {
  * MicButton — explicit-intent VAD voice input.
  *
  * Key invariants:
- *   - VAD only starts when user explicitly taps. NEVER on re-render.
+ *   - VAD instance created once on mount, destroyed on unmount.
+ *   - VAD only listens when user intent + not speaking/locked/disabled.
  *   - userIntentRef tracks whether user has asked to be listening.
- *   - stop() flips intent to false synchronously, then nukes VAD.
- *   - Any in-flight onSpeechEnd / transcribeAndCommit checks intent
- *     before doing anything.
  */
 export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function MicButton(
-  { state, language = "auto", onTranscript, onStateChange, disabled = false, locked = false, onLockedTap },
+  {
+    state,
+    language = "auto",
+    onTranscript,
+    onStateChange,
+    disabled = false,
+    locked = false,
+    onLockedTap,
+    speakingActive = false,
+  },
   ref,
 ) {
   const [amplitude, setAmplitude] = useState(0);
   const [debugVisible, setDebugVisible] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [listenIntent, setListenIntent] = useState(false);
+  const [vadReady, setVadReady] = useState(false);
 
   const flowTagSetRef = useRef(false);
-  const vadRef = useRef<MicVADInstance | null>(null);
-  const isLoadingVadRef = useRef(false);
+  const vadInstanceRef = useRef<MicVADInstance | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
-  // The ONLY source of truth for "should the mic be on right now".
   const userIntentRef = useRef(false);
-  const interruptModeRef = useRef(false);
-  const vadPositiveThresholdRef = useRef(0.5);
-  const vadRedemptionMsRef = useRef(1200);
 
   const trace = useCallback((msg: string, data?: Record<string, unknown>) => {
     if (typeof window === "undefined") return;
@@ -83,6 +89,11 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     if (flowTagSetRef.current) return;
     flowTagSetRef.current = true;
     try { Sentry.setTag("flow", "voice"); } catch { /* ignore */ }
+  }, []);
+
+  const setUserListening = useCallback((on: boolean) => {
+    userIntentRef.current = on;
+    setListenIntent(on);
   }, []);
 
   const transcribeAndCommit = useCallback(
@@ -165,141 +176,129 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     [language, trace, onStateChange, onTranscript],
   );
 
-  const killVAD = useCallback(() => {
-    if (vadRef.current) {
-      logEvent({ kind: "vad", level: "info", message: "vad destroyed" });
-      const v = vadRef.current;
-      vadRef.current = null;
-      try { void v.destroy().catch(() => { /* ignore */ }); } catch { /* ignore */ }
-    }
-    isLoadingVadRef.current = false;
-  }, []);
+  // Create VAD once on mount; destroy once on unmount.
+  useEffect(() => {
+    mountedRef.current = true;
+    let cancelled = false;
 
-  const startVAD = useCallback(async () => {
-    if (!userIntentRef.current) {
-      trace("startVAD aborted — no user intent");
-      return;
+    if (typeof window !== "undefined") {
+      void import("@ricky0123/vad-web").catch(() => { /* ignore */ });
+      const urls = ["/vad/silero_vad_v5.onnx", "/vad/ort-wasm-simd-threaded.wasm"];
+      urls.forEach((u) => { void fetch(u, { cache: "force-cache" }).catch(() => { /* ignore */ }); });
     }
-    if (vadRef.current) {
-      // Instance exists — just resume listening (instant, no re-allocation).
+
+    const initVad = async () => {
+      ensureFlowTag();
       try {
-        await vadRef.current.start();
-        if (mountedRef.current && userIntentRef.current) {
-          trace("VAD resumed (warm)");
-          onStateChange("listening");
+        trace("loading VAD library");
+        logEvent({ kind: "vad", level: "info", message: "vad loading" });
+        const { MicVAD } = await import("@ricky0123/vad-web");
+        if (cancelled || !mountedRef.current) return;
+
+        const vad = await MicVAD.new({
+          model: "v5",
+          baseAssetPath: "/vad/",
+          onnxWASMBasePath: "/vad/",
+          workletOptions: {},
+          startOnLoad: false,
+          positiveSpeechThreshold: 0.5,
+          negativeSpeechThreshold: 0.35,
+          minSpeechMs: 400,
+          preSpeechPadMs: 250,
+          redemptionMs: 1200,
+          onSpeechStart: () => {
+            if (!mountedRef.current) return;
+            if (!userIntentRef.current) return;
+            logEvent({ kind: "vad", level: "info", message: "speech start" });
+            trace("speech start");
+            onStateChange("listening");
+          },
+          onSpeechEnd: (audio: Float32Array) => {
+            if (!mountedRef.current) return;
+            if (!userIntentRef.current) {
+              trace("speech end ignored — user stopped");
+              return;
+            }
+            const wavBlob = float32ToWav(audio, 16000);
+            logEvent({
+              kind: "vad",
+              level: "info",
+              message: "speech end",
+              data: { samples: audio.length, wavBytes: wavBlob.size },
+            });
+            trace("speech end", { samples: audio.length });
+            void transcribeAndCommit(audio);
+          },
+          onVADMisfire: () => {
+            if (!mountedRef.current) return;
+            if (!userIntentRef.current) return;
+            logEvent({ kind: "vad", level: "warn", message: "misfire too short" });
+            trace("vad misfire (too short)");
+            onStateChange("idle");
+          },
+          onFrameProcessed: (probs) => {
+            if (!mountedRef.current) return;
+            setAmplitude(probs.isSpeech);
+          },
+        });
+
+        if (cancelled || !mountedRef.current) {
+          try { await vad.destroy(); } catch { /* ignore */ }
+          return;
         }
+
+        vadInstanceRef.current = vad as unknown as MicVADInstance;
+        logEvent({
+          kind: "vad",
+          level: "info",
+          message: "vad created",
+          data: { threshold: 0.5, redemptionMs: 1200 },
+        });
+        trace("VAD instance ready");
+        setVadReady(true);
       } catch (e) {
-        trace("VAD resume failed", { error: (e as Error).message });
+        const msg = (e as Error).message ?? "unknown";
+        trace("VAD init failed", { error: msg });
+        if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")) {
+          onStateChange("needs-permission");
+        }
       }
-      return;
-    }
-    if (isLoadingVadRef.current) return;
-    ensureFlowTag();
-    isLoadingVadRef.current = true;
-    try {
-      trace("loading VAD library");
-      logEvent({ kind: "vad", level: "info", message: "vad loading" });
-      const { MicVAD } = await import("@ricky0123/vad-web");
-      // While loading, user may have stopped. Check intent before allocating mic.
-      if (!userIntentRef.current) {
-        trace("startVAD aborted post-load — user stopped");
-        isLoadingVadRef.current = false;
-        return;
+    };
+
+    void initVad();
+
+    return () => {
+      cancelled = true;
+      mountedRef.current = false;
+      userIntentRef.current = false;
+      const v = vadInstanceRef.current;
+      vadInstanceRef.current = null;
+      if (v) {
+        logEvent({ kind: "vad", level: "info", message: "vad destroyed" });
+        try { void v.destroy().catch(() => { /* ignore */ }); } catch { /* ignore */ }
       }
-      const vad = await MicVAD.new({
-        model: "v5",
-        baseAssetPath: "/vad/",
-        onnxWASMBasePath: "/vad/",
-        workletOptions: {},
-        startOnLoad: false,
-        positiveSpeechThreshold: vadPositiveThresholdRef.current,
-        negativeSpeechThreshold: 0.35,
-        minSpeechMs: 400,
-        preSpeechPadMs: 250,
-        redemptionMs: vadRedemptionMsRef.current,
-        onSpeechStart: () => {
-          if (!mountedRef.current) return;
-          if (!userIntentRef.current) return;
-          logEvent({ kind: "vad", level: "info", message: "speech start" });
-          trace("speech start");
-          onStateChange("listening");
-        },
-        onSpeechEnd: (audio: Float32Array) => {
-          if (!mountedRef.current) return;
-          if (!userIntentRef.current) {
-            trace("speech end ignored — user stopped");
-            return;
-          }
-          const wavBlob = float32ToWav(audio, 16000);
-          logEvent({
-            kind: "vad",
-            level: "info",
-            message: "speech end",
-            data: { samples: audio.length, wavBytes: wavBlob.size },
-          });
-          trace("speech end", { samples: audio.length });
-          void transcribeAndCommit(audio);
-        },
-        onVADMisfire: () => {
-          if (!mountedRef.current) return;
-          if (!userIntentRef.current) return;
-          logEvent({ kind: "vad", level: "warn", message: "misfire too short" });
-          trace("vad misfire (too short)");
-          onStateChange("idle");
-        },
-        onFrameProcessed: (probs) => {
-          if (!mountedRef.current) return;
-          setAmplitude(probs.isSpeech);
-        },
-      });
-      // Final guard before storing the instance.
-      if (!mountedRef.current || !userIntentRef.current) {
-        try { await vad.destroy(); } catch { /* ignore */ }
-        isLoadingVadRef.current = false;
-        return;
-      }
-      vadRef.current = vad as unknown as MicVADInstance;
-      await vad.start();
-      logEvent({
-        kind: "vad",
-        level: "info",
-        message: "vad created",
-        data: { threshold: vadPositiveThresholdRef.current, redemptionMs: vadRedemptionMsRef.current },
-      });
-      trace("VAD running");
-      onStateChange("listening");
-    } catch (e) {
-      const msg = (e as Error).message ?? "unknown";
-      trace("VAD start failed", { error: msg });
-      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")) {
-        onStateChange("needs-permission");
-      } else {
-        onStateChange("idle");
-      }
-    } finally {
-      isLoadingVadRef.current = false;
-    }
+    };
   }, [trace, ensureFlowTag, onStateChange, transcribeAndCommit]);
 
-  const applyVadThresholds = useCallback(
-    async (positiveSpeechThreshold: number, redemptionMs: number) => {
-      if (
-        vadPositiveThresholdRef.current === positiveSpeechThreshold &&
-        vadRedemptionMsRef.current === redemptionMs
-      ) {
-        return;
-      }
-      vadPositiveThresholdRef.current = positiveSpeechThreshold;
-      vadRedemptionMsRef.current = redemptionMs;
-      const keepListening = userIntentRef.current;
-      killVAD();
-      if (keepListening) {
-        userIntentRef.current = true;
-        await startVAD();
-      }
-    },
-    [killVAD, startVAD],
-  );
+  const shouldListen =
+    vadReady && !speakingActive && !locked && !disabled && listenIntent;
+
+  useEffect(() => {
+    const vad = vadInstanceRef.current;
+    if (!vad) return;
+    if (shouldListen) {
+      void vad.start().then(() => {
+        if (mountedRef.current && userIntentRef.current && shouldListen) {
+          trace("VAD listening");
+          onStateChange("listening");
+        }
+      }).catch((e) => {
+        trace("VAD start failed", { error: (e as Error).message });
+      });
+    } else {
+      void vad.pause().catch(() => { /* ignore */ });
+    }
+  }, [shouldListen, trace, onStateChange]);
 
   const requestPermissionAgain = useCallback(async () => {
     trace("recovery: requesting permission");
@@ -317,35 +316,21 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     ref,
     () => ({
       start: () => {
-        console.log("[MicButton.start] called from:", new Error().stack?.split("\n").slice(2, 6).join("\n"));
         if (disabled || locked) {
           if (locked && onLockedTap) onLockedTap();
           return;
         }
-        userIntentRef.current = true;
-        void startVAD();
+        setUserListening(true);
       },
       stop: () => {
-        // Synchronous intent flip is the source of truth.
-        userIntentRef.current = false;
-        // Pause keeps instance warm for next tap; destroy only on lock/unmount.
-        if (vadRef.current) {
-          try { void vadRef.current.pause().catch(() => { /* ignore */ }); } catch { /* ignore */ }
-        }
+        setUserListening(false);
         if (mountedRef.current) onStateChange("idle");
       },
-      setInterruptMode: (enabled: boolean) => {
-        interruptModeRef.current = enabled;
-        const pos = enabled ? 0.65 : 0.5;
-        const red = enabled ? 300 : 1200;
-        void applyVadThresholds(pos, red);
-        if (enabled && !disabled && !locked) {
-          userIntentRef.current = true;
-          void startVAD();
-        }
+      setInterruptMode: () => {
+        // Deferred: interrupt-while-speaking disabled until foundation is solid.
       },
     }),
-    [disabled, locked, onLockedTap, startVAD, onStateChange, applyVadThresholds],
+    [disabled, locked, onLockedTap, setUserListening, onStateChange],
   );
 
   const handlePress = useCallback(() => {
@@ -356,27 +341,19 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     }
     if (state === "processing") return;
     if (state === "speaking") {
-      if (interruptModeRef.current) return;
-      userIntentRef.current = false;
-      if (vadRef.current) {
-        try { void vadRef.current.pause().catch(() => { /* ignore */ }); } catch { /* ignore */ }
-      }
+      setUserListening(false);
       onStateChange("idle");
       return;
     }
     if (state === "listening") {
-      userIntentRef.current = false;
-      if (vadRef.current) {
-        try { void vadRef.current.pause().catch(() => { /* ignore */ }); } catch { /* ignore */ }
-      }
+      setUserListening(false);
       onStateChange("idle");
       return;
     }
     if (state === "idle") {
-      userIntentRef.current = true;
-      void startVAD();
+      setUserListening(true);
     }
-  }, [disabled, locked, onLockedTap, state, onStateChange, startVAD]);
+  }, [disabled, locked, onLockedTap, state, onStateChange, setUserListening]);
 
   const onPointerDown = useCallback(() => {
     longPressTimerRef.current = window.setTimeout(() => {
@@ -391,31 +368,12 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     }
   }, []);
 
-  // Lock prop changes mid-session must immediately kill any active recording.
   useEffect(() => {
     if (locked) {
-      userIntentRef.current = false;
-      killVAD();
+      setUserListening(false);
       if (mountedRef.current) onStateChange("idle");
     }
-  }, [locked, killVAD, onStateChange]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    if (typeof window !== "undefined") {
-      void import("@ricky0123/vad-web").catch(() => { /* ignore */ });
-      const urls = ["/vad/silero_vad_v5.onnx", "/vad/ort-wasm-simd-threaded.wasm"];
-      urls.forEach((u) => { void fetch(u, { cache: "force-cache" }).catch(() => { /* ignore */ }); });
-    }
-    return () => {
-      mountedRef.current = false;
-      userIntentRef.current = false;
-      if (vadRef.current) {
-        try { vadRef.current.destroy(); } catch { /* ignore */ }
-        vadRef.current = null;
-      }
-    };
-  }, []);
+  }, [locked, setUserListening, onStateChange]);
 
   if (state === "needs-permission") {
     return (
@@ -465,7 +423,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       </motion.button>
       {debugVisible && (
         <div style={debugPanelStyle}>
-          <p style={{ margin: 0, marginBottom: "4px", color: COLORS.ctaSolid }}>MicButton · state={state} · intent={String(userIntentRef.current)} · speech={amplitude.toFixed(2)}</p>
+          <p style={{ margin: 0, marginBottom: "4px", color: COLORS.ctaSolid }}>MicButton · state={state} · intent={String(userIntentRef.current)} · shouldListen={String(shouldListen)} · speech={amplitude.toFixed(2)}</p>
           {debugLog.map((line, i) => (<p key={i} style={{ margin: 0, opacity: 0.85 }}>{line}</p>))}
           <p style={{ margin: 0, marginTop: "8px", opacity: 0.5, fontSize: "10px" }}>long-press mic to toggle</p>
         </div>

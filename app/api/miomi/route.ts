@@ -202,9 +202,9 @@ export async function POST(req: NextRequest) {
 
       move = chooseMove(brainState);
       adaptivePrompt = buildBrainPrompt({ state: brainState, move, userInput });
-      if (brainState.isPracticeAttempt && brainState.learningTargetLanguage) {
-        const speaks = brainState.userSpeaksLanguage;
-        const target = brainState.learningTargetLanguage;
+      if (brainState.isPracticeAttempt && brainState.targetLanguage) {
+        const speaks = brainState.uiLanguage;
+        const target = brainState.targetLanguage;
         adaptivePrompt += `\n\nPRACTICE MODE: The user just spoke '${userInput}' in ${target} as practice. Stay in ${speaks}. Echo their attempt, give one warm piece of feedback, invite repeat or progression.`;
       }
       if (!adaptivePrompt.trim()) {
@@ -539,7 +539,7 @@ CRITICAL RETENTION RULES — these are non-negotiable for the user experience:
       lastUserSignal: userInput.slice(0, 100),
     };
 
-    const replyLanguage = brainState.userSpeaksLanguage;
+    const replyLanguage = brainState.uiLanguage;
     return NextResponse.json({
       content,
       wordCard,
@@ -587,7 +587,7 @@ CRITICAL RETENTION RULES — these are non-negotiable for the user experience:
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function brainReplyLang(brainState: BrainState): "th" | "en" {
-  return brainState.userSpeaksLanguage;
+  return brainState.uiLanguage;
 }
 
 function brainLanguageToSession(brainState: BrainState): SessionState["primaryLanguage"] {
@@ -614,6 +614,8 @@ function createDefaultBrainState(args: {
     masteredWords: [],
     introducedWords: [],
     nowLanguage: "th",
+    uiLanguage: "th",
+    targetLanguage: null,
     userSpeaksLanguage: "th",
     learningTargetLanguage: null,
     isPracticeAttempt: false,

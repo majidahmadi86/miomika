@@ -38,7 +38,13 @@ export interface BrainState {
   masteredWords: string[];
   introducedWords: string[];
   nowLanguage: DetectedLang;
+  /** Sticky interface language — Miomi always replies in this. */
+  uiLanguage: "th" | "en";
+  /** Language the user is learning (from profile or explicit intent). */
+  targetLanguage: "th" | "en" | null;
+  /** Alias for uiLanguage (backwards compat). */
   userSpeaksLanguage: "th" | "en";
+  /** Alias for targetLanguage (backwards compat). */
   learningTargetLanguage: "th" | "en" | null;
   isPracticeAttempt: boolean;
   emotionalSignal: EmotionalSignal;
@@ -65,7 +71,7 @@ export async function readBrainState(args: {
   const introducedWords: string[] = [];
   let memory: Array<{ role: "user" | "miomi"; content: string }> = [];
 
-  const uiLanguage = profile?.ui_language ?? "th";
+  const profileUiLang = normalizeUiLanguage(profile?.ui_language ?? null);
   const learningTarget = normalizeLearningTarget(
     profile?.learning_target_language ?? null,
   );
@@ -126,12 +132,19 @@ export async function readBrainState(args: {
     }
   }
 
-  const nowLanguage = detectLanguage(userInput, uiLanguage);
-  const { learningTargetLanguage, userSpeaksLanguage } = resolveLearningLanguages({
+  const nowLanguage = detectLanguage(userInput, profileUiLang);
+  const uiLanguage = resolveUiLanguage({
+    profileUiLang,
+    userInput,
+    memory,
+  });
+  const targetLanguage = resolveTargetLanguage({
+    userInput,
     memory,
     profileTarget: learningTarget,
-    uiLanguage,
   });
+  const userSpeaksLanguage = uiLanguage;
+  const learningTargetLanguage = targetLanguage;
   const isPracticeAttempt = detectPracticeAttempt({
     userInput,
     nowLanguage,
@@ -160,6 +173,8 @@ export async function readBrainState(args: {
     masteredWords,
     introducedWords,
     nowLanguage,
+    uiLanguage,
+    targetLanguage,
     userSpeaksLanguage,
     learningTargetLanguage,
     isPracticeAttempt,
@@ -173,66 +188,64 @@ export async function readBrainState(args: {
   };
 }
 
-const LEARN_THAI_MARKERS = /teach me thai|i want to learn thai|สอนภาษาไทย/i;
-const LEARN_EN_MARKERS = /teach me english|i want to learn english|สอนภาษาอังกฤษ/i;
+const LEARN_INTENT_RE =
+  /(?:teach me|i want to learn|สอน|เรียน)\s*(?:thai|english|ไทย|อังกฤษ|ภาษาไทย|ภาษาอังกฤษ)/i;
 
-function resolveLearningLanguages(args: {
-  memory: Array<{ role: "user" | "miomi"; content: string }>;
-  profileTarget: "th" | "en" | null;
-  uiLanguage: "th" | "en";
-}): { learningTargetLanguage: "th" | "en" | null; userSpeaksLanguage: "th" | "en" } {
-  const { memory, profileTarget, uiLanguage } = args;
-
-  let target: "th" | "en" | null = profileTarget;
-
-  const recentUserMsgs = memory.filter((m) => m.role === "user").slice(-5);
-  for (const msg of recentUserMsgs) {
-    if (LEARN_THAI_MARKERS.test(msg.content)) {
-      target = "th";
-      break;
-    }
-    if (LEARN_EN_MARKERS.test(msg.content)) {
-      target = "en";
-      break;
-    }
-  }
-
-  let speaks: "th" | "en";
-  if (target === "th") {
-    speaks = "en";
-  } else if (target === "en") {
-    speaks = "th";
-  } else {
-    speaks = uiLanguage;
-  }
-
-  if (target) {
-    const nativeFromHistory = inferNativeLanguageFromHistory(memory, target);
-    if (nativeFromHistory) {
-      speaks = nativeFromHistory;
-    }
-  }
-
-  return { learningTargetLanguage: target, userSpeaksLanguage: speaks };
+function normalizeUiLanguage(raw: string | null): "th" | "en" {
+  if (!raw) return "th";
+  return raw.toLowerCase().startsWith("en") ? "en" : "th";
 }
 
-/** If last 3 user messages are non-practice chat in one language, that is their native tongue. */
-function inferNativeLanguageFromHistory(
-  memory: Array<{ role: "user" | "miomi"; content: string }>,
-  target: "th" | "en",
-): "th" | "en" | null {
-  const userMsgs = memory.filter((m) => m.role === "user").slice(-3);
-  if (userMsgs.length < 2) return null;
-
-  const langs = userMsgs.map((m) => messageDominantLang(m.content));
-  const nonTarget = langs.filter((l) => l !== null && l !== target);
-  if (nonTarget.length < 2) return null;
-
-  const allSame = nonTarget.every((l) => l === nonTarget[0]);
-  if (allSame && nonTarget[0]) {
-    return nonTarget[0];
-  }
+function detectLangSwitchCommand(text: string): "th" | "en" | null {
+  const lower = text.toLowerCase().trim();
+  if (/(พูด|คุย|สอน).*ไทย/.test(text) || /ไทยหน่อย/.test(text)) return "th";
+  if (/(พูด|คุย|สอน).*(อังกฤษ|english)/.test(text)) return "en";
+  if (/speak.*(thai|ไทย)|in thai|switch.*thai|teach.*thai/.test(lower)) return "th";
+  if (/speak.*english|in english|switch.*english|teach.*english/.test(lower)) return "en";
   return null;
+}
+
+function detectTargetLanguageFromIntent(text: string): "th" | "en" | null {
+  const m = text.match(LEARN_INTENT_RE);
+  if (!m) return null;
+  const fragment = m[0].toLowerCase();
+  if (/thai|ไทย|ภาษาไทย/.test(fragment)) return "th";
+  if (/english|อังกฤษ|ภาษาอังกฤษ/.test(fragment)) return "en";
+  return null;
+}
+
+function resolveUiLanguage(args: {
+  profileUiLang: "th" | "en";
+  userInput: string;
+  memory: Array<{ role: "user" | "miomi"; content: string }>;
+}): "th" | "en" {
+  const switchNow = detectLangSwitchCommand(args.userInput);
+  if (switchNow) return switchNow;
+
+  const recentUserMsgs = args.memory.filter((m) => m.role === "user").slice(-5);
+  for (let i = recentUserMsgs.length - 1; i >= 0; i--) {
+    const switched = detectLangSwitchCommand(recentUserMsgs[i].content);
+    if (switched) return switched;
+  }
+
+  return args.profileUiLang;
+}
+
+function resolveTargetLanguage(args: {
+  userInput: string;
+  memory: Array<{ role: "user" | "miomi"; content: string }>;
+  profileTarget: "th" | "en" | null;
+}): "th" | "en" | null {
+  const fromInput = detectTargetLanguageFromIntent(args.userInput);
+  if (fromInput) return fromInput;
+
+  const recentUserMsgs = args.memory.filter((m) => m.role === "user").slice(-5);
+  for (let i = recentUserMsgs.length - 1; i >= 0; i--) {
+    const fromHistory = detectTargetLanguageFromIntent(recentUserMsgs[i].content);
+    if (fromHistory) return fromHistory;
+  }
+
+  return args.profileTarget;
 }
 
 function messageDominantLang(text: string): "th" | "en" | null {

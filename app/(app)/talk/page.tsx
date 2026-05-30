@@ -18,7 +18,7 @@ import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
-import { speak, stopTts, killAllAudio, detectLang, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
+import { speak, stopTts, killAllAudio, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
 import { isLikelyHallucination } from "@/lib/voice/hallucination";
 import { pickIceBreaker, pickMasteryAdvanced, pickMasteryCelebration } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
@@ -43,6 +43,7 @@ type MasteryEventPayload = {
 type MiomiApiResponse = {
   content?: string;
   servedVia?: string;
+  replyLanguage?: TtsLang;
   wordCard?: IntroducedWordPayload | null;
   masteryEvent?: MasteryEventPayload;
 };
@@ -92,16 +93,6 @@ function toVocabularyEntry(word: IntroducedWordPayload): VocabularyEntry {
 function makeOpenerItem(): CanvasItem {
   const iceBreaker = pickIceBreaker();
   return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
-}
-
-/** Dominant language from message text; keeps previous when undecidable. */
-function resolveMessageLang(text: string, previous: TtsLang): TtsLang {
-  const switchCmd = detectLangSwitchCommand(text);
-  if (switchCmd) return switchCmd;
-  const thaiCount = text.match(/[\u0E00-\u0E7F]/g)?.length ?? 0;
-  const latinCount = text.match(/[a-zA-Z]/g)?.length ?? 0;
-  if (thaiCount === 0 && latinCount === 0) return previous;
-  return detectLang(text);
 }
 
 export default function TalkPage() {
@@ -176,14 +167,6 @@ export default function TalkPage() {
     const lang = profile.ui_language;
     queueMicrotask(() => updateConversationLang(lang));
   }, [profile?.ui_language, updateConversationLang]);
-
-  useEffect(() => {
-    if (micState === "speaking") {
-      micRef.current?.setInterruptMode(true);
-    } else if (micState === "idle" || micState === "listening") {
-      micRef.current?.setInterruptMode(false);
-    }
-  }, [micState]);
 
   useEffect(() => {
     if (prevMicStateRef.current !== micState) {
@@ -330,8 +313,6 @@ export default function TalkPage() {
       if (!text.trim()) return;
 
       const trimmed = text.trim();
-      const messageLang = resolveMessageLang(trimmed, conversationLangRef.current);
-      updateConversationLang(messageLang);
 
       setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "user_said", text: trimmed }]);
       setTextInput("");
@@ -358,13 +339,9 @@ export default function TalkPage() {
             messages: [{ role: "user", content: trimmed }],
             sessionInstruction: (() => {
               const lengthRule = respLength === "short" ? "Under 25 words." : respLength === "detailed" ? "60-100 words, thorough." : "Under 50 words.";
-              const userLang = messageLang;
-              const langRule = userLang === "th"
-                ? "The user spoke in Thai. Respond in Thai ONLY. Be warm and natural."
-                : "The user spoke in English. Respond in English ONLY. Be warm and natural. Do NOT add Thai unless they ask to learn Thai.";
               const levelRule = "CRITICAL: Mirror the user's language level. Look at the complexity, vocabulary, and sentence length of their LAST message. If they used simple words and short sentences, reply with simple words and short sentences. If they used advanced vocabulary, you can match it. Never speak above their level. Beginners get short, warm, easy replies — like a kind friend, not a textbook.";
               const modeRule = config.mode === "teach" ? `You are in Teach mode. The user is learning ${config.teach.learning === "th" ? "Thai" : "English"} at ${config.teach.level} level.` : config.mode === "social" ? `You are in Social mode. ${config.social.channel ? `Channel: ${config.social.channel}.` : ""} ${config.social.niche ? `Niche: ${config.social.niche}.` : ""}` : config.mode === "translate" ? "You are in Translator mode. Always provide translations with romanization." : config.mode === "chat" ? "You are in Just-chat mode. Be warm, present, brief, no teaching." : "Auto mode. Detect what the user needs and respond accordingly.";
-              return `You are Miomi, a warm kawaii cat companion. ${modeRule} ${langRule} ${levelRule} ${lengthRule} Always end with one question or invitation.`;
+              return `You are Miomi, a warm kawaii cat companion. ${modeRule} ${levelRule} ${lengthRule} Always end with one question or invitation.`;
             })(),
             sessionContext: { exchangeNumber: items.filter((i) => i.kind === "user_said").length, wordsIntroduced },
           }),
@@ -385,7 +362,11 @@ export default function TalkPage() {
           },
         });
         const content = data.content ?? "";
-        const lang = messageLang;
+        const lang: TtsLang =
+          data.replyLanguage === "en" || data.replyLanguage === "th"
+            ? data.replyLanguage
+            : conversationLangRef.current;
+        updateConversationLang(lang);
         const parts = content.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
         const primary = parts[0] ?? content;
         const secondary = parts[1] ?? "";
@@ -719,6 +700,7 @@ export default function TalkPage() {
         <MicButton
           ref={micRef}
           state={micState}
+          speakingActive={micState === "speaking"}
           language={
             profile?.ui_language === "en"
               ? "en-US"

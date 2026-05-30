@@ -14,51 +14,17 @@ export function buildBrainPrompt(args: {
   userInput: string;
 }): string {
   const { state, move, userInput } = args;
-  const lang = resolveReplyLanguage(state, userInput);
+  const lang = state.uiLanguage;
   const sections: string[] = [
     CORE_IDENTITY,
     buildUserContext(state),
     buildMemorySection(state),
-    buildRightNowSection(state, userInput, lang),
+    buildRightNowSection(state, userInput),
     buildMoveSection(move, lang, state),
     UNIVERSAL_RULES,
   ];
 
   return sections.join("\n\n");
-}
-
-function resolveReplyLanguage(state: BrainState, userInput: string): "th" | "en" {
-  if (state.isPracticeAttempt) {
-    return state.userSpeaksLanguage;
-  }
-  if (isClearLanguageSwitch(userInput, state)) {
-    const detected = state.nowLanguage;
-    if (detected === "th" || detected === "en") return detected;
-  }
-  return state.userSpeaksLanguage;
-}
-
-function isClearLanguageSwitch(userInput: string, state: BrainState): boolean {
-  const words = userInput.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= 10) return false;
-
-  const dominant = messageDominantLang(userInput);
-  if (!dominant || dominant === state.userSpeaksLanguage) return false;
-
-  const lower = userInput.toLowerCase();
-  const hasTargetWord = state.introducedWords.some((w) =>
-    lower.includes(w.toLowerCase()),
-  );
-  return !hasTargetWord;
-}
-
-function messageDominantLang(text: string): "th" | "en" | null {
-  const thai = text.match(/[\u0E00-\u0E7F]/g)?.length ?? 0;
-  const latin = text.match(/[a-zA-Z]/g)?.length ?? 0;
-  if (thai === 0 && latin === 0) return null;
-  if (thai > latin * 2) return "th";
-  if (latin > thai * 2) return "en";
-  return null;
 }
 
 function buildUserContext(state: BrainState): string {
@@ -103,36 +69,22 @@ function buildMemorySection(state: BrainState): string {
   return `Conversation so far:\n${transcript}`;
 }
 
-function buildRightNowSection(
-  state: BrainState,
-  userInput: string,
-  lang: "th" | "en",
-): string {
-  const langLabel = lang === "th" ? "Thai" : "English";
-  const speaksLabel = state.userSpeaksLanguage === "th" ? "Thai" : "English";
+function buildRightNowSection(state: BrainState, userInput: string): string {
+  const uiLabel = state.uiLanguage === "th" ? "Thai" : "English";
   const targetLabel =
-    state.learningTargetLanguage === "th"
+    state.targetLanguage === "th"
       ? "Thai"
-      : state.learningTargetLanguage === "en"
+      : state.targetLanguage === "en"
         ? "English"
         : "none";
 
-  const languageRule = state.isPracticeAttempt
-    ? [
-        "The user is PRACTICING the target language.",
-        `They said a word in ${targetLabel}.`,
-        `Reply ENTIRELY in ${speaksLabel} (${state.userSpeaksLanguage}).`,
-        "Acknowledge their attempt, give one piece of feedback, invite them to try again or move on.",
-        "Quote the practice word back to them with the correct pronunciation so they can compare.",
-        `Do NOT switch your reply language to ${targetLabel}.`,
-      ].join(" ")
-    : [
-        `Reply language: ${langLabel} (user speaks ${speaksLabel}).`,
-        "ONE language only. Never both.",
-        "Base reply language on who the user IS (their speaking language), not only what they just typed.",
-        "Exception: if they clearly switched (>10 words in the other language, no target vocabulary words), follow that switch.",
-        "Never mix unless teaching a single foreign word in context.",
-      ].join(" ");
+  const languageRule = [
+    `CRITICAL: Reply ENTIRELY in ${uiLabel} (${state.uiLanguage}).`,
+    `The user's interface language is ${uiLabel} — this NEVER changes mid-conversation, no matter what language they just spoke.`,
+    state.targetLanguage && state.isPracticeAttempt
+      ? `If they speak ${targetLabel} as practice, acknowledge in ${uiLabel}, repeat the target word in ${targetLabel} for them to compare, then continue in ${uiLabel}.`
+      : `If they speak ${targetLabel} as practice, acknowledge in ${uiLabel}, optionally repeat the target word in ${targetLabel}, then continue in ${uiLabel}.`,
+  ].join(" ");
 
   return [
     `The user just said: "${userInput}"`,

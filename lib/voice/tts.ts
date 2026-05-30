@@ -117,9 +117,10 @@ export function stopTts(): void {
 }
 
 async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | null> {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const maxAttempts = 3;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (attempt > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 600));
     }
     try {
       const res = await fetch("/api/talk/speak", {
@@ -127,6 +128,12 @@ async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | n
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, lang }),
       });
+      if (res.status === 503) {
+        if (attempt === maxAttempts - 1) {
+          console.warn("[tts] server 503, falling back to browser");
+        }
+        continue;
+      }
       if (!res.ok) continue;
       const data = (await res.json()) as { audio?: unknown };
       if (typeof data.audio === "string" && data.audio.length > 0) {
