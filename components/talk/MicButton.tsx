@@ -176,7 +176,21 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     [language, trace, onStateChange, onTranscript],
   );
 
+  // Callback refs — let the VAD effect read latest values without re-firing.
+  const traceRef = useRef(trace);
+  const ensureFlowTagRef = useRef(ensureFlowTag);
+  const onStateChangeRef = useRef(onStateChange);
+  const transcribeAndCommitRef = useRef(transcribeAndCommit);
+
+  useEffect(() => {
+    traceRef.current = trace;
+    ensureFlowTagRef.current = ensureFlowTag;
+    onStateChangeRef.current = onStateChange;
+    transcribeAndCommitRef.current = transcribeAndCommit;
+  });
+
   // Create VAD once on mount; destroy once on unmount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- VAD instance must persist for the session; callbacks read via refs
   useEffect(() => {
     mountedRef.current = true;
     let cancelled = false;
@@ -188,9 +202,9 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     }
 
     const initVad = async () => {
-      ensureFlowTag();
+      ensureFlowTagRef.current();
       try {
-        trace("loading VAD library");
+        traceRef.current("loading VAD library");
         logEvent({ kind: "vad", level: "info", message: "vad loading" });
         const { MicVAD } = await import("@ricky0123/vad-web");
         if (cancelled || !mountedRef.current) return;
@@ -210,13 +224,13 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
             if (!mountedRef.current) return;
             if (!userIntentRef.current) return;
             logEvent({ kind: "vad", level: "info", message: "speech start" });
-            trace("speech start");
-            onStateChange("listening");
+            traceRef.current("speech start");
+            onStateChangeRef.current("listening");
           },
           onSpeechEnd: (audio: Float32Array) => {
             if (!mountedRef.current) return;
             if (!userIntentRef.current) {
-              trace("speech end ignored — user stopped");
+              traceRef.current("speech end ignored — user stopped");
               return;
             }
             const wavBlob = float32ToWav(audio, 16000);
@@ -226,15 +240,15 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
               message: "speech end",
               data: { samples: audio.length, wavBytes: wavBlob.size },
             });
-            trace("speech end", { samples: audio.length });
-            void transcribeAndCommit(audio);
+            traceRef.current("speech end", { samples: audio.length });
+            void transcribeAndCommitRef.current(audio);
           },
           onVADMisfire: () => {
             if (!mountedRef.current) return;
             if (!userIntentRef.current) return;
             logEvent({ kind: "vad", level: "warn", message: "misfire too short" });
-            trace("vad misfire (too short)");
-            onStateChange("idle");
+            traceRef.current("vad misfire (too short)");
+            onStateChangeRef.current("idle");
           },
           onFrameProcessed: (probs) => {
             if (!mountedRef.current) return;
@@ -254,13 +268,13 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
           message: "vad created",
           data: { threshold: 0.5, redemptionMs: 1200 },
         });
-        trace("VAD instance ready");
+        traceRef.current("VAD instance ready");
         setVadReady(true);
       } catch (e) {
         const msg = (e as Error).message ?? "unknown";
-        trace("VAD init failed", { error: msg });
+        traceRef.current("VAD init failed", { error: msg });
         if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")) {
-          onStateChange("needs-permission");
+          onStateChangeRef.current("needs-permission");
         }
       }
     };
@@ -278,27 +292,28 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         try { void v.destroy().catch(() => { /* ignore */ }); } catch { /* ignore */ }
       }
     };
-  }, [trace, ensureFlowTag, onStateChange, transcribeAndCommit]);
+  }, []); // VAD created once on mount, destroyed on unmount
 
   const shouldListen =
     vadReady && !speakingActive && !locked && !disabled && listenIntent;
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks read via refs
   useEffect(() => {
     const vad = vadInstanceRef.current;
     if (!vad) return;
     if (shouldListen) {
       void vad.start().then(() => {
         if (mountedRef.current && userIntentRef.current && shouldListen) {
-          trace("VAD listening");
-          onStateChange("listening");
+          traceRef.current("VAD listening");
+          onStateChangeRef.current("listening");
         }
       }).catch((e) => {
-        trace("VAD start failed", { error: (e as Error).message });
+        traceRef.current("VAD start failed", { error: (e as Error).message });
       });
     } else {
       void vad.pause().catch(() => { /* ignore */ });
     }
-  }, [shouldListen, trace, onStateChange]);
+  }, [shouldListen]);
 
   const requestPermissionAgain = useCallback(async () => {
     trace("recovery: requesting permission");
