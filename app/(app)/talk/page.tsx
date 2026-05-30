@@ -176,7 +176,10 @@ export default function TalkPage() {
   useEffect(() => {
     if (!profile?.ui_language) return;
     const lang = profile.ui_language;
-    queueMicrotask(() => updateConversationLang(lang));
+    queueMicrotask(() => {
+      updateConversationLang(lang);
+      setUiLang(lang);
+    });
   }, [profile?.ui_language, updateConversationLang]);
 
   useEffect(() => {

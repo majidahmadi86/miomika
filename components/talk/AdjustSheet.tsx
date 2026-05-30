@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { TalkConfig, TalkMode, GameType, ContentChannel } from "@/lib/talk/modes";
 import { GAME_LABELS } from "@/lib/talk/modes";
+import { updateUiLanguage, useProfile } from "@/lib/auth/use-profile";
 
 interface AdjustSheetProps {
   open: boolean;
@@ -27,7 +28,11 @@ interface AdjustSheetProps {
 }
 
 export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp }: AdjustSheetProps) {
+  const { profile } = useProfile();
   const [draft, setDraft] = useState<TalkConfig>(config);
+  const [optimisticReplyLang, setOptimisticReplyLang] = useState<"th" | "en" | null>(null);
+  const [langConfirm, setLangConfirm] = useState<string | null>(null);
+  const replyLang = profile?.ui_language ?? optimisticReplyLang ?? uiLang;
 
   useEffect(() => {
     if (!open) return;
@@ -126,6 +131,42 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp
               <Group label={uiLang === "en" ? "Lock her role" : "ล็อคบทบาท"} help={uiLang === "en" ? "Auto = she reads you. Lock = she stays in one mode." : "อัตโนมัติ = หนูอ่านคุณ ล็อค = หนูอยู่ในโหมดเดียว"}>
                 <ModeGrid value={draft.mode} onChange={(m) => setDraft({ ...draft, mode: m })} uiLang={uiLang} />
               </Group>
+
+              <Section icon={Languages} title={uiLang === "en" ? "Reply language" : "ภาษาที่หนูตอบ"}>
+                <PillRow>
+                  <Pill
+                    active={replyLang === "en"}
+                    onClick={() => {
+                      if (replyLang === "en") return;
+                      setOptimisticReplyLang("en");
+                      void updateUiLanguage("en").then(() => {
+                        setLangConfirm("Now replying in English~");
+                        window.setTimeout(() => setLangConfirm(null), 2500);
+                      });
+                    }}
+                  >
+                    English
+                  </Pill>
+                  <Pill
+                    active={replyLang === "th"}
+                    onClick={() => {
+                      if (replyLang === "th") return;
+                      setOptimisticReplyLang("th");
+                      void updateUiLanguage("th").then(() => {
+                        setLangConfirm("Now replying in ไทย~");
+                        window.setTimeout(() => setLangConfirm(null), 2500);
+                      });
+                    }}
+                  >
+                    ไทย
+                  </Pill>
+                </PillRow>
+                {langConfirm && (
+                  <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", color: "#5BBFA8", margin: "8px 0 0", textAlign: "center" }}>
+                    {langConfirm}
+                  </p>
+                )}
+              </Section>
 
               {(draft.mode === "auto" || draft.mode === "teach") && (
                 <Section icon={GraduationCap} title={uiLang === "en" ? "If teaching" : "ถ้าสอนภาษา"}>

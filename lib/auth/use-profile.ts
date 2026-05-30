@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { setUILanguageCookie } from "@/lib/i18n/client";
 
 export type Tier = "guest" | "free" | "pro" | "pro_max";
 export type JourneyStage =
@@ -166,4 +167,25 @@ export function useProfile(): ProfileState {
   }, []);
 
   return state;
+}
+
+/** Persist reply language to profile + cookie; refreshes useProfile listeners. */
+export async function updateUiLanguage(lang: "th" | "en"): Promise<void> {
+  const supabase = createClient();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user?.id;
+  if (!userId) return;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ ui_language: lang })
+    .eq("id", userId);
+  if (error) {
+    console.error("[profile] updateUiLanguage failed:", error);
+    return;
+  }
+  setUILanguageCookie(lang);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("miomika:profile-refresh"));
+  }
 }
