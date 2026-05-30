@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { motion } from "framer-motion";
 import { Type, Globe, Volume2, VolumeX, Keyboard } from "lucide-react";
 
 export type ResponseLength = "short" | "normal" | "detailed";
@@ -17,6 +19,11 @@ interface ToolboxProps {
   onToggleKeyboard: () => void;
 }
 
+const iconVariants = {
+  inactive: { scale: 1, y: 0, opacity: 0.7 },
+  active: { scale: 1, y: -2, opacity: 1 },
+};
+
 export function Toolbox({
   length,
   lang,
@@ -28,6 +35,13 @@ export function Toolbox({
   onToggleTts,
   onToggleKeyboard,
 }: ToolboxProps) {
+  const [lastPressedId, setLastPressedId] = useState<string | null>(null);
+
+  const markPressed = (id: string) => {
+    setLastPressedId(id);
+    window.setTimeout(() => setLastPressedId((prev) => (prev === id ? null : prev)), 200);
+  };
+
   return (
     <div
       style={{
@@ -44,32 +58,40 @@ export function Toolbox({
       }}
     >
       <ToolBtn
+        id="keyboard"
         Icon={Keyboard}
         active={keyboardMode}
+        isPressed={lastPressedId === "keyboard"}
         label=""
         title={uiLang === "en" ? "Keyboard" : "แป้นพิมพ์"}
-        onClick={onToggleKeyboard}
+        onClick={() => { markPressed("keyboard"); onToggleKeyboard(); }}
       />
       <ToolBtn
+        id="length"
         Icon={Type}
         active={length !== "normal"}
+        isPressed={lastPressedId === "length"}
         label={length === "short" ? "S" : length === "detailed" ? "L" : "M"}
         title={uiLang === "en" ? `Length: ${length}` : "ความยาว"}
-        onClick={onCycleLength}
+        onClick={() => { markPressed("length"); onCycleLength(); }}
       />
       <ToolBtn
+        id="lang"
         Icon={Globe}
         active={lang !== "both"}
+        isPressed={lastPressedId === "lang"}
         label={lang === "both" ? "T+E" : lang.toUpperCase()}
         title={uiLang === "en" ? `Lang: ${lang}` : "ภาษา"}
-        onClick={onCycleLang}
+        onClick={() => { markPressed("lang"); onCycleLang(); }}
       />
       <ToolBtn
+        id="tts"
         Icon={ttsOn ? Volume2 : VolumeX}
         active={ttsOn}
+        isPressed={lastPressedId === "tts"}
         label=""
         title={uiLang === "en" ? (ttsOn ? "Voice on" : "Voice off") : "เสียง"}
-        onClick={onToggleTts}
+        onClick={() => { markPressed("tts"); onToggleTts(); }}
       />
     </div>
   );
@@ -78,23 +100,33 @@ export function Toolbox({
 function ToolBtn({
   Icon,
   active,
+  isPressed,
   label,
   title,
   onClick,
 }: {
+  id: string;
   Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
   active: boolean;
+  isPressed: boolean;
   label: string;
   title: string;
   onClick: () => void;
 }) {
+  const isActive = active || isPressed;
+
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       title={title}
       aria-label={title}
       aria-pressed={active}
+      variants={iconVariants}
+      animate={active ? "active" : "inactive"}
+      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+      whileHover={isActive ? { scale: 1.05 } : undefined}
+      whileTap={isActive ? { scale: 0.95 } : { scale: 1.0 }}
       style={{
         width: "42px",
         height: "42px",
@@ -127,6 +159,6 @@ function ToolBtn({
           {label}
         </span>
       )}
-    </button>
+    </motion.button>
   );
 }

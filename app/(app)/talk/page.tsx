@@ -191,6 +191,14 @@ export default function TalkPage() {
     }
   }, [micState]);
 
+  useEffect(() => {
+    if (micState === "listening") {
+      import("@/lib/voice/cues").then((m) => m.cueListening()).catch(() => {});
+    } else if (micState === "processing") {
+      import("@/lib/voice/cues").then((m) => m.cueThinking()).catch(() => {});
+    }
+  }, [micState]);
+
   const handleTitleTap = useCallback(() => {
     const now = Date.now();
     const taps = titleTapsRef.current;
@@ -230,7 +238,7 @@ export default function TalkPage() {
   }, [items.length, authReady, profile?.ui_language, uiLang]);
 
   useEffect(() => {
-    if (!audioUnlocked || !ttsOn || items.length !== 1 || openerSpokenRef.current || !authReady) return;
+    if (!ttsOn || items.length !== 1 || openerSpokenRef.current || !authReady) return;
     const first = items[0];
     if (first?.kind !== "mini_cat") return;
     openerSpokenRef.current = true;
@@ -241,19 +249,14 @@ export default function TalkPage() {
     const speakText = openerLang === "th" ? first.textTh : first.textEn;
     window.setTimeout(() => {
       if (!mountedRefForTts.current) return;
-      logEvent({
-        kind: "tts",
-        level: "info",
-        message: "speak called",
-        data: { lang: openerLang, len: speakText.length },
-      });
+      logEvent({ kind: "tts", level: "info", message: "speak called (opener)", data: { lang: openerLang, len: speakText.length } });
       setMicState("speaking");
       void speak(stripForTts(speakText), openerLang, {
         onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
         onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
       });
-    }, 400);
-  }, [audioUnlocked, ttsOn, items, authReady, profile?.ui_language, uiLang]);
+    }, 800);
+  }, [ttsOn, items, authReady, profile?.ui_language, uiLang]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset + auto-raise CTA on limit */
@@ -495,7 +498,7 @@ export default function TalkPage() {
         message: "transcript received",
         data: { text, len: text.length, lang: conversationLangRef.current },
       });
-      if (isLikelyHallucination(text, conversationLangRef.current, false)) {
+      if (isLikelyHallucination(text, profile?.ui_language ?? "en", false)) {
         logEvent({ kind: "transcribe", level: "warn", message: "dropped hallucination", data: { text } });
         return;
       }
@@ -507,7 +510,7 @@ export default function TalkPage() {
       if (transcriptTimerRef.current) window.clearTimeout(transcriptTimerRef.current);
       transcriptTimerRef.current = window.setTimeout(flushBuffer, 600);
     },
-    [isLocked, micState, flushBuffer],
+    [isLocked, micState, flushBuffer, profile?.ui_language],
   );
 
   const stateLabel = (() => {
