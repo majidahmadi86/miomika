@@ -18,7 +18,7 @@ import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
-import { speak, stopTts, killAllAudio, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
+import { speak, stopTts, killAllAudio, preloadTtsVoices, subscribeSpeaking, type TtsLang } from "@/lib/voice/tts";
 import { isLikelyHallucination } from "@/lib/voice/hallucination";
 import { pickIceBreaker, pickMasteryCelebration } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
@@ -129,6 +129,8 @@ export default function TalkPage() {
   const prevMicStateRef = useRef<MicState>("idle");
   const titleTapsRef = useRef<{ count: number; last: number }>({ count: 0, last: 0 });
   const [debugOpen, setDebugOpen] = useState(false);
+  const isSpeakingRef = useRef(false);
+  const [isSpeakingState, setIsSpeakingState] = useState(false);
 
   useEffect(() => {
     mountedRefForTts.current = true;
@@ -136,6 +138,15 @@ export default function TalkPage() {
       mountedRefForTts.current = false;
       stopTts();
     };
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeSpeaking((speaking: boolean) => {
+      isSpeakingRef.current = speaking;
+      setIsSpeakingState(speaking);
+      logEvent({ kind: "tts", level: "info", message: speaking ? "audio started" : "audio ended" });
+    });
+    return () => unsub();
   }, []);
 
   const updateConversationLang = useCallback((lang: TtsLang) => {
@@ -686,7 +697,7 @@ export default function TalkPage() {
         <MicButton
           ref={micRef}
           state={micState}
-          speakingActive={micState === "speaking"}
+          speakingActive={isSpeakingState}
           language={profile?.ui_language === "th" ? "th-TH" : "en-US"}
           onTranscript={handleMicTranscript}
           onStateChange={setMicState}

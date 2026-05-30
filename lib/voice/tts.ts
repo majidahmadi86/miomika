@@ -90,6 +90,28 @@ let __audioGen = 0;
 let __activeAudio: HTMLAudioElement | null = null;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
 
+// Global "is Miomi audibly speaking right now" flag.
+// Read synchronously by /talk to gate VAD.
+let __isSpeaking = false;
+const __speakingListeners = new Set<(speaking: boolean) => void>();
+
+export function isSpeakingNow(): boolean {
+  return __isSpeaking;
+}
+
+export function subscribeSpeaking(cb: (speaking: boolean) => void): () => void {
+  __speakingListeners.add(cb);
+  return () => __speakingListeners.delete(cb);
+}
+
+function setSpeaking(value: boolean) {
+  if (__isSpeaking === value) return;
+  __isSpeaking = value;
+  __speakingListeners.forEach((cb) => {
+    try { cb(value); } catch { /* ignore */ }
+  });
+}
+
 export function killAllAudio(): void {
   __audioGen += 1;
   if (__activeAudio) {
@@ -108,6 +130,7 @@ export function killAllAudio(): void {
       /* ignore */
     }
   }
+  setSpeaking(false);
 }
 
 export function stopTts(): void {
@@ -160,18 +183,21 @@ async function trySpeakViaServer(
 
     const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
     __activeAudio = el;
+    setSpeaking(true);
 
     const fail = () => {
       if (myGen !== __audioGen) return;
       el.pause();
       el.currentTime = 0;
       __activeAudio = null;
+      setSpeaking(false);
       resolve(false);
     };
 
     el.onended = () => {
       if (myGen !== __audioGen) return;
       __activeAudio = null;
+      setSpeaking(false);
       callbacks?.onEnd?.();
       resolve(true);
     };
@@ -208,15 +234,18 @@ async function speakViaBrowser(
   utter.onend = () => {
     if (myGen !== __audioGen) return;
     if (activeUtterance === utter) activeUtterance = null;
+    setSpeaking(false);
     callbacks?.onEnd?.();
   };
   utter.onerror = () => {
     if (myGen !== __audioGen) return;
     if (activeUtterance === utter) activeUtterance = null;
+    setSpeaking(false);
     callbacks?.onError?.();
   };
 
   activeUtterance = utter;
+  setSpeaking(true);
   window.speechSynthesis.speak(utter);
 }
 
