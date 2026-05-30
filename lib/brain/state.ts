@@ -198,17 +198,14 @@ function normalizeUiLanguage(raw: string | null): "th" | "en" {
 
 function detectLangSwitchCommand(text: string): "th" | "en" | null {
   const lower = text.toLowerCase().trim();
-  // Reply-language switch = how Miomi should SPEAK. "teach me X" is the TARGET
-  // (handled by resolveTargetLanguage) and must never be read as a reply switch.
-  // Match a language word only when it directly follows the verb (<=2 words), so
-  // "speak English and teach me Thai" resolves to EN, not TH.
-  // English direction (checked first)
-  if (/\b(speak|reply|talk|answer|say)\b(?:\s+\w+){0,2}\s+english\b/.test(lower)) return "en";
-  if (/\bin english\b/.test(lower)) return "en";
+  // ONLY an explicit, tightly-anchored request to change the REPLY language counts.
+  // Topic mentions ("a Thai person", "learn Thai", "understand Thai", "Thai language")
+  // must NEVER switch. Default is the language the user is already speaking.
+  const EN = /\bspeak\s+english\b|\b(speak|talk|reply|respond|answer|chat)\b(?:\s+(?:to|with)\s+me)?\s+in\s+english\b|\benglish\s+please\b/;
+  const TH = /\bspeak\s+thai\b|\b(speak|talk|reply|respond|answer|chat)\b(?:\s+(?:to|with)\s+me)?\s+in\s+thai\b|\bthai\s+please\b/;
+  if (EN.test(lower)) return "en";
+  if (TH.test(lower)) return "th";
   if (/(พูด|คุย|ตอบ)\s*(?:ภาษา)?\s*อังกฤษ/.test(text)) return "en";
-  // Thai direction
-  if (/\b(speak|reply|talk|answer|say)\b(?:\s+\w+){0,2}\s+thai\b/.test(lower)) return "th";
-  if (/\bin thai\b/.test(lower)) return "th";
   if (/(พูด|คุย|ตอบ)\s*(?:ภาษา)?\s*ไทย/.test(text) || /ไทยหน่อย/.test(text)) return "th";
   return null;
 }
