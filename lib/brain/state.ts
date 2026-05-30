@@ -273,6 +273,25 @@ function detectPracticeAttempt(args: {
 
   if (!spokeTarget) return false;
 
+  // Don't treat suspicious Whisper hallucinations as practice attempts.
+  // If userInput is short and entirely target-lang chars with no diversity,
+  // it's likely a hallucination from echo.
+  const targetCharCount = learningTargetLanguage === "th"
+    ? (userInput.match(/[\u0E00-\u0E7F]/g)?.length ?? 0)
+    : (userInput.match(/[a-zA-Z]/g)?.length ?? 0);
+  const totalLen = userInput.trim().length;
+  if (totalLen > 0 && targetCharCount / totalLen > 0.95 && totalLen < 40) {
+    // Almost pure target-language characters in a short utterance — could be
+    // hallucination. Require previous Miomi message to have introduced a word.
+    const lastMiomi = [...memory].reverse().find((m) => m.role === "miomi");
+    if (!lastMiomi) return false;
+    const targetWords = collectTargetWords(introducedWords, lastMiomi.content);
+    const matchesTarget = targetWords.some((w) =>
+      userInput.toLowerCase().includes(w.toLowerCase()),
+    );
+    if (!matchesTarget) return false;
+  }
+
   const wordCount = userInput.trim().split(/\s+/).filter(Boolean).length;
   const shortTargetUtterance =
     wordCount <= 5 && messageDominantLang(userInput) === learningTargetLanguage;

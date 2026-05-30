@@ -201,12 +201,7 @@ export async function POST(req: NextRequest) {
       }
 
       move = chooseMove(brainState);
-      adaptivePrompt = buildBrainPrompt({ state: brainState, move, userInput });
-      if (brainState.isPracticeAttempt && brainState.targetLanguage) {
-        const speaks = brainState.uiLanguage;
-        const target = brainState.targetLanguage;
-        adaptivePrompt += `\n\nPRACTICE MODE: The user just spoke '${userInput}' in ${target} as practice. Stay in ${speaks}. Echo their attempt, give one warm piece of feedback, invite repeat or progression.`;
-      }
+      adaptivePrompt = buildBrainPrompt({ state: brainState, move, userInput, mode });
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
       }
@@ -363,38 +358,6 @@ export async function POST(req: NextRequest) {
       adaptivePrompt += `\n\nTEACHING HINT: Naturally weave the word "${wordToIntroduce.word_en}" (${wordToIntroduce.word_th}) into your reply ONE time. Use it in context, don't define it formally — like a friend dropping it into conversation. The system will show the user a card after your reply.`;
     }
 
-    const retentionGuards = `
-
-CRITICAL RETENTION RULES — these are non-negotiable for the user experience:
-1. If this is one of the first 3 exchanges (state.exchangeNumber <= 3), DO NOT
-   teach a new word. Keep the conversation warm, casual, get-to-know-you.
-2. NEVER reply "I don't understand" or "ฉันไม่เข้าใจ". If the user's input is
-   unclear, respond with gentle curiosity: "Tell me a little more~" /
-   "เล่าให้ฟังอีกหน่อยได้ไหมคะ~"
-3. If you know the user's name (displayName), USE IT by exchange 3. Personal
-   recognition builds trust.
-4. Keep replies SHORT — under 50 words unless the user explicitly asked for
-   detail.
-5. End with one warm invitation or small question — but only ONE, and only
-   if it fits naturally. Do not force.
-`;
-
-    const finalPrompt = adaptivePrompt + retentionGuards;
-
-    const MODE_INSTRUCTIONS: Record<string, string> = {
-      auto: "",
-      teach:
-        "MODE: TEACH. The user is here to learn. Focus on language teaching: introduce useful words naturally, echo-correct gently, celebrate small wins.",
-      social:
-        "MODE: SOCIAL MEDIA STRATEGIST. The user wants help with their content. Be a sharp creative partner — short, punchy, suggest 2-3 hook ideas or caption variants. Less cat warmth, more brand voice.",
-      translate:
-        "MODE: TRANSLATOR. The user wants a translation, not chat. Provide: (1) the translation, (2) romanization if Thai↔English, (3) a one-line natural-usage note. Skip pleasantries. Keep it tight.",
-      chat:
-        "MODE: JUST CHAT. The user wants light conversation, no teaching pressure. Be warm, present, brief, never introduce vocabulary unless they ask.",
-    };
-    const modeInstruction = MODE_INSTRUCTIONS[mode || "auto"] || "";
-    const modedPrompt = finalPrompt + (modeInstruction ? "\n\n" + modeInstruction : "");
-
     // ── STAGE 7: Check library with brain-enriched context ───────────────────
     const matchContext: MatchContext = {
       estimatedLevel: brainState.profile.cefrLevel
@@ -453,8 +416,8 @@ CRITICAL RETENTION RULES — these are non-negotiable for the user experience:
         })
       );
 
-      log("miomi", "ai-call", { engine: "router", promptLen: modedPrompt.length });
-      const result = await getAIResponse(formattedMessages, modedPrompt);
+      log("miomi", "ai-call", { engine: "router", promptLen: adaptivePrompt.length });
+      const result = await getAIResponse(formattedMessages, adaptivePrompt);
       content = result.content;
       servedVia = `ai_${result.engine}__${move}`;
       wasFailover = result.wasFailover;

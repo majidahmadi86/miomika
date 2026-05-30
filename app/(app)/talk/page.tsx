@@ -20,7 +20,7 @@ import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
 import { speak, stopTts, killAllAudio, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
 import { isLikelyHallucination } from "@/lib/voice/hallucination";
-import { pickIceBreaker, pickMasteryAdvanced, pickMasteryCelebration } from "@/lib/voice/warmth";
+import { pickIceBreaker, pickMasteryCelebration } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
@@ -361,38 +361,24 @@ export default function TalkPage() {
             masteryEvent: data.masteryEvent?.type,
           },
         });
-        const content = data.content ?? "";
-        const lang: TtsLang =
+        // SERVER decides reply language. Client speaks what the brain decided.
+        const replyLang: TtsLang =
           data.replyLanguage === "en" || data.replyLanguage === "th"
             ? data.replyLanguage
             : conversationLangRef.current;
-        updateConversationLang(lang);
-        const parts = content.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
-        const primary = parts[0] ?? content;
-        const secondary = parts[1] ?? "";
-        let textTh = lang === "th" ? primary : secondary;
-        let textEn = lang === "en" ? primary : secondary;
-
-        const mastery = data.masteryEvent;
-        if (mastery?.type === "advanced" && mastery.word) {
-          const advTh = pickMasteryAdvanced(mastery.word, "th");
-          const advEn = pickMasteryAdvanced(mastery.word, "en");
-          if (lang === "th") {
-            textTh = [primary, advTh].filter(Boolean).join("\n\n");
-          } else {
-            textEn = [primary, advEn].filter(Boolean).join("\n\n");
-          }
-        }
+        updateConversationLang(replyLang);
 
         setItems((prev) => [
           ...prev,
           {
             id: crypto.randomUUID(),
             kind: "mini_cat",
-            textTh: textTh || primary,
-            textEn: textEn || primary,
+            textTh: replyLang === "th" ? (data.content ?? "") : "",
+            textEn: replyLang === "en" ? (data.content ?? "") : "",
           },
         ]);
+
+        const mastery = data.masteryEvent;
 
         if (mastery?.type === "mastered" && mastery.word) {
           void import("@/lib/celebration/burst")
@@ -436,16 +422,16 @@ export default function TalkPage() {
           }, 600);
         }
 
-        const speakText = lang === "th" ? (textTh || primary) : (textEn || primary);
+        const speakText = data.content ?? "";
         if (ttsOn && speakText.trim()) {
+          setMicState("speaking");
           logEvent({
             kind: "tts",
             level: "info",
             message: "speak called",
-            data: { lang, len: speakText.length },
+            data: { lang: replyLang, len: speakText.length },
           });
-          setMicState("speaking");
-          void speak(stripForTts(speakText), lang, {
+          void speak(stripForTts(speakText), replyLang, {
             onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
             onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
           });
@@ -702,11 +688,9 @@ export default function TalkPage() {
           state={micState}
           speakingActive={micState === "speaking"}
           language={
-            profile?.ui_language === "en"
-              ? "en-US"
-              : profile?.ui_language === "th"
-                ? "th-TH"
-                : "auto"
+            profile?.ui_language === "th" || conversationLang === "th"
+              ? "th-TH"
+              : "en-US"
           }
           onTranscript={handleMicTranscript}
           onStateChange={setMicState}
