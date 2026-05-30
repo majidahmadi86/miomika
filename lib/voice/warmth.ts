@@ -312,24 +312,36 @@ export function pickMasteryAdvanced(word: string, lang: Language): string {
 
 export type IceBreaker = { th: string; en: string; mood: "playful" | "warm" | "curious" | "sleepy" };
 
-export const ICE_BREAKERS: IceBreaker[] = [
-  { th: "คิดถึงคุณค่า~ วันนี้เป็นไงคะ?", en: "Missed you~ How's your day?", mood: "warm" },
-  { th: "กลับมาแล้ว ดีใจค่า~", en: "You're back. I'm happy~", mood: "warm" },
-  { th: "สวัสดีค่า~ หนูชื่อมิโอมิ คุยกันหน่อยไหมคะ?", en: "Hi~ I'm Miomi. Want to chat?", mood: "curious" },
-  { th: "หวัดดีค่า~ วันนี้เป็นไงบ้างคะ?", en: "Hi~ how's your day going?", mood: "curious" },
-  { th: "อยู่ตรงนี้นะคะ~ ไม่ต้องรีบ", en: "I'm here~ no rush at all.", mood: "warm" },
-  { th: "นั่งคุยกันสักครู่ไหมคะ~", en: "Want to sit and chat a moment?", mood: "warm" },
+export const ICE_BREAKERS_FIRST: IceBreaker[] = [
+  { th: "อ๊ะ! สวัสดีค่า~ หนูชื่อมิโอมิ ดีใจที่ได้เจอนะคะ", en: "Oh! Hi there~ I'm Miomi. So happy to finally meet you!", mood: "playful" },
+  { th: "สวัสดีค่า~ หนูมิโอมิเองค่ะ มาเป็นเพื่อนเรียนภาษากันไหม~", en: "Hi~ I'm Miomi! Want to be friends and learn together?", mood: "playful" },
+  { th: "เย้~ มีเพื่อนใหม่! หนูชื่อมิโอมิค่า อยากรู้จักคุณจังเลย", en: "Yay~ a new friend! I'm Miomi, and I'd love to get to know you.", mood: "playful" },
+  { th: "หวัดดีค่า~ หนูชื่อมิโอมิ มานั่งคุยกับหนูหน่อยสิคะ", en: "Hello~ I'm Miomi. Come sit and chat with me?", mood: "warm" },
 ];
 
-const LAST_ICE_BREAKER_KEY = "miomika.last_icebreaker";
+export const ICE_BREAKERS_RETURNING: IceBreaker[] = [
+  { th: "กลับมาแล้ว ดีใจค่า~", en: "You're back. I'm happy~", mood: "warm" },
+  { th: "คิดถึงคุณค่า~ วันนี้เป็นไงคะ?", en: "Missed you~ How's your day?", mood: "warm" },
+  { th: "ดีใจที่กลับมาค่า~ พร้อมเริ่มกันใหม่ไหม", en: "So glad you're back~ ready to pick up where we left off?", mood: "warm" },
+  { th: "อยู่ตรงนี้นะคะ~ ไม่ต้องรีบ", en: "I'm here~ no rush at all.", mood: "warm" },
+];
+
+let __isReturningThisLoad: boolean | null = null;
 
 export function pickIceBreaker(): IceBreaker {
-  if (typeof window === "undefined") return ICE_BREAKERS[0];
-  const lastIdx = parseInt(window.localStorage.getItem(LAST_ICE_BREAKER_KEY) ?? "-1", 10);
-  let next = Math.floor(Math.random() * ICE_BREAKERS.length);
-  if (next === lastIdx) next = (next + 1) % ICE_BREAKERS.length;
-  window.localStorage.setItem(LAST_ICE_BREAKER_KEY, String(next));
-  return ICE_BREAKERS[next];
+  if (typeof window === "undefined") return ICE_BREAKERS_FIRST[0];
+  if (__isReturningThisLoad === null) {
+    const met = window.localStorage.getItem("miomika.met_miomi") === "1";
+    __isReturningThisLoad = met;
+    if (!met) window.localStorage.setItem("miomika.met_miomi", "1");
+  }
+  const pool = __isReturningThisLoad ? ICE_BREAKERS_RETURNING : ICE_BREAKERS_FIRST;
+  const key = __isReturningThisLoad ? "miomika.last_ib_ret" : "miomika.last_ib_first";
+  const lastIdx = parseInt(window.localStorage.getItem(key) ?? "-1", 10);
+  let next = Math.floor(Math.random() * pool.length);
+  if (next === lastIdx && pool.length > 1) next = (next + 1) % pool.length;
+  window.localStorage.setItem(key, String(next));
+  return pool[next];
 }
 
 // ============================================================================
