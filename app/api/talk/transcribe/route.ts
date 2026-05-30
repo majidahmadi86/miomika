@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
   Sentry.setTag("flow", "voice");
 
   const groqKey = process.env.GROQ_API_KEY;
+  log("voice.transcribe", "start", { groqKeyPresent: !!groqKey });
   if (!groqKey) {
     log("voice.transcribe", "GROQ_API_KEY missing");
     return NextResponse.json(
@@ -120,12 +121,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (text.length === 0) {
+      log("voice.transcribe", "empty result");
       return NextResponse.json({ error: "empty_transcription" }, { status: 422 });
     }
+    log("voice.transcribe", "success", { textLen: text.length, language: explicitLang ?? "auto" });
     return NextResponse.json({ text });
   } catch (e) {
+    const err = e as { message?: string; status?: number };
+    log("voice.transcribe", "groq error", { message: err.message, status: err.status });
     logError("voice.transcribe", "groq failed", e);
     Sentry.captureException(e, { tags: { stage: "groq.transcribe" } });
-    return NextResponse.json({ error: "transcription_failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "transcribe_failed", detail: err.message ?? "unknown", status: err.status },
+      { status: 500 },
+    );
   }
 }

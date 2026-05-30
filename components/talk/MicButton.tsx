@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import * as Sentry from "@sentry/nextjs";
 import { COLORS } from "@/lib/design/colors";
 import { log, logError } from "@/lib/debug/log";
+import { logEvent } from "@/lib/debug/event-bus";
 
 export type MicState =
   | "idle"
@@ -100,6 +101,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         return;
       }
       onStateChange("processing");
+      logEvent({ kind: "network", level: "info", message: "POST /transcribe", data: { wavBytes: wavBlob.size, language } });
       const transcribeCtrl = new AbortController();
       const transcribeTimeout = window.setTimeout(() => transcribeCtrl.abort(), 8000);
       try {
@@ -121,10 +123,29 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         }
         if (!res.ok) {
           const errBody = await res.json().catch(() => ({}));
+          const errorBodyText = JSON.stringify(errBody);
+          logEvent({
+            kind: "transcribe",
+            level: "error",
+            message: "failed",
+            data: { status: res.status, body: errorBodyText },
+          });
+          logEvent({
+            kind: "network",
+            level: "error",
+            message: `/transcribe ${res.status}`,
+            data: { status: res.status, body: errorBodyText },
+          });
           trace("transcribe failed", { status: res.status, error: (errBody as { error?: string }).error ?? "unknown" });
           onStateChange("idle");
           return;
         }
+        logEvent({
+          kind: "network",
+          level: "info",
+          message: `/transcribe ${res.status}`,
+          data: { status: res.status },
+        });
         const json = (await res.json()) as { text?: string };
         const text = (json.text ?? "").trim();
         if (text.length === 0) {
@@ -146,6 +167,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
 
   const killVAD = useCallback(() => {
     if (vadRef.current) {
+      logEvent({ kind: "vad", level: "info", message: "vad destroyed" });
       const v = vadRef.current;
       vadRef.current = null;
       try { void v.destroy().catch(() => { /* ignore */ }); } catch { /* ignore */ }
@@ -176,6 +198,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     isLoadingVadRef.current = true;
     try {
       trace("loading VAD library");
+      logEvent({ kind: "vad", level: "info", message: "vad loading" });
       const { MicVAD } = await import("@ricky0123/vad-web");
       // While loading, user may have stopped. Check intent before allocating mic.
       if (!userIntentRef.current) {
@@ -197,6 +220,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         onSpeechStart: () => {
           if (!mountedRef.current) return;
           if (!userIntentRef.current) return;
+          logEvent({ kind: "vad", level: "info", message: "speech start" });
           trace("speech start");
           onStateChange("listening");
         },
@@ -206,12 +230,20 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
             trace("speech end ignored — user stopped");
             return;
           }
+          const wavBlob = float32ToWav(audio, 16000);
+          logEvent({
+            kind: "vad",
+            level: "info",
+            message: "speech end",
+            data: { samples: audio.length, wavBytes: wavBlob.size },
+          });
           trace("speech end", { samples: audio.length });
           void transcribeAndCommit(audio);
         },
         onVADMisfire: () => {
           if (!mountedRef.current) return;
           if (!userIntentRef.current) return;
+          logEvent({ kind: "vad", level: "warn", message: "misfire too short" });
           trace("vad misfire (too short)");
           onStateChange("idle");
         },
@@ -228,6 +260,12 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       }
       vadRef.current = vad as unknown as MicVADInstance;
       await vad.start();
+      logEvent({
+        kind: "vad",
+        level: "info",
+        message: "vad created",
+        data: { threshold: vadPositiveThresholdRef.current, redemptionMs: vadRedemptionMsRef.current },
+      });
       trace("VAD running");
       onStateChange("listening");
     } catch (e) {

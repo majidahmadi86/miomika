@@ -38,6 +38,7 @@ import {
   resolveContinuationWord,
   type PronunciationLesson,
 } from "@/lib/brain/pronunciation";
+import { log } from "@/lib/debug/log";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,8 @@ export async function POST(req: NextRequest) {
         creatorOutputs: clientSessionContext.creatorOutputs ?? [],
       };
     }
+
+    log("miomi", "start", { userInput: userInput.slice(0, 80), exchange: state.exchangeNumber });
 
     // ── SERVER-SIDE GUEST LIMIT (never trust client) ──────────────────────────
     if (serverIsGuest && state.exchangeNumber >= GUEST_EXCHANGE_LIMIT) {
@@ -207,6 +210,12 @@ export async function POST(req: NextRequest) {
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
       }
+      log("miomi", "state", {
+        lang: brainState.nowLanguage,
+        mood: brainState.emotionalSignal,
+        move,
+        memoryCount: brainState.memory.length,
+      });
     } catch (err) {
       console.error("[brain] readBrainState failed:", err);
       brainState = createDefaultBrainState({
@@ -416,6 +425,12 @@ CRITICAL RETENTION RULES — these are non-negotiable for the user experience:
         : match.response_en;
       content = `${thPart}\n\n${enPart}`;
       servedVia = `library_${match.matched_via}`;
+      log("miomi", "ai-result", {
+        servedVia,
+        replyLen: content.length,
+        wordCardSet: !!wordToIntroduce,
+        masteryEvent: masteryEvent.type,
+      });
 
       void updateTimesServed(match.id);
       void logInteraction({
@@ -438,11 +453,18 @@ CRITICAL RETENTION RULES — these are non-negotiable for the user experience:
         })
       );
 
+      log("miomi", "ai-call", { engine: "router", promptLen: modedPrompt.length });
       const result = await getAIResponse(formattedMessages, modedPrompt);
       content = result.content;
       servedVia = `ai_${result.engine}__${move}`;
       wasFailover = result.wasFailover;
       aiCostUsd = result.engine === "groq" ? 0 : 0.0008;
+      log("miomi", "ai-result", {
+        servedVia,
+        replyLen: content.length,
+        wordCardSet: !!wordToIntroduce,
+        masteryEvent: masteryEvent.type,
+      });
 
       void logInteraction({
         sessionId: state.sessionId,
@@ -536,7 +558,8 @@ CRITICAL RETENTION RULES — these are non-negotiable for the user experience:
     } satisfies MiomiResponse);
 
   } catch (error: unknown) {
-    const err = error as { message?: string };
+    const err = error as { message?: string; stack?: string };
+    log("miomi", "error", { error: err.message, stack: err.stack?.slice(0, 300) });
     console.error("Route error:", err?.message);
     const failover = getFailoverResponse();
     return NextResponse.json(

@@ -21,6 +21,9 @@ import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } 
 import { speak, stopTts, killAllAudio, detectLang, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
 import { isLikelyHallucination } from "@/lib/voice/hallucination";
 import { pickIceBreaker, pickMasteryAdvanced, pickMasteryCelebration } from "@/lib/voice/warmth";
+import { logEvent } from "@/lib/debug/event-bus";
+import { DebugOverlay } from "@/components/debug/DebugOverlay";
+import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
 
 type IntroducedWordPayload = {
   word: string;
@@ -132,6 +135,9 @@ export default function TalkPage() {
   const openerSpokenRef = useRef(false);
   const transcriptBufferRef = useRef<string>("");
   const transcriptTimerRef = useRef<number | null>(null);
+  const prevMicStateRef = useRef<MicState>("idle");
+  const titleTapsRef = useRef<{ count: number; last: number }>({ count: 0, last: 0 });
+  const [debugOpen, setDebugOpen] = useState(false);
 
   useEffect(() => {
     mountedRefForTts.current = true;
@@ -179,6 +185,33 @@ export default function TalkPage() {
     }
   }, [micState]);
 
+  useEffect(() => {
+    if (prevMicStateRef.current !== micState) {
+      logEvent({
+        kind: "state",
+        level: "info",
+        message: `micState → ${micState}`,
+        data: { prev: prevMicStateRef.current },
+      });
+      prevMicStateRef.current = micState;
+    }
+  }, [micState]);
+
+  const handleTitleTap = useCallback(() => {
+    const now = Date.now();
+    const taps = titleTapsRef.current;
+    if (now - taps.last > 1500) {
+      taps.count = 1;
+    } else {
+      taps.count += 1;
+    }
+    taps.last = now;
+    if (taps.count >= 3) {
+      taps.count = 0;
+      setDebugOpen(true);
+    }
+  }, []);
+
   const unlockAudio = useCallback(() => {
     if (audioUnlocked) return;
     setAudioUnlocked(true);
@@ -214,6 +247,12 @@ export default function TalkPage() {
     const speakText = openerLang === "th" ? first.textTh : first.textEn;
     window.setTimeout(() => {
       if (!mountedRefForTts.current) return;
+      logEvent({
+        kind: "tts",
+        level: "info",
+        message: "speak called",
+        data: { lang: openerLang, len: speakText.length },
+      });
       setMicState("speaking");
       void speak(stripForTts(speakText), openerLang, {
         onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
@@ -300,6 +339,12 @@ export default function TalkPage() {
       if (isGuest) setGuestExchanges((p) => p + 1);
 
       try {
+        logEvent({
+          kind: "engine",
+          level: "info",
+          message: "sending to engine",
+          data: { input: trimmed.slice(0, 80), mode: config.mode },
+        });
         const engineCtrl = new AbortController();
         const engineTimeout = window.setTimeout(() => engineCtrl.abort(), 12000);
         let res: Response;
@@ -329,6 +374,16 @@ export default function TalkPage() {
         }
         if (!res.ok) throw new Error("api failed");
         const data = (await res.json()) as MiomiApiResponse;
+        logEvent({
+          kind: "engine",
+          level: "info",
+          message: "engine reply",
+          data: {
+            servedVia: data.servedVia,
+            wordCard: !!data.wordCard,
+            masteryEvent: data.masteryEvent?.type,
+          },
+        });
         const content = data.content ?? "";
         const lang = messageLang;
         const parts = content.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
@@ -402,6 +457,12 @@ export default function TalkPage() {
 
         const speakText = lang === "th" ? (textTh || primary) : (textEn || primary);
         if (ttsOn && speakText.trim()) {
+          logEvent({
+            kind: "tts",
+            level: "info",
+            message: "speak called",
+            data: { lang, len: speakText.length },
+          });
           setMicState("speaking");
           void speak(stripForTts(speakText), lang, {
             onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
@@ -413,7 +474,13 @@ export default function TalkPage() {
         } else if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
           window.setTimeout(() => setShowGuestSheet(true), 800);
         }
-      } catch {
+      } catch (e) {
+        logEvent({
+          kind: "engine",
+          level: "error",
+          message: "engine failed",
+          data: { error: String(e) },
+        });
         setItems((prev) => [
           ...prev,
           { id: crypto.randomUUID(), kind: "mini_cat", textTh: "หนูขอโทษค่า~ มีบางอย่างผิดพลาด", textEn: "Sorry~ something went wrong." },
@@ -444,11 +511,16 @@ export default function TalkPage() {
         stopTts();
         setMicState("idle");
       }
+      logEvent({
+        kind: "mic",
+        level: "info",
+        message: "transcript received",
+        data: { text, len: text.length, lang: conversationLangRef.current },
+      });
       if (isLikelyHallucination(text, conversationLangRef.current, false)) {
-        console.log(`[talk] dropped likely hallucination: "${text}"`);
+        logEvent({ kind: "transcribe", level: "warn", message: "dropped hallucination", data: { text } });
         return;
       }
-      console.log("[mic] heard:", JSON.stringify(text));
       if (transcriptBufferRef.current) {
         transcriptBufferRef.current += ", " + text.trim();
       } else {
@@ -502,6 +574,7 @@ export default function TalkPage() {
   }, [micState, isLocked]);
 
   return (
+    <TalkErrorBoundary>
     <div
       onPointerDown={unlockAudio}
       style={{
@@ -533,13 +606,15 @@ export default function TalkPage() {
           <ArrowLeft size={22} strokeWidth={2} />
         </Link>
 
-        {authReady && isGuest ? (
-          <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, color: "#9A8B73", background: "transparent", padding: "5px 12px" }}>
-            {uiLang === "en" ? `${Math.max(0, GUEST_LIMIT - guestExchanges)} left` : `เหลืออีก ${Math.max(0, GUEST_LIMIT - guestExchanges)} ครั้ง`}
-          </span>
-        ) : (
-          <FuelPill heart={fuelHeart} zap={fuelZap} brain={fuelBrain} />
-        )}
+        <div onClick={handleTitleTap} style={{ cursor: "default" }}>
+          {authReady && isGuest ? (
+            <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, color: "#9A8B73", background: "transparent", padding: "5px 12px" }}>
+              {uiLang === "en" ? `${Math.max(0, GUEST_LIMIT - guestExchanges)} left` : `เหลืออีก ${Math.max(0, GUEST_LIMIT - guestExchanges)} ครั้ง`}
+            </span>
+          ) : (
+            <FuelPill heart={fuelHeart} zap={fuelZap} brain={fuelBrain} />
+          )}
+        </div>
 
         <button
           type="button"
@@ -813,6 +888,14 @@ export default function TalkPage() {
           </motion.div>
         </motion.div>
       )}
+
+      <DebugOverlay
+        open={debugOpen}
+        onClose={() => setDebugOpen(false)}
+        micState={micState}
+        conversationLang={conversationLang}
+      />
     </div>
+    </TalkErrorBoundary>
   );
 }
