@@ -2,35 +2,50 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
 import { MicButton, type MicState, type MicButtonHandle } from "@/components/talk/MicButton";
 import { FuelPill } from "@/components/talk/FuelPill";
+import { type OrbState } from "@/components/talk/VoiceOrb";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
 import { MicRow } from "@/components/talk/MicRow";
 import { Toolbox, type ResponseLength } from "@/components/talk/Toolbox";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { PracticeCard } from "@/components/talk/PracticeCard";
-import { PronunciationCardV1 } from "@/components/talk/PronunciationCardV1";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
-import { preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
-import {
-  ConversationOrchestrator,
-  mapOrchStateToMic,
-  mapOrchStateToOrb,
-  type CanvasMessage,
-  type ConversationState,
-} from "@/lib/conversation/orchestrator";
+import { speak, stopTts, detectLang, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
+import { pickIceBreaker, pickMasteryAdvanced, pickMasteryCelebration } from "@/lib/voice/warmth";
+
+type IntroducedWordPayload = {
+  word: string;
+  word_th: string;
+  word_en: string;
+  cefr_level: string | null;
+  emoji: string | null;
+  mastery_level?: number;
+};
+
+type MasteryEventPayload = {
+  type: "introduced" | "advanced" | "mastered" | "none";
+  word?: string;
+  newStage?: number;
+} | null;
+
+type MiomiApiResponse = {
+  content?: string;
+  servedVia?: string;
+  wordCard?: IntroducedWordPayload | null;
+  masteryEvent?: MasteryEventPayload;
+};
 
 type CanvasItem =
   | { id: string; kind: "mini_cat"; textTh: string; textEn: string }
   | { id: string; kind: "practice"; word: VocabularyEntry; position: number; total: number; topic?: string }
-  | { id: string; kind: "pronunciation"; lesson: import("@/components/talk/PronunciationCardV1").PronunciationLessonPayload; heardText?: string | null }
   | { id: string; kind: "user_said"; text: string };
 
 const GUEST_LIMIT = 5;
@@ -50,8 +65,29 @@ function readUiLang(): "th" | "en" {
   return lang.startsWith("en") ? "en" : "th";
 }
 
-function canvasMessageToItem(msg: CanvasMessage): CanvasItem {
-  return msg as CanvasItem;
+function toVocabularyEntry(word: IntroducedWordPayload): VocabularyEntry {
+  return {
+    id: word.word_en,
+    word_en: word.word_en,
+    word_th: word.word_th,
+    cefr_level: word.cefr_level ?? undefined,
+    emoji: word.emoji ?? undefined,
+  };
+}
+
+function makeOpenerItem(): CanvasItem {
+  const iceBreaker = pickIceBreaker();
+  return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
+}
+
+/** Dominant language from message text; keeps previous when undecidable. */
+function resolveMessageLang(text: string, previous: TtsLang): TtsLang {
+  const switchCmd = detectLangSwitchCommand(text);
+  if (switchCmd) return switchCmd;
+  const thaiCount = text.match(/[\u0E00-\u0E7F]/g)?.length ?? 0;
+  const latinCount = text.match(/[a-zA-Z]/g)?.length ?? 0;
+  if (thaiCount === 0 && latinCount === 0) return previous;
+  return detectLang(text);
 }
 
 export default function TalkPage() {
@@ -63,13 +99,14 @@ export default function TalkPage() {
   );
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [uiLang, setUiLang] = useState<"th" | "en">(readUiLang);
-  const [orchState, setOrchState] = useState<ConversationState>("AWAITING_FIRST_GESTURE");
   const [micState, setMicState] = useState<MicState>("idle");
   const [items, setItems] = useState<CanvasItem[]>([]);
   const [textInput, setTextInput] = useState("");
   const [keyboardMode, setKeyboardMode] = useState(false);
+  const [wordsIntroduced, setWordsIntroduced] = useState<string[]>([]);
   const [respLength, setRespLength] = useState<ResponseLength>("normal");
   const [ttsOn, setTtsOn] = useState(true);
+  const conversationLangRef = useRef<TtsLang>("th");
   const [conversationLang, setConversationLang] = useState<TtsLang>("th");
   const [guestExchangesRaw, setGuestExchangesRaw] = useState(readGuestExchanges);
   const [showGuestSheet, setShowGuestSheet] = useState(false);
@@ -79,125 +116,20 @@ export default function TalkPage() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false);
   const micRef = useRef<MicButtonHandle>(null);
-  const orchRef = useRef<ConversationOrchestrator | null>(null);
-  const activePronunciationIdRef = useRef<string | null>(null);
+  const mountedRefForTts = useRef(true);
 
-  const isThaiLeadUser = useMemo(() => {
-    const navIsTh =
-      typeof window !== "undefined" && (navigator.language || "th").startsWith("th");
-    return profile?.ui_language === "th" || (profile?.ui_language !== "en" && navIsTh);
-  }, [profile?.ui_language]);
-
-  const setGuestExchanges = useCallback((updater: number | ((p: number) => number)) => {
-    setGuestExchangesRaw((prev) => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      if (typeof window !== "undefined") window.localStorage.setItem(GUEST_COUNTER_KEY, String(next));
-      return next;
-    });
+  useEffect(() => {
+    mountedRefForTts.current = true;
+    return () => {
+      mountedRefForTts.current = false;
+      stopTts();
+    };
   }, []);
 
-  const guestExchanges = authReady && !isGuest ? 0 : guestExchangesRaw;
-  const isLocked = authReady && isGuest && guestExchanges >= GUEST_LIMIT;
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !authReady) return;
-
-    const orch = new ConversationOrchestrator({
-      userId: profile?.id ?? null,
-      isGuest: authReady ? isGuest : true,
-      authReady,
-      uiLang,
-      isThaiLeadUser: Boolean(isThaiLeadUser),
-      ttsOn,
-      config,
-      respLength,
-      guestExchanges,
-      guestLimit: GUEST_LIMIT,
-      callbacks: {
-        onMicStart: () => micRef.current?.start(),
-        onMicStop: () => micRef.current?.stop(),
-        onVadConfig: (cfg) => {
-          micRef.current?.setVadThresholds({
-            positive: cfg.positiveSpeechThreshold,
-            negative: cfg.negativeSpeechThreshold,
-            redemptionMs: cfg.redemptionMs,
-          });
-        },
-        onGuestLimit: () => {
-          micRef.current?.stop();
-          setShowGuestSheet(true);
-        },
-        onGuestExchange: () => setGuestExchanges((p) => p + 1),
-        onMasteryToast: (toast) => {
-          setMasteryToast(toast);
-          window.setTimeout(() => setMasteryToast(null), 3200);
-        },
-      },
-    });
-
-    orchRef.current = orch;
-
-    const unsubState = orch.onStateChange((s) => {
-      setOrchState(s);
-      setMicState(mapOrchStateToMic(s));
-    });
-
-    const unsubLang = orch.onConversationLangChange((lang) => {
-      setConversationLang(lang);
-    });
-
-    const unsubMsg = orch.onMessage((msg) => {
-      if (msg.kind === "pronunciation") {
-        activePronunciationIdRef.current = msg.id;
-        setItems((prev) => [...prev, canvasMessageToItem(msg)]);
-        return;
-      }
-      if (msg.kind === "user_said" && activePronunciationIdRef.current) {
-        const pronId = activePronunciationIdRef.current;
-        setItems((prev) => [
-          ...prev.map((item) =>
-            item.kind === "pronunciation" && item.id === pronId
-              ? { ...item, heardText: msg.text }
-              : item,
-          ),
-          canvasMessageToItem(msg),
-        ]);
-        return;
-      }
-      setItems((prev) => [...prev, canvasMessageToItem(msg)]);
-    });
-
-    setOrchState(orch.getState());
-    setMicState(mapOrchStateToMic(orch.getState()));
-    setConversationLang(orch.getConversationLang());
-
-    return () => {
-      unsubState();
-      unsubLang();
-      unsubMsg();
-      orch.destroy();
-      orchRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authReady, profile?.id]);
-
-  useEffect(() => {
-    orchRef.current?.updateOptions({
-      isGuest,
-      authReady,
-      uiLang,
-      isThaiLeadUser: Boolean(isThaiLeadUser),
-      ttsOn,
-      config,
-      respLength,
-      guestExchanges,
-      guestLimit: GUEST_LIMIT,
-    });
-  }, [isGuest, authReady, uiLang, isThaiLeadUser, ttsOn, config, respLength, guestExchanges]);
-
-  useEffect(() => {
-    orchRef.current?.setTtsOn(ttsOn);
-  }, [ttsOn]);
+  const updateConversationLang = useCallback((lang: TtsLang) => {
+    conversationLangRef.current = lang;
+    setConversationLang(lang);
+  }, []);
 
   /* eslint-disable react-hooks/set-state-in-effect -- hydrate localStorage + navigator prefs on mount */
   useEffect(() => {
@@ -209,20 +141,46 @@ export default function TalkPage() {
     const parsed = stored ? parseInt(stored, 10) : 0;
     if (!isNaN(parsed) && parsed > 0) setGuestExchangesRaw(parsed);
     const navLang = navigator.language || "th";
-    if (navLang.startsWith("en")) setUiLang("en");
+    const isEnglishUser = navLang.startsWith("en");
+    if (isEnglishUser) setUiLang("en");
+    updateConversationLang(isEnglishUser ? "en" : "th");
     const ttsStored = window.localStorage.getItem("miomika.tts_on");
     if (ttsStored !== null) setTtsOn(ttsStored === "1");
     void preloadTtsVoices();
-  }, []);
+  }, [updateConversationLang]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!profile?.ui_language) return;
-    queueMicrotask(() => {
-      if (profile.ui_language === "en") setUiLang("en");
-      else if (profile.ui_language === "th") setUiLang("th");
-    });
-  }, [profile?.ui_language]);
+    const lang = profile.ui_language;
+    queueMicrotask(() => updateConversationLang(lang));
+  }, [profile?.ui_language, updateConversationLang]);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
+  useEffect(() => {
+    if (items.length > 0 || !authReady) return;
+    const iceBreaker = pickIceBreaker();
+    const openerLang: TtsLang =
+      profile?.ui_language === "en" || profile?.ui_language === "th"
+        ? profile.ui_language
+        : uiLang;
+    updateConversationLang(openerLang);
+    setItems([{ id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en }]);
+    // Speak the ice-breaker if TTS is on. Small delay so voices have time to load.
+    if (ttsOn) {
+      const speakText = openerLang === "th" ? iceBreaker.th : iceBreaker.en;
+      window.setTimeout(() => {
+        if (!mountedRefForTts.current) return;
+        setMicState("speaking");
+        void speak(speakText, openerLang, {
+          onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
+          onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
+        });
+      }, 1200);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length, authReady, profile?.ui_language, uiLang]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset + auto-raise CTA on limit */
   useEffect(() => {
@@ -233,13 +191,25 @@ export default function TalkPage() {
     }
   }, [authReady, isGuest]);
 
+  const guestExchanges = authReady && !isGuest ? 0 : guestExchangesRaw;
+
+  // Auto-raise the guest CTA sheet the instant the limit is hit.
   useEffect(() => {
     if (authReady && isGuest && guestExchanges >= GUEST_LIMIT) {
       micRef.current?.stop();
+      setMicState("idle");
       setShowGuestSheet(true);
     }
   }, [authReady, isGuest, guestExchanges]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  const setGuestExchanges = useCallback((updater: number | ((p: number) => number)) => {
+    setGuestExchangesRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      if (typeof window !== "undefined") window.localStorage.setItem(GUEST_COUNTER_KEY, String(next));
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -247,7 +217,15 @@ export default function TalkPage() {
     }
   }, [items]);
 
-  const orbState = mapOrchStateToOrb(orchState, isLocked);
+  const isLocked = authReady && isGuest && guestExchanges >= GUEST_LIMIT;
+
+  const orbState: OrbState = (() => {
+    if (isLocked) return "locked";
+    if (micState === "listening") return "listening";
+    if (micState === "processing") return "thinking";
+    if (micState === "speaking") return "speaking";
+    return "idle";
+  })();
 
   const miomiMood: MiomiMood = (() => {
     if (micState === "listening") return "listening";
@@ -260,17 +238,139 @@ export default function TalkPage() {
   const fuelZap = 64;
   const fuelBrain = 45;
 
-  const submitText = useCallback(
-    (text: string) => {
+  const processInput = useCallback(
+    async (text: string) => {
+      if (!authReady) return;
       if (isLocked) {
         micRef.current?.stop();
+        setMicState("idle");
         setShowGuestSheet(true);
         return;
       }
+      if (!text.trim()) return;
+
+      const trimmed = text.trim();
+      const messageLang = resolveMessageLang(trimmed, conversationLangRef.current);
+      updateConversationLang(messageLang);
+
+      setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "user_said", text: trimmed }]);
       setTextInput("");
-      orchRef.current?.submitText(text);
+
+      if (isGuest) setGuestExchanges((p) => p + 1);
+
+      try {
+        const res = await fetch("/api/miomi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: trimmed }],
+            sessionInstruction: (() => {
+              const lengthRule = respLength === "short" ? "Under 25 words." : respLength === "detailed" ? "60-100 words, thorough." : "Under 50 words.";
+              const userLang = messageLang;
+              const langRule = userLang === "th"
+                ? "The user spoke in Thai. Respond in Thai ONLY. Be warm and natural."
+                : "The user spoke in English. Respond in English ONLY. Be warm and natural. Do NOT add Thai unless they ask to learn Thai.";
+              const levelRule = "CRITICAL: Mirror the user's language level. Look at the complexity, vocabulary, and sentence length of their LAST message. If they used simple words and short sentences, reply with simple words and short sentences. If they used advanced vocabulary, you can match it. Never speak above their level. Beginners get short, warm, easy replies — like a kind friend, not a textbook.";
+              const modeRule = config.mode === "teach" ? `You are in Teach mode. The user is learning ${config.teach.learning === "th" ? "Thai" : "English"} at ${config.teach.level} level.` : config.mode === "social" ? `You are in Social mode. ${config.social.channel ? `Channel: ${config.social.channel}.` : ""} ${config.social.niche ? `Niche: ${config.social.niche}.` : ""}` : config.mode === "translate" ? "You are in Translator mode. Always provide translations with romanization." : config.mode === "chat" ? "You are in Just-chat mode. Be warm, present, brief, no teaching." : "Auto mode. Detect what the user needs and respond accordingly.";
+              return `You are Miomi, a warm kawaii cat companion. ${modeRule} ${langRule} ${levelRule} ${lengthRule} Always end with one question or invitation.`;
+            })(),
+            sessionContext: { exchangeNumber: items.filter((i) => i.kind === "user_said").length, wordsIntroduced },
+          }),
+        });
+        if (!res.ok) throw new Error("api failed");
+        const data = (await res.json()) as MiomiApiResponse;
+        const content = data.content ?? "";
+        const lang = messageLang;
+        const parts = content.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+        const primary = parts[0] ?? content;
+        const secondary = parts[1] ?? "";
+        let textTh = lang === "th" ? primary : secondary;
+        let textEn = lang === "en" ? primary : secondary;
+
+        const mastery = data.masteryEvent;
+        if (mastery?.type === "advanced" && mastery.word) {
+          const advTh = pickMasteryAdvanced(mastery.word, "th");
+          const advEn = pickMasteryAdvanced(mastery.word, "en");
+          if (lang === "th") {
+            textTh = [primary, advTh].filter(Boolean).join("\n\n");
+          } else {
+            textEn = [primary, advEn].filter(Boolean).join("\n\n");
+          }
+        }
+
+        setItems((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            kind: "mini_cat",
+            textTh: textTh || primary,
+            textEn: textEn || primary,
+          },
+        ]);
+
+        if (mastery?.type === "mastered" && mastery.word) {
+          void import("@/lib/celebration/burst")
+            .then(({ triggerCelebration }) => {
+              triggerCelebration({
+                intensity: "high",
+                miomi_state: "excited",
+                duration_ms: 1400,
+              });
+            })
+            .catch(() => {});
+          setMasteryToast({
+            th: `${pickMasteryCelebration(mastery.word, "th")} +5 ✦`,
+            en: `${pickMasteryCelebration(mastery.word, "en")} +5 ✦`,
+          });
+          window.setTimeout(() => {
+            if (mountedRefForTts.current) setMasteryToast(null);
+          }, 3200);
+        }
+
+        const wordCard = data.wordCard;
+        if (
+          wordCard &&
+          typeof wordCard.word_en === "string" &&
+          typeof wordCard.word_th === "string"
+        ) {
+          const position = wordCard.mastery_level ?? 1;
+          const practiceItem: CanvasItem = {
+            id: crypto.randomUUID(),
+            kind: "practice",
+            word: toVocabularyEntry(wordCard),
+            position,
+            total: 3,
+          };
+          window.setTimeout(() => {
+            if (!mountedRefForTts.current) return;
+            setItems((prev) => [...prev, practiceItem]);
+            setWordsIntroduced((prev) =>
+              prev.includes(wordCard.word_en) ? prev : [...prev, wordCard.word_en],
+            );
+          }, 600);
+        }
+
+        const speakText = lang === "th" ? (textTh || primary) : (textEn || primary);
+        if (ttsOn && speakText.trim()) {
+          setMicState("speaking");
+          void speak(speakText, lang, {
+            onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
+            onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
+          });
+        }
+        if (data.servedVia === "guest_limit") {
+          setShowGuestSheet(true);
+        } else if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
+          window.setTimeout(() => setShowGuestSheet(true), 800);
+        }
+      } catch {
+        setItems((prev) => [
+          ...prev,
+          { id: crypto.randomUUID(), kind: "mini_cat", textTh: "หนูขอโทษค่า~ มีบางอย่างผิดพลาด", textEn: "Sorry~ something went wrong." },
+        ]);
+      }
     },
-    [isLocked],
+    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, updateConversationLang],
   );
 
   const toggleExpand = useCallback((id: string) => {
@@ -283,10 +383,8 @@ export default function TalkPage() {
   }, []);
 
   const handleClear = useCallback(() => {
-    activePronunciationIdRef.current = null;
-    setItems([]);
+    setItems([makeOpenerItem()]);
     setExpandedItems(new Set());
-    orchRef.current?.clearSession();
   }, []);
 
   const handleOrbTap = useCallback(() => {
@@ -294,8 +392,19 @@ export default function TalkPage() {
       setShowGuestSheet(true);
       return;
     }
-    orchRef.current?.onOrbTap();
-  }, [isLocked]);
+    if (micState === "speaking") {
+      stopTts();
+      setMicState("idle");
+      return;
+    }
+    if (micState === "listening") {
+      micRef.current?.stop();
+      return;
+    }
+    if (micState === "idle") {
+      micRef.current?.start();
+    }
+  }, [micState, isLocked]);
 
   return (
     <div
@@ -371,7 +480,7 @@ export default function TalkPage() {
             setTtsOn((p) => {
               const next = !p;
               if (typeof window !== "undefined") window.localStorage.setItem("miomika.tts_on", next ? "1" : "0");
-              if (!next) orchRef.current?.stopAudio();
+              if (!next) stopTts();
               return next;
             });
           }}
@@ -421,27 +530,10 @@ export default function TalkPage() {
                   total={item.total}
                   topic={item.topic}
                   uiLang={uiLang}
-                  onHear={() => {}}
-                  onSpeak={() => {
-                    orchRef.current?.setPracticeAttempt(true);
-                    micRef.current?.start();
-                  }}
+                  onHear={() => { /* TTS */ }}
+                  onSpeak={() => micRef.current?.start()}
                   onCopy={() => { void navigator.clipboard.writeText(item.word.word_th); }}
-                  onNext={() => {}}
-                />
-              );
-            }
-            if (item.kind === "pronunciation") {
-              return (
-                <PronunciationCardV1
-                  key={item.id}
-                  lesson={item.lesson}
-                  uiLang={uiLang}
-                  heardText={item.heardText}
-                  onTrySpeak={() => {
-                    orchRef.current?.setPracticeAttempt(true);
-                    micRef.current?.start();
-                  }}
+                  onNext={() => { /* engine */ }}
                 />
               );
             }
@@ -451,6 +543,7 @@ export default function TalkPage() {
         </div>
       </div>
 
+      {/* HIDDEN MicButton drives VAD pipeline; UI is the orb inside MicRow */}
       <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
         <MicButton
           ref={micRef}
@@ -462,13 +555,24 @@ export default function TalkPage() {
                 ? "th-TH"
                 : "auto"
           }
-          onSpeechStart={() => orchRef.current?.onSpeechStart()}
-          onSpeechEnd={(audio) => orchRef.current?.onSpeechEnd(audio)}
+          onTranscript={async (text, isFinal) => {
+            if (!isFinal) return;
+            if (isLocked) {
+              micRef.current?.stop();
+              setMicState("idle");
+              setShowGuestSheet(true);
+              return;
+            }
+            console.log("[mic] heard:", JSON.stringify(text));
+            await processInput(text);
+          }}
+          onStateChange={setMicState}
           locked={isLocked}
           onLockedTap={() => setShowGuestSheet(true)}
         />
       </div>
 
+      {/* MicRow ALWAYS visible. Keyboard mode just adds the input above it. */}
       {keyboardMode && (
         <div style={{ flexShrink: 0, padding: "6px 12px 4px", background: "transparent" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#FFFFFF", border: "0.5px solid #EDE8E0", borderRadius: "26px", padding: "5px 5px 5px 16px", boxShadow: "0 2px 10px rgba(26,26,24,0.04)" }}>
@@ -478,17 +582,17 @@ export default function TalkPage() {
               onChange={(e) => setTextInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && textInput.trim()) {
-                  submitText(textInput);
+                  void processInput(textInput);
                 }
               }}
               placeholder={uiLang === "en" ? "Message Miomi~" : "พิมพ์ถึงหนู~"}
               style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "'Kanit', sans-serif", fontSize: "13.5px", color: "#1A1A18", padding: "8px 0" }}
             />
-            <button type="button" onClick={() => {}} aria-label="Attach" style={{ width: "32px", height: "32px", borderRadius: "50%", background: "transparent", border: "none", color: "#9A8B73", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>
+            <button type="button" onClick={() => { /* placeholder attach */ }} aria-label="Attach" style={{ width: "32px", height: "32px", borderRadius: "50%", background: "transparent", border: "none", color: "#9A8B73", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>
               <Plus size={17} strokeWidth={2} />
             </button>
             {textInput.trim() && (
-              <button type="button" onClick={() => submitText(textInput)} aria-label="Send" style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <button type="button" onClick={() => void processInput(textInput)} aria-label="Send" style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
                 </svg>
@@ -530,7 +634,7 @@ export default function TalkPage() {
         onMiomiHelp={(topic) => {
           setAdjustOpen(false);
           const promptTh = topic === "pillars" ? "ช่วยหนูตั้งเสาหลักของเนื้อหาให้หน่อยค่า~" : topic === "niche" ? "ช่วยหนูหานิชของฉันหน่อยค่า~" : "ช่วยหนูตั้งสไตล์เนื้อหาให้หน่อยค่า~";
-          submitText(promptTh);
+          void processInput(promptTh);
         }}
       />
 
