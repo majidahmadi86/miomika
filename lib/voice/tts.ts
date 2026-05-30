@@ -85,18 +85,35 @@ export async function preloadTtsVoices(): Promise<void> {
   // Server warm-up skipped — /api/talk/speak would synthesize audio and cost credits.
 }
 
-let activeAudio: HTMLAudioElement | null = null;
+// Module-level singleton: only ONE audio source plays at a time.
+let __audioGen = 0;
+let __activeAudio: HTMLAudioElement | null = null;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
+
+export function killAllAudio(): void {
+  __audioGen += 1;
+  if (__activeAudio) {
+    try {
+      __activeAudio.pause();
+      __activeAudio.currentTime = 0;
+    } catch {
+      /* ignore */
+    }
+    __activeAudio = null;
+  }
+  if (typeof window !== "undefined" && window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 export function stopTts(): void {
   if (typeof window === "undefined") return;
-  if (activeAudio) {
-    activeAudio.pause();
-    activeAudio.currentTime = 0;
-    activeAudio = null;
-  }
+  killAllAudio();
   activeUtterance = null;
-  window.speechSynthesis?.cancel();
 }
 
 async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | null> {
@@ -131,18 +148,23 @@ async function trySpeakViaServer(
   if (!audioBase64) return false;
 
   return new Promise((resolve) => {
+    killAllAudio();
+    const myGen = ++__audioGen;
+
     const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
-    activeAudio = el;
+    __activeAudio = el;
 
     const fail = () => {
+      if (myGen !== __audioGen) return;
       el.pause();
       el.currentTime = 0;
-      activeAudio = null;
+      __activeAudio = null;
       resolve(false);
     };
 
     el.onended = () => {
-      activeAudio = null;
+      if (myGen !== __audioGen) return;
+      __activeAudio = null;
       callbacks?.onEnd?.();
       resolve(true);
     };
@@ -163,7 +185,8 @@ async function speakViaBrowser(
   }
   if (!VOICE_CACHE.loaded) await preloadTtsVoices();
 
-  window.speechSynthesis.cancel();
+  killAllAudio();
+  const myGen = ++__audioGen;
 
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = lang === "th" ? "th-TH" : "en-US";
@@ -176,10 +199,12 @@ async function speakViaBrowser(
 
   utter.onstart = () => callbacks?.onStart?.();
   utter.onend = () => {
+    if (myGen !== __audioGen) return;
     if (activeUtterance === utter) activeUtterance = null;
     callbacks?.onEnd?.();
   };
   utter.onerror = () => {
+    if (myGen !== __audioGen) return;
     if (activeUtterance === utter) activeUtterance = null;
     callbacks?.onError?.();
   };
@@ -198,7 +223,7 @@ export async function speak(
     return;
   }
 
-  stopTts();
+  killAllAudio();
   callbacks?.onStart?.();
 
   const serverOk = await trySpeakViaServer(text, lang, callbacks);

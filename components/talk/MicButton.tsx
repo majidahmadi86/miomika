@@ -40,6 +40,7 @@ type MicVADInstance = {
 export interface MicButtonHandle {
   start: () => void;
   stop: () => void;
+  setInterruptMode: (enabled: boolean) => void;
 }
 
 /**
@@ -67,6 +68,9 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
   const mountedRef = useRef(true);
   // The ONLY source of truth for "should the mic be on right now".
   const userIntentRef = useRef(false);
+  const interruptModeRef = useRef(false);
+  const vadPositiveThresholdRef = useRef(0.5);
+  const vadRedemptionMsRef = useRef(1200);
 
   const trace = useCallback((msg: string, data?: Record<string, unknown>) => {
     if (typeof window === "undefined") return;
@@ -96,11 +100,19 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         return;
       }
       onStateChange("processing");
+      const transcribeCtrl = new AbortController();
+      const transcribeTimeout = window.setTimeout(() => transcribeCtrl.abort(), 8000);
       try {
         const form = new FormData();
         form.append("audio", wavBlob, "utterance.wav");
         form.append("language", language);
-        const res = await fetch("/api/talk/transcribe", { method: "POST", body: form, credentials: "include", cache: "no-store" });
+        const res = await fetch("/api/talk/transcribe", {
+          method: "POST",
+          body: form,
+          credentials: "include",
+          cache: "no-store",
+          signal: transcribeCtrl.signal,
+        });
         if (!mountedRef.current) return;
         if (!userIntentRef.current) {
           trace("transcribe response dropped — user stopped");
@@ -125,6 +137,8 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       } catch (e) {
         logError("mic", "transcribe network error", e);
         if (mountedRef.current) onStateChange("idle");
+      } finally {
+        window.clearTimeout(transcribeTimeout);
       }
     },
     [language, trace, onStateChange, onTranscript],
@@ -175,12 +189,11 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         onnxWASMBasePath: "/vad/",
         workletOptions: {},
         startOnLoad: false,
-        positiveSpeechThreshold: 0.5,
+        positiveSpeechThreshold: vadPositiveThresholdRef.current,
         negativeSpeechThreshold: 0.35,
         minSpeechMs: 400,
         preSpeechPadMs: 250,
-        // 40 frames ≈ 1.2s silence — tolerates natural breath pauses
-        redemptionMs: 1200,
+        redemptionMs: vadRedemptionMsRef.current,
         onSpeechStart: () => {
           if (!mountedRef.current) return;
           if (!userIntentRef.current) return;
@@ -230,6 +243,26 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     }
   }, [trace, ensureFlowTag, onStateChange, transcribeAndCommit]);
 
+  const applyVadThresholds = useCallback(
+    async (positiveSpeechThreshold: number, redemptionMs: number) => {
+      if (
+        vadPositiveThresholdRef.current === positiveSpeechThreshold &&
+        vadRedemptionMsRef.current === redemptionMs
+      ) {
+        return;
+      }
+      vadPositiveThresholdRef.current = positiveSpeechThreshold;
+      vadRedemptionMsRef.current = redemptionMs;
+      const keepListening = userIntentRef.current;
+      killVAD();
+      if (keepListening) {
+        userIntentRef.current = true;
+        await startVAD();
+      }
+    },
+    [killVAD, startVAD],
+  );
+
   const requestPermissionAgain = useCallback(async () => {
     trace("recovery: requesting permission");
     try {
@@ -263,8 +296,18 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         }
         if (mountedRef.current) onStateChange("idle");
       },
+      setInterruptMode: (enabled: boolean) => {
+        interruptModeRef.current = enabled;
+        const pos = enabled ? 0.65 : 0.5;
+        const red = enabled ? 300 : 1200;
+        void applyVadThresholds(pos, red);
+        if (enabled && !disabled && !locked) {
+          userIntentRef.current = true;
+          void startVAD();
+        }
+      },
     }),
-    [disabled, locked, onLockedTap, startVAD, onStateChange],
+    [disabled, locked, onLockedTap, startVAD, onStateChange, applyVadThresholds],
   );
 
   const handlePress = useCallback(() => {
@@ -274,9 +317,17 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       return;
     }
     if (state === "processing") return;
-    if (state === "speaking" || state === "listening") {
+    if (state === "speaking") {
+      if (interruptModeRef.current) return;
       userIntentRef.current = false;
-      // Pause, don't destroy — keeps instance warm for next tap.
+      if (vadRef.current) {
+        try { void vadRef.current.pause().catch(() => { /* ignore */ }); } catch { /* ignore */ }
+      }
+      onStateChange("idle");
+      return;
+    }
+    if (state === "listening") {
+      userIntentRef.current = false;
       if (vadRef.current) {
         try { void vadRef.current.pause().catch(() => { /* ignore */ }); } catch { /* ignore */ }
       }

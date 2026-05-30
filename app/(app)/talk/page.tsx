@@ -18,7 +18,8 @@ import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
-import { speak, stopTts, detectLang, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
+import { speak, stopTts, killAllAudio, detectLang, detectLangSwitchCommand, preloadTtsVoices, type TtsLang } from "@/lib/voice/tts";
+import { isLikelyHallucination } from "@/lib/voice/hallucination";
 import { pickIceBreaker, pickMasteryAdvanced, pickMasteryCelebration } from "@/lib/voice/warmth";
 
 type IntroducedWordPayload = {
@@ -51,6 +52,16 @@ type CanvasItem =
 const GUEST_LIMIT = 5;
 const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
 const TRANSCRIPT_CLIP = 180;
+
+function stripForTts(text: string): string {
+  return text
+    .replace(/~/g, "")
+    .replace(/\*+/g, "")
+    .replace(/_+/g, "")
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 function readGuestExchanges(): number {
   if (typeof window === "undefined") return 0;
@@ -112,11 +123,15 @@ export default function TalkPage() {
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [masteryToast, setMasteryToast] = useState<{ th: string; en: string } | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false);
   const micRef = useRef<MicButtonHandle>(null);
   const mountedRefForTts = useRef(true);
+  const openerSpokenRef = useRef(false);
+  const transcriptBufferRef = useRef<string>("");
+  const transcriptTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     mountedRefForTts.current = true;
@@ -156,6 +171,24 @@ export default function TalkPage() {
     queueMicrotask(() => updateConversationLang(lang));
   }, [profile?.ui_language, updateConversationLang]);
 
+  useEffect(() => {
+    if (micState === "speaking") {
+      micRef.current?.setInterruptMode(true);
+    } else if (micState === "idle" || micState === "listening") {
+      micRef.current?.setInterruptMode(false);
+    }
+  }, [micState]);
+
+  const unlockAudio = useCallback(() => {
+    if (audioUnlocked) return;
+    setAudioUnlocked(true);
+    try {
+      new Audio().play().catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  }, [audioUnlocked]);
+
   /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
   useEffect(() => {
     if (items.length > 0 || !authReady) return;
@@ -166,20 +199,28 @@ export default function TalkPage() {
         : uiLang;
     updateConversationLang(openerLang);
     setItems([{ id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en }]);
-    // Speak the ice-breaker if TTS is on. Small delay so voices have time to load.
-    if (ttsOn) {
-      const speakText = openerLang === "th" ? iceBreaker.th : iceBreaker.en;
-      window.setTimeout(() => {
-        if (!mountedRefForTts.current) return;
-        setMicState("speaking");
-        void speak(speakText, openerLang, {
-          onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
-          onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
-        });
-      }, 1200);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length, authReady, profile?.ui_language, uiLang]);
+
+  useEffect(() => {
+    if (!audioUnlocked || !ttsOn || items.length !== 1 || openerSpokenRef.current || !authReady) return;
+    const first = items[0];
+    if (first?.kind !== "mini_cat") return;
+    openerSpokenRef.current = true;
+    const openerLang: TtsLang =
+      profile?.ui_language === "en" || profile?.ui_language === "th"
+        ? profile.ui_language
+        : uiLang;
+    const speakText = openerLang === "th" ? first.textTh : first.textEn;
+    window.setTimeout(() => {
+      if (!mountedRefForTts.current) return;
+      setMicState("speaking");
+      void speak(stripForTts(speakText), openerLang, {
+        onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
+        onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
+      });
+    }, 400);
+  }, [audioUnlocked, ttsOn, items, authReady, profile?.ui_language, uiLang]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset + auto-raise CTA on limit */
@@ -259,10 +300,16 @@ export default function TalkPage() {
       if (isGuest) setGuestExchanges((p) => p + 1);
 
       try {
-        const res = await fetch("/api/miomi", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const engineCtrl = new AbortController();
+        const engineTimeout = window.setTimeout(() => engineCtrl.abort(), 12000);
+        let res: Response;
+        try {
+          res = await fetch("/api/miomi", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: engineCtrl.signal,
+            body: JSON.stringify({
+            mode: config.mode,
             messages: [{ role: "user", content: trimmed }],
             sessionInstruction: (() => {
               const lengthRule = respLength === "short" ? "Under 25 words." : respLength === "detailed" ? "60-100 words, thorough." : "Under 50 words.";
@@ -276,7 +323,10 @@ export default function TalkPage() {
             })(),
             sessionContext: { exchangeNumber: items.filter((i) => i.kind === "user_said").length, wordsIntroduced },
           }),
-        });
+          });
+        } finally {
+          window.clearTimeout(engineTimeout);
+        }
         if (!res.ok) throw new Error("api failed");
         const data = (await res.json()) as MiomiApiResponse;
         const content = data.content ?? "";
@@ -353,7 +403,7 @@ export default function TalkPage() {
         const speakText = lang === "th" ? (textTh || primary) : (textEn || primary);
         if (ttsOn && speakText.trim()) {
           setMicState("speaking");
-          void speak(speakText, lang, {
+          void speak(stripForTts(speakText), lang, {
             onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
             onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
           });
@@ -372,6 +422,51 @@ export default function TalkPage() {
     },
     [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, updateConversationLang],
   );
+
+  const flushBuffer = useCallback(() => {
+    const text = transcriptBufferRef.current;
+    transcriptBufferRef.current = "";
+    transcriptTimerRef.current = null;
+    if (text.trim()) void processInput(text);
+  }, [processInput]);
+
+  const handleMicTranscript = useCallback(
+    async (text: string, isFinal: boolean) => {
+      if (!isFinal) return;
+      if (isLocked) {
+        micRef.current?.stop();
+        setMicState("idle");
+        setShowGuestSheet(true);
+        return;
+      }
+      if (micState === "speaking") {
+        killAllAudio();
+        stopTts();
+        setMicState("idle");
+      }
+      if (isLikelyHallucination(text, conversationLangRef.current, false)) {
+        console.log(`[talk] dropped likely hallucination: "${text}"`);
+        return;
+      }
+      console.log("[mic] heard:", JSON.stringify(text));
+      if (transcriptBufferRef.current) {
+        transcriptBufferRef.current += ", " + text.trim();
+      } else {
+        transcriptBufferRef.current = text.trim();
+      }
+      if (transcriptTimerRef.current) window.clearTimeout(transcriptTimerRef.current);
+      transcriptTimerRef.current = window.setTimeout(flushBuffer, 600);
+    },
+    [isLocked, micState, flushBuffer],
+  );
+
+  const stateLabel = (() => {
+    if (!audioUnlocked) return uiLang === "th" ? "แตะเพื่อเริ่มค่า~" : "tap anywhere to begin~";
+    if (micState === "listening") return uiLang === "th" ? "กำลังฟังค่า..." : "I'm listening...";
+    if (micState === "processing") return uiLang === "th" ? "กำลังคิดค่า..." : "thinking...";
+    if (micState === "speaking") return uiLang === "th" ? "หนูกำลังพูดค่า..." : "Miomi is talking...";
+    return "";
+  })();
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedItems((prev) => {
@@ -408,6 +503,7 @@ export default function TalkPage() {
 
   return (
     <div
+      onPointerDown={unlockAudio}
       style={{
         position: "relative",
         flex: 1,
@@ -555,17 +651,7 @@ export default function TalkPage() {
                 ? "th-TH"
                 : "auto"
           }
-          onTranscript={async (text, isFinal) => {
-            if (!isFinal) return;
-            if (isLocked) {
-              micRef.current?.stop();
-              setMicState("idle");
-              setShowGuestSheet(true);
-              return;
-            }
-            console.log("[mic] heard:", JSON.stringify(text));
-            await processInput(text);
-          }}
+          onTranscript={handleMicTranscript}
           onStateChange={setMicState}
           locked={isLocked}
           onLockedTap={() => setShowGuestSheet(true)}
@@ -602,18 +688,47 @@ export default function TalkPage() {
         </div>
       )}
 
-      <MicRow
-        current={config.mode}
-        orbState={orbState}
-        uiLang={uiLang}
-        onModeChange={(m) => {
-          const next = { ...config, mode: m };
-          setConfig(next);
-          saveTalkConfig(next);
-        }}
-        onOrbTap={handleOrbTap}
-        orbAriaLabel={orbState === "listening" ? (uiLang === "en" ? "Stop listening" : "หยุดฟัง") : (uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู")}
-      />
+      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {!audioUnlocked && items.length <= 1 && (
+          <p
+            style={{
+              margin: "0 0 4px",
+              fontFamily: "'Kanit', sans-serif",
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "#C9A96E",
+              opacity: 0.85,
+            }}
+          >
+            {uiLang === "th" ? "แตะที่ไหนก็ได้เพื่อเริ่มค่า~" : "tap anywhere to begin~"}
+          </p>
+        )}
+        <MicRow
+          current={config.mode}
+          orbState={orbState}
+          uiLang={uiLang}
+          onModeChange={(m) => {
+            const next = { ...config, mode: m };
+            setConfig(next);
+            saveTalkConfig(next);
+          }}
+          onOrbTap={handleOrbTap}
+          orbAriaLabel={orbState === "listening" ? (uiLang === "en" ? "Stop listening" : "หยุดฟัง") : (uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู")}
+        />
+        {stateLabel ? (
+          <p
+            style={{
+              margin: "2px 0 0",
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "12px",
+              color: "#C9A96E",
+              opacity: 0.7,
+            }}
+          >
+            {stateLabel}
+          </p>
+        ) : null}
+      </div>
 
       {items.length > 1 && (
         <button

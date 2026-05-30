@@ -38,7 +38,7 @@ export function PronunciationCardV1({
   const [activeSyllable, setActiveSyllable] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
 
-  const speakWord = async (rate: number) => {
+  const speakWord = async (_rate: number) => {
     if (playing) return;
     setPlaying(true);
     const text = lesson.word_th || lesson.word;
@@ -46,7 +46,7 @@ export function PronunciationCardV1({
     await speak(text, lang, {
       onEnd: () => setPlaying(false),
       onError: () => setPlaying(false),
-    }, { speakingRate: rate });
+    });
   };
 
   const playSyllableSequence = async () => {
@@ -59,7 +59,7 @@ export function PronunciationCardV1({
         void speak(lesson.syllables[i], lang, {
           onEnd: () => resolve(),
           onError: () => resolve(),
-        }, { speakingRate: 0.75 });
+        });
       });
       await new Promise((r) => setTimeout(r, 200));
     }

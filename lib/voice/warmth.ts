@@ -313,36 +313,12 @@ export function pickMasteryAdvanced(word: string, lang: Language): string {
 export type IceBreaker = { th: string; en: string; mood: "playful" | "warm" | "curious" | "sleepy" };
 
 export const ICE_BREAKERS: IceBreaker[] = [
-  {
-    th: "หนูคิดถึงคุณเลยค่า มาคุยกับหนูหน่อยนะคะ วันนี้เป็นยังไงบ้างคะ",
-    en: "I've missed you. Come sit with me a moment — how's your day been?",
-    mood: "warm",
-  },
-  {
-    th: "ดีใจที่ได้เจอกันค่า วันนี้มีเรื่องอะไรอยากเล่าให้หนูฟังไหมคะ",
-    en: "So glad you're here. Anything on your mind today, or shall we just chat?",
-    mood: "curious",
-  },
-  {
-    th: "ค่อยๆ ไม่ต้องรีบนะคะ หนูอยู่ตรงนี้ พร้อมฟังเสมอค่า",
-    en: "No rush — I'm here, I'm listening. We can go as slowly as you like.",
-    mood: "warm",
-  },
-  {
-    th: "หนูเพิ่งตื่นจากนอนกลางวันมาเจอคุณพอดีเลยค่า สบายดีไหมคะ",
-    en: "I was just waking up from a cat nap and there you are. How are you?",
-    mood: "playful",
-  },
-  {
-    th: "หนูอยากให้คุณกล้าพูดมากขึ้นค่า วันนี้อยากลองพูดอะไรกับหนูดีคะ",
-    en: "I want to help you feel braver about speaking. What would you like to try with me today?",
-    mood: "curious",
-  },
-  {
-    th: "เจอกันอีกแล้วนะคะ หนูดีใจค่า มาอยู่ด้วยกันสักครู่ไหมคะ",
-    en: "Hi, you. I'm happy. Want to spend a few minutes together?",
-    mood: "warm",
-  },
+  { th: "คิดถึงคุณค่า~ วันนี้เป็นไงคะ?", en: "Missed you~ How's your day?", mood: "warm" },
+  { th: "กลับมาแล้ว ดีใจค่า~", en: "You're back. I'm happy~", mood: "warm" },
+  { th: "สวัสดีค่า~ หนูชื่อมิโอมิ คุยกันหน่อยไหมคะ?", en: "Hi~ I'm Miomi. Want to chat?", mood: "curious" },
+  { th: "หวัดดีค่า~ วันนี้เป็นไงบ้างคะ?", en: "Hi~ how's your day going?", mood: "curious" },
+  { th: "อยู่ตรงนี้นะคะ~ ไม่ต้องรีบ", en: "I'm here~ no rush at all.", mood: "warm" },
+  { th: "นั่งคุยกันสักครู่ไหมคะ~", en: "Want to sit and chat a moment?", mood: "warm" },
 ];
 
 const LAST_ICE_BREAKER_KEY = "miomika.last_icebreaker";
