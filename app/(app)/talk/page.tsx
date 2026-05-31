@@ -106,6 +106,16 @@ function stripForTts(text: string, lang: TtsLang): string {
   return out;
 }
 
+// Spoken language follows Miomi's OWN reply (her output script), not the transcript.
+// Output-based detection is reliable — this is NOT the transcript detection removed in 120eeeb.
+function detectSpokenLangFromReply(text: string, fallback: TtsLang): TtsLang {
+  const thai = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
+  const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+  if (thai > latin) return "th";
+  if (latin > thai) return "en";
+  return fallback;
+}
+
 function readGuestExchanges(): number {
   if (typeof window === "undefined") return 0;
   const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
@@ -432,8 +442,8 @@ export default function TalkPage() {
             masteryEvent: data.masteryEvent?.type,
           },
         });
-        // Reply language = user setting only. Transcription auto-detect must never flip this.
-        const replyLang = replyLangFromSetting(profile?.ui_language, uiLang);
+        const settingLang = replyLangFromSetting(profile?.ui_language, uiLang);
+        const replyLang = detectSpokenLangFromReply(data.content ?? "", settingLang);
 
         setItems((prev) => [
           ...prev,
