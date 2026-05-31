@@ -1,6 +1,6 @@
 // lib/ai/router.ts
 // AI Router — tries engines in order, never fails the user
-// Order: Gemini (primary, clean Thai) → Groq (fallback) → Library failover
+// Order: Groq (primary, fast) → Gemini (fallback, Thai quality) → Library failover
 
 import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
@@ -42,22 +42,22 @@ export async function getAIResponse(
   systemPrompt: string
 ): Promise<{ content: string; engine: string; wasFailover: boolean }> {
 
-  // Try Gemini first — clean Thai, cheap and fast
-  try {
-    const content = await callGemini(messages, systemPrompt);
-    if (content) return { content, engine: "gemini", wasFailover: false };
-  } catch (error) {
-    const err = error as { status?: number; message?: string };
-    console.warn("Gemini failed:", err?.status, err?.message?.slice(0, 100));
-  }
-
-  // Try Groq second — fast fallback on error
+  // Try Groq first — fast, reliable
   try {
     const content = await callGroq(messages, systemPrompt);
     if (content) return { content, engine: "groq", wasFailover: false };
   } catch (error) {
     const err = error as { status?: number; message?: string };
     console.warn("Groq failed:", err?.status, err?.message?.slice(0, 100));
+  }
+
+  // Try Gemini second — Thai quality fallback
+  try {
+    const content = await callGemini(messages, systemPrompt);
+    if (content) return { content, engine: "gemini", wasFailover: false };
+  } catch (error) {
+    const err = error as { status?: number; message?: string };
+    console.error("[router] Gemini failed:", err?.status, err?.message);
   }
 
   // Both failed — library failover, always works
