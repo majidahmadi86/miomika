@@ -27,6 +27,8 @@ function mapVoice(lang: Lang, voice: VoicePref): { voiceName: string; languageCo
 }
 
 const VOLUME_GAIN_DB = 4.0;
+/** Short phrases (openers, greetings) cache on first synthesis; longer replies stay 3-strike. */
+const CACHE_IMMEDIATELY_MAX_CHARS = 60;
 
 function buildCacheKey(
   normalizedText: string,
@@ -43,7 +45,7 @@ function buildCacheKey(
  * POST /api/talk/speak
  *
  * Accepts JSON { text, lang, voice?, voiceName?, speakingRate? }. Returns { audio: base64, cached: boolean }.
- * 3-strike cache: MP3 stored only after the 3rd request for the same phrase.
+ * Short phrases (≤60 chars) cache on first synthesis; longer unique replies use 3-strike.
  */
 export async function POST(request: NextRequest) {
   Sentry.setTag("flow", "voice");
@@ -179,9 +181,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "tts_failed", detail, stack }, { status: 500 });
   }
 
-  // --- 3-strike cache write ---
-  // Hits 1–2: counter row only (audio_base64 empty). Hit 3+: store the MP3.
+  // --- Cache write ---
+  // Short phrases: store MP3 immediately (request_count 1).
+  // Long phrases: hits 1–2 counter only; hit 3+ stores the MP3.
   const now = new Date().toISOString();
+  const cacheImmediately = text.length <= CACHE_IMMEDIATELY_MAX_CHARS;
 
   if (!cached) {
     const { error: insertError } = await supabase.from("tts_cache").insert({
@@ -189,7 +193,7 @@ export async function POST(request: NextRequest) {
       text,
       lang,
       voice: voiceName,
-      audio_base64: "",
+      audio_base64: cacheImmediately ? audioBase64 : "",
       request_count: 1,
       last_used_at: now,
     });
@@ -198,12 +202,13 @@ export async function POST(request: NextRequest) {
     }
   } else {
     const nextCount = (cached.request_count ?? 0) + 1;
+    const storeAudio = cacheImmediately || nextCount >= 3;
     const { error: updateError } = await supabase
       .from("tts_cache")
       .update({
         request_count: nextCount,
         last_used_at: now,
-        ...(nextCount >= 3 ? { audio_base64: audioBase64 } : {}),
+        ...(storeAudio ? { audio_base64: audioBase64 } : {}),
       })
       .eq("id", cached.id);
 
