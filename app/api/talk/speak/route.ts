@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
       },
     });
     const timeoutPromise = new Promise<never>((_, rej) => {
-      setTimeout(() => rej(new Error("synth_timeout")), 9000);
+      setTimeout(() => rej(new Error("synth_timeout")), 18000);
     });
     const [response] = await Promise.race([synthPromise, timeoutPromise]);
 
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     if (detail === "synth_timeout") {
-      log("voice.speak", "google timeout (9s)");
+      log("voice.speak", "google timeout (18s)");
       return NextResponse.json({ error: "synth_timeout" }, { status: 503 });
     }
     const stack =
