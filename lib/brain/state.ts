@@ -149,6 +149,7 @@ export async function readBrainState(args: {
     userInput,
     nowLanguage,
     learningTargetLanguage,
+    uiLanguage,
     memory,
     introducedWords,
   });
@@ -296,11 +297,14 @@ function detectPracticeAttempt(args: {
   userInput: string;
   nowLanguage: DetectedLang;
   learningTargetLanguage: "th" | "en" | null;
+  uiLanguage: "th" | "en";
   memory: Array<{ role: "user" | "miomi"; content: string }>;
   introducedWords: string[];
 }): boolean {
-  const { userInput, nowLanguage, learningTargetLanguage, memory, introducedWords } = args;
+  const { userInput, nowLanguage, learningTargetLanguage, uiLanguage, memory, introducedWords } = args;
   if (!learningTargetLanguage) return false;
+  // You only practice your TARGET language, never the one you converse in.
+  if (learningTargetLanguage === uiLanguage) return false;
 
   const spokeTarget =
     nowLanguage === learningTargetLanguage ||
