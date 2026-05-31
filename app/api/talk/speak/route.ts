@@ -17,12 +17,12 @@ function mapVoice(lang: Lang, voice: VoicePref): { voiceName: string; languageCo
   if (lang === "th") {
     return {
       languageCode: "th-TH",
-      voiceName: voice === "male" ? "th-TH-Chirp3-HD-Charon" : "th-TH-Chirp3-HD-Leda",
+      voiceName: voice === "male" ? "th-TH-Chirp3-HD-Charon" : "th-TH-Chirp3-HD-Despina",
     };
   }
   return {
     languageCode: "en-US",
-    voiceName: voice === "male" ? "en-US-Chirp3-HD-Charon" : "en-US-Chirp3-HD-Leda",
+    voiceName: voice === "male" ? "en-US-Chirp3-HD-Charon" : "en-US-Chirp3-HD-Despina",
   };
 }
 
