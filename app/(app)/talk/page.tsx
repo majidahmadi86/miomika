@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
-import { useProfile } from "@/lib/auth/use-profile";
+import { updateUiLanguage, useProfile } from "@/lib/auth/use-profile";
 import { MicButton, type MicState, type MicButtonHandle } from "@/components/talk/MicButton";
 import { FuelPill } from "@/components/talk/FuelPill";
 import { type OrbState } from "@/components/talk/VoiceOrb";
@@ -89,6 +89,13 @@ function readUiLang(): "th" | "en" {
   return lang.startsWith("en") ? "en" : "th";
 }
 
+function replyLangFromSetting(
+  profileLang: "th" | "en" | null | undefined,
+  fallback: "th" | "en",
+): TtsLang {
+  return profileLang === "en" || profileLang === "th" ? profileLang : fallback;
+}
+
 function toVocabularyEntry(word: IntroducedWordPayload): VocabularyEntry {
   return {
     id: word.word_en,
@@ -162,6 +169,14 @@ export default function TalkPage() {
     conversationLangRef.current = lang;
     setConversationLang(lang);
   }, []);
+
+  const handleCycleLang = useCallback(() => {
+    const current = replyLangFromSetting(profile?.ui_language, uiLang);
+    const next: TtsLang = current === "th" ? "en" : "th";
+    updateConversationLang(next);
+    setUiLang(next);
+    void updateUiLanguage(next);
+  }, [profile?.ui_language, uiLang, updateConversationLang]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- hydrate localStorage + navigator prefs on mount */
   useEffect(() => {
@@ -387,12 +402,8 @@ export default function TalkPage() {
             masteryEvent: data.masteryEvent?.type,
           },
         });
-        // SERVER decides reply language. Client speaks what the brain decided.
-        const replyLang: TtsLang =
-          data.replyLanguage === "en" || data.replyLanguage === "th"
-            ? data.replyLanguage
-            : conversationLangRef.current;
-        updateConversationLang(replyLang);
+        // Reply language = user setting only. Transcription auto-detect must never flip this.
+        const replyLang = replyLangFromSetting(profile?.ui_language, uiLang);
 
         setItems((prev) => [
           ...prev,
@@ -480,7 +491,7 @@ export default function TalkPage() {
         ]);
       }
     },
-    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, updateConversationLang],
+    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, profile?.ui_language, uiLang],
   );
 
   const flushBuffer = useCallback(() => {
@@ -632,7 +643,7 @@ export default function TalkPage() {
           keyboardMode={keyboardMode}
           uiLang={uiLang}
           onCycleLength={() => setRespLength((p) => (p === "short" ? "normal" : p === "normal" ? "detailed" : "short"))}
-          onCycleLang={() => {}}
+          onCycleLang={handleCycleLang}
           onToggleTts={() => {
             setTtsOn((p) => {
               const next = !p;
