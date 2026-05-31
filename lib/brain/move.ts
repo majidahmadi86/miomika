@@ -41,7 +41,7 @@ export function chooseMove(s: BrainState): Move {
 }
 
 export function moveInstruction(move: Move, lang: "th" | "en", state?: BrainState): string {
-  const speaks = state?.userSpeaksLanguage ?? lang;
+  const speaks = state?.uiLanguage ?? lang;
   const target = state?.learningTargetLanguage ?? "th";
   const speaksLabel = speaks === "th" ? "Thai" : "English";
   const targetLabel = target === "th" ? "Thai" : "English";

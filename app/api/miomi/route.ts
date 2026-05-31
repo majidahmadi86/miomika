@@ -65,6 +65,7 @@ const BRAIN_PROMPT_FALLBACK =
 // ─── MAIN ROUTE ───────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  let brainState: BrainState | null = null;
   try {
     // SERVER reads user identity from cookies. Client cannot lie about tier.
     const profile = await getServerProfile();
@@ -114,37 +115,7 @@ export async function POST(req: NextRequest) {
 
     log("miomi", "start", { userInput: userInput.slice(0, 80), exchange: state.exchangeNumber });
 
-    // ── SERVER-SIDE GUEST LIMIT (never trust client) ──────────────────────────
-    if (serverIsGuest && state.exchangeNumber >= GUEST_EXCHANGE_LIMIT) {
-      const lang = state.primaryLanguage === "english" ? "en" : "th";
-      const guestLimitContent = pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang });
-      persistExchangePair({
-        userId: serverUserId,
-        state,
-        userInput,
-        miomiContent: guestLimitContent,
-      });
-      const guestReplyLang = lang;
-      return NextResponse.json({
-        content: guestLimitContent,
-        wordCard: null,
-        phraseCard: null,
-        creatorAsset: null,
-        sessionContext: buildSessionContext(state),
-        servedVia: "guest_limit",
-        wasFailover: false,
-        intent: null,
-        sessionMode: state.sessionMode,
-        needsClarification: false,
-        masteryEvent: null,
-        pronunciationLesson: null,
-        replyLanguage: guestReplyLang,
-        userSpeaksLanguage: guestReplyLang,
-      } satisfies MiomiResponse);
-    }
-
     // ── BRAIN: read state → choose move → build teacher-persona prompt ───────
-    let brainState: BrainState;
     let move: Move;
     let adaptivePrompt: string;
 
@@ -166,7 +137,7 @@ export async function POST(req: NextRequest) {
           if (lesson) {
             const replyTh = `ดีเลยค่า~ มาฝึกออกเสียงกันค่ะ คำว่า "${lesson.word_th || lesson.word}" แปลว่า ${lesson.meaning_th}. ลองพูดตามหนูทีละพยางค์นะคะ — ${lesson.syllables.join(" · ")}. พร้อมแล้วลองพูดให้หนูฟังได้เลยค่า~`;
             const replyEn = `Let's practice~ The word "${lesson.word}" means ${lesson.meaning_en}. Try saying it with me, one syllable at a time — ${lesson.syllables.join(" · ")}. When you're ready, say it back to me~`;
-            const useLang = brainState.userSpeaksLanguage;
+            const useLang = brainState.uiLanguage;
             const content = useLang === "th" ? replyTh : replyEn;
 
             persistExchangePair({
@@ -179,7 +150,7 @@ export async function POST(req: NextRequest) {
 
             state = { ...state, exchangeNumber: state.exchangeNumber + 1 };
 
-            const pronReplyLang = brainState.userSpeaksLanguage;
+            const pronReplyLang = brainState.uiLanguage;
             return NextResponse.json({
               content,
               wordCard: null,
@@ -194,7 +165,7 @@ export async function POST(req: NextRequest) {
               masteryEvent: null,
               pronunciationLesson: lesson,
               replyLanguage: pronReplyLang,
-              userSpeaksLanguage: pronReplyLang,
+              userSpeaksLanguage: brainState.uiLanguage,
             } satisfies MiomiResponse);
           }
         }
@@ -220,6 +191,34 @@ export async function POST(req: NextRequest) {
       });
       move = chooseMove(brainState);
       adaptivePrompt = BRAIN_PROMPT_FALLBACK;
+    }
+
+    // ── SERVER-SIDE GUEST LIMIT (never trust client) ──────────────────────────
+    if (serverIsGuest && state.exchangeNumber >= GUEST_EXCHANGE_LIMIT) {
+      const guestReplyLang = brainState.uiLanguage;
+      const guestLimitContent = pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang: guestReplyLang });
+      persistExchangePair({
+        userId: serverUserId,
+        state,
+        userInput,
+        miomiContent: guestLimitContent,
+      });
+      return NextResponse.json({
+        content: guestLimitContent,
+        wordCard: null,
+        phraseCard: null,
+        creatorAsset: null,
+        sessionContext: buildSessionContext(state),
+        servedVia: "guest_limit",
+        wasFailover: false,
+        intent: null,
+        sessionMode: state.sessionMode,
+        needsClarification: false,
+        masteryEvent: null,
+        pronunciationLesson: null,
+        replyLanguage: guestReplyLang,
+        userSpeaksLanguage: brainState.uiLanguage,
+      } satisfies MiomiResponse);
     }
 
     // ── Sticky speaking language for memory + session ───────────────────────
@@ -273,7 +272,9 @@ export async function POST(req: NextRequest) {
 
     // ── STAGE 5: Handle clarification needed ─────────────────────────────────
     if (intentResult.needsClarification) {
-      const clarification = buildClarificationPrompt(state.primaryLanguage);
+      const clarification = buildClarificationPrompt(
+        brainState.uiLanguage === "en" ? "english" : "thai",
+      );
       persistExchangePair({
         userId: serverUserId,
         state,
@@ -386,7 +387,7 @@ export async function POST(req: NextRequest) {
       const enPart = match.follow_up_question_en
         ? `${match.response_en}\n${match.follow_up_question_en}`
         : match.response_en;
-      content = `${thPart}\n\n${enPart}`;
+      content = brainState.uiLanguage === "th" ? thPart : enPart;
       servedVia = `library_${match.matched_via}`;
       log("miomi", "ai-result", {
         servedVia,
@@ -525,6 +526,7 @@ export async function POST(req: NextRequest) {
     log("miomi", "error", { error: err.message, stack: err.stack?.slice(0, 300) });
     console.error("Route error:", err?.message);
     const failover = getFailoverResponse();
+    const failoverReplyLang = brainState?.uiLanguage ?? "en";
     return NextResponse.json(
       {
         content: `${failover.th}\n\n${failover.en}`,
@@ -539,8 +541,8 @@ export async function POST(req: NextRequest) {
         needsClarification: false,
         masteryEvent: null,
         pronunciationLesson: null,
-        replyLanguage: "th",
-        userSpeaksLanguage: "th",
+        replyLanguage: failoverReplyLang,
+        userSpeaksLanguage: failoverReplyLang,
       } satisfies MiomiResponse,
       { status: 200 }
     );
