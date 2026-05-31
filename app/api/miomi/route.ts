@@ -23,7 +23,6 @@ import {
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 import { saveExchange } from "@/lib/brain/memory";
 import { readBrainState, type BrainState } from "@/lib/brain/state";
-import { chooseMove, type Move } from "@/lib/brain/move";
 import { buildBrainPrompt } from "@/lib/brain/prompt";
 import {
   detectReuseAndAdvance,
@@ -115,8 +114,7 @@ export async function POST(req: NextRequest) {
 
     log("miomi", "start", { userInput: userInput.slice(0, 80), exchange: state.exchangeNumber });
 
-    // ── BRAIN: read state → choose move → build teacher-persona prompt ───────
-    let move: Move;
+    // ── BRAIN: read state → build model-owned prompt ─────────────────────────
     let adaptivePrompt: string;
 
     try {
@@ -145,12 +143,14 @@ export async function POST(req: NextRequest) {
               state,
               userInput,
               miomiContent: content,
-              move: "pronunciation",
             });
 
             state = { ...state, exchangeNumber: state.exchangeNumber + 1 };
 
-            const pronReplyLang = brainState.uiLanguage;
+            const pronReplyLang = detectReplyLanguageFromContent(
+              content,
+              brainState.uiLanguage,
+            );
             return NextResponse.json({
               content,
               wordCard: null,
@@ -171,15 +171,14 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      move = chooseMove(brainState);
-      adaptivePrompt = buildBrainPrompt({ state: brainState, move, userInput, mode });
+      adaptivePrompt = buildBrainPrompt({ state: brainState, userInput, mode });
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
       }
       log("miomi", "state", {
         lang: brainState.nowLanguage,
         mood: brainState.emotionalSignal,
-        move,
+        mode: mode ?? "auto",
         memoryCount: brainState.memory.length,
       });
     } catch (err) {
@@ -189,14 +188,18 @@ export async function POST(req: NextRequest) {
         isGuest: serverIsGuest,
         userId: serverUserId,
       });
-      move = chooseMove(brainState);
       adaptivePrompt = BRAIN_PROMPT_FALLBACK;
     }
 
     // ── SERVER-SIDE GUEST LIMIT (never trust client) ──────────────────────────
     if (serverIsGuest && state.exchangeNumber >= GUEST_EXCHANGE_LIMIT) {
-      const guestReplyLang = brainState.uiLanguage;
-      const guestLimitContent = pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang: guestReplyLang });
+      const guestLimitContent = pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, {
+        lang: brainState.uiLanguage,
+      });
+      const guestReplyLang = detectReplyLanguageFromContent(
+        guestLimitContent,
+        brainState.uiLanguage,
+      );
       persistExchangePair({
         userId: serverUserId,
         state,
@@ -240,8 +243,9 @@ export async function POST(req: NextRequest) {
     // ── STAGE 4b: Recovery — negative emotion override ───────────────────────
     // Never teach when user is frustrated. Face-saving is enforced.
     if (intentResult.family === "social" && intentResult.primary.intent === "social_emotion_negative") {
-      const lang = brainReplyLang(brainState);
-      const recoveryContent = pickPhrase(RECOVERY_STRUGGLE, { lang });
+      const recoveryContent = pickPhrase(RECOVERY_STRUGGLE, {
+        lang: brainState.uiLanguage,
+      });
       persistExchangePair({
         userId: serverUserId,
         state,
@@ -249,9 +253,11 @@ export async function POST(req: NextRequest) {
         miomiContent: recoveryContent,
         intent: "social_emotion_negative",
         emotionalSignal: "negative",
-        move,
       });
-      const recoveryReplyLang = brainReplyLang(brainState);
+      const recoveryReplyLang = detectReplyLanguageFromContent(
+        recoveryContent,
+        brainState.uiLanguage,
+      );
       return NextResponse.json({
         content: recoveryContent,
         wordCard: null,
@@ -281,9 +287,11 @@ export async function POST(req: NextRequest) {
         userInput,
         miomiContent: clarification,
         intent: "meta_clarification_needed",
-        move,
       });
-      const clarifyReplyLang = brainReplyLang(brainState);
+      const clarifyReplyLang = detectReplyLanguageFromContent(
+        clarification,
+        brainState.uiLanguage,
+      );
       return NextResponse.json({
         content: clarification,
         wordCard: null,
@@ -313,23 +321,20 @@ export async function POST(req: NextRequest) {
     let masteryEvent: MasteryEvent = { type: "none" };
     let wordToIntroduce: IntroducedWord | null = null;
 
-    if (move !== "repair") {
-      try {
-        masteryEvent = await detectReuseAndAdvance({
-          userId: serverUserId,
-          userText: userInput,
-          introducedWords: brainState.introducedWords,
-        });
-      } catch (err) {
-        console.error("[brain] detectReuseAndAdvance failed:", err);
-        masteryEvent = { type: "none" };
-      }
+    try {
+      masteryEvent = await detectReuseAndAdvance({
+        userId: serverUserId,
+        userText: userInput,
+        introducedWords: brainState.introducedWords,
+      });
+    } catch (err) {
+      console.error("[brain] detectReuseAndAdvance failed:", err);
+      masteryEvent = { type: "none" };
     }
 
     // Teaching only when user is FLOWING and not asking a question. Better to skip than to interrupt.
     const shouldPickWord =
-      move !== "repair" &&
-      move === "teach" &&
+      (mode === "teach" || mode === "auto" || mode === undefined) &&
       state.exchangeNumber % 4 === 0 &&
       state.exchangeNumber >= 4 &&
       masteryEvent.type === "none" &&
@@ -420,7 +425,7 @@ export async function POST(req: NextRequest) {
       log("miomi", "ai-call", { engine: "router", promptLen: adaptivePrompt.length });
       const result = await getAIResponse(formattedMessages, adaptivePrompt);
       content = result.content;
-      servedVia = `ai_${result.engine}__${move}`;
+      servedVia = `ai_${result.engine}__${mode ?? "auto"}`;
       wasFailover = result.wasFailover;
       aiCostUsd = result.engine === "groq" ? 0 : 0.0008;
       log("miomi", "ai-result", {
@@ -450,7 +455,6 @@ export async function POST(req: NextRequest) {
       miomiContent: content,
       aiCostUsd,
       intent: intentResult.primary.intent,
-      move,
     });
 
     if (wordToIntroduce) {
@@ -503,7 +507,10 @@ export async function POST(req: NextRequest) {
       lastUserSignal: userInput.slice(0, 100),
     };
 
-    const replyLanguage = brainState.uiLanguage;
+    const replyLanguage = detectReplyLanguageFromContent(
+      content,
+      brainState.uiLanguage,
+    );
     return NextResponse.json({
       content,
       wordCard,
@@ -526,10 +533,14 @@ export async function POST(req: NextRequest) {
     log("miomi", "error", { error: err.message, stack: err.stack?.slice(0, 300) });
     console.error("Route error:", err?.message);
     const failover = getFailoverResponse();
-    const failoverReplyLang = brainState?.uiLanguage ?? "en";
+    const failoverContent = `${failover.th}\n\n${failover.en}`;
+    const failoverReplyLang = detectReplyLanguageFromContent(
+      failoverContent,
+      brainState?.uiLanguage ?? "en",
+    );
     return NextResponse.json(
       {
-        content: `${failover.th}\n\n${failover.en}`,
+        content: failoverContent,
         wordCard: null,
         phraseCard: null,
         creatorAsset: null,
@@ -551,8 +562,16 @@ export async function POST(req: NextRequest) {
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-function brainReplyLang(brainState: BrainState): "th" | "en" {
-  return brainState.uiLanguage;
+function detectReplyLanguageFromContent(
+  text: string,
+  fallback: "th" | "en",
+): "th" | "en" {
+  if (!text.trim()) return fallback;
+  const thaiChars = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
+  const latinLetters = (text.match(/[a-zA-Z]/g) ?? []).length;
+  if (thaiChars > latinLetters) return "th";
+  if (latinLetters > thaiChars) return "en";
+  return fallback;
 }
 
 function brainLanguageToSession(brainState: BrainState): SessionState["primaryLanguage"] {
@@ -643,7 +662,6 @@ function persistExchangePair(params: {
   aiCostUsd?: number;
   intent?: string | null;
   emotionalSignal?: string | null;
-  move?: string | null;
 }): void {
   const {
     userId,
@@ -653,7 +671,6 @@ function persistExchangePair(params: {
     aiCostUsd,
     intent,
     emotionalSignal,
-    move,
   } = params;
 
   void saveExchange({
@@ -674,7 +691,7 @@ function persistExchangePair(params: {
     aiCostUsd,
     intent: intent ?? null,
     emotionalSignal: emotionalSignal ?? null,
-    move: move ?? null,
+    move: null,
   });
 }
 
