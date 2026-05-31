@@ -25,10 +25,9 @@ export function isLikelyHallucination(
 
   // For an English-interface user:
   // - Mostly Latin → legitimate English (NOT hallucination)
-  // - Mostly Thai → suspicious (likely echo unless practice)
+  // - Thai speech is kept (echo blocked upstream while Miomi speaks)
   if (userSpeaksLang === "en") {
     if (latinRatio > 0.5) return false;  // legitimate English, KEEP
-    if (thaiRatio > 0.7 && !isPracticeAttempt) return true;  // Thai echo
     return false;
   }
 

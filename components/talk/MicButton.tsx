@@ -57,7 +57,7 @@ export interface MicButtonHandle {
 export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function MicButton(
   {
     state,
-    language = "auto",
+    language: _language = "auto",
     onTranscript,
     onStateChange,
     disabled = false,
@@ -112,13 +112,13 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         return;
       }
       onStateChange("processing");
-      logEvent({ kind: "network", level: "info", message: "POST /transcribe", data: { wavBytes: wavBlob.size, language } });
+      logEvent({ kind: "network", level: "info", message: "POST /transcribe", data: { wavBytes: wavBlob.size, language: "auto" } });
       const transcribeCtrl = new AbortController();
       const transcribeTimeout = window.setTimeout(() => transcribeCtrl.abort(), 8000);
       try {
         const form = new FormData();
         form.append("audio", wavBlob, "utterance.wav");
-        form.append("language", language);
+        form.append("language", "auto");
         const res = await fetch("/api/talk/transcribe", {
           method: "POST",
           body: form,
@@ -173,7 +173,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         window.clearTimeout(transcribeTimeout);
       }
     },
-    [language, trace, onStateChange, onTranscript],
+    [trace, onStateChange, onTranscript],
   );
 
   // Callback refs — let the VAD effect read latest values without re-firing.
