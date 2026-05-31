@@ -757,7 +757,7 @@ export default function TalkPage() {
           ref={micRef}
           state={micState}
           speakingActive={isSpeakingState || micState === "speaking"}
-          language={profile?.ui_language === "th" ? "th-TH" : "en-US"}
+          language={profile?.ui_language === "th" ? "th" : profile?.ui_language === "en" ? "en" : "auto"}
           onTranscript={handleMicTranscript}
           onStateChange={setMicState}
           locked={isLocked}

@@ -24,7 +24,7 @@ export type MicState =
 
 interface MicButtonProps {
   state: MicState;
-  language?: "th-TH" | "en-US" | "auto";
+  language?: "th" | "en" | "th-TH" | "en-US" | "auto";
   onTranscript: (text: string, isFinal: boolean) => void;
   onStateChange: (state: MicState) => void;
   disabled?: boolean;
@@ -46,6 +46,13 @@ export interface MicButtonHandle {
   setInterruptMode: (enabled: boolean) => void;
 }
 
+/** Whisper ISO-639-1 hint for /api/talk/transcribe (auto when unknown). */
+function whisperTranscribeLang(language: MicButtonProps["language"]): "th" | "en" | "auto" {
+  if (language === "th" || language === "th-TH") return "th";
+  if (language === "en" || language === "en-US") return "en";
+  return "auto";
+}
+
 /**
  * MicButton — explicit-intent VAD voice input.
  *
@@ -57,7 +64,7 @@ export interface MicButtonHandle {
 export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function MicButton(
   {
     state,
-    language: _language = "auto",
+    language = "auto",
     onTranscript,
     onStateChange,
     disabled = false,
@@ -112,13 +119,14 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         return;
       }
       onStateChange("processing");
-      logEvent({ kind: "network", level: "info", message: "POST /transcribe", data: { wavBytes: wavBlob.size, language: "auto" } });
+      const transcribeLang = whisperTranscribeLang(language);
+      logEvent({ kind: "network", level: "info", message: "POST /transcribe", data: { wavBytes: wavBlob.size, language: transcribeLang } });
       const transcribeCtrl = new AbortController();
       const transcribeTimeout = window.setTimeout(() => transcribeCtrl.abort(), 8000);
       try {
         const form = new FormData();
         form.append("audio", wavBlob, "utterance.wav");
-        form.append("language", "auto");
+        form.append("language", transcribeLang);
         const res = await fetch("/api/talk/transcribe", {
           method: "POST",
           body: form,
@@ -173,7 +181,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         window.clearTimeout(transcribeTimeout);
       }
     },
-    [trace, onStateChange, onTranscript],
+    [trace, onStateChange, onTranscript, language],
   );
 
   // Callback refs — let the VAD effect read latest values without re-firing.
