@@ -63,7 +63,7 @@ const MIOMI_TTS_NAME: Record<TtsLang, string> = {
 };
 
 function stripForTts(text: string, lang: TtsLang): string {
-  return text
+  let out = text
     .replace(/มิโอมิ/g, MIOMI_TTS_NAME[lang])
     .replace(/miomi/gi, MIOMI_TTS_NAME[lang])
     .replace(/[~*_`#|<>^=+/\\]/g, " ")
@@ -74,6 +74,29 @@ function stripForTts(text: string, lang: TtsLang): string {
     .replace(/[\u{2600}-\u{27BF}]/gu, "")
     .replace(/\s{2,}/g, " ")
     .trim();
+
+  // TTS-only polish — never applied to on-screen text or model input
+  out = out
+    .replace(
+      /\b([\p{Script=Latin}]{1,3})\b(?:[\s,]+\b([\p{Script=Latin}]{1,3})\b)+/giu,
+      (segment) => {
+        const parts = segment.match(/\b[\p{Script=Latin}]{1,3}\b/giu) ?? [];
+        if (parts.length < 3) return segment;
+        const first = parts[0];
+        if (!first) return segment;
+        const key = first.toLowerCase();
+        if (parts.every((p) => p.toLowerCase() === key)) return key;
+        return segment;
+      },
+    )
+    .replace(/([\p{Script=Latin}])\1{2,}/giu, "$1")
+    .replace(/\.{2,}/g, ", ")
+    .replace(/\s+[-–—]\s+/g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[,.\s:;!?\-–—]+|[,.\s:;!?\-–—]+$/g, "")
+    .trim();
+
+  return out;
 }
 
 function readGuestExchanges(): number {
