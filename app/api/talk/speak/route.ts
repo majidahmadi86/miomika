@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
       audioConfig: {
         audioEncoding: "MP3",
         speakingRate,
+        volumeGainDb: 6.0,
         // Chirp3-HD voices reject pitch — omit entirely.
       },
     });

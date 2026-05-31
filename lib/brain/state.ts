@@ -197,20 +197,6 @@ function normalizeUiLanguage(raw: string | null): "th" | "en" {
   return raw.toLowerCase().startsWith("en") ? "en" : "th";
 }
 
-function detectLangSwitchCommand(text: string): "th" | "en" | null {
-  const lower = text.toLowerCase().trim();
-  // ONLY an explicit, tightly-anchored request to change the REPLY language counts.
-  // Topic mentions ("a Thai person", "learn Thai", "understand Thai", "Thai language")
-  // must NEVER switch. Default is the language the user is already speaking.
-  const EN = /\bspeak\s+english\b|\b(speak|talk|reply|respond|answer|chat)\b(?:\s+(?:to|with)\s+me)?\s+in\s+english\b|\benglish\s+please\b/;
-  const TH = /\bspeak\s+thai\b|\b(speak|talk|reply|respond|answer|chat)\b(?:\s+(?:to|with)\s+me)?\s+in\s+thai\b|\bthai\s+please\b/;
-  if (EN.test(lower)) return "en";
-  if (TH.test(lower)) return "th";
-  if (/(พูด|คุย|ตอบ)\s*(?:ภาษา)?\s*อังกฤษ/.test(text)) return "en";
-  if (/(พูด|คุย|ตอบ)\s*(?:ภาษา)?\s*ไทย/.test(text) || /ไทยหน่อย/.test(text)) return "th";
-  return null;
-}
-
 function detectTargetLanguageFromIntent(text: string): "th" | "en" | null {
   const m = text.match(LEARN_INTENT_RE);
   if (!m) return null;
@@ -225,45 +211,9 @@ function resolveUiLanguage(args: {
   userInput: string;
   memory: Array<{ role: "user" | "miomi"; content: string }>;
 }): "th" | "en" {
-  // 1. Explicit command wins
-  const switchNow = detectLangSwitchCommand(args.userInput);
-  if (switchNow) return switchNow;
-  const recentUserMsgs = args.memory.filter((m) => m.role === "user").slice(-5);
-  for (let i = recentUserMsgs.length - 1; i >= 0; i--) {
-    const switched = detectLangSwitchCommand(recentUserMsgs[i].content);
-    if (switched) return switched;
-  }
-
-  // 2. Behavior signal: if user has spoken in one language consistently
-  //    for the last 3+ messages, that overrides profile.
-  const recent = [args.userInput, ...recentUserMsgs.map((m) => m.content)]
-    .slice(0, 4)
-    .filter((t) => t && t.trim().length >= 5);
-
-  if (recent.length >= 3) {
-    const allEnglish = recent.every((t) => {
-      const latin = (t.match(/[a-zA-Z]/g) ?? []).length;
-      const thai = (t.match(/[\u0E00-\u0E7F]/g) ?? []).length;
-      return latin > thai * 2;
-    });
-    const allThai = recent.every((t) => {
-      const latin = (t.match(/[a-zA-Z]/g) ?? []).length;
-      const thai = (t.match(/[\u0E00-\u0E7F]/g) ?? []).length;
-      return thai > latin * 2;
-    });
-    if (allEnglish) return "en";
-    if (allThai) return "th";
-  }
-
-  // 3. Even on first message: if dominant chars clearly indicate one
-  //    language, lean that way over profile default.
-  const t = args.userInput;
-  const latin = (t.match(/[a-zA-Z]/g) ?? []).length;
-  const thai = (t.match(/[\u0E00-\u0E7F]/g) ?? []).length;
-  if (latin >= 10 && latin > thai * 5) return "en";
-  if (thai >= 5 && thai > latin * 5) return "th";
-
-  // 4. Fallback to profile
+  // Reply language = the user's chosen interface language. We do NOT infer switches from
+  // free speech — it repeatedly produced wrong-language replies ("you cannot speak Thai"
+  // read as a command to switch). Explicit changes happen via settings, not by talking.
   return args.profileUiLang;
 }
 
