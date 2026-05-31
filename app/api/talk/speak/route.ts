@@ -26,8 +26,16 @@ function mapVoice(lang: Lang, voice: VoicePref): { voiceName: string; languageCo
   };
 }
 
-function buildCacheKey(normalizedText: string, lang: Lang, voiceName: string): string {
-  const raw = `${normalizedText}|${lang}|${voiceName}`;
+const VOLUME_GAIN_DB = 10.0;
+
+function buildCacheKey(
+  normalizedText: string,
+  lang: Lang,
+  voiceName: string,
+  speakingRate: number,
+  volumeGainDb: number,
+): string {
+  const raw = `${normalizedText}|${lang}|${voiceName}|${speakingRate}|${volumeGainDb}`;
   return createHash("sha256").update(raw, "utf8").digest("hex");
 }
 
@@ -87,7 +95,7 @@ export async function POST(request: NextRequest) {
       ? body.speakingRate
       : defaultSpeakingRate;
 
-  const cacheKey = buildCacheKey(text, lang, voiceName);
+  const cacheKey = buildCacheKey(text, lang, voiceName, speakingRate, VOLUME_GAIN_DB);
 
   let supabase;
   try {
@@ -136,7 +144,7 @@ export async function POST(request: NextRequest) {
       audioConfig: {
         audioEncoding: "MP3",
         speakingRate,
-        volumeGainDb: 6.0,
+        volumeGainDb: VOLUME_GAIN_DB,
         // Chirp3-HD voices reject pitch — omit entirely.
       },
     });
