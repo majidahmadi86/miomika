@@ -26,7 +26,7 @@ function mapVoice(lang: Lang, voice: VoicePref): { voiceName: string; languageCo
   };
 }
 
-const VOLUME_GAIN_DB = 10.0;
+const VOLUME_GAIN_DB = 4.0;
 
 function buildCacheKey(
   normalizedText: string,
