@@ -66,6 +66,13 @@ function stripForTts(text: string, lang: TtsLang): string {
   let out = text
     .replace(/มิโอมิ/g, MIOMI_TTS_NAME[lang])
     .replace(/miomi/gi, MIOMI_TTS_NAME[lang])
+    // Meta is for the eyes, never the voice: stage directions, glosses, romanization.
+    // Remove the CONTENT, not just the brackets.
+    .replace(/[([{][^)\]}]*[)\]}]/g, " ")
+    .replace(/\*[^*\n]+\*/g, " ")
+    .replace(/_[^_\n]+_/g, " ")
+    .replace(/["“”«»„‟‹›]/g, " ")
+    .replace(/[‘’]/g, "'")
     .replace(/[~*_`#|<>^=+/\\]/g, " ")
     .replace(/(\p{L})-(\p{L})/gu, "$1 $2")
     .replace(/[-–—]/g, " ")
