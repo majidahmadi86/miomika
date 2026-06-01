@@ -221,6 +221,11 @@ export function stopTts(): void {
   killAllAudio();
 }
 
+/** Fetch one short server MP3 (base64) for pre-warm / thinking cues. */
+export async function fetchTtsClip(text: string, lang: TtsLang): Promise<string | null> {
+  return fetchServerAudio(text, lang);
+}
+
 async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | null> {
   const maxAttempts = 3;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -263,6 +268,44 @@ function playMp3OnElement(el: HTMLAudioElement, audioBase64: string, gen: number
     el.addEventListener("ended", onEnded);
     el.addEventListener("error", onErr);
     el.src = `data:audio/mp3;base64,${audioBase64}`;
+    void el.play().catch(() => finish(false));
+  });
+}
+
+/**
+ * Play one pre-warmed MP3 without superseding other audio (thinking cue).
+ * Sets speaking for echo guard; full reply `speak()` may kill this via `killAllAudio`.
+ */
+export async function playWarmClip(audioBase64: string): Promise<boolean> {
+  const gen = __audioGen;
+  return new Promise((resolve) => {
+    const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+    __activeAudio = el;
+    const teardown = () => {
+      disconnectPlaybackSource();
+      try {
+        el.pause();
+        el.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+      __activeAudio = null;
+    };
+    const finish = (ok: boolean) => {
+      if (gen !== __audioGen) {
+        teardown();
+        resolve(false);
+        return;
+      }
+      teardown();
+      setSpeaking(false);
+      resolve(ok);
+    };
+    el.onended = () => finish(true);
+    el.onerror = () => finish(false);
+    routeElementThroughPlayback(el);
+    unlockTtsPlayback();
+    setSpeaking(true);
     void el.play().catch(() => finish(false));
   });
 }
