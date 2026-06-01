@@ -1,3 +1,5 @@
+Current handoff: MIOMIKA-HANDOFF-3.md — supersedes HANDOFF #2.
+
 # Miomika · The AI Companion Who Helps People Grow
 
 > **Canonical project document v6** — Single source of truth. Replaces all other `.md` files in project root.
