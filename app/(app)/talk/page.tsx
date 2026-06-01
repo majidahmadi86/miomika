@@ -226,6 +226,15 @@ export default function TalkPage() {
   const isSpeakingRef = useRef(false);
   const [isSpeakingState, setIsSpeakingState] = useState(false);
   const turnTimingRef = useRef<TurnTiming | null>(null);
+  const turnInFlightRef = useRef(false);
+  const micStateRef = useRef<MicState>(micState);
+
+  useEffect(() => {
+    micStateRef.current = micState;
+    if (micState === "idle") {
+      turnInFlightRef.current = false;
+    }
+  }, [micState]);
 
   useEffect(() => {
     mountedRefForTts.current = true;
@@ -428,13 +437,33 @@ export default function TalkPage() {
   const fuelZap = 64;
   const fuelBrain = 45;
 
-  const handleVadSpeechEnd = useCallback(() => {
+  const isTurnInFlight = useCallback(
+    () =>
+      turnInFlightRef.current ||
+      micStateRef.current === "processing" ||
+      micStateRef.current === "speaking" ||
+      isSpeakingRef.current,
+    [],
+  );
+
+  const handleVadSpeechEnd = useCallback((): boolean => {
+    if (isTurnInFlight()) {
+      logEvent({
+        kind: "vad",
+        level: "warn",
+        message: "dropped speech-end (turn in flight)",
+        data: { micState: micStateRef.current },
+      });
+      return false;
+    }
+    turnInFlightRef.current = true;
     turnTimingRef.current = {
       t0: performance.now(),
       voiceTurn: true,
       logged: false,
     };
-  }, []);
+    return true;
+  }, [isTurnInFlight]);
 
   const handleTranscribeReceived = useCallback((meta: { servedBy: string }) => {
     const t = turnTimingRef.current;
@@ -597,6 +626,7 @@ export default function TalkPage() {
         } else {
           const t = turnTimingRef.current;
           if (t && !t.logged) logTurnTimingLine(t);
+          setMicState("idle");
         }
         if (data.servedVia === "guest_limit") {
           setShowGuestSheet(true);
@@ -634,6 +664,11 @@ export default function TalkPage() {
         micRef.current?.stop();
         setMicState("idle");
         setShowGuestSheet(true);
+        return;
+      }
+      // Prior turn still in flight — drop overlapping VAD segment (no barge-in).
+      if (micState === "processing") {
+        logEvent({ kind: "transcribe", level: "warn", message: "dropped turn (processing)", data: { text } });
         return;
       }
       // Mic capture while Miomi is (or is about to be) speaking is her own echo. Drop it.
@@ -842,7 +877,7 @@ export default function TalkPage() {
         <MicButton
           ref={micRef}
           state={micState}
-          speakingActive={isSpeakingState || micState === "speaking"}
+          speakingActive={isSpeakingState || micState === "speaking" || micState === "processing"}
           language={profile?.ui_language === "th" ? "th" : profile?.ui_language === "en" ? "en" : "auto"}
           onVadSpeechEnd={handleVadSpeechEnd}
           onTranscribeReceived={handleTranscribeReceived}

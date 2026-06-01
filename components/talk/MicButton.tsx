@@ -32,8 +32,8 @@ interface MicButtonProps {
   onLockedTap?: () => void;
   /** When true (Miomi speaking), VAD stays paused to avoid speaker echo. */
   speakingActive?: boolean;
-  /** Fired at VAD speech-end (turn timing anchor a). */
-  onVadSpeechEnd?: () => void;
+  /** Fired at VAD speech-end (turn timing anchor a). Return false to skip transcribe. */
+  onVadSpeechEnd?: () => void | boolean;
   /** Fired when /api/talk/transcribe returns OK (turn timing anchor b). */
   onTranscribeReceived?: (meta: { servedBy: string }) => void;
 }
@@ -260,7 +260,10 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
               data: { samples: audio.length, wavBytes: wavBlob.size },
             });
             traceRef.current("speech end", { samples: audio.length });
-            onVadSpeechEndRef.current?.();
+            if (onVadSpeechEndRef.current?.() === false) {
+              traceRef.current("speech end dropped — turn in flight");
+              return;
+            }
             void transcribeAndCommitRef.current(audio);
           },
           onVADMisfire: () => {
