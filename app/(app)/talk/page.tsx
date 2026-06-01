@@ -57,8 +57,6 @@ const GUEST_LIMIT = 5;
 const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
 const TRANSCRIPT_CLIP = 180;
 const TURN_PLAYBACK_TIMEOUT_MS = 12_000;
-/** Skip thinking cue if reply TTS is ready within this window after VAD speech-end. */
-const THINKING_CUE_DELAY_MS = 250;
 
 type TurnTiming = {
   t0: number;
@@ -235,64 +233,6 @@ export default function TalkPage() {
   const engineAbortRef = useRef<AbortController | null>(null);
   const micSessionRef = useRef(false);
   const micStateRef = useRef<MicState>(micState);
-  const turnAckTimerRef = useRef<number | null>(null);
-  const turnAckReplyReadyRef = useRef(false);
-  const turnAckCueRef = useRef<Promise<boolean> | null>(null);
-  const pendingSpeakAfterAckRef = useRef<(() => void) | null>(null);
-
-  const cancelVoiceTurnAck = useCallback(() => {
-    if (turnAckTimerRef.current != null) {
-      window.clearTimeout(turnAckTimerRef.current);
-      turnAckTimerRef.current = null;
-    }
-    turnAckReplyReadyRef.current = false;
-    turnAckCueRef.current = null;
-    pendingSpeakAfterAckRef.current = null;
-  }, []);
-
-  const scheduleVoiceTurnAck = useCallback(
-    (turnGen: number) => {
-      cancelVoiceTurnAck();
-      if (!ttsOn) return;
-      turnAckTimerRef.current = window.setTimeout(() => {
-        turnAckTimerRef.current = null;
-        if (turnGen !== turnGenRef.current) return;
-        if (turnAckReplyReadyRef.current) return;
-        const lang = conversationLangRef.current;
-        const cuePromise = import("@/lib/voice/cues").then((m) => m.playThinkingCue(lang));
-        turnAckCueRef.current = cuePromise;
-        logEvent({ kind: "tts", level: "info", message: "thinking cue play" });
-        void cuePromise.then(() => {
-          const pending = pendingSpeakAfterAckRef.current;
-          if (pending) {
-            pendingSpeakAfterAckRef.current = null;
-            pending();
-          }
-        });
-      }, THINKING_CUE_DELAY_MS);
-    },
-    [cancelVoiceTurnAck, ttsOn],
-  );
-
-  const enqueueReplyTts = useCallback((runSpeak: () => void) => {
-    turnAckReplyReadyRef.current = true;
-    if (turnAckTimerRef.current != null) {
-      window.clearTimeout(turnAckTimerRef.current);
-      turnAckTimerRef.current = null;
-    }
-    const cue = turnAckCueRef.current;
-    if (cue) {
-      pendingSpeakAfterAckRef.current = runSpeak;
-      void cue.then(() => {
-        if (pendingSpeakAfterAckRef.current === runSpeak) {
-          pendingSpeakAfterAckRef.current = null;
-          runSpeak();
-        }
-      });
-      return;
-    }
-    runSpeak();
-  }, []);
 
   const clearTurnWatchdog = useCallback(() => {
     if (turnWatchdogRef.current != null) {
@@ -303,7 +243,6 @@ export default function TalkPage() {
 
   const recoverFromTurn = useCallback(
     (opts?: { playSorryCue?: boolean; reason?: string }) => {
-      cancelVoiceTurnAck();
       clearTurnWatchdog();
       turnInFlightRef.current = false;
       turnTimingRef.current = null;
@@ -332,7 +271,7 @@ export default function TalkPage() {
         setMicState("idle");
       }
     },
-    [clearTurnWatchdog, cancelVoiceTurnAck],
+    [clearTurnWatchdog],
   );
 
   const armTurnWatchdog = useCallback(() => {
@@ -343,7 +282,6 @@ export default function TalkPage() {
   }, [clearTurnWatchdog, recoverFromTurn]);
 
   const finishTurn = useCallback(() => {
-    cancelVoiceTurnAck();
     clearTurnWatchdog();
     turnInFlightRef.current = false;
     turnTimingRef.current = null;
@@ -352,7 +290,7 @@ export default function TalkPage() {
     } else {
       setMicState("idle");
     }
-  }, [clearTurnWatchdog, cancelVoiceTurnAck]);
+  }, [clearTurnWatchdog]);
 
   useEffect(() => {
     micStateRef.current = micState;
@@ -454,13 +392,6 @@ export default function TalkPage() {
       import("@/lib/voice/cues").then((m) => m.cueListening()).catch(() => {});
     }
   }, [micState]);
-
-  useEffect(() => {
-    if (!ttsOn) return;
-    void import("@/lib/voice/cues")
-      .then((m) => m.preloadThinkingCues(conversationLang))
-      .catch(() => {});
-  }, [ttsOn, conversationLang]);
 
   const handleTitleTap = useCallback(() => {
     const now = Date.now();
@@ -610,9 +541,8 @@ export default function TalkPage() {
       logged: false,
     };
     armTurnWatchdog();
-    scheduleVoiceTurnAck(turnGenRef.current);
     return true;
-  }, [armTurnWatchdog, scheduleVoiceTurnAck]);
+  }, [armTurnWatchdog]);
 
   const handleTranscribeReceived = useCallback((meta: { servedBy: string }) => {
     const t = turnTimingRef.current;
@@ -799,11 +729,7 @@ export default function TalkPage() {
               },
             });
           };
-          if (voiceTurn) {
-            enqueueReplyTts(runSpeak);
-          } else {
-            runSpeak();
-          }
+          runSpeak();
         } else {
           const t = turnTimingRef.current;
           if (t && !t.logged) logTurnTimingLine(t);
@@ -846,7 +772,6 @@ export default function TalkPage() {
       armTurnWatchdog,
       finishTurn,
       recoverFromTurn,
-      enqueueReplyTts,
     ],
   );
 
