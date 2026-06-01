@@ -22,6 +22,31 @@ const CHIRP2_MODEL = "chirp_2";
  */
 const CHIRP2_LANGUAGE_CODES = ["th-TH"] as const;
 
+// Lazy clients — constructing at module load fails Next 16's page-data
+// collection step when env vars are absent (build-time).
+let _googleSpeechClient: v2.SpeechClient | null = null;
+let _groq: Groq | null = null;
+
+function getGoogleSpeechClient(): v2.SpeechClient | null {
+  if (_googleSpeechClient) return _googleSpeechClient;
+  const credsJson = process.env.GOOGLE_TTS_CREDENTIALS;
+  if (!credsJson) return null;
+  const credentials = JSON.parse(credsJson) as Record<string, unknown>;
+  _googleSpeechClient = new v2.SpeechClient({
+    credentials,
+    apiEndpoint: `${CHIRP2_LOCATION}-speech.googleapis.com`,
+  });
+  return _googleSpeechClient;
+}
+
+function getGroq(): Groq | null {
+  if (_groq) return _groq;
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
+  _groq = new Groq({ apiKey: key });
+  return _groq;
+}
+
 type ExplicitLang = "th" | "en" | null;
 
 function extractGoogleTranscript(
@@ -69,19 +94,13 @@ function logChirp2Fallback(
 }
 
 async function recognizeGoogle(
-  credentials: Record<string, unknown>,
   audioBytes: Buffer,
   languageCodes: string[],
   model: string,
   location: string,
 ): Promise<string> {
-  const clientOptions: { credentials: Record<string, unknown>; apiEndpoint?: string } = {
-    credentials,
-  };
-  if (location !== "global") {
-    clientOptions.apiEndpoint = `${location}-speech.googleapis.com`;
-  }
-  const client = new v2.SpeechClient(clientOptions);
+  const client = getGoogleSpeechClient();
+  if (!client) throw new Error("GOOGLE_TTS_CREDENTIALS missing");
   const recognizer = `projects/${PROJECT_ID}/locations/${location}/recognizers/_`;
   const config: protos.google.cloud.speech.v2.IRecognitionConfig = {
     autoDecodingConfig: {},
@@ -97,7 +116,6 @@ async function recognizeGoogle(
 }
 
 async function transcribeWithGoogle(
-  credentialsJson: string,
   audioBytes: Buffer,
 ): Promise<{
   text: string;
@@ -106,12 +124,10 @@ async function transcribeWithGoogle(
   location: string;
   languageCodes: string[];
 }> {
-  const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
   const languageCodes = [...CHIRP2_LANGUAGE_CODES];
 
   try {
     const text = await recognizeGoogle(
-      credentials,
       audioBytes,
       languageCodes,
       CHIRP2_MODEL,
@@ -138,11 +154,11 @@ async function transcribeWithGoogle(
 }
 
 async function transcribeWithGroq(
-  groqKey: string,
   audioBlob: File,
   explicitLang: ExplicitLang,
 ): Promise<string> {
-  const groq = new Groq({ apiKey: groqKey });
+  const groq = getGroq();
+  if (!groq) throw new Error("GROQ_API_KEY missing");
   const transcribeOpts: Parameters<Groq["audio"]["transcriptions"]["create"]>[0] = {
     file: audioBlob,
     model: "whisper-large-v3-turbo",
@@ -253,10 +269,7 @@ export async function POST(request: NextRequest) {
 
   if (googleCredsJson) {
     try {
-      const google = await transcribeWithGoogle(
-        googleCredsJson,
-        audioBytes,
-      );
+      const google = await transcribeWithGoogle(audioBytes);
       const latency = Date.now() - start;
       log("voice.transcribe", "transcribed", {
         latency,
@@ -293,7 +306,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const text = await transcribeWithGroq(groqKey, audioBlob, explicitLang);
+    const text = await transcribeWithGroq(audioBlob, explicitLang);
     const latency = Date.now() - start;
     log("voice.transcribe", "transcribed", {
       latency,
