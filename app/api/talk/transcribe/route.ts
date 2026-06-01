@@ -5,9 +5,154 @@ export const maxDuration = 15;
 
 import { NextResponse, type NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { v2 } from "@google-cloud/speech";
+import type { protos } from "@google-cloud/speech";
 import Groq from "groq-sdk";
 import { createServerClient } from "@supabase/ssr";
 import { log, logError } from "@/lib/debug/log";
+
+const PROJECT_ID = "miomika";
+/** Chirp 3 + th-TH: `us` multi-region (asia-southeast1 is Chirp 2 only per Google docs). */
+const CHIRP3_LOCATION = "us";
+
+type ExplicitLang = "th" | "en" | null;
+
+function resolveLanguageCodes(explicitLang: ExplicitLang): string[] {
+  if (explicitLang === "th") return ["th-TH"];
+  if (explicitLang === "en") return ["en-US"];
+  return ["th-TH", "en-US"];
+}
+
+function singleLanguageFallback(explicitLang: ExplicitLang): string {
+  if (explicitLang === "th") return "th-TH";
+  if (explicitLang === "en") return "en-US";
+  return "th-TH";
+}
+
+function extractGoogleTranscript(
+  response: protos.google.cloud.speech.v2.IRecognizeResponse,
+): string {
+  const parts: string[] = [];
+  for (const result of response.results ?? []) {
+    const transcript = result.alternatives?.[0]?.transcript;
+    if (transcript) parts.push(transcript);
+  }
+  return parts.join(" ").trim();
+}
+
+function googleErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+async function recognizeGoogle(
+  credentials: Record<string, unknown>,
+  audioBytes: Buffer,
+  languageCodes: string[],
+  model: string,
+  location: string,
+): Promise<string> {
+  const clientOptions: { credentials: Record<string, unknown>; apiEndpoint?: string } = {
+    credentials,
+  };
+  if (location !== "global") {
+    clientOptions.apiEndpoint = `${location}-speech.googleapis.com`;
+  }
+  const client = new v2.SpeechClient(clientOptions);
+  const recognizer = `projects/${PROJECT_ID}/locations/${location}/recognizers/_`;
+  const config: protos.google.cloud.speech.v2.IRecognitionConfig = {
+    autoDecodingConfig: {},
+    model,
+    languageCodes,
+  };
+  const [response] = await client.recognize({
+    recognizer,
+    config,
+    content: audioBytes,
+  });
+  return extractGoogleTranscript(response);
+}
+
+async function transcribeWithGoogle(
+  credentialsJson: string,
+  audioBytes: Buffer,
+  explicitLang: ExplicitLang,
+): Promise<{
+  text: string;
+  servedBy: "google_chirp3";
+  model: string;
+  location: string;
+  languageCodes: string[];
+}> {
+  const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
+  const primaryCodes = resolveLanguageCodes(explicitLang);
+  const fallbackCode = singleLanguageFallback(explicitLang);
+
+  type Attempt = { location: string; model: string; languageCodes: string[] };
+  const attempts: Attempt[] = [
+    { location: CHIRP3_LOCATION, model: "chirp_3", languageCodes: primaryCodes },
+  ];
+  if (primaryCodes.length > 1) {
+    attempts.push({
+      location: CHIRP3_LOCATION,
+      model: "chirp_3",
+      languageCodes: [fallbackCode],
+    });
+  }
+  attempts.push({
+    location: CHIRP3_LOCATION,
+    model: "chirp_2",
+    languageCodes: primaryCodes.length > 1 ? [fallbackCode] : primaryCodes,
+  });
+
+  let lastError: unknown;
+  for (let i = 0; i < attempts.length; i++) {
+    const attempt = attempts[i];
+    try {
+      const text = await recognizeGoogle(
+        credentials,
+        audioBytes,
+        attempt.languageCodes,
+        attempt.model,
+        attempt.location,
+      );
+      if (text.length === 0) {
+        lastError = new Error("empty_google_transcription");
+        if (i === attempts.length - 1) break;
+        continue;
+      }
+      return {
+        text,
+        servedBy: "google_chirp3",
+        model: attempt.model,
+        location: attempt.location,
+        languageCodes: attempt.languageCodes,
+      };
+    } catch (e) {
+      lastError = e;
+      if (i === attempts.length - 1) break;
+    }
+  }
+  throw lastError ?? new Error("google_transcribe_failed");
+}
+
+async function transcribeWithGroq(
+  groqKey: string,
+  audioBlob: File,
+  explicitLang: ExplicitLang,
+): Promise<string> {
+  const groq = new Groq({ apiKey: groqKey });
+  const transcribeOpts: Parameters<Groq["audio"]["transcriptions"]["create"]>[0] = {
+    file: audioBlob,
+    model: "whisper-large-v3-turbo",
+    response_format: "json",
+    temperature: 0,
+    prompt: "บทสนทนาภาษาไทยและภาษาอังกฤษ Thai and English bilingual conversation.",
+  };
+  if (explicitLang) transcribeOpts.language = explicitLang;
+  const result = await groq.audio.transcriptions.create(transcribeOpts);
+  return (result.text ?? "").trim();
+}
 
 /**
  * POST /api/talk/transcribe
@@ -22,9 +167,13 @@ export async function POST(request: NextRequest) {
   Sentry.setTag("flow", "voice");
 
   const groqKey = process.env.GROQ_API_KEY;
-  log("voice.transcribe", "start", { groqKeyPresent: !!groqKey });
-  if (!groqKey) {
-    log("voice.transcribe", "GROQ_API_KEY missing");
+  const googleCredsJson = process.env.GOOGLE_TTS_CREDENTIALS;
+  log("voice.transcribe", "start", {
+    groqKeyPresent: !!groqKey,
+    googleCredsPresent: !!googleCredsJson,
+  });
+  if (!googleCredsJson && !groqKey) {
+    log("voice.transcribe", "no transcription backend configured");
     return NextResponse.json(
       { error: "transcription_not_configured" },
       { status: 500 },
@@ -75,7 +224,7 @@ export async function POST(request: NextRequest) {
   }
 
   const langHint = typeof clientLang === "string" ? clientLang : null;
-  const explicitLang: "th" | "en" | null =
+  const explicitLang: ExplicitLang =
     langHint === "th" || langHint === "th-TH"
       ? "th"
       : langHint === "en" || langHint === "en-US"
@@ -99,32 +248,78 @@ export async function POST(request: NextRequest) {
   });
 
   const start = Date.now();
+  const audioBytes = Buffer.from(await audioBlob.arrayBuffer());
+
+  if (googleCredsJson) {
+    try {
+      const google = await transcribeWithGoogle(
+        googleCredsJson,
+        audioBytes,
+        explicitLang,
+      );
+      const latency = Date.now() - start;
+      log("voice.transcribe", "transcribed", {
+        latency,
+        length: google.text.length,
+        preview: google.text.slice(0, 40),
+        servedBy: google.servedBy,
+        model: google.model,
+        location: google.location,
+        languageCodes: google.languageCodes,
+      });
+      if (google.text.length === 0) {
+        log("voice.transcribe", "empty google result, trying groq");
+      } else {
+        log("voice.transcribe", "success", {
+          textLen: google.text.length,
+          language: explicitLang ?? "auto",
+          servedBy: google.servedBy,
+          model: google.model,
+          location: google.location,
+          languageCodes: google.languageCodes,
+        });
+        return NextResponse.json({ text: google.text });
+      }
+    } catch (e) {
+      log("voice.transcribe", "google error, falling back to groq", {
+        message: googleErrorMessage(e),
+      });
+      logError("voice.transcribe", "google failed", e);
+      Sentry.captureException(e, { tags: { stage: "google.transcribe" } });
+    }
+  }
+
+  if (!groqKey) {
+    return NextResponse.json(
+      { error: "transcribe_failed", detail: "google_failed_and_groq_not_configured" },
+      { status: 500 },
+    );
+  }
+
   try {
-    const groq = new Groq({ apiKey: groqKey });
-    const transcribeOpts: Parameters<Groq["audio"]["transcriptions"]["create"]>[0] = {
-      file: audioBlob,
-      model: "whisper-large-v3-turbo",
-      response_format: "json",
-      temperature: 0,
-      prompt: "บทสนทนาภาษาไทยและภาษาอังกฤษ Thai and English bilingual conversation.",
-    };
-    if (explicitLang) transcribeOpts.language = explicitLang;
-
-    const result = await groq.audio.transcriptions.create(transcribeOpts);
-
-    const text = (result.text ?? "").trim();
+    const text = await transcribeWithGroq(groqKey, audioBlob, explicitLang);
     const latency = Date.now() - start;
     log("voice.transcribe", "transcribed", {
       latency,
       length: text.length,
       preview: text.slice(0, 40),
+      servedBy: "groq_whisper",
+      model: "whisper-large-v3-turbo",
+      languageCodes: explicitLang
+        ? [explicitLang === "th" ? "th-TH" : "en-US"]
+        : ["th-TH", "en-US"],
     });
 
     if (text.length === 0) {
       log("voice.transcribe", "empty result");
       return NextResponse.json({ error: "empty_transcription" }, { status: 422 });
     }
-    log("voice.transcribe", "success", { textLen: text.length, language: explicitLang ?? "auto" });
+    log("voice.transcribe", "success", {
+      textLen: text.length,
+      language: explicitLang ?? "auto",
+      servedBy: "groq_whisper",
+      model: "whisper-large-v3-turbo",
+    });
     return NextResponse.json({ text });
   } catch (e) {
     const err = e as { message?: string; status?: number };

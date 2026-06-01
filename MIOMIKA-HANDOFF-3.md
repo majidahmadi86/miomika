@@ -142,7 +142,7 @@ The strategic moat. Spec:
 - `lib/brain/prompt.ts` — **the single flexible persona prompt.** MEDIUM/TARGET language logic, brevity, no-stage-directions, never-say-input-is-scrambled. Tune here.
 - `app/api/miomi/route.ts` — builds prompt from state + userInput + mode; routes via `lib/ai/router.ts`; servedVia branches (incl. `clarification` canned line). Do NOT change the response shape.
 - `lib/ai/router.ts` — **Groq `llama-3.3-70b-versatile` primary, Gemini `gemini-2.5-flash` fallback** (Gemini currently dead — no key). Library failover last.
-- `app/api/talk/transcribe/route.ts` — **Groq Whisper `whisper-large-v3-turbo` → migrating to Google STT V2 Chirp 3** (§5.1). Multipart `audio` + `language`; returns `{ text }`.
+- `app/api/talk/transcribe/route.ts` — **Google STT V2 Chirp 3** primary (`us`, `chirp_3`, bilingual `th-TH`/`en-US`); Groq Whisper fallback. Multipart `audio` + `language`; returns `{ text }`.
 - `app/api/talk/speak/route.ts` — Google Chirp3-HD **Leda**; `VOLUME_GAIN_DB = 4.0`; `tts_cache` keyed by voice+rate+gain; short-phrase first-synth cache (≤60 chars); 18s synth timeout.
 
 Stack: Next.js 15 on Vercel (pinned sin1/hnd1), Supabase, Groq, Google Cloud (TTS now, STT incoming), VAD via `@ricky0123/vad-web`. Repo `github.com/majidahmadi86/miomika`, domain `miomika.com`, GCP project `miomika`.
