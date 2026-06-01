@@ -20,7 +20,7 @@ const CHIRP2_MODEL = "chirp_2";
  * multi-locale auto-detect (`["th-TH","en-US"]`). Default th-TH — dominant
  * input + hardest script.
  */
-const CHIRP2_LANGUAGE_CODES = ["th-TH"] as const;
+const CHIRP2_LANGUAGE_CODES = ["auto"] as const;
 
 // Lazy clients — constructing at module load fails Next 16's page-data
 // collection step when env vars are absent (build-time).
