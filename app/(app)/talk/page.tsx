@@ -873,8 +873,13 @@ export default function TalkPage() {
         setShowGuestSheet(true);
         return;
       }
-      // Echo from Miomi's own voice — drop (no barge-in).
-      if (micStateRef.current === "speaking" || isSpeakingRef.current) {
+      // Echo from Miomi's reply audio — drop (no barge-in). Never drop this turn's
+      // own in-flight transcript while still processing (thinking cue may overlap ASR).
+      const isReplyEcho =
+        micStateRef.current === "speaking" ||
+        (isSpeakingRef.current &&
+          !(turnInFlightRef.current && micStateRef.current === "processing"));
+      if (isReplyEcho) {
         logEvent({ kind: "transcribe", level: "warn", message: "dropped echo (speaking)", data: { text } });
         recoverFromTurn({ reason: "echo" });
         return;

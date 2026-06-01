@@ -274,7 +274,8 @@ function playMp3OnElement(el: HTMLAudioElement, audioBase64: string, gen: number
 
 /**
  * Play one pre-warmed MP3 without superseding other audio (thinking cue).
- * Sets speaking for echo guard; full reply `speak()` may kill this via `killAllAudio`.
+ * Does not set the global speaking flag — cues play during processing while
+ * this turn's ASR is in flight; reply TTS owns echo guard via `speak()`.
  */
 export async function playWarmClip(audioBase64: string): Promise<boolean> {
   const gen = __audioGen;
@@ -298,14 +299,12 @@ export async function playWarmClip(audioBase64: string): Promise<boolean> {
         return;
       }
       teardown();
-      setSpeaking(false);
       resolve(ok);
     };
     el.onended = () => finish(true);
     el.onerror = () => finish(false);
     routeElementThroughPlayback(el);
     unlockTtsPlayback();
-    setSpeaking(true);
     void el.play().catch(() => finish(false));
   });
 }
