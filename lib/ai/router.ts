@@ -4,6 +4,7 @@
 
 import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
+import { log } from "@/lib/debug/log";
 import { getFailoverResponse } from "./session";
 
 // Lazy clients — constructing at module load fails Next 16's page-data
@@ -37,18 +38,32 @@ type Message = { role: "user" | "assistant"; content: string };
 
 // ─── MAIN ROUTER ─────────────────────────────────────────────────────────────
 
+function aiErrorFields(error: unknown): { message: string; status?: number } {
+  const err = error as { status?: number; message?: string };
+  return {
+    message:
+      err?.message ??
+      (error instanceof Error ? error.message : String(error)),
+    status: err?.status,
+  };
+}
+
 export async function getAIResponse(
   messages: Message[],
   systemPrompt: string
 ): Promise<{ content: string; engine: string; wasFailover: boolean }> {
+  log("ai.router", "env keys", {
+    GROQ_API_KEY: Boolean(process.env.GROQ_API_KEY),
+    GEMINI_API_KEY: Boolean(process.env.GEMINI_API_KEY),
+  });
 
   // Try Groq first — fast, reliable
   try {
     const content = await callGroq(messages, systemPrompt);
     if (content) return { content, engine: "groq", wasFailover: false };
   } catch (error) {
-    const err = error as { status?: number; message?: string };
-    console.warn("Groq failed:", err?.status, err?.message?.slice(0, 100));
+    const { message, status } = aiErrorFields(error);
+    log("ai.router", "groq failed", { message, status });
   }
 
   // Try Gemini second — Thai quality fallback
@@ -56,8 +71,8 @@ export async function getAIResponse(
     const content = await callGemini(messages, systemPrompt);
     if (content) return { content, engine: "gemini", wasFailover: false };
   } catch (error) {
-    const err = error as { status?: number; message?: string };
-    console.error("[router] Gemini failed:", err?.status, err?.message);
+    const { message, status } = aiErrorFields(error);
+    log("ai.router", "gemini failed", { message, status });
   }
 
   // Both failed — library failover, always works
