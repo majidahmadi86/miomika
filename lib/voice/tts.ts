@@ -90,6 +90,83 @@ let __audioGen = 0;
 let __activeAudio: HTMLAudioElement | null = null;
 let __supersede: (() => void) | null = null;
 
+// Shared Web Audio playback chain: element → compressor → makeup gain → destination.
+let __playbackCtx: AudioContext | null = null;
+let __playbackCompressor: DynamicsCompressorNode | null = null;
+let __playbackSource: MediaElementAudioSourceNode | null = null;
+let __playbackUnlocked = false;
+
+function getPlaybackCtx(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  if (__playbackCtx) return __playbackCtx;
+  try {
+    const AC =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AC();
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -20;
+    compressor.knee.value = 24;
+    compressor.ratio.value = 8;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.2;
+
+    const gain = ctx.createGain();
+    gain.gain.value = 1.7;
+
+    compressor.connect(gain);
+    gain.connect(ctx.destination);
+
+    __playbackCtx = ctx;
+    __playbackCompressor = compressor;
+  } catch {
+    return null;
+  }
+  return __playbackCtx;
+}
+
+/** Resume shared AudioContext after a user gesture (mobile autoplay policy). */
+export function unlockTtsPlayback(): void {
+  const ctx = getPlaybackCtx();
+  if (!ctx || __playbackUnlocked) return;
+  void ctx.resume().then(() => {
+    __playbackUnlocked = true;
+  }).catch(() => {});
+}
+
+function disconnectPlaybackSource(): void {
+  if (!__playbackSource) return;
+  try {
+    __playbackSource.disconnect();
+  } catch {
+    /* ignore */
+  }
+  __playbackSource = null;
+}
+
+function routeElementThroughPlayback(el: HTMLAudioElement): void {
+  const ctx = getPlaybackCtx();
+  if (!ctx || !__playbackCompressor) return;
+  disconnectPlaybackSource();
+  try {
+    __playbackSource = ctx.createMediaElementSource(el);
+    __playbackSource.connect(__playbackCompressor);
+    if (ctx.state === "suspended") {
+      void ctx.resume();
+    }
+  } catch {
+    __playbackSource = null;
+  }
+}
+
+if (typeof window !== "undefined") {
+  const onFirstGesture = () => {
+    unlockTtsPlayback();
+  };
+  window.addEventListener("pointerdown", onFirstGesture, { once: true, passive: true });
+  window.addEventListener("keydown", onFirstGesture, { once: true, passive: true });
+}
+
 // Global "is Miomi audibly speaking right now" flag.
 // Read synchronously by /talk to gate VAD.
 let __isSpeaking = false;
@@ -114,6 +191,7 @@ function setSpeaking(value: boolean) {
 
 export function killAllAudio(): void {
   __audioGen += 1;
+  disconnectPlaybackSource();
   if (__activeAudio) {
     try {
       __activeAudio.pause();
@@ -191,24 +269,31 @@ async function trySpeakViaServer(
       resolve(true);
     };
     setSpeaking(true);
-    const fail = () => {
-      if (myGen !== __audioGen) return;
-      __supersede = null;
+    const teardown = () => {
+      disconnectPlaybackSource();
       el.pause();
       el.currentTime = 0;
       __activeAudio = null;
+    };
+    const fail = () => {
+      if (myGen !== __audioGen) return;
+      __supersede = null;
+      teardown();
       setSpeaking(false);
       resolve(false);
     };
     el.onended = () => {
       if (myGen !== __audioGen) return;
       __supersede = null;
+      disconnectPlaybackSource();
       __activeAudio = null;
       setSpeaking(false);
       callbacks?.onEnd?.();
       resolve(true);
     };
     el.onerror = fail;
+    routeElementThroughPlayback(el);
+    unlockTtsPlayback();
     void el.play().catch(fail);
   });
 }
