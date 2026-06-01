@@ -17,10 +17,13 @@ const CHIRP3_LOCATION = "us";
 
 type ExplicitLang = "th" | "en" | null;
 
+/** Chirp 3 primary attempt — always bilingual (UI lang ≠ spoken lang in learning mode). */
+const CHIRP3_BILINGUAL_CODES = ["th-TH", "en-US"] as const;
+
 function resolveLanguageCodes(explicitLang: ExplicitLang): string[] {
   if (explicitLang === "th") return ["th-TH"];
   if (explicitLang === "en") return ["en-US"];
-  return ["th-TH", "en-US"];
+  return [...CHIRP3_BILINGUAL_CODES];
 }
 
 function singleLanguageFallback(explicitLang: ExplicitLang): string {
@@ -90,20 +93,22 @@ async function transcribeWithGoogle(
 
   type Attempt = { location: string; model: string; languageCodes: string[] };
   const attempts: Attempt[] = [
-    { location: CHIRP3_LOCATION, model: "chirp_3", languageCodes: primaryCodes },
-  ];
-  if (primaryCodes.length > 1) {
-    attempts.push({
+    {
+      location: CHIRP3_LOCATION,
+      model: "chirp_3",
+      languageCodes: [...CHIRP3_BILINGUAL_CODES],
+    },
+    {
       location: CHIRP3_LOCATION,
       model: "chirp_3",
       languageCodes: [fallbackCode],
-    });
-  }
-  attempts.push({
-    location: CHIRP3_LOCATION,
-    model: "chirp_2",
-    languageCodes: primaryCodes.length > 1 ? [fallbackCode] : primaryCodes,
-  });
+    },
+    {
+      location: CHIRP3_LOCATION,
+      model: "chirp_2",
+      languageCodes: primaryCodes.length > 1 ? [fallbackCode] : primaryCodes,
+    },
+  ];
 
   let lastError: unknown;
   for (let i = 0; i < attempts.length; i++) {
