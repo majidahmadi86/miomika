@@ -30,3 +30,8 @@ function tone(freq: number, durationMs: number, volume = 0.08): void {
 export function cueListening(): void { tone(880, 130); }
 /** Lower note when AI starts thinking — "received". */
 export function cueThinking(): void { tone(440, 100, 0.05); }
+/** Soft double tone when a turn times out — "sorry, try again". */
+export function cueSorry(): void {
+  tone(330, 110, 0.06);
+  window.setTimeout(() => tone(392, 140, 0.06), 130);
+}

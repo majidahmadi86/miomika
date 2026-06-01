@@ -56,6 +56,7 @@ type CanvasItem =
 const GUEST_LIMIT = 5;
 const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
 const TRANSCRIPT_CLIP = 180;
+const TURN_PLAYBACK_TIMEOUT_MS = 12_000;
 
 type TurnTiming = {
   t0: number;
@@ -227,22 +228,94 @@ export default function TalkPage() {
   const [isSpeakingState, setIsSpeakingState] = useState(false);
   const turnTimingRef = useRef<TurnTiming | null>(null);
   const turnInFlightRef = useRef(false);
+  const turnGenRef = useRef(0);
+  const turnWatchdogRef = useRef<number | null>(null);
+  const engineAbortRef = useRef<AbortController | null>(null);
+  const micSessionRef = useRef(false);
   const micStateRef = useRef<MicState>(micState);
+
+  const clearTurnWatchdog = useCallback(() => {
+    if (turnWatchdogRef.current != null) {
+      window.clearTimeout(turnWatchdogRef.current);
+      turnWatchdogRef.current = null;
+    }
+  }, []);
+
+  const recoverFromTurn = useCallback(
+    (opts?: { playSorryCue?: boolean; reason?: string }) => {
+      clearTurnWatchdog();
+      turnInFlightRef.current = false;
+      turnTimingRef.current = null;
+      engineAbortRef.current?.abort();
+      engineAbortRef.current = null;
+      stopTts();
+      transcriptBufferRef.current = "";
+      if (transcriptTimerRef.current != null) {
+        window.clearTimeout(transcriptTimerRef.current);
+        transcriptTimerRef.current = null;
+      }
+      if (opts?.reason) {
+        logEvent({
+          kind: "state",
+          level: "warn",
+          message: "turn recovered",
+          data: { reason: opts.reason },
+        });
+      }
+      if (opts?.playSorryCue) {
+        void import("@/lib/voice/cues").then((m) => m.cueSorry()).catch(() => {});
+      }
+      if (micSessionRef.current) {
+        setMicState("listening");
+      } else {
+        setMicState("idle");
+      }
+    },
+    [clearTurnWatchdog],
+  );
+
+  const armTurnWatchdog = useCallback(() => {
+    clearTurnWatchdog();
+    turnWatchdogRef.current = window.setTimeout(() => {
+      recoverFromTurn({ playSorryCue: true, reason: "watchdog" });
+    }, TURN_PLAYBACK_TIMEOUT_MS);
+  }, [clearTurnWatchdog, recoverFromTurn]);
+
+  const finishTurn = useCallback(() => {
+    clearTurnWatchdog();
+    turnInFlightRef.current = false;
+    turnTimingRef.current = null;
+    if (micSessionRef.current) {
+      setMicState("listening");
+    } else {
+      setMicState("idle");
+    }
+  }, [clearTurnWatchdog]);
 
   useEffect(() => {
     micStateRef.current = micState;
-    if (micState === "idle") {
-      turnInFlightRef.current = false;
-    }
   }, [micState]);
+
+  useEffect(() => {
+    const prev = prevMicStateRef.current;
+    if (
+      prev === "processing" &&
+      micState === "idle" &&
+      turnInFlightRef.current &&
+      micSessionRef.current
+    ) {
+      recoverFromTurn({ playSorryCue: true, reason: "transcribe-abort" });
+    }
+  }, [micState, recoverFromTurn]);
 
   useEffect(() => {
     mountedRefForTts.current = true;
     return () => {
       mountedRefForTts.current = false;
+      clearTurnWatchdog();
       stopTts();
     };
-  }, []);
+  }, [clearTurnWatchdog]);
 
   useEffect(() => {
     const unsub = subscribeSpeaking((speaking: boolean) => {
@@ -250,6 +323,7 @@ export default function TalkPage() {
       setIsSpeakingState(speaking);
       logEvent({ kind: "tts", level: "info", message: speaking ? "audio started" : "audio ended" });
       if (speaking) {
+        clearTurnWatchdog();
         const t = turnTimingRef.current;
         if (t && !t.logged && t.t5 == null) {
           t.t5 = performance.now();
@@ -258,7 +332,7 @@ export default function TalkPage() {
       }
     });
     return () => unsub();
-  }, []);
+  }, [clearTurnWatchdog]);
 
   const updateConversationLang = useCallback((lang: TtsLang) => {
     conversationLangRef.current = lang;
@@ -396,10 +470,11 @@ export default function TalkPage() {
   useEffect(() => {
     if (authReady && isGuest && guestExchanges >= GUEST_LIMIT) {
       micRef.current?.stop();
-      setMicState("idle");
+      micSessionRef.current = false;
+      recoverFromTurn({ reason: "guest-limit" });
       setShowGuestSheet(true);
     }
-  }, [authReady, isGuest, guestExchanges]);
+  }, [authReady, isGuest, guestExchanges, recoverFromTurn]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const setGuestExchanges = useCallback((updater: number | ((p: number) => number)) => {
@@ -447,7 +522,11 @@ export default function TalkPage() {
   );
 
   const handleVadSpeechEnd = useCallback((): boolean => {
-    if (isTurnInFlight()) {
+    if (
+      turnInFlightRef.current ||
+      micStateRef.current === "processing" ||
+      micStateRef.current === "speaking"
+    ) {
       logEvent({
         kind: "vad",
         level: "warn",
@@ -456,14 +535,16 @@ export default function TalkPage() {
       });
       return false;
     }
+    turnGenRef.current += 1;
     turnInFlightRef.current = true;
     turnTimingRef.current = {
       t0: performance.now(),
       voiceTurn: true,
       logged: false,
     };
+    armTurnWatchdog();
     return true;
-  }, [isTurnInFlight]);
+  }, [armTurnWatchdog]);
 
   const handleTranscribeReceived = useCallback((meta: { servedBy: string }) => {
     const t = turnTimingRef.current;
@@ -477,14 +558,28 @@ export default function TalkPage() {
       if (!authReady) return;
       if (isLocked) {
         micRef.current?.stop();
-        setMicState("idle");
+        micSessionRef.current = false;
+        finishTurn();
         setShowGuestSheet(true);
         return;
       }
       if (!text.trim()) return;
 
       const trimmed = text.trim();
-      if (!turnTimingRef.current) {
+      const turnGen = turnGenRef.current;
+      const voiceTurn = turnTimingRef.current?.voiceTurn ?? false;
+
+      if (!voiceTurn && isTurnInFlight()) {
+        logEvent({
+          kind: "state",
+          level: "warn",
+          message: "dropped processInput (turn in flight)",
+        });
+        return;
+      }
+
+      if (!voiceTurn) {
+        turnInFlightRef.current = true;
         turnTimingRef.current = {
           t0: performance.now(),
           t1: performance.now(),
@@ -492,6 +587,7 @@ export default function TalkPage() {
           asrServedBy: "keyboard",
           logged: false,
         };
+        armTurnWatchdog();
       }
 
       setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "user_said", text: trimmed }]);
@@ -500,6 +596,7 @@ export default function TalkPage() {
       if (isGuest) setGuestExchanges((p) => p + 1);
 
       try {
+        if (turnGen !== turnGenRef.current) return;
         logEvent({
           kind: "engine",
           level: "info",
@@ -507,6 +604,7 @@ export default function TalkPage() {
           data: { input: trimmed.slice(0, 80), mode: config.mode },
         });
         const engineCtrl = new AbortController();
+        engineAbortRef.current = engineCtrl;
         const engineTimeout = window.setTimeout(() => engineCtrl.abort(), 12000);
         let res: Response;
         try {
@@ -528,7 +626,9 @@ export default function TalkPage() {
           });
         } finally {
           window.clearTimeout(engineTimeout);
+          if (engineAbortRef.current === engineCtrl) engineAbortRef.current = null;
         }
+        if (turnGen !== turnGenRef.current) return;
         if (!res.ok) throw new Error("api failed");
         const data = (await res.json()) as MiomiApiResponse;
         {
@@ -616,17 +716,23 @@ export default function TalkPage() {
             data: { lang: replyLang, len: speakText.length },
           });
           void speak(stripForTts(speakText, replyLang), replyLang, {
-            onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
-            onError: () => {
-              if (mountedRefForTts.current) setMicState("idle");
+            onEnd: () => {
+              if (!mountedRefForTts.current) return;
               const t = turnTimingRef.current;
               if (t && !t.logged) logTurnTimingLine(t);
+              finishTurn();
+            },
+            onError: () => {
+              if (!mountedRefForTts.current) return;
+              const t = turnTimingRef.current;
+              if (t && !t.logged) logTurnTimingLine(t);
+              recoverFromTurn({ reason: "tts-error", playSorryCue: true });
             },
           });
         } else {
           const t = turnTimingRef.current;
           if (t && !t.logged) logTurnTimingLine(t);
-          setMicState("idle");
+          finishTurn();
         }
         if (data.servedVia === "guest_limit") {
           setShowGuestSheet(true);
@@ -634,7 +740,7 @@ export default function TalkPage() {
           window.setTimeout(() => setShowGuestSheet(true), 800);
         }
       } catch (e) {
-        turnTimingRef.current = null;
+        if (turnGen !== turnGenRef.current) return;
         logEvent({
           kind: "engine",
           level: "error",
@@ -645,36 +751,60 @@ export default function TalkPage() {
           ...prev,
           { id: crypto.randomUUID(), kind: "mini_cat", textTh: "หนูขอโทษค่า~ มีบางอย่างผิดพลาด", textEn: "Sorry~ something went wrong." },
         ]);
+        recoverFromTurn({ reason: "engine", playSorryCue: true });
       }
     },
-    [authReady, isLocked, isGuest, guestExchanges, wordsIntroduced, items, setGuestExchanges, config, respLength, ttsOn, profile?.ui_language, uiLang],
+    [
+      authReady,
+      isLocked,
+      isGuest,
+      guestExchanges,
+      wordsIntroduced,
+      items,
+      setGuestExchanges,
+      config,
+      respLength,
+      ttsOn,
+      profile?.ui_language,
+      uiLang,
+      isTurnInFlight,
+      armTurnWatchdog,
+      finishTurn,
+      recoverFromTurn,
+    ],
   );
 
   const flushBuffer = useCallback(() => {
+    const scheduledGen = turnGenRef.current;
     const text = transcriptBufferRef.current;
     transcriptBufferRef.current = "";
     transcriptTimerRef.current = null;
-    if (text.trim()) void processInput(text);
-  }, [processInput]);
+    if (!text.trim()) {
+      recoverFromTurn({ reason: "empty-transcript" });
+      return;
+    }
+    if (scheduledGen !== turnGenRef.current) return;
+    void processInput(text);
+  }, [processInput, recoverFromTurn]);
 
   const handleMicTranscript = useCallback(
     async (text: string, isFinal: boolean) => {
       if (!isFinal) return;
       if (isLocked) {
         micRef.current?.stop();
-        setMicState("idle");
+        micSessionRef.current = false;
+        recoverFromTurn();
         setShowGuestSheet(true);
         return;
       }
-      // Prior turn still in flight — drop overlapping VAD segment (no barge-in).
-      if (micState === "processing") {
-        logEvent({ kind: "transcribe", level: "warn", message: "dropped turn (processing)", data: { text } });
+      // Echo from Miomi's own voice — drop (no barge-in).
+      if (micStateRef.current === "speaking" || isSpeakingRef.current) {
+        logEvent({ kind: "transcribe", level: "warn", message: "dropped echo (speaking)", data: { text } });
+        recoverFromTurn({ reason: "echo" });
         return;
       }
-      // Mic capture while Miomi is (or is about to be) speaking is her own echo. Drop it.
-      // No barge-in for now — this is what kills the self-talk loop.
-      if (micState === "speaking" || isSpeakingRef.current) {
-        logEvent({ kind: "transcribe", level: "warn", message: "dropped echo (speaking)", data: { text } });
+      if (!turnInFlightRef.current) {
+        logEvent({ kind: "transcribe", level: "warn", message: "dropped transcript (no turn)", data: { text } });
         return;
       }
       logEvent({
@@ -685,6 +815,7 @@ export default function TalkPage() {
       });
       if (isLikelyHallucination(text, profile?.ui_language ?? "en", false)) {
         logEvent({ kind: "transcribe", level: "warn", message: "dropped hallucination", data: { text } });
+        recoverFromTurn({ reason: "hallucination" });
         return;
       }
       if (transcriptBufferRef.current) {
@@ -693,9 +824,13 @@ export default function TalkPage() {
         transcriptBufferRef.current = text.trim();
       }
       if (transcriptTimerRef.current) window.clearTimeout(transcriptTimerRef.current);
-      transcriptTimerRef.current = window.setTimeout(flushBuffer, 600);
+      const scheduledGen = turnGenRef.current;
+      transcriptTimerRef.current = window.setTimeout(() => {
+        if (scheduledGen !== turnGenRef.current) return;
+        flushBuffer();
+      }, 600);
     },
-    [isLocked, micState, flushBuffer, profile?.ui_language],
+    [isLocked, flushBuffer, profile?.ui_language, recoverFromTurn],
   );
 
   const stateLabel = (() => {
@@ -725,11 +860,14 @@ export default function TalkPage() {
     if (micState === "speaking" || micState === "processing" || micState === "listening") {
       stopTts();
       micRef.current?.stop();
-      setMicState("idle");
+      micSessionRef.current = false;
+      turnGenRef.current += 1;
+      recoverFromTurn({ reason: "user-stop" });
       return;
     }
+    micSessionRef.current = true;
     micRef.current?.start();
-  }, [micState, isLocked]);
+  }, [micState, isLocked, recoverFromTurn]);
 
   return (
     <TalkErrorBoundary>
