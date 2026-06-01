@@ -57,6 +57,41 @@ const GUEST_LIMIT = 5;
 const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
 const TRANSCRIPT_CLIP = 180;
 
+type TurnTiming = {
+  t0: number;
+  t1?: number;
+  t2?: number;
+  t3?: number;
+  t5?: number;
+  asrServedBy?: string;
+  voiceTurn: boolean;
+  logged: boolean;
+};
+
+function msBetween(from: number, to: number): number {
+  return Math.round(to - from);
+}
+
+function logTurnTimingLine(t: TurnTiming): void {
+  if (t.logged || t.t1 == null || t.t2 == null) return;
+  const end = t.t5 ?? t.t2;
+  const asr = msBetween(t.t0, t.t1);
+  const llm = msBetween(t.t1, t.t2);
+  const tts = t.t5 != null ? msBetween(t.t2, t.t5) : null;
+  const total = msBetween(t.t0, end);
+  const ttsPart = tts != null ? `TTS=${tts}ms` : "TTS=n/a";
+  const asrBackend = t.asrServedBy ?? (t.voiceTurn ? "unknown" : "keyboard");
+  const line = `[turn-timing] ASR=${asr}ms LLM=${llm}ms ${ttsPart} TOTAL=${total}ms asr=${asrBackend}`;
+  console.log(line);
+  logEvent({
+    kind: "state",
+    level: "info",
+    message: "turn timing",
+    data: { ASR: asr, LLM: llm, TTS: tts, TOTAL: total, asr: asrBackend },
+  });
+  t.logged = true;
+}
+
 const MIOMI_TTS_NAME: Record<TtsLang, string> = {
   en: "Mee-oh-mee",
   th: "มิโอมิ",
@@ -187,6 +222,7 @@ export default function TalkPage() {
   const [debugOpen, setDebugOpen] = useState(false);
   const isSpeakingRef = useRef(false);
   const [isSpeakingState, setIsSpeakingState] = useState(false);
+  const turnTimingRef = useRef<TurnTiming | null>(null);
 
   useEffect(() => {
     mountedRefForTts.current = true;
@@ -201,6 +237,13 @@ export default function TalkPage() {
       isSpeakingRef.current = speaking;
       setIsSpeakingState(speaking);
       logEvent({ kind: "tts", level: "info", message: speaking ? "audio started" : "audio ended" });
+      if (speaking) {
+        const t = turnTimingRef.current;
+        if (t && !t.logged && t.t5 == null) {
+          t.t5 = performance.now();
+          logTurnTimingLine(t);
+        }
+      }
     });
     return () => unsub();
   }, []);
@@ -382,6 +425,21 @@ export default function TalkPage() {
   const fuelZap = 64;
   const fuelBrain = 45;
 
+  const handleVadSpeechEnd = useCallback(() => {
+    turnTimingRef.current = {
+      t0: performance.now(),
+      voiceTurn: true,
+      logged: false,
+    };
+  }, []);
+
+  const handleTranscribeReceived = useCallback((meta: { servedBy: string }) => {
+    const t = turnTimingRef.current;
+    if (!t || t.logged) return;
+    t.t1 = performance.now();
+    t.asrServedBy = meta.servedBy;
+  }, []);
+
   const processInput = useCallback(
     async (text: string) => {
       if (!authReady) return;
@@ -394,6 +452,15 @@ export default function TalkPage() {
       if (!text.trim()) return;
 
       const trimmed = text.trim();
+      if (!turnTimingRef.current) {
+        turnTimingRef.current = {
+          t0: performance.now(),
+          t1: performance.now(),
+          voiceTurn: false,
+          asrServedBy: "keyboard",
+          logged: false,
+        };
+      }
 
       setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "user_said", text: trimmed }]);
       setTextInput("");
@@ -432,6 +499,10 @@ export default function TalkPage() {
         }
         if (!res.ok) throw new Error("api failed");
         const data = (await res.json()) as MiomiApiResponse;
+        {
+          const t = turnTimingRef.current;
+          if (t && !t.logged) t.t2 = performance.now();
+        }
         logEvent({
           kind: "engine",
           level: "info",
@@ -502,6 +573,10 @@ export default function TalkPage() {
         const speakText = data.content ?? "";
         if (ttsOn && speakText.trim()) {
           setMicState("speaking");
+          {
+            const t = turnTimingRef.current;
+            if (t && !t.logged) t.t3 = performance.now();
+          }
           logEvent({
             kind: "tts",
             level: "info",
@@ -510,8 +585,15 @@ export default function TalkPage() {
           });
           void speak(stripForTts(speakText, replyLang), replyLang, {
             onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
-            onError: () => { if (mountedRefForTts.current) setMicState("idle"); },
+            onError: () => {
+              if (mountedRefForTts.current) setMicState("idle");
+              const t = turnTimingRef.current;
+              if (t && !t.logged) logTurnTimingLine(t);
+            },
           });
+        } else {
+          const t = turnTimingRef.current;
+          if (t && !t.logged) logTurnTimingLine(t);
         }
         if (data.servedVia === "guest_limit") {
           setShowGuestSheet(true);
@@ -519,6 +601,7 @@ export default function TalkPage() {
           window.setTimeout(() => setShowGuestSheet(true), 800);
         }
       } catch (e) {
+        turnTimingRef.current = null;
         logEvent({
           kind: "engine",
           level: "error",
@@ -758,6 +841,8 @@ export default function TalkPage() {
           state={micState}
           speakingActive={isSpeakingState || micState === "speaking"}
           language={profile?.ui_language === "th" ? "th" : profile?.ui_language === "en" ? "en" : "auto"}
+          onVadSpeechEnd={handleVadSpeechEnd}
+          onTranscribeReceived={handleTranscribeReceived}
           onTranscript={handleMicTranscript}
           onStateChange={setMicState}
           locked={isLocked}

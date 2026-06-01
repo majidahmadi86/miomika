@@ -32,6 +32,10 @@ interface MicButtonProps {
   onLockedTap?: () => void;
   /** When true (Miomi speaking), VAD stays paused to avoid speaker echo. */
   speakingActive?: boolean;
+  /** Fired at VAD speech-end (turn timing anchor a). */
+  onVadSpeechEnd?: () => void;
+  /** Fired when /api/talk/transcribe returns OK (turn timing anchor b). */
+  onTranscribeReceived?: (meta: { servedBy: string }) => void;
 }
 
 type MicVADInstance = {
@@ -71,6 +75,8 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     locked = false,
     onLockedTap,
     speakingActive = false,
+    onVadSpeechEnd,
+    onTranscribeReceived,
   },
   ref,
 ) {
@@ -165,14 +171,17 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
           message: `/transcribe ${res.status}`,
           data: { status: res.status },
         });
-        const json = (await res.json()) as { text?: string };
+        const json = (await res.json()) as { text?: string; servedBy?: string };
         const text = (json.text ?? "").trim();
         if (text.length === 0) {
           trace("empty transcription");
           onStateChange("idle");
           return;
         }
-        trace("transcribed", { preview: text.slice(0, 40) });
+        onTranscribeReceived?.({
+          servedBy: json.servedBy ?? "unknown",
+        });
+        trace("transcribed", { preview: text.slice(0, 40), servedBy: json.servedBy });
         onTranscript(text, true);
       } catch (e) {
         logError("mic", "transcribe network error", e);
@@ -181,7 +190,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         window.clearTimeout(transcribeTimeout);
       }
     },
-    [trace, onStateChange, onTranscript, language],
+    [trace, onStateChange, onTranscript, onTranscribeReceived, language],
   );
 
   // Callback refs — let the VAD effect read latest values without re-firing.
@@ -189,12 +198,14 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
   const ensureFlowTagRef = useRef(ensureFlowTag);
   const onStateChangeRef = useRef(onStateChange);
   const transcribeAndCommitRef = useRef(transcribeAndCommit);
+  const onVadSpeechEndRef = useRef(onVadSpeechEnd);
 
   useEffect(() => {
     traceRef.current = trace;
     ensureFlowTagRef.current = ensureFlowTag;
     onStateChangeRef.current = onStateChange;
     transcribeAndCommitRef.current = transcribeAndCommit;
+    onVadSpeechEndRef.current = onVadSpeechEnd;
   });
 
   // Create VAD once on mount; destroy once on unmount.
@@ -249,6 +260,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
               data: { samples: audio.length, wavBytes: wavBlob.size },
             });
             traceRef.current("speech end", { samples: audio.length });
+            onVadSpeechEndRef.current?.();
             void transcribeAndCommitRef.current(audio);
           },
           onVADMisfire: () => {

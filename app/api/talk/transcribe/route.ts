@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
         location: google.location,
         languageCodes: google.languageCodes,
       });
-      return NextResponse.json({ text: google.text });
+      return NextResponse.json({ text: google.text, servedBy: google.servedBy });
     } catch (e) {
       log("voice.transcribe", "google error, falling back to groq", {
         message: googleErrorMessage(e),
@@ -316,7 +316,7 @@ export async function POST(request: NextRequest) {
       servedBy: "groq_whisper",
       model: "whisper-large-v3-turbo",
     });
-    return NextResponse.json({ text });
+    return NextResponse.json({ text, servedBy: "groq_whisper" });
   } catch (e) {
     const err = e as { message?: string; status?: number };
     log("voice.transcribe", "groq error", { message: err.message, status: err.status });
