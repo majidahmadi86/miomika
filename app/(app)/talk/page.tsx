@@ -655,7 +655,7 @@ export default function TalkPage() {
         transcriptBufferRef.current = text.trim();
       }
       if (transcriptTimerRef.current) window.clearTimeout(transcriptTimerRef.current);
-      transcriptTimerRef.current = window.setTimeout(flushBuffer, 600);
+      transcriptTimerRef.current = window.setTimeout(flushBuffer, 250);
     },
     [isLocked, micState, flushBuffer, profile?.ui_language],
   );
