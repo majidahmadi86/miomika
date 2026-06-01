@@ -46,6 +46,7 @@ type MiomiApiResponse = {
   replyLanguage?: TtsLang;
   wordCard?: IntroducedWordPayload | null;
   masteryEvent?: MasteryEventPayload;
+  guestHandoff?: boolean;
 };
 
 type CanvasItem =
@@ -692,6 +693,7 @@ export default function TalkPage() {
 
         const speakText = data.content ?? "";
         const isGuestLimitReply = data.servedVia === "guest_limit";
+        const isGuestHandoff = data.guestHandoff === true;
         const completeGuestLimitTurn = () => {
           micRef.current?.stop();
           micSessionRef.current = false;
@@ -716,7 +718,7 @@ export default function TalkPage() {
                 if (!mountedRefForTts.current) return;
                 const t = turnTimingRef.current;
                 if (t && !t.logged) logTurnTimingLine(t);
-                if (isGuestLimitReply) {
+                if (isGuestLimitReply || isGuestHandoff) {
                   completeGuestLimitTurn();
                 } else {
                   finishTurn();
@@ -734,14 +736,11 @@ export default function TalkPage() {
         } else {
           const t = turnTimingRef.current;
           if (t && !t.logged) logTurnTimingLine(t);
-          if (isGuestLimitReply) {
+          if (isGuestLimitReply || isGuestHandoff) {
             completeGuestLimitTurn();
           } else {
             finishTurn();
           }
-        }
-        if (!isGuestLimitReply && isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
-          window.setTimeout(() => setShowGuestSheet(true), 800);
         }
       } catch (e) {
         if (turnGen !== turnGenRef.current) return;
@@ -762,7 +761,6 @@ export default function TalkPage() {
       authReady,
       isLocked,
       isGuest,
-      guestExchanges,
       wordsIntroduced,
       items,
       setGuestExchanges,

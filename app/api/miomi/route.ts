@@ -56,6 +56,7 @@ type MiomiResponse = {
   pronunciationLesson: PronunciationLesson | null;
   replyLanguage: "th" | "en";
   userSpeaksLanguage: "th" | "en";
+  guestHandoff?: boolean;
 };
 
 const BRAIN_PROMPT_FALLBACK =
@@ -364,6 +365,12 @@ export async function POST(req: NextRequest) {
       adaptivePrompt += `\n\nTEACHING HINT: Naturally weave the word "${wordToIntroduce.word_en}" (${wordToIntroduce.word_th}) into your reply ONE time. Use it in context, don't define it formally — like a friend dropping it into conversation. The system will show the user a card after your reply.`;
     }
 
+    const isLastFreeGuestTurn =
+      serverIsGuest && state.exchangeNumber === GUEST_EXCHANGE_LIMIT - 1;
+    if (isLastFreeGuestTurn) {
+      adaptivePrompt += `\n\nLAST-TURN HAND-OFF: This is this guest's final turn before signing up. FIRST answer their message warmly and fully. THEN, in the same reply, gently invite them to sign up — it's free — so you can remember them and keep going together; refer to something specific from your conversation so it feels personal. Be a warm host walking a friend to the next room. NEVER say "limit", "quota", "trial", or "goodbye". Keep it heartfelt and short.`;
+    }
+
     // ── STAGE 7: Check library with brain-enriched context ───────────────────
     const matchContext: MatchContext = {
       estimatedLevel: brainState.profile.cefrLevel
@@ -526,6 +533,7 @@ export async function POST(req: NextRequest) {
       pronunciationLesson: null,
       replyLanguage,
       userSpeaksLanguage: brainState.userSpeaksLanguage,
+      guestHandoff: isLastFreeGuestTurn,
     } satisfies MiomiResponse);
 
   } catch (error: unknown) {
