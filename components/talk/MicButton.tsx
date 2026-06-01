@@ -238,7 +238,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
           negativeSpeechThreshold: 0.35,
           minSpeechMs: 400,
           preSpeechPadMs: 250,
-          redemptionMs: 800,
+          redemptionMs: 1500,
           onSpeechStart: () => {
             if (!mountedRef.current) return;
             if (!userIntentRef.current) return;
