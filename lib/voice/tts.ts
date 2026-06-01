@@ -251,6 +251,59 @@ async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | n
   return null;
 }
 
+function playMp3OnElement(el: HTMLAudioElement, audioBase64: string, gen: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const finish = (ok: boolean) => {
+      el.removeEventListener("ended", onEnded);
+      el.removeEventListener("error", onErr);
+      resolve(gen === __audioGen && ok);
+    };
+    const onEnded = () => finish(true);
+    const onErr = () => finish(false);
+    el.addEventListener("ended", onEnded);
+    el.addEventListener("error", onErr);
+    el.src = `data:audio/mp3;base64,${audioBase64}`;
+    void el.play().catch(() => finish(false));
+  });
+}
+
+/** Play one server MP3 chunk without killing a multi-chunk sequence. */
+function playServerAudioChunk(
+  audioBase64: string,
+  gen: number,
+  manageSpeakingFlag: boolean,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+    __activeAudio = el;
+    const teardown = () => {
+      disconnectPlaybackSource();
+      try {
+        el.pause();
+        el.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+      __activeAudio = null;
+    };
+    const finish = (ok: boolean) => {
+      if (gen !== __audioGen) {
+        teardown();
+        resolve(false);
+        return;
+      }
+      teardown();
+      resolve(ok);
+    };
+    el.onended = () => finish(true);
+    el.onerror = () => finish(false);
+    routeElementThroughPlayback(el);
+    unlockTtsPlayback();
+    if (manageSpeakingFlag) setSpeaking(true);
+    void el.play().catch(() => finish(false));
+  });
+}
+
 async function trySpeakViaServer(
   text: string,
   lang: TtsLang,
@@ -262,40 +315,155 @@ async function trySpeakViaServer(
   return new Promise((resolve) => {
     killAllAudio();
     const myGen = ++__audioGen;
-    const el = new Audio(`data:audio/mp3;base64,${audioBase64}`);
-    __activeAudio = el;
     __supersede = () => {
       __supersede = null;
       resolve(true);
     };
-    setSpeaking(true);
-    const teardown = () => {
-      disconnectPlaybackSource();
-      el.pause();
-      el.currentTime = 0;
-      __activeAudio = null;
-    };
-    const fail = () => {
+    void playServerAudioChunk(audioBase64, myGen, true).then((ok) => {
       if (myGen !== __audioGen) return;
       __supersede = null;
-      teardown();
       setSpeaking(false);
-      resolve(false);
-    };
-    el.onended = () => {
-      if (myGen !== __audioGen) return;
-      __supersede = null;
-      disconnectPlaybackSource();
-      __activeAudio = null;
-      setSpeaking(false);
-      callbacks?.onEnd?.();
-      resolve(true);
-    };
-    el.onerror = fail;
-    routeElementThroughPlayback(el);
-    unlockTtsPlayback();
-    void el.play().catch(fail);
+      if (ok) callbacks?.onEnd?.();
+      resolve(ok);
+    });
   });
+}
+
+const THAI_CLOSING_PARTICLE =
+  /(?<=(?:นะคะ|นะครับ|ค่ะ|ค่า|ครับ|จ้า|นะ|ฮะ|คะ)(?:~|ๆ)?)\s+(?=[\u0E00-\u0E7F])/;
+
+function isCleanTtsChunkSplit(chunks: string[]): boolean {
+  if (chunks.length < 2) return false;
+  for (const c of chunks) {
+    const t = c.trim();
+    if (t.length < 2) return false;
+    if (!/[\u0E00-\u0E7FA-Za-z]/.test(t)) return false;
+  }
+  return true;
+}
+
+function splitAtSentenceBoundaries(text: string): string[] {
+  const out: string[] = [];
+  for (const block of text.split(/\n+/)) {
+    const para = block.trim();
+    if (!para) continue;
+    const parts = para.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
+    out.push(...parts);
+  }
+  return out;
+}
+
+function splitAtThaiClosingParticles(text: string): string[] {
+  if (!/[\u0E00-\u0E7F]/.test(text)) return [];
+  return text
+    .split(THAI_CLOSING_PARTICLE)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Split a reply for gapless multi-chunk TTS; returns one element when no clean split exists. */
+export function splitReplyIntoTtsChunks(text: string): string[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  const bySentence = splitAtSentenceBoundaries(trimmed);
+  if (isCleanTtsChunkSplit(bySentence)) return bySentence;
+
+  const byParticle = splitAtThaiClosingParticles(trimmed);
+  if (isCleanTtsChunkSplit(byParticle)) return byParticle;
+
+  return [trimmed];
+}
+
+async function speakChunkedSequence(
+  chunks: string[],
+  lang: TtsLang,
+  callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+): Promise<void> {
+  killAllAudio();
+  callbacks?.onStart?.();
+  const myGen = ++__audioGen;
+  setSpeaking(true);
+
+  let aborted = false;
+  __supersede = () => {
+    aborted = true;
+  };
+
+  const finish = (ok: boolean) => {
+    if (myGen !== __audioGen) return;
+    __supersede = null;
+    setSpeaking(false);
+    if (ok) callbacks?.onEnd?.();
+    else callbacks?.onError?.();
+  };
+
+  const restFetches = chunks.slice(1).map((chunk) => fetchServerAudio(chunk, lang));
+  const firstAudio = await fetchServerAudio(chunks[0]!, lang);
+  if (aborted || myGen !== __audioGen) return;
+  if (!firstAudio) {
+    console.warn("[tts] server TTS failed; one-voice policy: staying silent");
+    finish(false);
+    return;
+  }
+
+  const el = new Audio();
+  __activeAudio = el;
+  routeElementThroughPlayback(el);
+  unlockTtsPlayback();
+
+  const firstOk = await playMp3OnElement(el, firstAudio, myGen);
+  if (aborted || myGen !== __audioGen) return;
+  if (!firstOk) {
+    disconnectPlaybackSource();
+    __activeAudio = null;
+    finish(false);
+    return;
+  }
+
+  const restAudios = await Promise.all(restFetches);
+  if (aborted || myGen !== __audioGen) return;
+
+  for (const audio of restAudios) {
+    if (!audio) {
+      console.warn("[tts] server TTS failed; one-voice policy: staying silent");
+      disconnectPlaybackSource();
+      __activeAudio = null;
+      finish(false);
+      return;
+    }
+    if (aborted || myGen !== __audioGen) return;
+    const ok = await playMp3OnElement(el, audio, myGen);
+    if (aborted || myGen !== __audioGen) return;
+    if (!ok) {
+      disconnectPlaybackSource();
+      __activeAudio = null;
+      finish(false);
+      return;
+    }
+  }
+
+  disconnectPlaybackSource();
+  __activeAudio = null;
+  finish(true);
+}
+
+/** Speak a full reply: first sentence ASAP when cleanly splittable; otherwise identical to `speak()`. */
+export async function speakReply(
+  text: string,
+  lang: TtsLang,
+  callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+): Promise<void> {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    callbacks?.onEnd?.();
+    return;
+  }
+  const chunks = splitReplyIntoTtsChunks(trimmed);
+  if (chunks.length <= 1) {
+    return speak(trimmed, lang, callbacks);
+  }
+  await speakChunkedSequence(chunks, lang, callbacks);
 }
 
 export async function speak(

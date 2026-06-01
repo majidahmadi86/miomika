@@ -18,7 +18,7 @@ import { PracticeCard } from "@/components/talk/PracticeCard";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type VocabularyEntry } from "@/components/talk/WordCardV3";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
-import { speak, stopTts, preloadTtsVoices, subscribeSpeaking, type TtsLang } from "@/lib/voice/tts";
+import { speak, speakReply, stopTts, preloadTtsVoices, subscribeSpeaking, type TtsLang } from "@/lib/voice/tts";
 import { isLikelyHallucination } from "@/lib/voice/hallucination";
 import { pickIceBreaker, pickMasteryCelebration } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
@@ -583,7 +583,7 @@ export default function TalkPage() {
             message: "speak called",
             data: { lang: replyLang, len: speakText.length },
           });
-          void speak(stripForTts(speakText, replyLang), replyLang, {
+          void speakReply(stripForTts(speakText, replyLang), replyLang, {
             onEnd: () => { if (mountedRefForTts.current) setMicState("idle"); },
             onError: () => {
               if (mountedRefForTts.current) setMicState("idle");
