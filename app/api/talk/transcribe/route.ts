@@ -12,19 +12,13 @@ import { createServerClient } from "@supabase/ssr";
 import { log, logError } from "@/lib/debug/log";
 
 const PROJECT_ID = "miomika";
-/** Chirp 3 + th-TH: `us` multi-region (asia-southeast1 is Chirp 2 only per Google docs). */
+/** Chirp 3 + th-TH: `us` multi-region (Chirp 3 GA in `us`/`eu` only per Google docs). */
 const CHIRP3_LOCATION = "us";
 
 type ExplicitLang = "th" | "en" | null;
 
 /** Chirp 3 primary attempt — always bilingual (UI lang ≠ spoken lang in learning mode). */
 const CHIRP3_BILINGUAL_CODES = ["th-TH", "en-US"] as const;
-
-function resolveLanguageCodes(explicitLang: ExplicitLang): string[] {
-  if (explicitLang === "th") return ["th-TH"];
-  if (explicitLang === "en") return ["en-US"];
-  return [...CHIRP3_BILINGUAL_CODES];
-}
 
 function singleLanguageFallback(explicitLang: ExplicitLang): string {
   if (explicitLang === "th") return "th-TH";
@@ -46,6 +40,37 @@ function extractGoogleTranscript(
 function googleErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function googleErrorDetails(err: unknown): { status: number | string; message: string } {
+  if (err && typeof err === "object") {
+    const o = err as { code?: number; status?: number | string; message?: string };
+    return {
+      status: o.code ?? o.status ?? "unknown",
+      message: o.message ?? googleErrorMessage(err),
+    };
+  }
+  return { status: "unknown", message: googleErrorMessage(err) };
+}
+
+function logChirp3Fallback(
+  attemptIndex: number,
+  attempt: { model: string; languageCodes: string[] },
+  next: { model: string; languageCodes: string[] } | "groq",
+  status: number | string,
+  message: string,
+): void {
+  const payload = {
+    attempt: attemptIndex + 1,
+    status,
+    message,
+    model: attempt.model,
+    languageCodes: attempt.languageCodes,
+    next: next === "groq" ? "groq_whisper" : next.model,
+    nextLanguageCodes: next === "groq" ? undefined : next.languageCodes,
+  };
+  console.log("[voice.transcribe] chirp_3 attempt failed, falling back", payload);
+  log("voice.transcribe", "chirp_3 attempt failed, falling back", payload);
 }
 
 async function recognizeGoogle(
@@ -88,7 +113,6 @@ async function transcribeWithGoogle(
   languageCodes: string[];
 }> {
   const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
-  const primaryCodes = resolveLanguageCodes(explicitLang);
   const fallbackCode = singleLanguageFallback(explicitLang);
 
   type Attempt = { location: string; model: string; languageCodes: string[] };
@@ -103,16 +127,12 @@ async function transcribeWithGoogle(
       model: "chirp_3",
       languageCodes: [fallbackCode],
     },
-    {
-      location: CHIRP3_LOCATION,
-      model: "chirp_2",
-      languageCodes: primaryCodes.length > 1 ? [fallbackCode] : primaryCodes,
-    },
   ];
 
   let lastError: unknown;
   for (let i = 0; i < attempts.length; i++) {
     const attempt = attempts[i];
+    const next = i < attempts.length - 1 ? attempts[i + 1] : "groq";
     try {
       const text = await recognizeGoogle(
         credentials,
@@ -123,7 +143,11 @@ async function transcribeWithGoogle(
       );
       if (text.length === 0) {
         lastError = new Error("empty_google_transcription");
-        if (i === attempts.length - 1) break;
+        if (i < attempts.length - 1) {
+          logChirp3Fallback(i, attempt, next, "empty", "empty_google_transcription");
+        } else {
+          logChirp3Fallback(i, attempt, "groq", "empty", "empty_google_transcription");
+        }
         continue;
       }
       return {
@@ -135,7 +159,12 @@ async function transcribeWithGoogle(
       };
     } catch (e) {
       lastError = e;
-      if (i === attempts.length - 1) break;
+      const { status, message } = googleErrorDetails(e);
+      if (i < attempts.length - 1) {
+        logChirp3Fallback(i, attempt, next, status, message);
+      } else {
+        logChirp3Fallback(i, attempt, "groq", status, message);
+      }
     }
   }
   throw lastError ?? new Error("google_transcribe_failed");
