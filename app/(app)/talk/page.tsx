@@ -79,15 +79,18 @@ function logTurnTimingLine(t: TurnTiming): void {
   const llm = msBetween(t.t1, t.t2);
   const tts = t.t5 != null ? msBetween(t.t2, t.t5) : null;
   const total = msBetween(t.t0, end);
+  const ttfs =
+    t.voiceTurn && t.t5 != null ? msBetween(t.t0, t.t5) : null;
   const ttsPart = tts != null ? `TTS=${tts}ms` : "TTS=n/a";
+  const ttfsPart = ttfs != null ? `TTFS=${ttfs}ms` : "TTFS=n/a";
   const asrBackend = t.asrServedBy ?? (t.voiceTurn ? "unknown" : "keyboard");
-  const line = `[turn-timing] ASR=${asr}ms LLM=${llm}ms ${ttsPart} TOTAL=${total}ms asr=${asrBackend}`;
+  const line = `[turn-timing] ASR=${asr}ms LLM=${llm}ms ${ttsPart} ${ttfsPart} TOTAL=${total}ms asr=${asrBackend}`;
   console.log(line);
   logEvent({
     kind: "state",
     level: "info",
     message: "turn timing",
-    data: { ASR: asr, LLM: llm, TTS: tts, TOTAL: total, asr: asrBackend },
+    data: { ASR: asr, LLM: llm, TTS: tts, TTFS: ttfs, TOTAL: total, asr: asrBackend },
   });
   t.logged = true;
 }

@@ -182,6 +182,7 @@ async function transcribeWithGroq(
  */
 export async function POST(request: NextRequest) {
   Sentry.setTag("flow", "voice");
+  const handlerEnteredAt = Date.now();
 
   const groqKey = process.env.GROQ_API_KEY;
   const googleCredsJson = process.env.GOOGLE_TTS_CREDENTIALS;
@@ -239,6 +240,7 @@ export async function POST(request: NextRequest) {
     logError("voice.transcribe", "form parse failed", e);
     return NextResponse.json({ error: "invalid_form" }, { status: 400 });
   }
+  const uploadReadMs = Date.now() - handlerEnteredAt;
 
   const langHint = typeof clientLang === "string" ? clientLang : null;
   const explicitLang: ExplicitLang =
@@ -269,7 +271,10 @@ export async function POST(request: NextRequest) {
 
   if (googleCredsJson) {
     try {
+      const recognizeStart = Date.now();
       const google = await transcribeWithGoogle(audioBytes);
+      const recognizeMs = Date.now() - recognizeStart;
+      log("voice.transcribe", "asr-split", { uploadReadMs, recognizeMs });
       const latency = Date.now() - start;
       log("voice.transcribe", "transcribed", {
         latency,
@@ -306,7 +311,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const recognizeStart = Date.now();
     const text = await transcribeWithGroq(audioBlob, explicitLang);
+    const recognizeMs = Date.now() - recognizeStart;
+    log("voice.transcribe", "asr-split", { uploadReadMs, recognizeMs });
     const latency = Date.now() - start;
     log("voice.transcribe", "transcribed", {
       latency,
