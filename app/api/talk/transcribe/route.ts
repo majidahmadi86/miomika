@@ -12,19 +12,17 @@ import { createServerClient } from "@supabase/ssr";
 import { log, logError } from "@/lib/debug/log";
 
 const PROJECT_ID = "miomika";
-/** Chirp 3 + th-TH: `us` multi-region (Chirp 3 GA in `us`/`eu` only per Google docs). */
-const CHIRP3_LOCATION = "us";
+/** Chirp 2 GA in asia-southeast1 (~1.1s vs ~2.3s Chirp 3 in us). */
+const CHIRP2_LOCATION = "asia-southeast1";
+const CHIRP2_MODEL = "chirp_2";
+/**
+ * Chirp 2 has language-agnostic `["auto"]` but NOT Chirp 3's constrained
+ * multi-locale auto-detect (`["th-TH","en-US"]`). Default th-TH — dominant
+ * input + hardest script.
+ */
+const CHIRP2_LANGUAGE_CODES = ["th-TH"] as const;
 
 type ExplicitLang = "th" | "en" | null;
-
-/** Chirp 3 primary attempt — always bilingual (UI lang ≠ spoken lang in learning mode). */
-const CHIRP3_BILINGUAL_CODES = ["th-TH", "en-US"] as const;
-
-function singleLanguageFallback(explicitLang: ExplicitLang): string {
-  if (explicitLang === "th") return "th-TH";
-  if (explicitLang === "en") return "en-US";
-  return "th-TH";
-}
 
 function extractGoogleTranscript(
   response: protos.google.cloud.speech.v2.IRecognizeResponse,
@@ -53,24 +51,21 @@ function googleErrorDetails(err: unknown): { status: number | string; message: s
   return { status: "unknown", message: googleErrorMessage(err) };
 }
 
-function logChirp3Fallback(
-  attemptIndex: number,
-  attempt: { model: string; languageCodes: string[] },
-  next: { model: string; languageCodes: string[] } | "groq",
+function logChirp2Fallback(
   status: number | string,
   message: string,
+  languageCodes: string[],
 ): void {
   const payload = {
-    attempt: attemptIndex + 1,
     status,
     message,
-    model: attempt.model,
-    languageCodes: attempt.languageCodes,
-    next: next === "groq" ? "groq_whisper" : next.model,
-    nextLanguageCodes: next === "groq" ? undefined : next.languageCodes,
+    model: CHIRP2_MODEL,
+    location: CHIRP2_LOCATION,
+    languageCodes,
+    next: "groq_whisper",
   };
-  console.log("[voice.transcribe] chirp_3 attempt failed, falling back", payload);
-  log("voice.transcribe", "chirp_3 attempt failed, falling back", payload);
+  console.log("[voice.transcribe] chirp_2 failed, falling back", payload);
+  log("voice.transcribe", "chirp_2 failed, falling back", payload);
 }
 
 async function recognizeGoogle(
@@ -104,70 +99,42 @@ async function recognizeGoogle(
 async function transcribeWithGoogle(
   credentialsJson: string,
   audioBytes: Buffer,
-  explicitLang: ExplicitLang,
 ): Promise<{
   text: string;
-  servedBy: "google_chirp3";
+  servedBy: "google_chirp2";
   model: string;
   location: string;
   languageCodes: string[];
 }> {
   const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
-  const fallbackCode = singleLanguageFallback(explicitLang);
+  const languageCodes = [...CHIRP2_LANGUAGE_CODES];
 
-  type Attempt = { location: string; model: string; languageCodes: string[] };
-  const attempts: Attempt[] = [
-    {
-      location: CHIRP3_LOCATION,
-      model: "chirp_3",
-      languageCodes: [...CHIRP3_BILINGUAL_CODES],
-    },
-    {
-      location: CHIRP3_LOCATION,
-      model: "chirp_3",
-      languageCodes: [fallbackCode],
-    },
-  ];
-
-  let lastError: unknown;
-  for (let i = 0; i < attempts.length; i++) {
-    const attempt = attempts[i];
-    const next = i < attempts.length - 1 ? attempts[i + 1] : "groq";
-    try {
-      const text = await recognizeGoogle(
-        credentials,
-        audioBytes,
-        attempt.languageCodes,
-        attempt.model,
-        attempt.location,
-      );
-      if (text.length === 0) {
-        lastError = new Error("empty_google_transcription");
-        if (i < attempts.length - 1) {
-          logChirp3Fallback(i, attempt, next, "empty", "empty_google_transcription");
-        } else {
-          logChirp3Fallback(i, attempt, "groq", "empty", "empty_google_transcription");
-        }
-        continue;
-      }
-      return {
-        text,
-        servedBy: "google_chirp3",
-        model: attempt.model,
-        location: attempt.location,
-        languageCodes: attempt.languageCodes,
-      };
-    } catch (e) {
-      lastError = e;
-      const { status, message } = googleErrorDetails(e);
-      if (i < attempts.length - 1) {
-        logChirp3Fallback(i, attempt, next, status, message);
-      } else {
-        logChirp3Fallback(i, attempt, "groq", status, message);
-      }
+  try {
+    const text = await recognizeGoogle(
+      credentials,
+      audioBytes,
+      languageCodes,
+      CHIRP2_MODEL,
+      CHIRP2_LOCATION,
+    );
+    if (text.length === 0) {
+      logChirp2Fallback("empty", "empty_google_transcription", languageCodes);
+      throw new Error("empty_google_transcription");
     }
+    return {
+      text,
+      servedBy: "google_chirp2",
+      model: CHIRP2_MODEL,
+      location: CHIRP2_LOCATION,
+      languageCodes,
+    };
+  } catch (e) {
+    if (googleErrorMessage(e) !== "empty_google_transcription") {
+      const { status, message } = googleErrorDetails(e);
+      logChirp2Fallback(status, message, languageCodes);
+    }
+    throw e;
   }
-  throw lastError ?? new Error("google_transcribe_failed");
 }
 
 async function transcribeWithGroq(
@@ -289,7 +256,6 @@ export async function POST(request: NextRequest) {
       const google = await transcribeWithGoogle(
         googleCredsJson,
         audioBytes,
-        explicitLang,
       );
       const latency = Date.now() - start;
       log("voice.transcribe", "transcribed", {
@@ -301,19 +267,15 @@ export async function POST(request: NextRequest) {
         location: google.location,
         languageCodes: google.languageCodes,
       });
-      if (google.text.length === 0) {
-        log("voice.transcribe", "empty google result, trying groq");
-      } else {
-        log("voice.transcribe", "success", {
-          textLen: google.text.length,
-          language: explicitLang ?? "auto",
-          servedBy: google.servedBy,
-          model: google.model,
-          location: google.location,
-          languageCodes: google.languageCodes,
-        });
-        return NextResponse.json({ text: google.text });
-      }
+      log("voice.transcribe", "success", {
+        textLen: google.text.length,
+        language: explicitLang ?? "auto",
+        servedBy: google.servedBy,
+        model: google.model,
+        location: google.location,
+        languageCodes: google.languageCodes,
+      });
+      return NextResponse.json({ text: google.text });
     } catch (e) {
       log("voice.transcribe", "google error, falling back to groq", {
         message: googleErrorMessage(e),
