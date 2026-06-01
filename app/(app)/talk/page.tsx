@@ -453,7 +453,7 @@ export default function TalkPage() {
   }, [ttsOn, items, authReady, profile?.ui_language, uiLang]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset + auto-raise CTA on limit */
+  /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset on sign-in */
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (authReady && !isGuest) {
@@ -461,19 +461,9 @@ export default function TalkPage() {
       setGuestExchangesRaw(0);
     }
   }, [authReady, isGuest]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const guestExchanges = authReady && !isGuest ? 0 : guestExchangesRaw;
-
-  // Auto-raise the guest CTA sheet the instant the limit is hit.
-  useEffect(() => {
-    if (authReady && isGuest && guestExchanges >= GUEST_LIMIT) {
-      micRef.current?.stop();
-      micSessionRef.current = false;
-      recoverFromTurn({ reason: "guest-limit" });
-      setShowGuestSheet(true);
-    }
-  }, [authReady, isGuest, guestExchanges, recoverFromTurn]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const setGuestExchanges = useCallback((updater: number | ((p: number) => number)) => {
     setGuestExchangesRaw((prev) => {
@@ -701,6 +691,13 @@ export default function TalkPage() {
         }
 
         const speakText = data.content ?? "";
+        const isGuestLimitReply = data.servedVia === "guest_limit";
+        const completeGuestLimitTurn = () => {
+          micRef.current?.stop();
+          micSessionRef.current = false;
+          setShowGuestSheet(true);
+          finishTurn();
+        };
         if (ttsOn && speakText.trim()) {
           const runSpeak = () => {
             setMicState("speaking");
@@ -719,7 +716,11 @@ export default function TalkPage() {
                 if (!mountedRefForTts.current) return;
                 const t = turnTimingRef.current;
                 if (t && !t.logged) logTurnTimingLine(t);
-                finishTurn();
+                if (isGuestLimitReply) {
+                  completeGuestLimitTurn();
+                } else {
+                  finishTurn();
+                }
               },
               onError: () => {
                 if (!mountedRefForTts.current) return;
@@ -733,11 +734,13 @@ export default function TalkPage() {
         } else {
           const t = turnTimingRef.current;
           if (t && !t.logged) logTurnTimingLine(t);
-          finishTurn();
+          if (isGuestLimitReply) {
+            completeGuestLimitTurn();
+          } else {
+            finishTurn();
+          }
         }
-        if (data.servedVia === "guest_limit") {
-          setShowGuestSheet(true);
-        } else if (isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
+        if (!isGuestLimitReply && isGuest && guestExchanges + 1 >= GUEST_LIMIT) {
           window.setTimeout(() => setShowGuestSheet(true), 800);
         }
       } catch (e) {
