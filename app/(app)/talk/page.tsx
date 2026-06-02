@@ -303,7 +303,11 @@ export default function TalkPage() {
       prev === "processing" &&
       micState === "idle" &&
       turnInFlightRef.current &&
-      micSessionRef.current
+      micSessionRef.current &&
+      // Only treat processing→idle as a dead transcribe pipeline. If the engine request
+      // is already in flight (engineAbortRef set), the turn is alive and this idle is a
+      // spurious VAD callback — do NOT abort the live reply. runSpeak will restore state.
+      !engineAbortRef.current
     ) {
       recoverFromTurn({ playSorryCue: true, reason: "transcribe-abort" });
     }
