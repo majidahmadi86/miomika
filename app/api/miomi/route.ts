@@ -192,6 +192,12 @@ export async function POST(req: NextRequest) {
       adaptivePrompt = BRAIN_PROMPT_FALLBACK;
     }
 
+    // True on the guest's final free turn. Flag the handoff on EVERY served reply path
+    // (recovery, clarification, main) so the signup sheet fires regardless of how the
+    // turn was answered — not only the main AI return.
+    const isLastFreeGuestTurn =
+      serverIsGuest && state.exchangeNumber === GUEST_EXCHANGE_LIMIT - 1;
+
     // ── SERVER-SIDE GUEST LIMIT (never trust client) ──────────────────────────
     if (serverIsGuest && state.exchangeNumber >= GUEST_EXCHANGE_LIMIT) {
       const guestLimitContent = pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, {
@@ -274,6 +280,7 @@ export async function POST(req: NextRequest) {
         pronunciationLesson: null,
         replyLanguage: recoveryReplyLang,
         userSpeaksLanguage: brainState.userSpeaksLanguage,
+        guestHandoff: isLastFreeGuestTurn,
       } satisfies MiomiResponse);
     }
 
@@ -308,6 +315,7 @@ export async function POST(req: NextRequest) {
         pronunciationLesson: null,
         replyLanguage: clarifyReplyLang,
         userSpeaksLanguage: brainState.userSpeaksLanguage,
+        guestHandoff: isLastFreeGuestTurn,
       } satisfies MiomiResponse);
     }
 
@@ -365,8 +373,6 @@ export async function POST(req: NextRequest) {
       adaptivePrompt += `\n\nTEACHING HINT: Naturally weave the word "${wordToIntroduce.word_en}" (${wordToIntroduce.word_th}) into your reply ONE time. Use it in context, don't define it formally — like a friend dropping it into conversation. The system will show the user a card after your reply.`;
     }
 
-    const isLastFreeGuestTurn =
-      serverIsGuest && state.exchangeNumber === GUEST_EXCHANGE_LIMIT - 1;
     if (isLastFreeGuestTurn) {
       adaptivePrompt += `\n\nLAST-TURN HAND-OFF: This is this guest's final turn before signing up. FIRST answer their message warmly and fully. THEN, in the same reply, gently invite them to sign up — it's free — so you can remember them and keep going together; refer to something specific from your conversation so it feels personal. Be a warm host walking a friend to the next room. NEVER say "limit", "quota", "trial", or "goodbye". Keep it heartfelt and short.`;
     }
