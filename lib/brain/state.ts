@@ -211,10 +211,28 @@ function resolveUiLanguage(args: {
   userInput: string;
   memory: Array<{ role: "user" | "miomi"; content: string }>;
 }): "th" | "en" {
-  // Reply language = the user's chosen interface language. We do NOT infer switches from
-  // free speech — it repeatedly produced wrong-language replies ("you cannot speak Thai"
-  // read as a command to switch). Explicit changes happen via settings, not by talking.
-  return args.profileUiLang;
+  // MEDIUM = the language the conversation is actually happening in. The live spoken
+  // language wins; the saved setting is only a fallback when the live signal is ambiguous.
+  // This serves every direction (TH<->EN, beginner or native) because it never REFUSES a
+  // language. The model (see buildBrainPrompt) handles the nuance of a beginner attempting
+  // their target vs. a fluent user choosing to live in it. Pure script distribution, no
+  // keyword matching: "you cannot speak Thai" is all-Latin -> resolves "en", never a switch.
+  const { profileUiLang, userInput, memory } = args;
+
+  const current = messageDominantLang(userInput);
+  if (current) return current;
+
+  // Current message ambiguous (mixed scripts / no letters): use the most recent user turn
+  // that had a clear dominant language.
+  for (let i = memory.length - 1; i >= 0; i--) {
+    const m = memory[i];
+    if (m.role !== "user") continue;
+    const lang = messageDominantLang(m.content);
+    if (lang) return lang;
+  }
+
+  // No signal anywhere (first turn, all-ambiguous): fall back to the saved setting.
+  return profileUiLang;
 }
 
 function resolveTargetLanguage(args: {
