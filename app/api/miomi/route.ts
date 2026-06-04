@@ -374,6 +374,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (isLastFreeGuestTurn) {
+      // LOCKED 2026-06-04 — paired with completeGuestLimitTurn (talk/page.tsx), verified in prod.
+      // Reply must NOT mention signup; the invitation is a separate spoken cue. Do not re-add invite text.
       adaptivePrompt += `\n\nLAST-TURN HAND-OFF: This is this guest's final free turn, but DO NOT mention signing up, accounts, remembering, limits, quota, trial, or goodbye anywhere in your reply. Simply answer their message warmly, fully, and naturally, as if the conversation just continues. The sign-up invitation is handled elsewhere; your only job here is one warm, complete answer.`;
     }
 

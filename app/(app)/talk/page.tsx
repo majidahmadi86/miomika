@@ -698,6 +698,9 @@ export default function TalkPage() {
         const speakText = data.content ?? "";
         const isGuestLimitReply = data.servedVia === "guest_limit";
         const isGuestHandoff = data.guestHandoff === true;
+        // LOCKED 2026-06-04 — guest signup invitation decouple, VERIFIED in production (Thai + English):
+        // warm reply only, CTA sheet + spoken cue. Do NOT modify this fn or the LAST-TURN HAND-OFF prompt
+        // in app/api/miomi/route.ts without re-verifying the full guest 5-turn handoff + CTA flow.
         const completeGuestLimitTurn = () => {
           micRef.current?.stop();
           micSessionRef.current = false;
