@@ -374,7 +374,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (isLastFreeGuestTurn) {
-      adaptivePrompt += `\n\nLAST-TURN HAND-OFF: This is this guest's final turn before signing up. FIRST answer their message warmly and fully. THEN, in the same reply, gently invite them to sign up — it's free — so you can remember them and keep going together; refer to something specific from your conversation so it feels personal. Be a warm host walking a friend to the next room. NEVER say "limit", "quota", "trial", or "goodbye". Keep it heartfelt and short.`;
+      adaptivePrompt += `\n\nLAST-TURN HAND-OFF: This is this guest's final free turn, but DO NOT mention signing up, accounts, remembering, limits, quota, trial, or goodbye anywhere in your reply. Simply answer their message warmly, fully, and naturally, as if the conversation just continues. The sign-up invitation is handled elsewhere; your only job here is one warm, complete answer.`;
     }
 
     // ── STAGE 7: Check library with brain-enriched context ───────────────────

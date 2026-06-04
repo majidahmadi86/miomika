@@ -702,6 +702,16 @@ export default function TalkPage() {
           micRef.current?.stop();
           micSessionRef.current = false;
           setShowGuestSheet(true);
+          // Graceful handoff turn: reply is just a warm answer (no verbal invite), so the CTA
+          // invitation plays here as its own voice cue, synced to the sheet — never a chat bubble.
+          // Skip on the hard-cap turn (its reply already invites) and when TTS is muted.
+          if (ttsOn && isGuestHandoff && !isGuestLimitReply) {
+            const invitationCue =
+              replyLang === "th"
+                ? "อยู่กับหนูต่อนะคะ~ เปิดบัญชีฟรี หนูจะได้จำคุณไว้ค่ะ"
+                : "Stay with me~ open a free account so I won't forget you.";
+            void speak(stripForTts(invitationCue, replyLang), replyLang, {});
+          }
           finishTurn();
         };
         if (ttsOn && speakText.trim()) {
