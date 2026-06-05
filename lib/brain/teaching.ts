@@ -47,7 +47,7 @@ function startOfUtcDay(): string {
   return d.toISOString();
 }
 
-function rowToIntroducedWord(
+export function rowToIntroducedWord(
   row: VocabBankRow,
   learningTarget: "th" | "en" | null,
 ): IntroducedWord | null {
@@ -132,6 +132,23 @@ function textContainsWord(userText: string, word: string): boolean {
   return new RegExp(`\\b${escaped}\\b`, "i").test(userText);
 }
 
+/** Pure bank filter — excludes known/session words; used by pickWordToIntroduce + self-check. */
+export function filterVocabCandidates(args: {
+  rows: VocabBankRow[];
+  learningTarget: "th" | "en" | null;
+  exclude: Set<string>;
+}): IntroducedWord[] {
+  const candidates: IntroducedWord[] = [];
+  for (const row of args.rows) {
+    const intro = rowToIntroducedWord(row, args.learningTarget);
+    if (!intro) continue;
+    const keys = [intro.word_en, intro.word_th, intro.word].map((k) => k.toLowerCase());
+    if (keys.some((k) => args.exclude.has(k))) continue;
+    candidates.push(intro);
+  }
+  return candidates;
+}
+
 /** LOCKED 2026-06-05 — Live Tool 1 backend: /api/teach-word → pickWordToIntroduce (+ introduceWord for members). */
 export async function pickWordToIntroduce(args: {
   userId: string | null;
@@ -174,16 +191,11 @@ export async function pickWordToIntroduce(args: {
       return null;
     }
 
-    const candidates: IntroducedWord[] = [];
-    for (const row of data ?? []) {
-      const intro = rowToIntroducedWord(row as VocabBankRow, args.learningTarget);
-      if (!intro) continue;
-      const keys = [intro.word_en, intro.word_th, intro.word].map((k) =>
-        k.toLowerCase(),
-      );
-      if (keys.some((k) => exclude.has(k))) continue;
-      candidates.push(intro);
-    }
+    const candidates = filterVocabCandidates({
+      rows: (data ?? []) as VocabBankRow[],
+      learningTarget: args.learningTarget,
+      exclude,
+    });
 
     if (candidates.length === 0) {
       return null;

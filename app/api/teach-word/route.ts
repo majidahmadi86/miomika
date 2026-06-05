@@ -2,19 +2,16 @@ export const runtime = "nodejs";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
+import {
+  normalizeLearningTarget,
+  normalizeUiLanguage,
+  sanitizeTargetLanguage,
+} from "@/lib/brain/language";
 import { resolvePhonetics } from "@/lib/brain/phonetics";
 import { introduceWord, pickWordToIntroduce } from "@/lib/brain/teaching";
 import { createServiceClient } from "@/lib/supabase/service";
 import { log } from "@/lib/debug/log";
 import type { Tier } from "@/lib/auth/get-server-profile";
-
-function normalizeLearningTarget(raw: string | null): "th" | "en" | null {
-  if (!raw) return null;
-  const lower = raw.toLowerCase();
-  if (lower.startsWith("th") || lower === "thai") return "th";
-  if (lower.startsWith("en") || lower === "english") return "en";
-  return null;
-}
 
 async function loadVocabLists(userId: string): Promise<{
   introduced: string[];
@@ -102,34 +99,58 @@ async function loadBankExtras(wordEn: string): Promise<{
  */
 export async function POST(req: NextRequest) {
   let topicHint = "";
+  let bodyLearningTarget: string | null = null;
+  let sessionIntroduced: string[] = [];
   try {
-    const body = (await req.json()) as { topic_hint?: string; topicHint?: string };
+    const body = (await req.json()) as {
+      topic_hint?: string;
+      topicHint?: string;
+      learning_target?: string;
+      session_introduced?: string[];
+    };
     topicHint = String(body?.topic_hint ?? body?.topicHint ?? "").trim();
+    bodyLearningTarget = body?.learning_target ?? null;
+    if (Array.isArray(body?.session_introduced)) {
+      sessionIntroduced = body.session_introduced.filter(
+        (w): w is string => typeof w === "string" && w.trim().length > 0,
+      );
+    }
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const profile = await getServerProfile();
   const isGuest = !profile;
+  const uiLanguage = isGuest
+    ? "en"
+    : normalizeUiLanguage(profile.ui_language ?? null);
 
-  let introduced: string[] = [];
+  let introduced: string[] = [...sessionIntroduced];
   let mastered: string[] = [];
   let cefrLevel: string | null = null;
-  let learningTarget: "th" | "en" | null = null;
+  let learningTarget: "th" | "en";
   let tier: Tier = "guest";
   let userId: string | null = null;
 
   if (profile) {
     userId = profile.id;
     tier = profile.tier;
-    learningTarget = normalizeLearningTarget(profile.learning_target_language);
+    const profileTarget = normalizeLearningTarget(profile.learning_target_language);
+    const requestTarget = normalizeLearningTarget(bodyLearningTarget);
+    learningTarget = sanitizeTargetLanguage(
+      uiLanguage,
+      requestTarget ?? profileTarget,
+    );
     const [lists, cefr] = await Promise.all([
       loadVocabLists(profile.id),
       loadCefrLevel(profile.id),
     ]);
-    introduced = lists.introduced;
+    introduced = [...introduced, ...lists.introduced];
     mastered = lists.mastered;
     cefrLevel = cefr;
+  } else {
+    const requestTarget = normalizeLearningTarget(bodyLearningTarget);
+    learningTarget = sanitizeTargetLanguage(uiLanguage, requestTarget ?? "th");
   }
 
   const word = await pickWordToIntroduce({

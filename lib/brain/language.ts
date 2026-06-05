@@ -60,17 +60,30 @@ export function resolveTargetLanguage(args: {
   userInput: string;
   memory: Array<{ role: "user" | "miomi"; content: string }>;
   profileTarget: "th" | "en" | null;
-}): "th" | "en" | null {
+  uiLanguage?: "th" | "en";
+}): "th" | "en" {
   const fromInput = detectTargetLanguageFromIntent(args.userInput);
-  if (fromInput) return fromInput;
+  if (fromInput) {
+    return args.uiLanguage
+      ? sanitizeTargetLanguage(args.uiLanguage, fromInput)
+      : fromInput;
+  }
 
   const recentUserMsgs = args.memory.filter((m) => m.role === "user").slice(-5);
   for (let i = recentUserMsgs.length - 1; i >= 0; i--) {
     const fromHistory = detectTargetLanguageFromIntent(recentUserMsgs[i].content);
-    if (fromHistory) return fromHistory;
+    if (fromHistory) {
+      return args.uiLanguage
+        ? sanitizeTargetLanguage(args.uiLanguage, fromHistory)
+        : fromHistory;
+    }
   }
 
-  return args.profileTarget;
+  const fallback = args.profileTarget ?? null;
+  if (args.uiLanguage) {
+    return sanitizeTargetLanguage(args.uiLanguage, fallback);
+  }
+  return fallback ?? "th";
 }
 
 export function messageDominantLang(text: string): "th" | "en" | null {
@@ -158,16 +171,31 @@ export function detectLanguage(userInput: string, fallback: "th" | "en"): Detect
   return fallback;
 }
 
+/** Target must differ from UI — never teach the learner's own conversation language. */
+export function oppositeLanguage(lang: "th" | "en"): "th" | "en" {
+  return lang === "en" ? "th" : "en";
+}
+
+export function sanitizeTargetLanguage(
+  uiLanguage: "th" | "en",
+  targetLanguage: "th" | "en" | null,
+): "th" | "en" {
+  if (targetLanguage && targetLanguage !== uiLanguage) return targetLanguage;
+  return oppositeLanguage(uiLanguage);
+}
+
 export function resolveSessionLanguages(args: {
   isGuest: boolean;
   profileUiLang: string | null;
   profileTarget: string | null;
-}): { uiLanguage: "th" | "en"; targetLanguage: "th" | "en" | null } {
+}): { uiLanguage: "th" | "en"; targetLanguage: "th" | "en" } {
   if (args.isGuest) {
     return { uiLanguage: "en", targetLanguage: "th" };
   }
+  const uiLanguage = normalizeUiLanguage(args.profileUiLang);
+  const profileTarget = normalizeLearningTarget(args.profileTarget);
   return {
-    uiLanguage: normalizeUiLanguage(args.profileUiLang),
-    targetLanguage: normalizeLearningTarget(args.profileTarget),
+    uiLanguage,
+    targetLanguage: sanitizeTargetLanguage(uiLanguage, profileTarget),
   };
 }

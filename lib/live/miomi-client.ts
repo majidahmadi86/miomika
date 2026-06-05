@@ -48,20 +48,37 @@ type LiveSession = {
   sendToolResponse: (input: { functionResponses: { id?: string; name: string; response: unknown }[] }) => Promise<void>;
 };
 
+export type TeachWordContext = {
+  learningTarget: "th" | "en";
+  sessionIntroduced: string[];
+};
+
 export class MiomiLiveClient {
   private session: LiveSession | null = null;
   private connected = false;
+  private teachWordContext: TeachWordContext = {
+    learningTarget: "th",
+    sessionIntroduced: [],
+  };
 
   constructor(private callbacks: LiveClientCallbacks) {}
+
+  setTeachWordContext(ctx: TeachWordContext): void {
+    this.teachWordContext = ctx;
+  }
 
   async connect(opts?: {
     voice?: string;
     uiLanguage: "th" | "en";
-    targetLanguage: "th" | "en" | null;
+    targetLanguage: "th" | "en";
   }): Promise<void> {
     const voice = opts?.voice ?? LIVE_VOICE;
     const uiLanguage = opts?.uiLanguage ?? "en";
     const targetLanguage = opts?.targetLanguage ?? "th";
+    this.teachWordContext = {
+      learningTarget: targetLanguage,
+      sessionIntroduced: this.teachWordContext.sessionIntroduced,
+    };
     // LOCKED 2026-06-05 — ephemeral token from server; GEMINI_API_KEY never in browser.
     const tokenRes = await fetch("/api/live-token");
     if (!tokenRes.ok) {
@@ -180,7 +197,11 @@ export class MiomiLiveClient {
           const resp = await fetch("/api/teach-word", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ topic_hint: topicHint || undefined }),
+            body: JSON.stringify({
+              topic_hint: topicHint || undefined,
+              learning_target: this.teachWordContext.learningTarget,
+              session_introduced: this.teachWordContext.sessionIntroduced,
+            }),
           });
           if (!resp.ok) {
             const err = (await resp.json().catch(() => ({}))) as { error?: string };
@@ -243,7 +264,11 @@ export class MiomiLiveClient {
   }
 
   /** Remind the model when UI/TARGET language adapts mid-session. */
-  sendLanguageContext(ui: "th" | "en", target: "th" | "en" | null): void {
+  sendLanguageContext(ui: "th" | "en", target: "th" | "en"): void {
+    this.teachWordContext = {
+      ...this.teachWordContext,
+      learningTarget: target,
+    };
     const uiName = ui === "en" ? "English" : "Thai";
     const targetName =
       target === "en" ? "English" : target === "th" ? "Thai" : "none";

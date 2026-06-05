@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 import { LIVE_MODEL } from "@/lib/live/live-config";
+import { liveTokenDurations } from "@/lib/live/token-policy";
 import { log, logError } from "@/lib/debug/log";
 
 let tokenClient: GoogleGenAI | null = null;
@@ -33,11 +34,10 @@ export async function GET() {
     return NextResponse.json({ error: "Live voice unavailable" }, { status: 503 });
   }
 
-  const expireTime = new Date(
-    Date.now() + (isGuest ? 10 : 30) * 60 * 1000,
-  ).toISOString();
+  const { sessionMinutes, expireMinutes } = liveTokenDurations(isGuest);
+  const expireTime = new Date(Date.now() + expireMinutes * 60 * 1000).toISOString();
   const newSessionExpireTime = new Date(
-    Date.now() + (isGuest ? 5 : 1) * 60 * 1000,
+    Date.now() + sessionMinutes * 60 * 1000,
   ).toISOString();
 
   try {

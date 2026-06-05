@@ -28,10 +28,16 @@ import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
 import {
   detectLanguage,
   detectPracticeAttempt,
+  normalizeLearningTarget,
   normalizeUiLanguage,
   resolveSessionLanguages,
+  resolveTargetLanguage,
   resolveUiLanguage,
 } from "@/lib/brain/language";
+import {
+  newGeminiTranscriptItem,
+  routeGeminiTranscriptChunk,
+} from "@/lib/live/transcript-routing";
 import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config";
 import {
   cardDirectionForTarget,
@@ -64,10 +70,10 @@ function readGuestExchanges(): number {
   return !isNaN(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function readUiLang(): "th" | "en" {
-  if (typeof window === "undefined") return "en";
-  const lang = navigator.language || "en";
-  return lang.startsWith("en") ? "en" : "th";
+function sessionIntroducedWords(items: CanvasItem[]): string[] {
+  return items
+    .filter((item): item is Extract<CanvasItem, { kind: "word_card" }> => item.kind === "word_card")
+    .map((item) => item.word.word_en);
 }
 
 function canvasToMemory(
@@ -86,14 +92,6 @@ function canvasToMemory(
   return memory;
 }
 
-function detectReplyLang(text: string, fallback: "th" | "en"): "th" | "en" {
-  const thai = (text.match(/[\u0E00-\u0E7F]/g) ?? []).length;
-  const latin = (text.match(/[A-Za-z]/g) ?? []).length;
-  if (thai > latin) return "th";
-  if (latin > thai) return "en";
-  return fallback;
-}
-
 function makeOpenerItem(): CanvasItem {
   const iceBreaker = pickIceBreaker();
   return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
@@ -110,7 +108,7 @@ export default function TalkPage() {
     typeof window !== "undefined" ? loadTalkConfig() : DEFAULT_TALK_CONFIG,
   );
   const [adjustOpen, setAdjustOpen] = useState(false);
-  const [uiLang, setUiLang] = useState<"th" | "en">(readUiLang);
+  const [uiLang, setUiLang] = useState<"th" | "en">("en");
   const [items, setItems] = useState<CanvasItem[]>([]);
   const [textInput, setTextInput] = useState("");
   const [keyboardMode, setKeyboardMode] = useState(false);
@@ -145,11 +143,18 @@ export default function TalkPage() {
   const isLockedRef = useRef(false);
   const conversationLangRef = useRef<"th" | "en">("en");
   const sessionUiLangRef = useRef<"th" | "en">("en");
-  const sessionTargetLangRef = useRef<"th" | "en" | null>("th");
+  const sessionTargetLangRef = useRef<"th" | "en">("th");
   const itemsRef = useRef<CanvasItem[]>([]);
   const teardownSessionRef = useRef<() => void>(() => {});
   const userExchangeCountedRef = useRef(false);
   const pendingHandoffContextRef = useRef(false);
+
+  const syncTeachWordContext = useCallback(() => {
+    clientRef.current?.setTeachWordContext({
+      learningTarget: sessionTargetLangRef.current,
+      sessionIntroduced: sessionIntroducedWords(itemsRef.current),
+    });
+  }, []);
 
   const primeAudio = useCallback(() => {
     if (!mediaRef.current) mediaRef.current = new MediaHandler();
@@ -206,7 +211,7 @@ export default function TalkPage() {
     itemsRef.current = items;
   }, [items]);
 
-  const maybeAdaptSessionLanguage = useCallback(
+  const maybeAdaptSessionLanguages = useCallback(
     (userInput: string) => {
       const trimmed = userInput.trim();
       if (!trimmed) return;
@@ -217,6 +222,7 @@ export default function TalkPage() {
       const profileUiAnchor = isGuestRef.current
         ? sessionUi
         : normalizeUiLanguage(profile?.ui_language ?? null);
+      const profileTarget = normalizeLearningTarget(profile?.learning_target_language ?? null);
 
       const isPracticeAttempt = detectPracticeAttempt({
         userInput: trimmed,
@@ -224,24 +230,35 @@ export default function TalkPage() {
         learningTargetLanguage: targetLang,
         uiLanguage: sessionUi,
         memory,
-        introducedWords: [],
+        introducedWords: sessionIntroducedWords(itemsRef.current),
       });
       if (isPracticeAttempt) return;
 
-      const resolved = resolveUiLanguage({
+      const resolvedUi = resolveUiLanguage({
         profileUiLang: profileUiAnchor,
         userInput: trimmed,
         memory,
       });
-      if (resolved === sessionUi) return;
+      const resolvedTarget = resolveTargetLanguage({
+        userInput: trimmed,
+        memory,
+        profileTarget,
+        uiLanguage: resolvedUi,
+      });
 
-      sessionUiLangRef.current = resolved;
-      conversationLangRef.current = resolved;
-      setConversationLang(resolved);
-      setUiLang(resolved);
-      clientRef.current?.sendLanguageContext(resolved, targetLang);
+      const uiChanged = resolvedUi !== sessionUi;
+      const targetChanged = resolvedTarget !== targetLang;
+      if (!uiChanged && !targetChanged) return;
+
+      sessionUiLangRef.current = resolvedUi;
+      sessionTargetLangRef.current = resolvedTarget;
+      conversationLangRef.current = resolvedUi;
+      setConversationLang(resolvedUi);
+      setUiLang(resolvedUi);
+      clientRef.current?.sendLanguageContext(resolvedUi, resolvedTarget);
+      syncTeachWordContext();
     },
-    [profile?.ui_language],
+    [profile?.ui_language, profile?.learning_target_language, syncTeachWordContext],
   );
 
   const completeGuestLimitTurn = useCallback(() => {
@@ -274,7 +291,6 @@ export default function TalkPage() {
   }, [setGuestExchanges]);
 
   const appendTranscript = useCallback((role: "user" | "gemini", chunk: string) => {
-    const fallback = uiLang;
     if (role === "user") {
       const cleaned = sanitizeUserTranscript(chunk);
       if (!cleaned) return;
@@ -294,30 +310,32 @@ export default function TalkPage() {
       return;
     }
 
-    const lang = detectReplyLang(chunk, fallback);
+    const uiField = sessionUiLangRef.current;
     if (currentGeminiItemIdRef.current) {
       setItems((prev) =>
         prev.map((item) => {
           if (item.id !== currentGeminiItemIdRef.current || item.kind !== "mini_cat") return item;
-          return lang === "th"
-            ? { ...item, textTh: item.textTh + chunk }
-            : { ...item, textEn: item.textEn + chunk };
+          return {
+            ...item,
+            ...routeGeminiTranscriptChunk(uiField, item, chunk),
+          };
         }),
       );
     } else {
       const id = crypto.randomUUID();
       currentGeminiItemIdRef.current = id;
+      const routed = newGeminiTranscriptItem(uiField, chunk);
       setItems((prev) => [
         ...prev,
         {
           id,
           kind: "mini_cat",
-          textTh: lang === "th" ? chunk : "",
-          textEn: lang === "en" ? chunk : "",
+          textTh: routed.textTh,
+          textEn: routed.textEn,
         },
       ]);
     }
-  }, [uiLang]);
+  }, []);
 
   const openGuestSignupSheet = useCallback((reason: "talk" | "save") => {
     setGuestSheetReason(reason);
@@ -337,7 +355,7 @@ export default function TalkPage() {
         .reverse()
         .find((item): item is Extract<CanvasItem, { kind: "user_said" }> => item.kind === "user_said");
       if (lastUser) {
-        maybeAdaptSessionLanguage(lastUser.text);
+        maybeAdaptSessionLanguages(lastUser.text);
       }
       currentGeminiItemIdRef.current = null;
       currentUserItemIdRef.current = null;
@@ -400,16 +418,24 @@ export default function TalkPage() {
         message: "get_word_to_teach tool call",
         data: { args: msg.args, result, phonetics_source: result.phonetics_source ?? null },
       });
+      syncTeachWordContext();
+      if (handoffTurnRef.current) return;
       const entry = teachWordToVocabularyEntry(result);
       if (entry) {
         const direction = cardDirectionForTarget(sessionTargetLangRef.current);
-        setItems((prev) => [
-          ...prev,
-          { id: crypto.randomUUID(), kind: "word_card", word: entry, direction },
-        ]);
+        const cardId = crypto.randomUUID();
+        setItems((prev) => {
+          const next = [
+            ...prev,
+            { id: cardId, kind: "word_card" as const, word: entry, direction },
+          ];
+          itemsRef.current = next;
+          return next;
+        });
+        syncTeachWordContext();
       }
     }
-  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn, maybeAdaptSessionLanguage, openGuestSignupSheet]);
+  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn, maybeAdaptSessionLanguages, openGuestSignupSheet, syncTeachWordContext]);
 
   const teardownSession = useCallback(() => {
     sessionActiveRef.current = false;
@@ -471,6 +497,7 @@ export default function TalkPage() {
       setUiLang(uiLanguage);
 
       await clientRef.current.connect({ uiLanguage, targetLanguage });
+      syncTeachWordContext();
       sessionActiveRef.current = true;
       if (pendingHandoffContextRef.current) {
         clientRef.current.sendHiddenContext(LAST_TURN_HANDOFF);
@@ -503,7 +530,7 @@ export default function TalkPage() {
       teardownSession();
       setLiveUiState("error");
     }
-  }, [canUseLive, handleLiveMessage, teardownSession, startContinuousMic, profile]);
+  }, [canUseLive, handleLiveMessage, teardownSession, startContinuousMic, profile, syncTeachWordContext]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -690,7 +717,7 @@ export default function TalkPage() {
     itemsRef.current = [...itemsRef.current, newItem];
     setItems((prev) => [...prev, newItem]);
     setTextInput("");
-    maybeAdaptSessionLanguage(cleaned);
+    maybeAdaptSessionLanguages(cleaned);
     if (!sessionActiveRef.current) {
       void (async () => {
         await ensurePlaybackUnlocked();
@@ -700,7 +727,7 @@ export default function TalkPage() {
     } else {
       clientRef.current?.sendText(trimmed);
     }
-  }, [textInput, isLocked, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession, maybeAdaptSessionLanguage, openGuestSignupSheet]);
+  }, [textInput, isLocked, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession, maybeAdaptSessionLanguages, openGuestSignupSheet]);
 
   const handleMiomiHelp = useCallback(
     (topic: "pillars" | "niche" | "voice") => {

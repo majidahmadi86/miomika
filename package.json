@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "check:drift": "tsx scripts/check-drift.ts",
+    "check:talk": "tsx scripts/talk-self-check.ts",
     "predeploy": "tsc --noEmit && npm run lint && npm run check:drift"
   },
   "dependencies": {
