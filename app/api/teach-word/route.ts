@@ -8,7 +8,11 @@ import {
   sanitizeTargetLanguage,
 } from "@/lib/brain/language";
 import { resolvePhonetics } from "@/lib/brain/phonetics";
-import { introduceWord, pickWordToIntroduce } from "@/lib/brain/teaching";
+import {
+  introduceWord,
+  pickWordToIntroduce,
+  pickWordToPractice,
+} from "@/lib/brain/teaching";
 import { createServiceClient } from "@/lib/supabase/service";
 import { log } from "@/lib/debug/log";
 import type { Tier } from "@/lib/auth/get-server-profile";
@@ -153,7 +157,7 @@ export async function POST(req: NextRequest) {
     learningTarget = sanitizeTargetLanguage(uiLanguage, requestTarget ?? "th");
   }
 
-  const word = await pickWordToIntroduce({
+  let word = await pickWordToIntroduce({
     userId,
     cefrLevel: isGuest ? "A1" : cefrLevel,
     learningTarget,
@@ -162,17 +166,25 @@ export async function POST(req: NextRequest) {
     tier,
   });
 
+  let mode: "introduce" | "practice" | "none" = word ? "introduce" : "none";
+
+  if (!word && userId) {
+    word = await pickWordToPractice({ userId, learningTarget });
+    if (word) mode = "practice";
+  }
+
   log("teach-word", "get_word_to_teach", {
     userId: userId ?? "guest",
     topicHint: topicHint || null,
     picked: word?.word_en ?? null,
+    mode,
   });
 
   if (!word) {
-    return NextResponse.json({ ok: true, word: null });
+    return NextResponse.json({ ok: true, word: null, mode: "none" });
   }
 
-  if (userId) {
+  if (userId && mode === "introduce") {
     await introduceWord({ userId, word });
   }
 
@@ -192,6 +204,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    mode,
     word_en: word.word_en,
     word_th: word.word_th,
     emoji: word.emoji,

@@ -14,7 +14,10 @@ import {
   resolveUiLanguage,
   sanitizeTargetLanguage,
 } from "../lib/brain/language";
-import { filterVocabCandidates } from "../lib/brain/teaching";
+import {
+  filterVocabCandidates,
+  selectDueReviewCandidate,
+} from "../lib/brain/teaching";
 import {
   buildKickoffPrompt,
   buildSystemInstruction,
@@ -35,6 +38,7 @@ import {
   createGuestFlowState,
   onHandoffTurnComplete,
   onInvitationDrained,
+  onMicStop,
   onWordCardDuringHandoff,
   simulateGuestFiveTurnFlow,
 } from "../lib/talk/guest-flow";
@@ -289,7 +293,67 @@ assert(
   "API key stays server-side in live-token route",
 );
 
-// --- G. Sanity on helpers ---------------------------------------------------
+// --- G. Live-test regressions (2026-06-05) ----------------------------------
+
+section("Live-test regressions");
+
+const reviewRows = [
+  { word_en: "hello", next_spiral_at: "2026-06-01T00:00:00Z", mastery_level: 1 },
+  { word_en: "water", next_spiral_at: "2026-06-10T00:00:00Z", mastery_level: 0 },
+  { word_en: "thanks", next_spiral_at: "2026-06-04T12:00:00Z", mastery_level: 2 },
+];
+const duePick = selectDueReviewCandidate(reviewRows, new Date("2026-06-05T12:00:00Z"));
+assert(duePick === "hello", "null intro pick → earliest overdue review word");
+assert(duePick !== "empty" && duePick !== "invented", "review path never returns made-up word");
+
+const teachWordRouteSrc = readFileSync(
+  join(ROOT, "app/api/teach-word/route.ts"),
+  "utf8",
+);
+assert(
+  teachWordRouteSrc.includes("pickWordToPractice"),
+  "teach-word falls back to pickWordToPractice when intro is null",
+);
+assert(
+  teachWordRouteSrc.includes('mode = "practice"'),
+  "practice mode flagged when reviewing known word",
+);
+
+const mediaHandlerSrc = readFileSync(
+  join(ROOT, "lib/live/media-handler.ts"),
+  "utf8",
+);
+assert(
+  mediaHandlerSrc.includes("micSendSuspended") &&
+    mediaHandlerSrc.includes("shouldForwardMicToGemini"),
+  "replay guard suspends mic PCM to Gemini",
+);
+
+const talkPageSrc = readFileSync(join(ROOT, "app/(app)/talk/page.tsx"), "utf8");
+assert(
+  talkPageSrc.includes("suspendMicSend(true)") &&
+    talkPageSrc.includes("shouldForwardMicToGemini"),
+  "card replay suspends mic send during TTS",
+);
+assert(
+  talkPageSrc.includes("stopContinuousMic") &&
+    !/liveUiState === "listening"\)[\s\S]{0,120}teardownSession/.test(talkPageSrc),
+  "mic-stop uses stopContinuousMic, not full teardown",
+);
+assert(
+  talkPageSrc.includes("invitationVoiceSentRef"),
+  "CTA sheet requires voiced invitation (no silent handoff)",
+);
+
+flow = createGuestFlowState(GUEST_EXCHANGE_LIMIT - 1);
+flow = beginGuestExchange(flow);
+flow = onMicStop(flow);
+flow = onHandoffTurnComplete(flow);
+assert(flow.invitationCueCount === 0, "mic-stop never triggers invitation cue");
+flow = onInvitationDrained(flow);
+assert(flow.signupSheetCount === 0, "mic-stop never opens signup sheet");
+
+// --- H. Sanity on helpers ---------------------------------------------------
 
 section("Helpers");
 assert(oppositeLanguage("en") === "th", "oppositeLanguage en→th");

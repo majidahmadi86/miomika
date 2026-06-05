@@ -138,6 +138,8 @@ export default function TalkPage() {
   const entryStartedRef = useRef(false);
   const handoffTurnRef = useRef(false);
   const invitationPendingRef = useRef(false);
+  const invitationVoiceSentRef = useRef(false);
+  const handoffGenerationRef = useRef(0);
   const guestExchangesRef = useRef(0);
   const isGuestRef = useRef(false);
   const isLockedRef = useRef(false);
@@ -170,11 +172,24 @@ export default function TalkPage() {
 
   const startContinuousMic = useCallback(async () => {
     if (!mediaRef.current) return;
+    mediaRef.current.suspendMicSend(false);
     await mediaRef.current.startAudio((pcm) => {
+      if (!mediaRef.current?.shouldForwardMicToGemini()) return;
       if (clientRef.current?.isConnected()) clientRef.current.sendAudio(pcm);
     });
     setLiveUiState("listening");
     logEvent({ kind: "mic", level: "info", message: "continuous mic started" });
+  }, []);
+
+  const stopContinuousMic = useCallback(() => {
+    handoffGenerationRef.current += 1;
+    handoffTurnRef.current = false;
+    invitationPendingRef.current = false;
+    invitationVoiceSentRef.current = false;
+    mediaRef.current?.suspendMicSend(false);
+    mediaRef.current?.stopAudio();
+    setLiveUiState("idle");
+    logEvent({ kind: "mic", level: "info", message: "continuous mic stopped" });
   }, []);
 
   const guestExchanges = guestAuthReady && !isGuest ? 0 : guestExchangesRaw;
@@ -264,8 +279,10 @@ export default function TalkPage() {
   const completeGuestLimitTurn = useCallback(() => {
     // LOCKED 2026-06-05 — guest 5th-reply handoff: spoken GUEST_INVITATION_CUE only (never a chat
     // bubble). Sheet opens after waitForPlaybackIdle in turn_complete. Paired with LAST_TURN_HANDOFF.
+    if (!sessionActiveRef.current || !clientRef.current?.isConnected()) return;
     const lang = conversationLangRef.current;
-    clientRef.current?.sendSpeakExact(GUEST_INVITATION_CUE[lang]);
+    clientRef.current.sendSpeakExact(GUEST_INVITATION_CUE[lang]);
+    invitationVoiceSentRef.current = true;
     invitationPendingRef.current = true;
   }, []);
 
@@ -362,10 +379,14 @@ export default function TalkPage() {
       userExchangeCountedRef.current = false;
       // LOCKED 2026-06-05 — 5th open-loop reply must finish audio before invite cue + signup sheet.
       if (invitationPendingRef.current) {
+        if (!invitationVoiceSentRef.current) return;
         invitationPendingRef.current = false;
+        const gen = handoffGenerationRef.current;
         void (async () => {
           await mediaRef.current?.waitForTurnAudioThenIdle();
-          if (!mountedRef.current) return;
+          if (!mountedRef.current || !sessionActiveRef.current) return;
+          if (gen !== handoffGenerationRef.current) return;
+          invitationVoiceSentRef.current = false;
           teardownSessionRef.current();
           openGuestSignupSheet("talk");
         })();
@@ -382,9 +403,11 @@ export default function TalkPage() {
       // LOCKED 2026-06-05 — open-loop 5th reply drains fully, then spoken invite (not bubble text).
       if (handoffTurnRef.current) {
         handoffTurnRef.current = false;
+        const gen = handoffGenerationRef.current;
         void (async () => {
           await mediaRef.current?.waitForTurnAudioThenIdle();
           if (!mountedRef.current || !sessionActiveRef.current) return;
+          if (gen !== handoffGenerationRef.current) return;
           completeGuestLimitTurn();
         })();
         return;
@@ -446,6 +469,8 @@ export default function TalkPage() {
     setAwaitingMic(false);
     handoffTurnRef.current = false;
     invitationPendingRef.current = false;
+    invitationVoiceSentRef.current = false;
+    handoffGenerationRef.current += 1;
     userExchangeCountedRef.current = false;
     pendingHandoffContextRef.current = false;
     mediaRef.current?.stopAudio();
@@ -647,11 +672,11 @@ export default function TalkPage() {
   }, []);
 
   const handleWordReplay = useCallback(async (word: VocabularyEntry) => {
-    mediaRef.current?.setInputMuted(true);
+    mediaRef.current?.suspendMicSend(true);
     try {
       await replayWordAudio(word, sessionTargetLangRef.current);
     } finally {
-      mediaRef.current?.setInputMuted(false);
+      mediaRef.current?.suspendMicSend(false);
     }
   }, []);
 
@@ -684,10 +709,10 @@ export default function TalkPage() {
     }
     if (sessionActiveRef.current) {
       if (liveUiState === "listening") {
-        teardownSession();
+        stopContinuousMic();
         return;
       }
-      if (awaitingMicRef.current) {
+      if (awaitingMicRef.current || liveUiState === "idle") {
         awaitingMicRef.current = false;
         setAwaitingMic(false);
         void startContinuousMic();
@@ -699,7 +724,7 @@ export default function TalkPage() {
       await ensurePlaybackUnlocked();
       await startLiveSession();
     })();
-  }, [guestAuthReady, isLocked, liveUiState, primeAudio, ensurePlaybackUnlocked, teardownSession, startLiveSession, startContinuousMic, openGuestSignupSheet]);
+  }, [guestAuthReady, isLocked, liveUiState, primeAudio, ensurePlaybackUnlocked, stopContinuousMic, startLiveSession, startContinuousMic, openGuestSignupSheet]);
 
   const handleSendText = useCallback(() => {
     const trimmed = textInput.trim();

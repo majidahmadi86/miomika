@@ -13,7 +13,13 @@ export class MediaHandler {
   private nextStartTime = 0;
   private scheduledSources: AudioBufferSourceNode[] = [];
   private playbackActive = false;
+  private micSendSuspended = false;
   isRecording = false;
+
+  /** True when mic PCM may be forwarded to Gemini (harness + replay guard). */
+  shouldForwardMicToGemini(): boolean {
+    return this.isRecording && !this.playbackActive && !this.micSendSuspended;
+  }
 
   /** Call synchronously inside a user-gesture handler before any await. */
   primeAudioContext(): void {
@@ -64,7 +70,7 @@ export class MediaHandler {
     this.audioWorkletNode = new AudioWorkletNode(this.audioContext, "pcm-processor");
 
     this.audioWorkletNode.port.onmessage = (event: MessageEvent<Float32Array>) => {
-      if (!this.isRecording || this.playbackActive) return;
+      if (!this.shouldForwardMicToGemini()) return;
       const downsampled = this.downsampleBuffer(
         event.data,
         this.audioContext!.sampleRate,
@@ -211,11 +217,17 @@ export class MediaHandler {
     });
   }
 
-  /** Duck live mic while card replay TTS plays ? prevents speaker bleed confusing VAD. */
-  setInputMuted(muted: boolean): void {
+  /** Suspend mic PCM to Gemini (card replay, speaker bleed guard). */
+  suspendMicSend(suspended: boolean): void {
+    this.micSendSuspended = suspended;
     if (this.inputGain) {
-      this.inputGain.gain.value = muted ? 0 : 1;
+      this.inputGain.gain.value = suspended ? 0 : 1;
     }
+  }
+
+  /** @deprecated use suspendMicSend ? kept for callers that only duck gain */
+  setInputMuted(muted: boolean): void {
+    this.suspendMicSend(muted);
   }
 
   private downsampleBuffer(buffer: Float32Array, sampleRate: number, outSampleRate: number): Float32Array {

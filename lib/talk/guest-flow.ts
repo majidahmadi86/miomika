@@ -74,6 +74,15 @@ export function onWordCardDuringHandoff(state: GuestFlowFlags): GuestFlowFlags {
   return { ...state, wordCardsOnHandoffTurn: state.wordCardsOnHandoffTurn + 1 };
 }
 
+/** Mic orb stop — must not trigger handoff invite or signup sheet. */
+export function onMicStop(state: GuestFlowFlags): GuestFlowFlags {
+  return {
+    ...state,
+    handoffTurn: false,
+    invitationPending: false,
+  };
+}
+
 /** Simulate five full user turns through handoff + invite + sheet. */
 export function simulateGuestFiveTurnFlow(): GuestFlowFlags {
   let state = createGuestFlowState(0);

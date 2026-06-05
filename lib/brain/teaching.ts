@@ -149,6 +149,90 @@ export function filterVocabCandidates(args: {
   return candidates;
 }
 
+export type ReviewCandidateRow = {
+  word_en: string;
+  next_spiral_at: string | null;
+  mastery_level: number;
+};
+
+/** Pure due-word picker — overdue first, then earliest spiral (self-check + pickWordToPractice). */
+export function selectDueReviewCandidate(
+  rows: ReviewCandidateRow[],
+  now: Date = new Date(),
+): string | null {
+  if (rows.length === 0) return null;
+  const nowMs = now.getTime();
+  const scored = rows.map((row) => {
+    const dueAt = row.next_spiral_at ? new Date(row.next_spiral_at).getTime() : 0;
+    return {
+      word_en: row.word_en,
+      dueAt,
+      overdue: dueAt <= nowMs,
+      mastery: row.mastery_level,
+    };
+  });
+  const due = scored.filter((r) => r.overdue);
+  const pool = due.length > 0 ? due : scored;
+  pool.sort((a, b) => a.dueAt - b.dueAt || a.mastery - b.mastery);
+  return pool[0]?.word_en ?? null;
+}
+
+/** When intro cap or bank is exhausted, practice a due word from vocabulary_user_state. */
+export async function pickWordToPractice(args: {
+  userId: string;
+  learningTarget: "th" | "en" | null;
+}): Promise<IntroducedWord | null> {
+  try {
+    const supabase = await createServiceClient();
+    const { data, error } = await supabase
+      .from("vocabulary_user_state")
+      .select("word_en, next_spiral_at, mastery_level")
+      .eq("user_id", args.userId)
+      .is("mastered_at", null)
+      .order("next_spiral_at", { ascending: true, nullsFirst: true })
+      .limit(50);
+
+    if (error) {
+      console.error(
+        "[teaching.pickWordToPractice] vocabulary_user_state query failed:",
+        error.message,
+        error.details,
+      );
+      return null;
+    }
+
+    const pickEn = selectDueReviewCandidate(
+      (data ?? []).map((row) => ({
+        word_en: row.word_en as string,
+        next_spiral_at: (row.next_spiral_at as string | null) ?? null,
+        mastery_level: (row.mastery_level as number) ?? 0,
+      })),
+    );
+    if (!pickEn) return null;
+
+    const { data: bankRow, error: bankErr } = await supabase
+      .from("vocabulary_bank")
+      .select("word_en, word_th, cefr_level, emoji")
+      .eq("word_en", pickEn)
+      .maybeSingle();
+
+    if (bankErr) {
+      console.error(
+        "[teaching.pickWordToPractice] vocabulary_bank query failed:",
+        bankErr.message,
+        bankErr.details,
+      );
+      return null;
+    }
+
+    if (!bankRow) return null;
+    return rowToIntroducedWord(bankRow as VocabBankRow, args.learningTarget);
+  } catch (err) {
+    console.error("[teaching.pickWordToPractice] failed:", err);
+    return null;
+  }
+}
+
 /** LOCKED 2026-06-05 — Live Tool 1 backend: /api/teach-word → pickWordToIntroduce (+ introduceWord for members). */
 export async function pickWordToIntroduce(args: {
   userId: string | null;
