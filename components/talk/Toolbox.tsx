@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Type, Globe, Volume2, VolumeX, Keyboard } from "lucide-react";
+import { Type, Globe, Keyboard } from "lucide-react";
 
 export type ResponseLength = "short" | "normal" | "detailed";
 export type ResponseLang = "th" | "en" | "both";
@@ -10,12 +10,10 @@ export type ResponseLang = "th" | "en" | "both";
 interface ToolboxProps {
   length: ResponseLength;
   lang: ResponseLang;
-  ttsOn: boolean;
   keyboardMode: boolean;
   uiLang: "th" | "en";
   onCycleLength: () => void;
   onCycleLang: () => void;
-  onToggleTts: () => void;
   onToggleKeyboard: () => void;
 }
 
@@ -27,12 +25,10 @@ const iconVariants = {
 export function Toolbox({
   length,
   lang,
-  ttsOn,
   keyboardMode,
   uiLang,
   onCycleLength,
   onCycleLang,
-  onToggleTts,
   onToggleKeyboard,
 }: ToolboxProps) {
   const [lastPressedId, setLastPressedId] = useState<string | null>(null);
@@ -83,15 +79,6 @@ export function Toolbox({
         label={lang === "both" ? "T+E" : lang.toUpperCase()}
         title={uiLang === "en" ? `Lang: ${lang}` : "ภาษา"}
         onClick={() => { markPressed("lang"); onCycleLang(); }}
-      />
-      <ToolBtn
-        id="tts"
-        Icon={ttsOn ? Volume2 : VolumeX}
-        active={ttsOn}
-        isPressed={lastPressedId === "tts"}
-        label=""
-        title={uiLang === "en" ? (ttsOn ? "Voice on" : "Voice off") : "เสียง"}
-        onClick={() => { markPressed("tts"); onToggleTts(); }}
       />
     </div>
   );

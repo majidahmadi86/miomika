@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# throwaway spikes — never commit
+/spike-live/
+
 # Strategic documents — keep local only
 AGENTS.md
 BRIEF.md

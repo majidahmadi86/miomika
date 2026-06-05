@@ -10,6 +10,7 @@ interface MicRowProps {
   current: TalkMode;
   orbState: OrbState;
   uiLang: "th" | "en";
+  showModes?: boolean;
   onModeChange: (m: TalkMode) => void;
   onOrbTap: () => void;
   orbAriaLabel: string;
@@ -23,7 +24,7 @@ const MODES: { key: TalkMode; Icon: LucideIcon; labelTh: string; labelEn: string
   { key: "chat", Icon: Heart, labelTh: "คุย", labelEn: "Chat" },
 ];
 
-export function MicRow({ current, orbState, uiLang, onModeChange, onOrbTap, orbAriaLabel }: MicRowProps) {
+export function MicRow({ current, orbState, uiLang, showModes = false, onModeChange, onOrbTap, orbAriaLabel }: MicRowProps) {
   const activeIdx = Math.max(0, MODES.findIndex((m) => m.key === current));
   const activeMode = MODES[activeIdx];
 
@@ -46,6 +47,7 @@ export function MicRow({ current, orbState, uiLang, onModeChange, onOrbTap, orbA
   // Native touch listeners with passive: false so we can stopPropagation/preventDefault
   // BEFORE the swipe is hijacked by parent scroll containers.
   useEffect(() => {
+    if (!showModes) return;
     const el = containerRef.current;
     if (!el) return;
 
@@ -101,12 +103,14 @@ export function MicRow({ current, orbState, uiLang, onModeChange, onOrbTap, orbA
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
     };
-  }, []);
+  }, [showModes]);
 
   const OrbIcon =
     orbState === "listening" || orbState === "thinking" || orbState === "speaking"
       ? AudioWaveform
-      : activeMode.Icon;
+      : showModes
+        ? activeMode.Icon
+        : Heart;
 
   return (
     <div
@@ -125,11 +129,12 @@ export function MicRow({ current, orbState, uiLang, onModeChange, onOrbTap, orbA
         userSelect: "none",
       }}
     >
-      {leftSlots.map((m, i) => (
-        <ModePill key={`l-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
-      ))}
+      {showModes &&
+        leftSlots.map((m, i) => (
+          <ModePill key={`l-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
+        ))}
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, margin: "0 4px" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, margin: showModes ? "0 4px" : 0 }}>
         <button
           type="button"
           onClick={onOrbTap}
@@ -149,7 +154,7 @@ export function MicRow({ current, orbState, uiLang, onModeChange, onOrbTap, orbA
           >
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeMode.key + (orbState === "listening" || orbState === "thinking" || orbState === "speaking" ? "-active" : "-idle")}
+                key={(showModes ? activeMode.key : "companion") + (orbState === "listening" || orbState === "thinking" || orbState === "speaking" ? "-active" : "-idle")}
                 initial={{ opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.85 }}
@@ -161,14 +166,17 @@ export function MicRow({ current, orbState, uiLang, onModeChange, onOrbTap, orbA
             </AnimatePresence>
           </motion.div>
         </button>
-        <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 600, color: "#B8985C", letterSpacing: "0.03em", marginTop: "4px" }}>
-          {uiLang === "en" ? activeMode.labelEn : activeMode.labelTh}
-        </span>
+        {showModes && (
+          <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 600, color: "#B8985C", letterSpacing: "0.03em", marginTop: "4px" }}>
+            {uiLang === "en" ? activeMode.labelEn : activeMode.labelTh}
+          </span>
+        )}
       </div>
 
-      {rightSlots.map((m, i) => (
-        <ModePill key={`r-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
-      ))}
+      {showModes &&
+        rightSlots.map((m, i) => (
+          <ModePill key={`r-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
+        ))}
     </div>
   );
 }
