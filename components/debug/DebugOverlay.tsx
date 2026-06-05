@@ -36,6 +36,19 @@ function formatRelative(ts: number, now: number): string {
   return `${Math.floor(diff / 60)}m${Math.floor(diff % 60)}s`;
 }
 
+function extractTurnLatency(events: DebugEvent[]): string | null {
+  for (const event of events) {
+    if (!event.message.startsWith("turn:model_audio_first")) continue;
+    const data = event.data as { report?: string; deltaMs?: number | null } | undefined;
+    const reportLine = data?.report
+      ?.split("\n")
+      .find((line) => line.includes("user_turn → first_audio"));
+    if (reportLine) return reportLine;
+    if (data?.deltaMs != null) return `user_turn → first_audio: ${data.deltaMs}ms`;
+  }
+  return null;
+}
+
 function inferVadState(events: DebugEvent[]): string {
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i];
@@ -157,6 +170,7 @@ export function DebugOverlay({ open, onClose, micState, conversationLang }: Debu
 
   const errorCount = events.filter((e) => e.level === "error").length;
   const vadState = inferVadState(events);
+  const turnLatency = extractTurnLatency(events);
 
   const handleCopy = useCallback(async () => {
     const text = JSON.stringify(getEvents(), null, 2);
@@ -224,6 +238,12 @@ export function DebugOverlay({ open, onClose, micState, conversationLang }: Debu
                   <span>vad: <strong style={{ color: vadState === "started" ? "#22C55E" : "#F97316" }}>{vadState}</strong></span>
                   <span>errors: <strong style={{ color: errorCount > 0 ? "#EF4444" : "#22C55E" }}>{errorCount}</strong></span>
                 </div>
+                <p style={{ margin: "8px 0 0", fontFamily: "monospace", fontSize: "10px", color: turnLatency ? "#C9A96E" : "#9A8B73" }}>
+                  latency: {turnLatency ?? "user_turn_start → model_audio_first (awaiting turn)"}
+                </p>
+                <p style={{ margin: "4px 0 0", fontFamily: "monospace", fontSize: "9px", color: "#9A8B73" }}>
+                  open: triple-tap header bar · toggle: ? key
+                </p>
                 <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
                   <button type="button" onClick={() => setPaused((p) => !p)} style={btnStyle}>
                     {paused ? "Resume" : "Pause stream"}

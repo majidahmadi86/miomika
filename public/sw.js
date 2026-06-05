@@ -48,8 +48,8 @@ async function networkFirst(request) {
   try {
     const response = await fetch(request);
     if (response.ok && request.method === "GET") {
-      const cache = await caches.open(name);
-      void cache.put(request, response.clone());
+      const cacheResponse = response.clone();
+      void caches.open(name).then((cache) => cache.put(request, cacheResponse));
     }
     return response;
   } catch (error) {
@@ -64,8 +64,8 @@ async function cacheFirst(request) {
   if (cached) return cached;
   const response = await fetch(request);
   if (response.ok && request.method === "GET") {
-    const cache = await caches.open(await cacheName());
-    void cache.put(request, response.clone());
+    const cacheResponse = response.clone();
+    void caches.open(await cacheName()).then((cache) => cache.put(request, cacheResponse));
   }
   return response;
 }
@@ -76,8 +76,8 @@ async function staleWhileRevalidate(request) {
   const network = fetch(request)
     .then((response) => {
       if (response.ok && request.method === "GET") {
-        const cache = caches.open(name);
-        void cache.then((c) => c.put(request, response.clone()));
+        const cacheResponse = response.clone();
+        void caches.open(name).then((cache) => cache.put(request, cacheResponse));
       }
       return response;
     })
