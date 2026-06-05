@@ -89,8 +89,9 @@ async function loadBankExamples(wordEn: string): Promise<{
 
 /**
  * POST /api/teach-word
- * Brain-backed word picker for Gemini Live `get_word_to_teach` tool.
- * Members: pick + save (vocabulary_user_state + 24h spiral). Guests: A1 pick only.
+ * LOCKED 2026-06-05 — Brain-backed word picker for Gemini Live `get_word_to_teach` tool.
+ * pickWordToIntroduce + introduceWord (lib/brain/teaching.ts). Members: pick + save.
+ * Guests: A1 pick only, no save, never 401. Do not add auth gate without re-verifying /talk guest flow.
  */
 export async function POST(req: NextRequest) {
   let topicHint = "";

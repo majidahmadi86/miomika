@@ -18,9 +18,10 @@ function getTokenClient(): GoogleGenAI | null {
 
 /**
  * GET /api/live-token
- * Mints a short-lived ephemeral token for Gemini Live.
+ * LOCKED 2026-06-05 — Mints a short-lived ephemeral token for Gemini Live.
  * GEMINI_API_KEY stays server-side — browser receives token.name only.
- * Logged-in: standard session cap. Guest: shorter cap as cost backstop (not 401).
+ * Guests allowed (shorter cap as cost backstop, never 401). Do not expose the API key client-side.
+ * Do not change without re-verifying the full /talk + guest flow.
  */
 export async function GET() {
   const profile = await getServerProfile();

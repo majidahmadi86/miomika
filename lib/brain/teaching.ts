@@ -132,6 +132,7 @@ function textContainsWord(userText: string, word: string): boolean {
   return new RegExp(`\\b${escaped}\\b`, "i").test(userText);
 }
 
+/** LOCKED 2026-06-05 — Live Tool 1 backend: /api/teach-word → pickWordToIntroduce (+ introduceWord for members). */
 export async function pickWordToIntroduce(args: {
   userId: string | null;
   cefrLevel: string | null;

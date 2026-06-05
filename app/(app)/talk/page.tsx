@@ -33,6 +33,12 @@ import {
 } from "@/lib/brain/language";
 import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config";
 
+/**
+ * LOCKED 2026-06-05 — /talk is audio-native Gemini Live (MiomiLiveClient + /api/live-token
+ * ephemeral mint). Legacy ASR → LLM → TTS pipeline is NOT used on this route. Do not re-wire
+ * transcribe/miomi/speak here without re-verifying the full /talk + guest flow end-to-end.
+ */
+
 type CanvasItem =
   | { id: string; kind: "mini_cat"; textTh: string; textEn: string }
   | { id: string; kind: "user_said"; text: string };
@@ -226,12 +232,14 @@ export default function TalkPage() {
   );
 
   const completeGuestLimitTurn = useCallback(() => {
-    // LOCKED 2026-06-04 — guest signup invitation decouple, paired with LAST_TURN_HANDOFF.
+    // LOCKED 2026-06-05 — guest 5th-reply handoff: spoken GUEST_INVITATION_CUE only (never a chat
+    // bubble). Sheet opens after waitForPlaybackIdle in turn_complete. Paired with LAST_TURN_HANDOFF.
     const lang = conversationLangRef.current;
     clientRef.current?.sendSpeakExact(GUEST_INVITATION_CUE[lang]);
     invitationPendingRef.current = true;
   }, []);
 
+  // LOCKED 2026-06-05 — guest 5-exchange hook: inject LAST_TURN_HANDOFF on exchange 5; no signup in bubble.
   const beginGuestExchange = useCallback(() => {
     if (!isGuestRef.current || isLockedRef.current) return false;
     if (guestExchangesRef.current >= GUEST_EXCHANGE_LIMIT) return false;
@@ -316,6 +324,7 @@ export default function TalkPage() {
       currentGeminiItemIdRef.current = null;
       currentUserItemIdRef.current = null;
       userExchangeCountedRef.current = false;
+      // LOCKED 2026-06-05 — 5th open-loop reply must finish audio before invite cue + signup sheet.
       if (invitationPendingRef.current) {
         invitationPendingRef.current = false;
         void (async () => {
@@ -326,6 +335,7 @@ export default function TalkPage() {
         })();
         return;
       }
+      // LOCKED 2026-06-05 — icebreaker voice on entry; mic press is a separate orb tap (awaitingMic).
       if (kickoffPendingRef.current && sessionActiveRef.current) {
         kickoffPendingRef.current = false;
         awaitingMicRef.current = true;
@@ -333,6 +343,7 @@ export default function TalkPage() {
         setLiveUiState("idle");
         return;
       }
+      // LOCKED 2026-06-05 — open-loop 5th reply drains fully, then spoken invite (not bubble text).
       if (handoffTurnRef.current) {
         handoffTurnRef.current = false;
         void (async () => {
@@ -521,7 +532,7 @@ export default function TalkPage() {
   }, [items.length, authReady]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  /* eslint-disable react-hooks/set-state-in-effect -- voiced kickoff on /talk entry (SPA nav; AudioContext already unlocked) */
+  /* eslint-disable react-hooks/set-state-in-effect -- LOCKED 2026-06-05: voiced icebreaker on /talk entry; mic is separate orb tap */
   useEffect(() => {
     if (!authReady || isLocked || items.length < 1) return;
     if (sessionActiveRef.current || entryStartedRef.current) return;

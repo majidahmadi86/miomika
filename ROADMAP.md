@@ -1,6 +1,6 @@
 # Miomika — Roadmap & Strategy
 
-_Canonical strategy doc. Last updated: 2026-06-04. Every session should read this._
+_Canonical strategy doc. Last updated: 2026-06-05. Every session should read this._
 
 ---
 
@@ -12,11 +12,26 @@ Miomika is an AI companion — the cat **Miomi** — for **connection through la
 
 ## Architecture decision (LOCKED)
 
-- **Conversation core = audio-native (Google Gemini Live)**, replacing the legacy ASR → LLM → TTS pipeline. The pipeline is being retired.
+- **Conversation core = audio-native (Google Gemini Live)**, replacing the legacy ASR → LLM → TTS pipeline. The pipeline is retired from **`/talk`** (legacy routes may remain for other surfaces until fully removed).
 - Audio-native is fast, hears any language natively (kills the Thai/English lock), and is continuous + barge-in (kills the "is it recording?" confusion). Three of the worst complaints die with this one move.
 - **One system, two modalities:** *voice* runs on Gemini Live (premium + the free taste); *text* runs on a cheap text model (free daily engagement). Cost matched to value.
 - **Cost is controlled by metering minutes, not by engine choice** (pipeline ≈ Live per-minute; the only real lever is limits).
-- Production `/talk` stays **frozen at commit `d0ff9aa`** until the migration is proven via a throwaway spike.
+- Production **`/talk`** is **LOCKED 2026-06-05** on Gemini Live (`MiomiLiveClient` + `/api/live-token` ephemeral mint). Do not revert to transcribe/miomi/speak on this route without Mike sign-off and full guest-flow re-verify.
+
+### `/talk` frozen contracts (LOCKED 2026-06-05)
+
+Do **not** change any item below without re-verifying the full `/talk` + guest flow (ear + 5-exchange sheet + teach-word mid-convo):
+
+| Contract | Where |
+|---|---|
+| Audio-native Gemini Live; key server-side via ephemeral token | `app/(app)/talk/page.tsx`, `lib/live/miomi-client.ts`, `app/api/live-token/route.ts` |
+| Persona: Leda, occasional meow, leads, slow new phrases, short replies | `lib/live/live-config.ts` (`PERSONA_CORE`, `LIVE_VOICE`) |
+| Icebreaker voice on entry; mic press is separate orb tap | `app/(app)/talk/page.tsx` (entry effect + `awaitingMic` after kickoff) |
+| Guest 5-exchange hook; 5th reply = open loop in bubble; invite = spoken cue + signup sheet only | `lib/live/live-config.ts` (`LAST_TURN_HANDOFF`, `GUEST_INVITATION_CUE`), `app/(app)/talk/page.tsx`, `lib/live/media-handler.ts` (`waitForPlaybackIdle`) |
+| `teach-word` never 401 guests; tool handler always `sendToolResponse`, never throws | `app/api/teach-word/route.ts`, `lib/live/miomi-client.ts` |
+| Tool 1 `get_word_to_teach` → `pickWordToIntroduce` + `introduceWord` (member saves; guest A1 no-save) | `lib/live/live-config.ts`, `app/api/teach-word/route.ts`, `lib/brain/teaching.ts` |
+
+Code sites carry `LOCKED 2026-06-05` comments — search before editing.
 
 ---
 
@@ -85,7 +100,7 @@ Voice cost estimate ≈ **0.36 ฿/min** (≈ $0.01). **Verify the exact Gemini 
 
 ## Phased plan
 
-1. **Speed + core voice — migrate to audio-native.** Fixes slow + English-deafness + mic-confusion together. Begin with a throwaway `/talk-live` spike proving (a) the audio-native feel in-app and (b) that the smart lib plugs in via one function call. Production `/talk` stays frozen at `d0ff9aa`.
+1. **Speed + core voice — migrate to audio-native.** Fixes slow + English-deafness + mic-confusion together. **`/talk` shipped on Gemini Live (LOCKED 2026-06-05).** Legacy pipeline retired from `/talk`; spike-live may remain for experiments.
 2. **Smart + usable** — teaching brain (CEFR, spaced repetition, word cards) wired as Live tools; fix profile/settings; add status badges / levels.
 3. **The moat** — relational People Layer, social connect (FB / TikTok / Instagram), Miomi-with-friends, learner / creator network. The viral engine.
 
@@ -96,7 +111,7 @@ Voice cost estimate ≈ **0.36 ฿/min** (≈ $0.01). **Verify the exact Gemini 
 - **Opus = brain; Composer = hands** (exact, no-decision instructions); **Mike = interface**. Repo is not mounted to Opus.
 - 100% understanding before any edit; never blind-code; **one concern per commit**; every change runs `tsc --noEmit` + `lint` + VAD churn, then commit + push; verify by Mike + real logs, not Composer's "done".
 - **Never** push to `main`, change Vercel env, or deploy without Mike's explicit per-step OK.
-- **Frozen + verified:** guest invitation decouple (commits `e9ba8b8` / `77996e0`) — do not change without re-verifying the full guest handoff + CTA flow.
+- **Frozen + verified (2026-06-05):** production `/talk` Gemini Live stack — see Architecture § frozen contracts table. Search `LOCKED 2026-06-05` before editing. Guest invitation decouple (commits `e9ba8b8` / `77996e0`) remains in force.
 
 ---
 

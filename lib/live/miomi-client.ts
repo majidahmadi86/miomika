@@ -62,6 +62,7 @@ export class MiomiLiveClient {
     const voice = opts?.voice ?? LIVE_VOICE;
     const uiLanguage = opts?.uiLanguage ?? "en";
     const targetLanguage = opts?.targetLanguage ?? "th";
+    // LOCKED 2026-06-05 — ephemeral token from server; GEMINI_API_KEY never in browser.
     const tokenRes = await fetch("/api/live-token");
     if (!tokenRes.ok) {
       const err = (await tokenRes.json().catch(() => ({}))) as { error?: string };
@@ -164,6 +165,7 @@ export class MiomiLiveClient {
     }
   }
 
+  /** LOCKED 2026-06-05 — always sendToolResponse; never throw (guest teach-word must not break audio). */
   private async handleToolCall(toolCall: {
     functionCalls?: { id?: string; name: string; args?: Record<string, unknown> }[];
   }): Promise<void> {

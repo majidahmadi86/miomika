@@ -174,7 +174,7 @@ export class MediaHandler {
     return this.playbackActive || this.scheduledSources.length > 0;
   }
 
-  /** Resolves once all scheduled PCM chunks have finished playing. */
+  /** LOCKED 2026-06-05 ? guest 5th-turn invite + sheet wait on playback idle before firing CTA. */
   waitForPlaybackIdle(): Promise<void> {
     if (!this.isPlaybackActive()) return Promise.resolve();
     return new Promise((resolve) => {
