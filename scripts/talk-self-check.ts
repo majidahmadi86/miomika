@@ -46,12 +46,16 @@ import {
   liveTokenDurations,
 } from "../lib/live/token-policy";
 import {
-  createTurnController,
-  reduceTurn,
-  runRepeatedFlowSimulations,
-  simulateGuestFiveTurnFlowController,
-  simulateMemberTurnLoop,
-} from "../lib/live/turn-controller";
+  beginGuestExchange,
+  createGuestFlowState,
+  onHandoffReplyOutput,
+  onHandoffTurnComplete,
+  onInvitationDrained,
+  onMicStop,
+  onSpuriousHandoffTurnComplete,
+  onWordCardDuringHandoff,
+  simulateGuestFiveTurnFlow,
+} from "../lib/talk/guest-flow";
 import {
   cardDirectionForTarget,
   cardMeaningForWord,
@@ -158,54 +162,37 @@ assert(
   "detectExplicitUiLanguageRequest catches speak Thai",
 );
 
-// --- B. Guest 5-turn flow (turn controller) -------------------------------
+// --- B. Guest 5-turn flow ---------------------------------------------------
 
 section("Guest 5-turn flow");
 
-let flow = createTurnController(0, true);
+let flow = createGuestFlowState(0);
 for (let i = 0; i < GUEST_EXCHANGE_LIMIT; i += 1) {
-  const before = flow.guestExchanges;
-  const r = reduceTurn(flow, { type: "guest_text_turn", isGuest: true });
-  flow = r.state;
-  assert(flow.guestExchanges === before + 1, `exchange ${flow.guestExchanges} counted`);
+  const before = flow.exchanges;
+  flow = beginGuestExchange(flow);
+  assert(flow.exchanges === before + 1, `exchange ${flow.exchanges} counted`);
   flow = { ...flow, userExchangeCounted: false };
 }
-assert(flow.guestExchanges === GUEST_EXCHANGE_LIMIT, "exactly 5 exchanges");
-assert(flow.guestLocked, "locked after 5th exchange");
+assert(flow.exchanges === GUEST_EXCHANGE_LIMIT, "exactly 5 exchanges");
+assert(flow.locked, "locked after 5th exchange");
 
-flow = reduceTurn(flow, { type: "model_audio" }).state;
-flow = reduceTurn(flow, { type: "turn_complete" }).state;
-flow = reduceTurn(flow, { type: "playback_idle", context: "handoff" }).state;
-assert(flow.invitationVoiceSent, "invitation cue armed after handoff drain");
-flow = reduceTurn(flow, { type: "model_audio" }).state;
-flow = reduceTurn(flow, { type: "turn_complete" }).state;
-flow = reduceTurn(flow, { type: "playback_idle", context: "invitation" }).state;
-assert(flow.phase === "sheet", "signup sheet phase after invite audio");
+flow = onHandoffReplyOutput(flow);
+flow = onHandoffTurnComplete(flow);
+assert(flow.invitationCueCount === 1, "invitation cue fires once on handoff complete");
 
-const endState = simulateGuestFiveTurnFlowController();
-assert(endState.guestExchanges === GUEST_EXCHANGE_LIMIT, "simulator ends at limit");
-assert(endState.phase === "sheet", "simulator: ends on sheet phase");
-assert(endState.invitationVoiceSent === false, "simulator: invitation cleared after sheet");
+flow = onInvitationDrained(flow);
+assert(flow.signupSheetCount === 1, "signup sheet fires once after invite audio");
 
-flow = createTurnController(GUEST_EXCHANGE_LIMIT - 1, true);
-flow = reduceTurn(flow, { type: "guest_text_turn", isGuest: true }).state;
-assert(flow.handoffArmed, "handoff armed on 5th turn start");
-assert(flow.phase === "handoff", "handoff phase on 5th turn start");
+const endState = simulateGuestFiveTurnFlow();
+assert(endState.exchanges === GUEST_EXCHANGE_LIMIT, "simulator ends at limit");
+assert(endState.invitationCueCount === 1, "simulator: one invitation cue");
+assert(endState.signupSheetCount === 1, "simulator: one signup sheet");
 
-const spurious = reduceTurn(
-  createTurnController(GUEST_EXCHANGE_LIMIT - 1, true),
-  { type: "guest_text_turn", isGuest: true },
-).state;
-const afterSpurious = reduceTurn(spurious, { type: "turn_complete" }).state;
-assert(afterSpurious.handoffArmed, "spurious turn_complete keeps handoff armed");
-assert(!afterSpurious.invitationVoiceSent, "spurious turn_complete never triggers invitation cue");
-
-flow = createTurnController(GUEST_EXCHANGE_LIMIT - 1, true);
-flow = reduceTurn(flow, { type: "guest_text_turn", isGuest: true }).state;
-flow = reduceTurn(flow, { type: "orb_mic_stop" }).state;
-const afterMicStop = reduceTurn(flow, { type: "turn_complete" }).state;
-assert(!afterMicStop.invitationVoiceSent, "mic-stop never triggers invitation cue");
-assert(afterMicStop.phase !== "sheet", "mic-stop never opens signup sheet");
+flow = createGuestFlowState(GUEST_EXCHANGE_LIMIT - 1);
+flow = beginGuestExchange(flow);
+flow = onWordCardDuringHandoff(flow);
+assert(flow.wordCardsOnHandoffTurn === 1, "handoff turn tracks suppressed card");
+assert(flow.handoffTurn === true, "handoff flag set on 5th turn start");
 
 // --- C. Word pick (vocabulary_bank, exclude known) --------------------------
 
@@ -491,53 +478,32 @@ assert(
 );
 
 const talkPageSrc = readFileSync(join(ROOT, "app/(app)/talk/page.tsx"), "utf8");
-const turnControllerSrc = readFileSync(join(ROOT, "lib/live/turn-controller.ts"), "utf8");
-const turnRuntimeSrc = readFileSync(join(ROOT, "lib/live/turn-runtime.ts"), "utf8");
-assert(
-  talkPageSrc.includes("TurnRuntime") && talkPageSrc.includes("dispatchTurn"),
-  "talk page uses deterministic turn controller",
-);
-assert(
-  turnControllerSrc.includes("guest_count") &&
-    turnControllerSrc.includes("voiced_reply") &&
-    turnControllerSrc.includes("invitation") &&
-    turnControllerSrc.includes("sheet"),
-  "turn controller declares explicit guest tail states",
-);
-assert(
-  !turnControllerSrc.includes("setTimeout") && !talkPageSrc.includes("handoffNudgeSentRef"),
-  "no racing handoff timers or nudge refs",
-);
-assert(
-  turnControllerSrc.includes("lastPhaseNudged"),
-  "phase nudge deduped — not sent every turn",
-);
 assert(
   talkPageSrc.includes("suspendMicSend(true)") &&
     talkPageSrc.includes("shouldForwardMicToGemini"),
   "card replay suspends mic send during TTS",
 );
 assert(
-  talkPageSrc.includes("discardSuspendedModelTurn"),
+  talkPageSrc.includes("isReplayModelTurnSuspended") &&
+    talkPageSrc.includes("discardSuspendedModelTurn"),
   "model output during replay-suspension is dropped, not queued",
 );
 assert(
-  turnRuntimeSrc.includes("waitForHandoffReplyDrain") &&
-    turnControllerSrc.includes("handoffReplyStarted"),
+  talkPageSrc.includes("waitForHandoffReplyDrain") &&
+    talkPageSrc.includes("handoffReplyStartedRef"),
   "5th-exchange reply is voiced before invitation handoff",
 );
 assert(
-  turnControllerSrc.includes("send_hidden_turn") &&
-    turnControllerSrc.includes("HANDOFF_NUDGE"),
-  "spurious handoff turn_complete auto-nudges model reply synchronously",
+  talkPageSrc.includes("sendHiddenTurn") && talkPageSrc.includes("handoffNudgeSentRef"),
+  "spurious handoff turn_complete auto-nudges model reply",
 );
 assert(
-  talkPageSrc.includes("orb_mic_stop") &&
+  talkPageSrc.includes("stopContinuousMic") &&
     !/liveUiState === "listening"\)[\s\S]{0,120}teardownSession/.test(talkPageSrc),
-  "mic-stop uses turn controller orb_mic_stop, not full teardown",
+  "mic-stop uses stopContinuousMic, not full teardown",
 );
 assert(
-  turnControllerSrc.includes("invitationVoiceSent"),
+  talkPageSrc.includes("invitationVoiceSentRef"),
   "CTA sheet requires voiced invitation (no silent handoff)",
 );
 assert(
@@ -559,28 +525,25 @@ assert(
   "sw.js never defers response.clone() inside cache.then",
 );
 
-section("Repeated flow simulations (5× guest + 5× member)");
-const guestRuns = runRepeatedFlowSimulations("guest", 5);
-const memberRuns = runRepeatedFlowSimulations("member", 5);
-assert(
-  guestRuns.every((r) => r.sheet && r.guestExchanges === GUEST_EXCHANGE_LIMIT),
-  "guest flow ×5: CTA sheet every run, 5 exchanges",
-);
-assert(
-  memberRuns.every((r) => r.phase === "render" && r.guestExchanges === 0),
-  "member flow ×3 ×5 runs: stable render phase, no guest counter",
-);
-console.log("  guest runs:", guestRuns.map((r) => `run${r.run}=sheet@${r.guestExchanges}`).join(", "));
-console.log("  member runs:", memberRuns.map((r) => `run${r.run}=${r.phase}`).join(", "));
+flow = createGuestFlowState(GUEST_EXCHANGE_LIMIT - 1);
+flow = beginGuestExchange(flow);
+flow = onHandoffTurnComplete(flow);
+assert(flow.invitationCueCount === 0, "handoff invite waits for reply output before firing");
+flow = onHandoffReplyOutput(flow);
+flow = onHandoffTurnComplete(flow);
+assert(flow.invitationCueCount === 1, "handoff invite fires after 5th reply output");
+flow = beginGuestExchange(createGuestFlowState(GUEST_EXCHANGE_LIMIT - 1));
+flow = onSpuriousHandoffTurnComplete(flow);
+assert(flow.handoffTurn === true, "spurious turn_complete keeps handoff armed");
+assert(flow.invitationCueCount === 0, "spurious turn_complete never triggers invitation cue");
 
-flow = createTurnController(GUEST_EXCHANGE_LIMIT - 1, true);
-flow = reduceTurn(flow, { type: "guest_text_turn", isGuest: true }).state;
-flow = reduceTurn(flow, { type: "model_audio" }).state;
-const beforeInvite = reduceTurn(flow, { type: "turn_complete" }).state;
-assert(!beforeInvite.invitationVoiceSent, "handoff invite waits for reply output before firing");
-flow = reduceTurn(flow, { type: "model_audio" }).state;
-const afterReply = reduceTurn(flow, { type: "turn_complete" }).state;
-assert(afterReply.phase === "invitation", "handoff invite phase after 5th reply output");
+flow = createGuestFlowState(GUEST_EXCHANGE_LIMIT - 1);
+flow = beginGuestExchange(flow);
+flow = onMicStop(flow);
+flow = onHandoffTurnComplete(flow);
+assert(flow.invitationCueCount === 0, "mic-stop never triggers invitation cue");
+flow = onInvitationDrained(flow);
+assert(flow.signupSheetCount === 0, "mic-stop never opens signup sheet");
 
 // --- I. Sanity on helpers ---------------------------------------------------
 assert(oppositeLanguage("en") === "th", "oppositeLanguage en→th");
