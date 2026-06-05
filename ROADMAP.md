@@ -30,52 +30,64 @@ Do **not** change any item below without re-verifying the full `/talk` + guest f
 | Guest 5-exchange hook; 5th reply = open loop in bubble; invite = spoken cue + signup sheet only | `lib/live/live-config.ts` (`LAST_TURN_HANDOFF`, `GUEST_INVITATION_CUE`), `app/(app)/talk/page.tsx`, `lib/live/media-handler.ts` (`waitForPlaybackIdle`) |
 | `teach-word` never 401 guests; tool handler always `sendToolResponse`, never throws | `app/api/teach-word/route.ts`, `lib/live/miomi-client.ts` |
 | Tool 1 `get_word_to_teach` → `pickWordToIntroduce` + `introduceWord` (member saves; guest A1 no-save) | `lib/live/live-config.ts`, `app/api/teach-word/route.ts`, `lib/brain/teaching.ts` |
+| **Language adaptation:** explain in UI language; teach target in small pieces; never full target to a beginner; practice repeats do **not** flip UI language | `lib/live/live-config.ts` (`buildSystemInstruction`, `buildKickoffPrompt`, `buildLiveConfig`), `lib/brain/language.ts` (`resolveSessionLanguages`, `resolveUiLanguage`, `detectPracticeAttempt`), `app/(app)/talk/page.tsx` (`maybeAdaptSessionLanguage`) |
+
+**Language adaptation contract (detail):**
+- **UI_LANGUAGE** = the learner's medium — Miomi converses and explains here.
+- **TARGET_LANGUAGE** = what they are learning — taught in small pieces, always with meaning + pronunciation in UI_LANGUAGE.
+- Guest default: UI = English, TARGET = Thai (English-first kickoff).
+- Per-turn `resolveUiLanguage` mirrors sustained conversation; `detectPracticeAttempt` guard blocks UI flip when the user repeats a taught target word/phrase.
+- System instruction enforces: never reply entirely in TARGET to a beginner; practice exception keeps UI stable.
 
 Code sites carry `LOCKED 2026-06-05` comments — search before editing.
 
 ---
 
-## Monetization (LOCKED — all prices in THB)
+## Pricing & Monetization (LOCKED)
 
-Voice cost estimate ≈ **0.36 ฿/min** (≈ $0.01). **Verify the exact Gemini Live native-audio rate before final commit — it is the one number that sets the margins.** Rule: **every paid tier margin ≥ 70%.**
+Voice cost estimate ≈ **0.36 ฿/min** (≈ $0.01). **Verify from real usage / exact Gemini Live native-audio rate** — it is the one number that sets margins. **Rule: every paid tier margin ≥ 70%.**
+
+### Tiers (THB)
 
 | Tier | Price | Voice allowance | Notes |
 |---|---|---|---|
-| Guest | free | 5 exchanges | hook → signup |
-| Free | free | 10-min **lifetime** voice trial + cheap text + small earned voice | trial verification-gated (1 real person = 1 trial) |
-| **Pro** | **299 ฿/mo** | ~8–10 min/day | volume anchor; ~5 hrs/mo |
-| **Pro Max** | **599 ฿/mo** | 15 min/day + premium features (people layer, advanced teaching, badges) | margin ~73% |
-| **Confident Speaking** | **799 ฿ / 5 hrs** · **1,499 ฿ / 10 hrs** | one-time packs | margin ~86%; pay-per-use makes heavy users profitable, never a loss |
+| Guest | free | **5 exchanges** | hook → signup |
+| Free | free | **10-min lifetime** voice trial + cheap daily **TEXT** + small earned voice | trial verification-gated (1 real person = 1 trial) |
+| **Pro** | **299 ฿/mo** | ~**8–10 min/day** (~5 hrs/mo) | **volume anchor** — the price users compare everything to |
+| **Pro Max** | **599 ฿/mo** | **15 min/day** + premium features (people layer, advanced teaching, badges) | margin ~73% |
+| **Confident Speaking** (one-time) | **799 ฿ / 5 hrs** · **1,499 ฿ / 10 hrs** | pay-per-use packs | margin ~86%; heavy users stay profitable, never a loss |
 
-**Positioning weapon — price per HOUR, not per month:** a human tutor in Thailand is **300 ฿/hr**. Miomi is ~**40–80 ฿/hr** (4–7× cheaper), 24/7, infinitely patient, and remembers you.
+### Multi-language pricing
 
----
+Same engine = same cost → price difference is **pure margin**. Sequence: **Thai market first**, then international.
 
-## Free-tier economics (the cost solve)
+| Market / language | Pro anchor | Rationale |
+|---|---|---|
+| **English** | **299 ฿/mo** | wedge — lowest barrier, highest volume |
+| Chinese / Japanese / Korean | **399 ฿/mo** | premium learner markets |
+| German / French | **499 ฿/mo** | highest willingness-to-pay |
+| Spanish | **399 ฿/mo** | large market, mid tier |
+| **International / foreigner** | **~$12–19 USD/mo** | expat + global learners |
 
-- **Daily engagement = text** (≈ free) — full Miomi personality, teaching, social. The sticky daily habit (Duolingo-style).
-- **Voice = a bounded wow, not a daily buffet:** a generous **day-1 onboarding voice session** (the conversion + screenshot-and-share moment) + a small earned daily treat. Free voice costs ~pennies **once** per user, not monthly.
-- Profitability: roughly break-even at ~1% conversion; clear profit at ~2–3%+. Higher tiers, the fraud-proof referral, and the viral social loop drive conversion up. You keep **~65–86%** of paid revenue — not "working for Google."
+**Positioning weapon — price per HOUR, not per month:** a human tutor runs **~$10–30/hr** (Thailand ~300 ฿/hr). Miomi is ~**40–80 ฿/hr** (4–7× cheaper), 24/7, infinitely patient, and remembers you.
 
----
+### Economics & cost levers
 
-## Cost levers
+- **Daily free engagement = TEXT** (≈ free) — full Miomi personality, teaching, social. The sticky daily habit.
+- **Voice = bounded WOW, not a daily buffet** — generous day-1 onboarding voice session (conversion + share moment) + small earned daily treat. Free voice costs pennies **once** per user, not monthly.
+- Profitability: roughly break-even at ~1% conversion; clear profit at ~2–3%+. Paid tiers + referral + social loop lift conversion; you keep **~65–86%** of paid revenue.
+- **Concise replies — "efficient eloquence."** Charming, complete, never rambling. Output audio is the costly half.
+- **Context caching (Gemini):** ~90% off repeated persona/history input tokens. Caches input setup, not her words — no repetition risk.
+- **Smart lib:** CEFR-adaptive, spaced-repetition spiral (1/2/4/7/12 days), anti-repetition — precomputes and serves content; fewer LLM calls, higher quality. Real intelligence, never a dumb cache.
 
-- **Concise replies — "efficient eloquence."** Charming, smart, funny, complete — but never rambling or repetitive. Output audio is the costly half, so every word earns its place. (Better voice UX *and* cheaper.)
-- **Context caching (Gemini):** ~90% off repeated persona/history input tokens. Invisible to the user; does **not** cause repetition (it caches the input setup, not her words).
-- **Smart lib:** a *genuinely intelligent* teaching engine (CEFR-adaptive, spaced-repetition spiral 1/2/4/7/12 days, anti-repetition) that precomputes and serves content — fewer LLM calls **and** higher quality. It must be real intelligence, never a dumb cache.
+### Referral (fraud-proof — LOCKED)
 
----
+**Governing rule:** reward **<** the revenue it triggers; paid **only after** the friend's first Pro payment clears. Cheating always costs more than it gains.
 
-## Referral (fraud-proof — LOCKED rule)
-
-**Governing rule:** a referral must net more revenue than it pays out — the reward is always *less* than the revenue that triggers it, and pays out only *after* that revenue lands. Then cheating always costs the fraudster more than they gain.
-
-- Friend pays full **299 ฿** (no revenue-cutting discount; a tiny welcome perk only).
-- Referrer earns **30 ฿ credit** on next bill, **only when the friend's first Pro payment clears**.
-- Net **+269 ฿** per referral; fraud is always a net loss for the cheater.
-- Free trial is **verification-gated** (phone/device) so fake accounts can't farm free minutes.
-- Bigger rewards later must be **retention-gated** (e.g., on the friend's 2nd payment).
+- Friend pays full **299 ฿** — no revenue-cutting discount (tiny welcome perk only).
+- Referrer earns **30 ฿ credit** on next bill when that first Pro payment clears → net **+269 ฿** per referral.
+- Free trial **verification-gated** (phone/device) — fake accounts can't farm minutes.
+- Bigger rewards later must be **retention-gated** (e.g. on the friend's 2nd payment).
 
 ---
 
