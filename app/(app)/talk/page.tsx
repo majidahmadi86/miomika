@@ -21,6 +21,8 @@ import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
 import { MiomiLiveClient, type LiveClientMessage } from "@/lib/live/miomi-client";
 import { MediaHandler } from "@/lib/live/media-handler";
+import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
+import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config";
 
 type CanvasItem =
   | { id: string; kind: "mini_cat"; textTh: string; textEn: string }
@@ -29,6 +31,14 @@ type CanvasItem =
 type LiveUiState = "idle" | "connecting" | "listening" | "speaking" | "error";
 
 const TRANSCRIPT_CLIP = 180;
+const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
+
+function readGuestExchanges(): number {
+  if (typeof window === "undefined") return 0;
+  const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
+  const parsed = stored ? parseInt(stored, 10) : 0;
+  return !isNaN(parsed) && parsed > 0 ? parsed : 0;
+}
 
 function readUiLang(): "th" | "en" {
   if (typeof window === "undefined") return "th";
@@ -49,10 +59,19 @@ function makeOpenerItem(): CanvasItem {
   return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
 }
 
+function isInternalLivePrompt(text: string): boolean {
+  const t = text.trim();
+  return (
+    t.startsWith("[session_open]") ||
+    t.startsWith("[Speak exactly") ||
+    t.startsWith("LAST-TURN HAND-OFF:")
+  );
+}
+
 export default function TalkPage() {
   const { isGuest, authReady } = useGuestExploration();
   const { profile } = useProfile();
-  const canUseLive = authReady && !isGuest && !!profile;
+  const canUseLive = authReady && (isGuest || !!profile);
 
   const [config, setConfig] = useState<TalkConfig>(() =>
     typeof window !== "undefined" ? loadTalkConfig() : DEFAULT_TALK_CONFIG,
@@ -65,6 +84,7 @@ export default function TalkPage() {
   const [respLength, setRespLength] = useState<ResponseLength>("normal");
   const [conversationLang, setConversationLang] = useState<"th" | "en">("th");
   const [showGuestSheet, setShowGuestSheet] = useState(false);
+  const [guestExchangesRaw, setGuestExchangesRaw] = useState(readGuestExchanges);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [liveUiState, setLiveUiState] = useState<LiveUiState>("idle");
@@ -79,6 +99,16 @@ export default function TalkPage() {
   const currentGeminiItemIdRef = useRef<string | null>(null);
   const sessionActiveRef = useRef(false);
   const mountedRef = useRef(true);
+  const kickoffSentRef = useRef(false);
+  const handoffTurnRef = useRef(false);
+  const invitationPendingRef = useRef(false);
+  const guestExchangesRef = useRef(0);
+  const isGuestRef = useRef(false);
+  const isLockedRef = useRef(false);
+  const conversationLangRef = useRef<"th" | "en">("th");
+  const teardownSessionRef = useRef<() => void>(() => {});
+  const userExchangeCountedRef = useRef(false);
+  const pendingHandoffContextRef = useRef(false);
 
   const unlockAudio = useCallback(() => {
     if (audioUnlocked) return;
@@ -89,6 +119,63 @@ export default function TalkPage() {
       /* ignore */
     }
   }, [audioUnlocked]);
+
+  const guestExchanges = authReady && !isGuest ? 0 : guestExchangesRaw;
+  const isLocked = authReady && isGuest && guestExchanges >= GUEST_EXCHANGE_LIMIT;
+
+  const setGuestExchanges = useCallback((updater: number | ((p: number) => number)) => {
+    setGuestExchangesRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      guestExchangesRef.current = next;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(GUEST_COUNTER_KEY, String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    guestExchangesRef.current = guestExchanges;
+  }, [guestExchanges]);
+
+  useEffect(() => {
+    isGuestRef.current = isGuest;
+  }, [isGuest]);
+
+  useEffect(() => {
+    isLockedRef.current = isLocked;
+  }, [isLocked]);
+
+  useEffect(() => {
+    conversationLangRef.current = conversationLang;
+  }, [conversationLang]);
+
+  const completeGuestLimitTurn = useCallback(() => {
+    // LOCKED 2026-06-04 — guest signup invitation decouple, paired with LAST_TURN_HANDOFF.
+    const lang = conversationLangRef.current;
+    clientRef.current?.sendSpeakExact(GUEST_INVITATION_CUE[lang]);
+    invitationPendingRef.current = true;
+  }, []);
+
+  const beginGuestExchange = useCallback(() => {
+    if (!isGuestRef.current || isLockedRef.current) return false;
+    if (guestExchangesRef.current >= GUEST_EXCHANGE_LIMIT) return false;
+    if (userExchangeCountedRef.current) return true;
+
+    userExchangeCountedRef.current = true;
+
+    if (guestExchangesRef.current === GUEST_EXCHANGE_LIMIT - 1) {
+      handoffTurnRef.current = true;
+      if (clientRef.current?.isConnected()) {
+        clientRef.current.sendHiddenContext(LAST_TURN_HANDOFF);
+      } else {
+        pendingHandoffContextRef.current = true;
+      }
+    }
+
+    setGuestExchanges((p) => p + 1);
+    return true;
+  }, [setGuestExchanges]);
 
   const appendTranscript = useCallback((role: "user" | "gemini", chunk: string) => {
     const fallback = uiLang;
@@ -145,6 +232,17 @@ export default function TalkPage() {
     if (msg.type === "turn_complete") {
       currentGeminiItemIdRef.current = null;
       currentUserItemIdRef.current = null;
+      userExchangeCountedRef.current = false;
+      if (invitationPendingRef.current) {
+        invitationPendingRef.current = false;
+        teardownSessionRef.current();
+        setShowGuestSheet(true);
+        return;
+      }
+      if (handoffTurnRef.current) {
+        handoffTurnRef.current = false;
+        completeGuestLimitTurn();
+      }
       setLiveUiState(sessionActiveRef.current ? "listening" : "idle");
       return;
     }
@@ -154,6 +252,10 @@ export default function TalkPage() {
       return;
     }
     if (msg.type === "user") {
+      if (isInternalLivePrompt(msg.text)) return;
+      if (!currentUserItemIdRef.current) {
+        beginGuestExchange();
+      }
       appendTranscript("user", msg.text);
       return;
     }
@@ -169,10 +271,15 @@ export default function TalkPage() {
         data: { args: msg.args, result: msg.result },
       });
     }
-  }, [appendTranscript]);
+  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn]);
 
   const teardownSession = useCallback(() => {
     sessionActiveRef.current = false;
+    kickoffSentRef.current = false;
+    handoffTurnRef.current = false;
+    invitationPendingRef.current = false;
+    userExchangeCountedRef.current = false;
+    pendingHandoffContextRef.current = false;
     mediaRef.current?.stopAudio();
     mediaRef.current?.stopAudioPlayback();
     clientRef.current?.disconnect();
@@ -181,6 +288,10 @@ export default function TalkPage() {
     currentUserItemIdRef.current = null;
     setLiveUiState("idle");
   }, []);
+
+  useEffect(() => {
+    teardownSessionRef.current = teardownSession;
+  }, [teardownSession]);
 
   const startLiveSession = useCallback(async () => {
     if (!canUseLive || sessionActiveRef.current) return;
@@ -208,6 +319,16 @@ export default function TalkPage() {
       await mediaRef.current.initializeAudio();
       await clientRef.current.connect();
       sessionActiveRef.current = true;
+      setItems((prev) =>
+        prev.length === 1 && prev[0]?.kind === "mini_cat" ? [] : prev,
+      );
+      if (pendingHandoffContextRef.current) {
+        clientRef.current.sendHiddenContext(LAST_TURN_HANDOFF);
+        pendingHandoffContextRef.current = false;
+      } else if (!kickoffSentRef.current) {
+        kickoffSentRef.current = true;
+        clientRef.current.sendKickoff(conversationLangRef.current);
+      }
       await mediaRef.current.startAudio((pcm) => {
         if (clientRef.current?.isConnected()) clientRef.current.sendAudio(pcm);
       });
@@ -239,6 +360,12 @@ export default function TalkPage() {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
     setConfig(loadTalkConfig());
+    const stored = window.localStorage.getItem(GUEST_COUNTER_KEY);
+    const parsed = stored ? parseInt(stored, 10) : 0;
+    if (!isNaN(parsed) && parsed > 0) {
+      setGuestExchangesRaw(parsed);
+      guestExchangesRef.current = parsed;
+    }
     const navLang = navigator.language || "th";
     const isEnglishUser = navLang.startsWith("en");
     if (isEnglishUser) setUiLang("en");
@@ -260,6 +387,17 @@ export default function TalkPage() {
     if (items.length > 0 || !authReady) return;
     setItems([makeOpenerItem()]);
   }, [items.length, authReady]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset on sign-in */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (authReady && !isGuest) {
+      window.localStorage.removeItem(GUEST_COUNTER_KEY);
+      setGuestExchangesRaw(0);
+      guestExchangesRef.current = 0;
+    }
+  }, [authReady, isGuest]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
@@ -307,7 +445,7 @@ export default function TalkPage() {
   const handleOrbTap = useCallback(() => {
     unlockAudio();
     if (!authReady) return;
-    if (isGuest) {
+    if (isLocked) {
       setShowGuestSheet(true);
       return;
     }
@@ -316,17 +454,20 @@ export default function TalkPage() {
       return;
     }
     void startLiveSession();
-  }, [authReady, isGuest, unlockAudio, teardownSession, startLiveSession]);
+  }, [authReady, isLocked, unlockAudio, teardownSession, startLiveSession]);
 
   const handleSendText = useCallback(() => {
     const trimmed = textInput.trim();
     if (!trimmed) return;
     unlockAudio();
-    if (isGuest) {
+    if (isLocked) {
       setShowGuestSheet(true);
       return;
     }
-    setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "user_said", text: trimmed }]);
+    beginGuestExchange();
+    const id = crypto.randomUUID();
+    currentUserItemIdRef.current = id;
+    setItems((prev) => [...prev, { id, kind: "user_said", text: trimmed }]);
     setTextInput("");
     if (!sessionActiveRef.current) {
       void (async () => {
@@ -336,13 +477,13 @@ export default function TalkPage() {
     } else {
       clientRef.current?.sendText(trimmed);
     }
-  }, [textInput, isGuest, unlockAudio, startLiveSession]);
+  }, [textInput, isLocked, unlockAudio, beginGuestExchange, startLiveSession]);
 
   const handleMiomiHelp = useCallback(
     (topic: "pillars" | "niche" | "voice") => {
       setAdjustOpen(false);
       unlockAudio();
-      if (isGuest) {
+      if (isLocked) {
         setShowGuestSheet(true);
         return;
       }
@@ -358,7 +499,10 @@ export default function TalkPage() {
             : uiLang === "en"
               ? "Help me define my brand voice."
               : "ช่วยหนูกำหนดเสียงแบรนด์ให้หน่อยค่ะ";
-      setItems((prev) => [...prev, { id: crypto.randomUUID(), kind: "user_said", text }]);
+      beginGuestExchange();
+      const id = crypto.randomUUID();
+      currentUserItemIdRef.current = id;
+      setItems((prev) => [...prev, { id, kind: "user_said", text }]);
       if (!sessionActiveRef.current) {
         void (async () => {
           await startLiveSession();
@@ -370,11 +514,11 @@ export default function TalkPage() {
         clientRef.current?.sendText(text);
       }
     },
-    [isGuest, uiLang, unlockAudio, startLiveSession],
+    [isLocked, uiLang, unlockAudio, beginGuestExchange, startLiveSession],
   );
 
   const orbState: OrbState = (() => {
-    if (isGuest) return "locked";
+    if (isLocked) return "locked";
     if (liveUiState === "listening") return "listening";
     if (liveUiState === "connecting") return "thinking";
     if (liveUiState === "speaking") return "speaking";
@@ -394,8 +538,8 @@ export default function TalkPage() {
   const fuelBrain = 45;
 
   const stateLabel = (() => {
-    if (isGuest) {
-      return uiLang === "th" ? "สมัครเพื่อพูดคุยกับหนูค่า~" : "Sign in to talk with Miomi~";
+    if (isLocked) {
+      return uiLang === "th" ? "สมัครเพื่อพูดคุยต่อกับหนูค่า~" : "Sign in to keep talking with Miomi~";
     }
     if (!audioUnlocked) return uiLang === "th" ? "แตะเพื่อเริ่มค่า~" : "tap anywhere to begin~";
     if (liveUiState === "connecting") return uiLang === "th" ? "กำลังเชื่อมต่อค่า..." : "connecting...";
@@ -443,7 +587,9 @@ export default function TalkPage() {
         <div onClick={handleTitleTap} style={{ cursor: "default" }}>
           {authReady && isGuest ? (
             <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, color: "#9A8B73", background: "transparent", padding: "5px 12px" }}>
-              {uiLang === "en" ? "Sign in to talk" : "สมัครเพื่อพูดคุย"}
+              {uiLang === "en"
+                ? `${Math.max(0, GUEST_EXCHANGE_LIMIT - guestExchanges)} left`
+                : `เหลืออีก ${Math.max(0, GUEST_EXCHANGE_LIMIT - guestExchanges)} ครั้ง`}
             </span>
           ) : (
             <FuelPill heart={fuelHeart} zap={fuelZap} brain={fuelBrain} />
@@ -548,7 +694,7 @@ export default function TalkPage() {
       )}
 
       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
-        {!audioUnlocked && items.length <= 1 && !isGuest && (
+        {!audioUnlocked && items.length <= 1 && (
           <p
             style={{
               margin: "0 0 4px",
@@ -573,8 +719,8 @@ export default function TalkPage() {
           }}
           onOrbTap={handleOrbTap}
           orbAriaLabel={
-            isGuest
-              ? uiLang === "en" ? "Sign in to talk" : "สมัครเพื่อพูดคุย"
+            isLocked
+              ? uiLang === "en" ? "Sign in to keep talking" : "สมัครเพื่อพูดคุยต่อ"
               : orbState === "listening"
                 ? uiLang === "en" ? "Stop listening" : "หยุดฟัง"
                 : uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู"

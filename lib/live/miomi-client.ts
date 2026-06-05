@@ -1,7 +1,12 @@
 "use client";
 
 import { GoogleGenAI } from "@google/genai";
-import { LIVE_MODEL, LIVE_VOICE, buildLiveConfig } from "@/lib/live/live-config";
+import {
+  LIVE_MODEL,
+  LIVE_VOICE,
+  buildKickoffPrompt,
+  buildLiveConfig,
+} from "@/lib/live/live-config";
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -190,6 +195,38 @@ export class MiomiLiveClient {
     if (!this.session || !this.connected) return;
     this.session.sendClientContent({
       turns: [{ role: "user", parts: [{ text }] }],
+      turnComplete: true,
+    });
+  }
+
+  /** Trigger Miomi's opening greeting on connect — not shown as user speech. */
+  sendKickoff(lang: "th" | "en"): void {
+    if (!this.session || !this.connected) return;
+    this.session.sendClientContent({
+      turns: [{ role: "user", parts: [{ text: buildKickoffPrompt(lang) }] }],
+      turnComplete: true,
+    });
+  }
+
+  /** Inject guest handoff context mid-session — invisible to the transcript UI. */
+  sendHiddenContext(text: string): void {
+    if (!this.session || !this.connected) return;
+    this.session.sendClientContent({
+      turns: [{ role: "user", parts: [{ text }] }],
+      turnComplete: false,
+    });
+  }
+
+  /** Speak an exact phrase aloud (invitation cue) — not shown as user speech. */
+  sendSpeakExact(text: string): void {
+    if (!this.session || !this.connected) return;
+    this.session.sendClientContent({
+      turns: [
+        {
+          role: "user",
+          parts: [{ text: `[Speak exactly this one line aloud, nothing else: "${text}"]` }],
+        },
+      ],
       turnComplete: true,
     });
   }

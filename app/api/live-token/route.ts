@@ -20,16 +20,11 @@ function getTokenClient(): GoogleGenAI | null {
  * GET /api/live-token
  * Mints a short-lived ephemeral token for Gemini Live.
  * GEMINI_API_KEY stays server-side — browser receives token.name only.
- * Logged-in users only (getServerProfile); guests get 401.
+ * Logged-in: standard session cap. Guest: shorter cap as cost backstop (not 401).
  */
 export async function GET() {
   const profile = await getServerProfile();
-  if (!profile) {
-    log("live-token", "rejected — no profile (guest)");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  void touchLastSeen(profile.id);
+  const isGuest = !profile;
 
   const client = getTokenClient();
   if (!client) {
@@ -37,10 +32,14 @@ export async function GET() {
     return NextResponse.json({ error: "Live voice unavailable" }, { status: 503 });
   }
 
-  try {
-    const expireTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-    const newSessionExpireTime = new Date(Date.now() + 60 * 1000).toISOString();
+  const expireTime = new Date(
+    Date.now() + (isGuest ? 10 : 30) * 60 * 1000,
+  ).toISOString();
+  const newSessionExpireTime = new Date(
+    Date.now() + (isGuest ? 5 : 1) * 60 * 1000,
+  ).toISOString();
 
+  try {
     const token = await client.authTokens.create({
       config: {
         uses: 1,
@@ -56,11 +55,17 @@ export async function GET() {
       return NextResponse.json({ error: "Token mint failed" }, { status: 500 });
     }
 
-    log("live-token", "minted ephemeral token", { userId: profile.id, model: LIVE_MODEL });
-    return NextResponse.json({ token: name, model: LIVE_MODEL });
+    if (profile) void touchLastSeen(profile.id);
+
+    log("live-token", "minted ephemeral token", {
+      guest: isGuest,
+      userId: profile?.id ?? null,
+      model: LIVE_MODEL,
+    });
+    return NextResponse.json({ token: name, model: LIVE_MODEL, guest: isGuest });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logError("live-token", "mint failed", err, { error: msg });
+    logError("live-token", "mint failed", err, { error: msg, guest: isGuest });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
