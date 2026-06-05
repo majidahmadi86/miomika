@@ -9,5 +9,6 @@ export async function replayWordAudio(
 ): Promise<void> {
   unlockTtsPlayback();
   const { text, lang } = replayTextForWord(word, targetLanguage);
+  if (!text.trim()) return;
   await speak(text, lang);
 }

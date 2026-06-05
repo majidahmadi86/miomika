@@ -14,6 +14,7 @@ export function isHiddenLiveTranscript(text: string): boolean {
   if (
     t.startsWith("[session_open]") ||
     t.startsWith("[Speak exactly") ||
+    t.startsWith("[handoff_reply]") ||
     t.startsWith("LAST-TURN HAND-OFF:")
   ) {
     return true;

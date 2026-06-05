@@ -204,7 +204,7 @@ export class MediaHandler {
    * LOCKED 2026-06-05 ? guest 5th reply: turn_complete often precedes PCM; wait longer so
    * invitation sendSpeakExact cannot interrupt voiced handoff audio.
    */
-  waitForHandoffReplyDrain(maxWaitForStartMs = 10000, settleMs = 300): Promise<void> {
+  waitForHandoffReplyDrain(maxWaitForStartMs = 2500, settleMs = 120): Promise<void> {
     const start = Date.now();
     return new Promise((resolve) => {
       const poll = () => {

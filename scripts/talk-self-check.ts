@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GUEST_EXCHANGE_LIMIT } from "../lib/ai/limits";
 import {
+  detectExplicitUiLanguageRequest,
   normalizeLearningTarget,
   oppositeLanguage,
   resolveSessionLanguages,
@@ -46,6 +47,9 @@ import {
 } from "../lib/talk/guest-flow";
 import {
   cardDirectionForTarget,
+  cardMeaningForWord,
+  isVocabularySlug,
+  replayTextForWord,
   teachWordToVocabularyEntry,
 } from "../lib/talk/teach-word-card";
 
@@ -124,14 +128,28 @@ const uiFromEnglish = resolveUiLanguage({
   userInput: "Hello, how are you doing today?",
   memory: [],
 });
-assert(uiFromEnglish === "en", "UI follows sustained English input");
+assert(uiFromEnglish === "en", "UI stays anchored to profile on English input");
 
-const uiThaiConversation = resolveUiLanguage({
+const uiTargetPractice = resolveUiLanguage({
   profileUiLang: "en",
-  userInput: "ผมอยากคุยภาษาไทยกับหนูได้ไหมครับ วันนี้อากาศดีมากเลยนะ",
+  userInput: "ตู้เย็น",
   memory: [],
+  learningTargetLanguage: "th",
 });
-assert(uiThaiConversation === "th", "sustained Thai input can adapt UI to th");
+assert(uiTargetPractice === "en", "target-language practice does not flip UI");
+
+const uiExplicitThai = resolveUiLanguage({
+  profileUiLang: "en",
+  userInput: "Please explain in Thai from now on",
+  memory: [],
+  learningTargetLanguage: "th",
+});
+assert(uiExplicitThai === "th", "explicit UI switch request is honored");
+
+assert(
+  detectExplicitUiLanguageRequest("speak Thai please") === "th",
+  "detectExplicitUiLanguageRequest catches speak Thai",
+);
 
 // --- B. Guest 5-turn flow ---------------------------------------------------
 
@@ -221,6 +239,37 @@ assert(!!guestCard?.word_en && !!guestCard?.word_th, "guest card payload produce
 assert(!!memberCard?.word_en && !!memberCard?.word_th, "member card payload produced");
 assert(cardDirectionForTarget("th") === "en_to_th", "th learner card direction en_to_th");
 assert(cardDirectionForTarget("en") === "th_to_en", "en learner card direction th_to_en");
+
+assert(isVocabularySlug("home_stuff_22"), "home_stuff_22 is a vocabulary slug");
+assert(!isVocabularySlug("fridge"), "fridge is not a slug");
+assert(!isVocabularySlug("ตู้เย็น"), "Thai gloss is not a slug");
+
+assert(
+  teachWordToVocabularyEntry({
+    ok: true,
+    word_en: "home_stuff_22",
+    word_th: "ตู้เย็น",
+    emoji: "🧊",
+  }) === null,
+  "slug word_en rejects card payload",
+);
+
+const fridgeCard = teachWordToVocabularyEntry({
+  ok: true,
+  word_en: "fridge",
+  word_th: "ตู้เย็น",
+  emoji: "🧊",
+});
+assert(!!fridgeCard, "valid gloss card payload produced");
+const meaning = cardMeaningForWord(
+  { word_en: fridgeCard!.word_en, word_th: fridgeCard!.word_th },
+  "en_to_th",
+);
+assert(meaning === "fridge", "card meaning is human gloss");
+assert(!isVocabularySlug(meaning), "card meaning never shows slug");
+const replay = replayTextForWord(fridgeCard!, "th");
+assert(replay.text === "ตู้เย็น", "replay speaks target surface form");
+assert(!isVocabularySlug(replay.text), "replay text never contains slug");
 
 // --- E. Voice/text match (transcript routing) ------------------------------
 
@@ -336,6 +385,10 @@ assert(
   mediaHandlerSrc.includes("waitForHandoffReplyDrain"),
   "5th-exchange reply uses extended voiced drain before invitation",
 );
+assert(
+  /waitForHandoffReplyDrain\(maxWaitForStartMs = 2500/.test(mediaHandlerSrc),
+  "handoff drain wait capped at 2.5s",
+);
 
 const talkPageSrc = readFileSync(join(ROOT, "app/(app)/talk/page.tsx"), "utf8");
 assert(
@@ -352,6 +405,10 @@ assert(
   talkPageSrc.includes("waitForHandoffReplyDrain") &&
     talkPageSrc.includes("handoffReplyStartedRef"),
   "5th-exchange reply is voiced before invitation handoff",
+);
+assert(
+  talkPageSrc.includes("sendHiddenTurn") && talkPageSrc.includes("handoffNudgeSentRef"),
+  "spurious handoff turn_complete auto-nudges model reply",
 );
 assert(
   talkPageSrc.includes("stopContinuousMic") &&

@@ -141,6 +141,7 @@ export default function TalkPage() {
   const invitationPendingRef = useRef(false);
   const invitationVoiceSentRef = useRef(false);
   const handoffGenerationRef = useRef(0);
+  const handoffNudgeSentRef = useRef(false);
   const guestExchangesRef = useRef(0);
   const isGuestRef = useRef(false);
   const isLockedRef = useRef(false);
@@ -186,6 +187,7 @@ export default function TalkPage() {
     handoffGenerationRef.current += 1;
     handoffTurnRef.current = false;
     handoffReplyStartedRef.current = false;
+    handoffNudgeSentRef.current = false;
     invitationPendingRef.current = false;
     invitationVoiceSentRef.current = false;
     mediaRef.current?.suspendMicSend(false);
@@ -255,6 +257,7 @@ export default function TalkPage() {
         profileUiLang: profileUiAnchor,
         userInput: trimmed,
         memory,
+        learningTargetLanguage: targetLang,
       });
       const resolvedTarget = resolveTargetLanguage({
         userInput: trimmed,
@@ -299,6 +302,7 @@ export default function TalkPage() {
     if (guestExchangesRef.current === GUEST_EXCHANGE_LIMIT - 1) {
       handoffTurnRef.current = true;
       handoffReplyStartedRef.current = false;
+      handoffNudgeSentRef.current = false;
       if (clientRef.current?.isConnected()) {
         clientRef.current.sendHiddenContext(LAST_TURN_HANDOFF);
       } else {
@@ -427,6 +431,17 @@ export default function TalkPage() {
       if (handoffTurnRef.current) {
         if (!handoffReplyStartedRef.current) {
           setLiveUiState(sessionActiveRef.current ? "listening" : "idle");
+          if (!handoffNudgeSentRef.current && clientRef.current?.isConnected()) {
+            handoffNudgeSentRef.current = true;
+            const gen = handoffGenerationRef.current;
+            window.setTimeout(() => {
+              if (gen !== handoffGenerationRef.current) return;
+              if (!handoffTurnRef.current || handoffReplyStartedRef.current) return;
+              clientRef.current?.sendHiddenTurn(
+                "[handoff_reply] Deliver your warm open-loop answer now — one or two short sentences only.",
+              );
+            }, 500);
+          }
           return;
         }
         handoffTurnRef.current = false;
@@ -511,6 +526,7 @@ export default function TalkPage() {
     setAwaitingMic(false);
     handoffTurnRef.current = false;
     handoffReplyStartedRef.current = false;
+    handoffNudgeSentRef.current = false;
     invitationPendingRef.current = false;
     invitationVoiceSentRef.current = false;
     handoffGenerationRef.current += 1;

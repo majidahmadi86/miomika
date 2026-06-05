@@ -5,6 +5,27 @@ export type DetectedLang = "th" | "en" | "mixed";
 const LEARN_INTENT_RE =
   /(?:teach me|i want to learn|สอน|เรียน)\s*(?:thai|english|ไทย|อังกฤษ|ภาษาไทย|ภาษาอังกฤษ)/i;
 
+/** Explicit UI-language switch — practicing the target language is NOT a switch. */
+const UI_SWITCH_RE =
+  /(?:speak|talk|explain|reply|switch|use|in)\s+(?:to\s+)?(?:thai|english|ไทย|อังกฤษ)|(?:พูด|คุย|อธิบาย|ตอบ).*(?:ไทย|อังกฤษ)|(?:ภาษาไทย|ภาษาอังกฤษ)\s*(?:หน่อย|ได้ไหม|please)|ไทยหน่อย/i;
+
+export function detectExplicitUiLanguageRequest(text: string): "th" | "en" | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  if (/(?:พูด|คุย|สอน|อธิบาย|ตอบ).*ไทย|ไทยหน่อย/.test(trimmed)) return "th";
+  if (/(?:พูด|คุย|สอน|อธิบาย|ตอบ).*(?:อังกฤษ|english)/i.test(trimmed)) return "en";
+  if (/speak.*(thai|ไทย)|in thai|switch.*thai|explain.*thai|reply.*thai/.test(lower)) return "th";
+  if (/speak.*english|in english|switch.*english|explain.*english|reply.*english/.test(lower)) {
+    return "en";
+  }
+  if (UI_SWITCH_RE.test(trimmed)) {
+    if (/thai|ไทย|ภาษาไทย/i.test(trimmed)) return "th";
+    if (/english|อังกฤษ|ภาษาอังกฤษ/i.test(trimmed)) return "en";
+  }
+  return null;
+}
+
 export function normalizeUiLanguage(raw: string | null): "th" | "en" {
   if (!raw) return "th";
   return raw.toLowerCase().startsWith("en") ? "en" : "th";
@@ -31,28 +52,32 @@ export function resolveUiLanguage(args: {
   profileUiLang: "th" | "en";
   userInput: string;
   memory: Array<{ role: "user" | "miomi"; content: string }>;
+  /** When set, dominant target-language input (practice) does not flip UI. */
+  learningTargetLanguage?: "th" | "en" | null;
 }): "th" | "en" {
-  // MEDIUM = the language the conversation is actually happening in. The live spoken
-  // language wins; the saved setting is only a fallback when the live signal is ambiguous.
-  // This serves every direction (TH<->EN, beginner or native) because it never REFUSES a
-  // language. The model (see buildBrainPrompt) handles the nuance of a beginner attempting
-  // their target vs. a fluent user choosing to live in it. Pure script distribution, no
-  // keyword matching: "you cannot speak Thai" is all-Latin -> resolves "en", never a switch.
-  const { profileUiLang, userInput, memory } = args;
+  const { profileUiLang, userInput, memory, learningTargetLanguage } = args;
 
-  const current = messageDominantLang(userInput);
-  if (current) return current;
+  const explicitNow = detectExplicitUiLanguageRequest(userInput);
+  if (explicitNow) return explicitNow;
 
-  // Current message ambiguous (mixed scripts / no letters): use the most recent user turn
-  // that had a clear dominant language.
+  // Scan recent user turns for an explicit switch request only — never mirror script.
   for (let i = memory.length - 1; i >= 0; i--) {
     const m = memory[i];
     if (m.role !== "user") continue;
-    const lang = messageDominantLang(m.content);
-    if (lang) return lang;
+    const explicit = detectExplicitUiLanguageRequest(m.content);
+    if (explicit) return explicit;
+    if (memory.length - i > 6) break;
   }
 
-  // No signal anywhere (first turn, all-ambiguous): fall back to the saved setting.
+  const dominant = messageDominantLang(userInput);
+  if (
+    learningTargetLanguage &&
+    dominant === learningTargetLanguage &&
+    dominant !== profileUiLang
+  ) {
+    return profileUiLang;
+  }
+
   return profileUiLang;
 }
 

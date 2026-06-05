@@ -286,6 +286,15 @@ export class MiomiLiveClient {
     });
   }
 
+  /** Hidden prompt that completes a turn — e.g. resume a stalled handoff reply. */
+  sendHiddenTurn(text: string): void {
+    if (!this.session || !this.connected) return;
+    this.session.sendClientContent({
+      turns: [{ role: "user", parts: [{ text }] }],
+      turnComplete: true,
+    });
+  }
+
   /** Speak an exact phrase aloud (invitation cue) — not shown as user speech. */
   sendSpeakExact(text: string): void {
     if (!this.session || !this.connected) return;

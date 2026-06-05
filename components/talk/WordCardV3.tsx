@@ -10,6 +10,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Volume2, Lightbulb, AlertCircle, ChevronDown, ChevronUp, Mic, BookmarkCheck } from "lucide-react";
 import { getIconForCategory } from "@/lib/talk/imageCategoryMap";
+import { cardMeaningForWord } from "@/lib/talk/teach-word-card";
 import { playWordAudio } from "@/lib/talk/speech";
 
 export interface VocabularyEntry {
@@ -60,7 +61,7 @@ export function WordCardV3({
   const isThaiLearner = direction === "th_to_en";
   const primaryWord = isThaiLearner ? word.word_en : word.word_th;
   const pronunciation = isThaiLearner ? word.en_ipa : word.th_romanization;
-  const meaningWord = isThaiLearner ? word.word_th : word.word_en;
+  const meaningWord = cardMeaningForWord(word, direction);
   const audioLang = isThaiLearner ? "en-US" : "th-TH";
   const audioKey = isThaiLearner ? word.audio_key_en : word.audio_key_th;
 

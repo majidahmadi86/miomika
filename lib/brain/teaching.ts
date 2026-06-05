@@ -1,5 +1,6 @@
 // SERVER ONLY. Vocabulary introduce / mastery / spiral helpers (service role).
 
+import { isVocabularySlug } from "@/lib/talk/teach-word-card";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export interface IntroducedWord {
@@ -51,9 +52,12 @@ export function rowToIntroducedWord(
   row: VocabBankRow,
   learningTarget: "th" | "en" | null,
 ): IntroducedWord | null {
-  const word_en = (row.word_en ?? row.word ?? "").trim();
+  const rawEn = (row.word_en ?? "").trim();
+  const rawWord = (row.word ?? "").trim();
+  const word_en = rawEn || (rawWord && !isVocabularySlug(rawWord) ? rawWord : "");
   const word_th = (row.word_th ?? "").trim();
   if (!word_en || !word_th) return null;
+  if (isVocabularySlug(word_en) || isVocabularySlug(word_th)) return null;
   const word = learningTarget === "th" ? word_th : word_en;
   return {
     word,

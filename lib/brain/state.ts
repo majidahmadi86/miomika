@@ -142,15 +142,16 @@ export async function readBrainState(args: {
   }
 
   const nowLanguage = detectLanguage(userInput, profileUiLang);
-  const uiLanguage = resolveUiLanguage({
-    profileUiLang,
-    userInput,
-    memory,
-  });
   const targetLanguage = resolveTargetLanguage({
     userInput,
     memory,
     profileTarget: learningTarget,
+  });
+  const uiLanguage = resolveUiLanguage({
+    profileUiLang,
+    userInput,
+    memory,
+    learningTargetLanguage: targetLanguage,
   });
   const userSpeaksLanguage = uiLanguage;
   const learningTargetLanguage = targetLanguage;
