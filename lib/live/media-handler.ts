@@ -21,6 +21,11 @@ export class MediaHandler {
     return this.isRecording && !this.playbackActive && !this.micSendSuspended;
   }
 
+  /** Card replay / speaker-bleed guard ? model turns during suspension must be discarded. */
+  isMicSendSuspended(): boolean {
+    return this.micSendSuspended;
+  }
+
   /** Call synchronously inside a user-gesture handler before any await. */
   primeAudioContext(): void {
     if (typeof window === "undefined") return;
@@ -186,6 +191,30 @@ export class MediaHandler {
     return new Promise((resolve) => {
       const poll = () => {
         if (!this.isPlaybackActive()) {
+          resolve();
+          return;
+        }
+        requestAnimationFrame(poll);
+      };
+      poll();
+    });
+  }
+
+  /**
+   * LOCKED 2026-06-05 ? guest 5th reply: turn_complete often precedes PCM; wait longer so
+   * invitation sendSpeakExact cannot interrupt voiced handoff audio.
+   */
+  waitForHandoffReplyDrain(maxWaitForStartMs = 10000, settleMs = 300): Promise<void> {
+    const start = Date.now();
+    return new Promise((resolve) => {
+      const poll = () => {
+        if (this.isPlaybackActive()) {
+          void this.waitForPlaybackIdle().then(() => {
+            setTimeout(resolve, settleMs);
+          });
+          return;
+        }
+        if (Date.now() - start >= maxWaitForStartMs) {
           resolve();
           return;
         }

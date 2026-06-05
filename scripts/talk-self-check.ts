@@ -36,9 +36,11 @@ import {
 import {
   beginGuestExchange,
   createGuestFlowState,
+  onHandoffReplyOutput,
   onHandoffTurnComplete,
   onInvitationDrained,
   onMicStop,
+  onSpuriousHandoffTurnComplete,
   onWordCardDuringHandoff,
   simulateGuestFiveTurnFlow,
 } from "../lib/talk/guest-flow";
@@ -145,6 +147,7 @@ for (let i = 0; i < GUEST_EXCHANGE_LIMIT; i += 1) {
 assert(flow.exchanges === GUEST_EXCHANGE_LIMIT, "exactly 5 exchanges");
 assert(flow.locked, "locked after 5th exchange");
 
+flow = onHandoffReplyOutput(flow);
 flow = onHandoffTurnComplete(flow);
 assert(flow.invitationCueCount === 1, "invitation cue fires once on handoff complete");
 
@@ -325,8 +328,13 @@ const mediaHandlerSrc = readFileSync(
 );
 assert(
   mediaHandlerSrc.includes("micSendSuspended") &&
-    mediaHandlerSrc.includes("shouldForwardMicToGemini"),
+    mediaHandlerSrc.includes("shouldForwardMicToGemini") &&
+    mediaHandlerSrc.includes("isMicSendSuspended"),
   "replay guard suspends mic PCM to Gemini",
+);
+assert(
+  mediaHandlerSrc.includes("waitForHandoffReplyDrain"),
+  "5th-exchange reply uses extended voiced drain before invitation",
 );
 
 const talkPageSrc = readFileSync(join(ROOT, "app/(app)/talk/page.tsx"), "utf8");
@@ -334,6 +342,16 @@ assert(
   talkPageSrc.includes("suspendMicSend(true)") &&
     talkPageSrc.includes("shouldForwardMicToGemini"),
   "card replay suspends mic send during TTS",
+);
+assert(
+  talkPageSrc.includes("isReplayModelTurnSuspended") &&
+    talkPageSrc.includes("discardSuspendedModelTurn"),
+  "model output during replay-suspension is dropped, not queued",
+);
+assert(
+  talkPageSrc.includes("waitForHandoffReplyDrain") &&
+    talkPageSrc.includes("handoffReplyStartedRef"),
+  "5th-exchange reply is voiced before invitation handoff",
 );
 assert(
   talkPageSrc.includes("stopContinuousMic") &&
@@ -344,6 +362,18 @@ assert(
   talkPageSrc.includes("invitationVoiceSentRef"),
   "CTA sheet requires voiced invitation (no silent handoff)",
 );
+
+flow = createGuestFlowState(GUEST_EXCHANGE_LIMIT - 1);
+flow = beginGuestExchange(flow);
+flow = onHandoffTurnComplete(flow);
+assert(flow.invitationCueCount === 0, "handoff invite waits for reply output before firing");
+flow = onHandoffReplyOutput(flow);
+flow = onHandoffTurnComplete(flow);
+assert(flow.invitationCueCount === 1, "handoff invite fires after 5th reply output");
+flow = beginGuestExchange(createGuestFlowState(GUEST_EXCHANGE_LIMIT - 1));
+flow = onSpuriousHandoffTurnComplete(flow);
+assert(flow.handoffTurn === true, "spurious turn_complete keeps handoff armed");
+assert(flow.invitationCueCount === 0, "spurious turn_complete never triggers invitation cue");
 
 flow = createGuestFlowState(GUEST_EXCHANGE_LIMIT - 1);
 flow = beginGuestExchange(flow);

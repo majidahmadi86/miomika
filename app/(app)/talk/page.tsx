@@ -137,6 +137,7 @@ export default function TalkPage() {
   const awaitingMicRef = useRef(false);
   const entryStartedRef = useRef(false);
   const handoffTurnRef = useRef(false);
+  const handoffReplyStartedRef = useRef(false);
   const invitationPendingRef = useRef(false);
   const invitationVoiceSentRef = useRef(false);
   const handoffGenerationRef = useRef(0);
@@ -184,6 +185,7 @@ export default function TalkPage() {
   const stopContinuousMic = useCallback(() => {
     handoffGenerationRef.current += 1;
     handoffTurnRef.current = false;
+    handoffReplyStartedRef.current = false;
     invitationPendingRef.current = false;
     invitationVoiceSentRef.current = false;
     mediaRef.current?.suspendMicSend(false);
@@ -296,6 +298,7 @@ export default function TalkPage() {
 
     if (guestExchangesRef.current === GUEST_EXCHANGE_LIMIT - 1) {
       handoffTurnRef.current = true;
+      handoffReplyStartedRef.current = false;
       if (clientRef.current?.isConnected()) {
         clientRef.current.sendHiddenContext(LAST_TURN_HANDOFF);
       } else {
@@ -359,6 +362,22 @@ export default function TalkPage() {
     setShowGuestSheet(true);
   }, []);
 
+  const discardSuspendedModelTurn = useCallback(() => {
+    const ghostId = currentGeminiItemIdRef.current;
+    currentGeminiItemIdRef.current = null;
+    if (!ghostId) return;
+    setItems((prev) => {
+      const next = prev.filter((item) => item.id !== ghostId);
+      itemsRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const isReplayModelTurnSuspended = useCallback(
+    () => mediaRef.current?.isMicSendSuspended() ?? false,
+    [],
+  );
+
   const handleLiveMessage = useCallback((msg: LiveClientMessage) => {
     if (msg.type === "interrupted") {
       mediaRef.current?.stopAudioPlayback();
@@ -368,6 +387,10 @@ export default function TalkPage() {
       return;
     }
     if (msg.type === "turn_complete") {
+      if (isReplayModelTurnSuspended()) {
+        discardSuspendedModelTurn();
+        return;
+      }
       const lastUser = [...itemsRef.current]
         .reverse()
         .find((item): item is Extract<CanvasItem, { kind: "user_said" }> => item.kind === "user_said");
@@ -402,10 +425,15 @@ export default function TalkPage() {
       }
       // LOCKED 2026-06-05 — open-loop 5th reply drains fully, then spoken invite (not bubble text).
       if (handoffTurnRef.current) {
+        if (!handoffReplyStartedRef.current) {
+          setLiveUiState(sessionActiveRef.current ? "listening" : "idle");
+          return;
+        }
         handoffTurnRef.current = false;
+        handoffReplyStartedRef.current = false;
         const gen = handoffGenerationRef.current;
         void (async () => {
-          await mediaRef.current?.waitForTurnAudioThenIdle();
+          await mediaRef.current?.waitForHandoffReplyDrain();
           if (!mountedRef.current || !sessionActiveRef.current) return;
           if (gen !== handoffGenerationRef.current) return;
           completeGuestLimitTurn();
@@ -416,6 +444,8 @@ export default function TalkPage() {
       return;
     }
     if (msg.type === "audio") {
+      if (isReplayModelTurnSuspended()) return;
+      if (handoffTurnRef.current) handoffReplyStartedRef.current = true;
       setLiveUiState("speaking");
       mediaRef.current?.playAudio(msg.data);
       return;
@@ -429,11 +459,14 @@ export default function TalkPage() {
       return;
     }
     if (msg.type === "gemini") {
+      if (isReplayModelTurnSuspended()) return;
       if (isHiddenLiveTranscript(msg.text)) return;
+      if (handoffTurnRef.current) handoffReplyStartedRef.current = true;
       appendTranscript("gemini", msg.text);
       return;
     }
     if (msg.type === "tool_call" && msg.name === "get_word_to_teach") {
+      if (isReplayModelTurnSuspended()) return;
       const result = msg.result as TeachWordResult;
       logEvent({
         kind: "engine",
@@ -458,7 +491,16 @@ export default function TalkPage() {
         syncTeachWordContext();
       }
     }
-  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn, maybeAdaptSessionLanguages, openGuestSignupSheet, syncTeachWordContext]);
+  }, [
+    appendTranscript,
+    beginGuestExchange,
+    completeGuestLimitTurn,
+    discardSuspendedModelTurn,
+    isReplayModelTurnSuspended,
+    maybeAdaptSessionLanguages,
+    openGuestSignupSheet,
+    syncTeachWordContext,
+  ]);
 
   const teardownSession = useCallback(() => {
     sessionActiveRef.current = false;
@@ -468,6 +510,7 @@ export default function TalkPage() {
     entryStartedRef.current = false;
     setAwaitingMic(false);
     handoffTurnRef.current = false;
+    handoffReplyStartedRef.current = false;
     invitationPendingRef.current = false;
     invitationVoiceSentRef.current = false;
     handoffGenerationRef.current += 1;
@@ -673,12 +716,13 @@ export default function TalkPage() {
 
   const handleWordReplay = useCallback(async (word: VocabularyEntry) => {
     mediaRef.current?.suspendMicSend(true);
+    discardSuspendedModelTurn();
     try {
       await replayWordAudio(word, sessionTargetLangRef.current);
     } finally {
       mediaRef.current?.suspendMicSend(false);
     }
-  }, []);
+  }, [discardSuspendedModelTurn]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedItems((prev) => {

@@ -6,6 +6,7 @@ export type GuestFlowFlags = {
   exchanges: number;
   locked: boolean;
   handoffTurn: boolean;
+  handoffReplyStarted: boolean;
   invitationPending: boolean;
   userExchangeCounted: boolean;
   invitationCueCount: number;
@@ -18,6 +19,7 @@ export function createGuestFlowState(exchanges = 0): GuestFlowFlags {
     exchanges,
     locked: exchanges >= GUEST_EXCHANGE_LIMIT,
     handoffTurn: false,
+    handoffReplyStarted: false,
     invitationPending: false,
     userExchangeCounted: false,
     invitationCueCount: 0,
@@ -34,6 +36,7 @@ export function beginGuestExchange(state: GuestFlowFlags): GuestFlowFlags {
   const next: GuestFlowFlags = { ...state, userExchangeCounted: true };
   if (next.exchanges === GUEST_EXCHANGE_LIMIT - 1) {
     next.handoffTurn = true;
+    next.handoffReplyStarted = false;
   }
   next.exchanges += 1;
   next.locked = next.exchanges >= GUEST_EXCHANGE_LIMIT;
@@ -45,12 +48,25 @@ export function onKickoffTurnComplete(state: GuestFlowFlags): GuestFlowFlags {
   return { ...state, userExchangeCounted: false };
 }
 
+/** Model output chunk during armed handoff — real 5th reply has started. */
+export function onHandoffReplyOutput(state: GuestFlowFlags): GuestFlowFlags {
+  if (!state.handoffTurn) return state;
+  return { ...state, handoffReplyStarted: true };
+}
+
+/** Spurious turn_complete before 5th reply output — keep handoff armed. */
+export function onSpuriousHandoffTurnComplete(state: GuestFlowFlags): GuestFlowFlags {
+  if (!state.handoffTurn || state.handoffReplyStarted) return state;
+  return { ...state, userExchangeCounted: false };
+}
+
 /** Model turn_complete after handoff reply — invitation cue fires once, no extra word card. */
 export function onHandoffTurnComplete(state: GuestFlowFlags): GuestFlowFlags {
-  if (!state.handoffTurn) return state;
+  if (!state.handoffTurn || !state.handoffReplyStarted) return state;
   return {
     ...state,
     handoffTurn: false,
+    handoffReplyStarted: false,
     invitationPending: true,
     invitationCueCount: state.invitationCueCount + 1,
     userExchangeCounted: false,
@@ -79,6 +95,7 @@ export function onMicStop(state: GuestFlowFlags): GuestFlowFlags {
   return {
     ...state,
     handoffTurn: false,
+    handoffReplyStarted: false,
     invitationPending: false,
   };
 }
@@ -90,6 +107,7 @@ export function simulateGuestFiveTurnFlow(): GuestFlowFlags {
     state = beginGuestExchange(state);
     state = { ...state, userExchangeCounted: false };
   }
+  state = onHandoffReplyOutput(state);
   state = onHandoffTurnComplete(state);
   state = onInvitationDrained(state);
   return state;
