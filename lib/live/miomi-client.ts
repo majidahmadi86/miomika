@@ -54,7 +54,14 @@ export class MiomiLiveClient {
 
   constructor(private callbacks: LiveClientCallbacks) {}
 
-  async connect(voice: string = LIVE_VOICE): Promise<void> {
+  async connect(opts?: {
+    voice?: string;
+    uiLanguage: "th" | "en";
+    targetLanguage: "th" | "en" | null;
+  }): Promise<void> {
+    const voice = opts?.voice ?? LIVE_VOICE;
+    const uiLanguage = opts?.uiLanguage ?? "en";
+    const targetLanguage = opts?.targetLanguage ?? "th";
     const tokenRes = await fetch("/api/live-token");
     if (!tokenRes.ok) {
       const err = (await tokenRes.json().catch(() => ({}))) as { error?: string };
@@ -77,7 +84,7 @@ export class MiomiLiveClient {
 
     this.session = (await ai.live.connect({
       model: LIVE_MODEL,
-      config: buildLiveConfig(voice),
+      config: buildLiveConfig(voice, uiLanguage, targetLanguage),
       callbacks: {
         onopen: () => {
           this.connected = true;
@@ -231,6 +238,16 @@ export class MiomiLiveClient {
       turns: [{ role: "user", parts: [{ text: buildKickoffPrompt(lang) }] }],
       turnComplete: true,
     });
+  }
+
+  /** Remind the model when UI/TARGET language adapts mid-session. */
+  sendLanguageContext(ui: "th" | "en", target: "th" | "en" | null): void {
+    const uiName = ui === "en" ? "English" : "Thai";
+    const targetName =
+      target === "en" ? "English" : target === "th" ? "Thai" : "none";
+    this.sendHiddenContext(
+      `[language_update] UI_LANGUAGE is now ${uiName}. TARGET_LANGUAGE is ${targetName}. ALWAYS explain and converse in ${uiName}. Teach ${targetName} in small pieces with meaning and pronunciation in ${uiName}. Do NOT reply entirely in ${targetName} to a beginner.`,
+    );
   }
 
   /** Inject guest handoff context mid-session — invisible to the transcript UI. */

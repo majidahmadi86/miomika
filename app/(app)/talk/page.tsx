@@ -24,6 +24,13 @@ import { MiomiLiveClient, type LiveClientMessage } from "@/lib/live/miomi-client
 import { MediaHandler } from "@/lib/live/media-handler";
 import { isHiddenLiveTranscript, sanitizeUserTranscript } from "@/lib/live/transcript";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
+import {
+  detectLanguage,
+  detectPracticeAttempt,
+  normalizeUiLanguage,
+  resolveSessionLanguages,
+  resolveUiLanguage,
+} from "@/lib/brain/language";
 import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config";
 
 type CanvasItem =
@@ -43,9 +50,24 @@ function readGuestExchanges(): number {
 }
 
 function readUiLang(): "th" | "en" {
-  if (typeof window === "undefined") return "th";
-  const lang = navigator.language || "th";
+  if (typeof window === "undefined") return "en";
+  const lang = navigator.language || "en";
   return lang.startsWith("en") ? "en" : "th";
+}
+
+function canvasToMemory(
+  items: CanvasItem[],
+): Array<{ role: "user" | "miomi"; content: string }> {
+  const memory: Array<{ role: "user" | "miomi"; content: string }> = [];
+  for (const item of items) {
+    if (item.kind === "user_said") {
+      memory.push({ role: "user", content: item.text });
+      continue;
+    }
+    const content = [item.textEn, item.textTh].filter(Boolean).join(" ");
+    if (content) memory.push({ role: "miomi", content });
+  }
+  return memory;
 }
 
 function detectReplyLang(text: string, fallback: "th" | "en"): "th" | "en" {
@@ -75,7 +97,7 @@ export default function TalkPage() {
   const [textInput, setTextInput] = useState("");
   const [keyboardMode, setKeyboardMode] = useState(false);
   const [respLength, setRespLength] = useState<ResponseLength>("normal");
-  const [conversationLang, setConversationLang] = useState<"th" | "en">("th");
+  const [conversationLang, setConversationLang] = useState<"th" | "en">("en");
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [guestExchangesRaw, setGuestExchangesRaw] = useState(readGuestExchanges);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -102,7 +124,10 @@ export default function TalkPage() {
   const guestExchangesRef = useRef(0);
   const isGuestRef = useRef(false);
   const isLockedRef = useRef(false);
-  const conversationLangRef = useRef<"th" | "en">("th");
+  const conversationLangRef = useRef<"th" | "en">("en");
+  const sessionUiLangRef = useRef<"th" | "en">("en");
+  const sessionTargetLangRef = useRef<"th" | "en" | null>("th");
+  const itemsRef = useRef<CanvasItem[]>([]);
   const teardownSessionRef = useRef<() => void>(() => {});
   const userExchangeCountedRef = useRef(false);
   const pendingHandoffContextRef = useRef(false);
@@ -157,6 +182,48 @@ export default function TalkPage() {
   useEffect(() => {
     conversationLangRef.current = conversationLang;
   }, [conversationLang]);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const maybeAdaptSessionLanguage = useCallback(
+    (userInput: string) => {
+      const trimmed = userInput.trim();
+      if (!trimmed) return;
+
+      const memory = canvasToMemory(itemsRef.current);
+      const sessionUi = sessionUiLangRef.current;
+      const targetLang = sessionTargetLangRef.current;
+      const profileUiAnchor = isGuestRef.current
+        ? sessionUi
+        : normalizeUiLanguage(profile?.ui_language ?? null);
+
+      const isPracticeAttempt = detectPracticeAttempt({
+        userInput: trimmed,
+        nowLanguage: detectLanguage(trimmed, sessionUi),
+        learningTargetLanguage: targetLang,
+        uiLanguage: sessionUi,
+        memory,
+        introducedWords: [],
+      });
+      if (isPracticeAttempt) return;
+
+      const resolved = resolveUiLanguage({
+        profileUiLang: profileUiAnchor,
+        userInput: trimmed,
+        memory,
+      });
+      if (resolved === sessionUi) return;
+
+      sessionUiLangRef.current = resolved;
+      conversationLangRef.current = resolved;
+      setConversationLang(resolved);
+      setUiLang(resolved);
+      clientRef.current?.sendLanguageContext(resolved, targetLang);
+    },
+    [profile?.ui_language],
+  );
 
   const completeGuestLimitTurn = useCallback(() => {
     // LOCKED 2026-06-04 — guest signup invitation decouple, paired with LAST_TURN_HANDOFF.
@@ -240,6 +307,12 @@ export default function TalkPage() {
       return;
     }
     if (msg.type === "turn_complete") {
+      const lastUser = [...itemsRef.current]
+        .reverse()
+        .find((item): item is Extract<CanvasItem, { kind: "user_said" }> => item.kind === "user_said");
+      if (lastUser) {
+        maybeAdaptSessionLanguage(lastUser.text);
+      }
       currentGeminiItemIdRef.current = null;
       currentUserItemIdRef.current = null;
       userExchangeCountedRef.current = false;
@@ -298,7 +371,7 @@ export default function TalkPage() {
         data: { args: msg.args, result: msg.result },
       });
     }
-  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn]);
+  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn, maybeAdaptSessionLanguage]);
 
   const teardownSession = useCallback(() => {
     sessionActiveRef.current = false;
@@ -348,7 +421,18 @@ export default function TalkPage() {
     }
 
     try {
-      await clientRef.current.connect();
+      const { uiLanguage, targetLanguage } = resolveSessionLanguages({
+        isGuest: isGuestRef.current,
+        profileUiLang: profile?.ui_language ?? null,
+        profileTarget: profile?.learning_target_language ?? null,
+      });
+      sessionUiLangRef.current = uiLanguage;
+      sessionTargetLangRef.current = targetLanguage;
+      conversationLangRef.current = uiLanguage;
+      setConversationLang(uiLanguage);
+      setUiLang(uiLanguage);
+
+      await clientRef.current.connect({ uiLanguage, targetLanguage });
       sessionActiveRef.current = true;
       if (pendingHandoffContextRef.current) {
         clientRef.current.sendHiddenContext(LAST_TURN_HANDOFF);
@@ -380,7 +464,7 @@ export default function TalkPage() {
       teardownSession();
       setLiveUiState("error");
     }
-  }, [canUseLive, handleLiveMessage, teardownSession, startContinuousMic]);
+  }, [canUseLive, handleLiveMessage, teardownSession, startContinuousMic, profile]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -402,21 +486,33 @@ export default function TalkPage() {
       setGuestExchangesRaw(parsed);
       guestExchangesRef.current = parsed;
     }
-    const navLang = navigator.language || "th";
-    const isEnglishUser = navLang.startsWith("en");
-    if (isEnglishUser) setUiLang("en");
-    setConversationLang(isEnglishUser ? "en" : "th");
+    const { uiLanguage } = resolveSessionLanguages({
+      isGuest: true,
+      profileUiLang: null,
+      profileTarget: null,
+    });
+    setUiLang(uiLanguage);
+    setConversationLang(uiLanguage);
+    sessionUiLangRef.current = uiLanguage;
+    conversationLangRef.current = uiLanguage;
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
-    const lang = profile?.ui_language;
-    if (lang !== "th" && lang !== "en") return;
-    queueMicrotask(() => {
-      setConversationLang(lang);
-      setUiLang(lang);
+    if (!authReady || isGuest) return;
+    const { uiLanguage, targetLanguage } = resolveSessionLanguages({
+      isGuest: false,
+      profileUiLang: profile?.ui_language ?? null,
+      profileTarget: profile?.learning_target_language ?? null,
     });
-  }, [profile?.ui_language]);
+    queueMicrotask(() => {
+      setConversationLang(uiLanguage);
+      setUiLang(uiLanguage);
+      sessionUiLangRef.current = uiLanguage;
+      sessionTargetLangRef.current = targetLanguage;
+      conversationLangRef.current = uiLanguage;
+    });
+  }, [authReady, isGuest, profile?.ui_language, profile?.learning_target_language]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
   useEffect(() => {
@@ -541,8 +637,12 @@ export default function TalkPage() {
     beginGuestExchange();
     const id = crypto.randomUUID();
     currentUserItemIdRef.current = id;
-    setItems((prev) => [...prev, { id, kind: "user_said", text: sanitizeUserTranscript(trimmed) }]);
+    const cleaned = sanitizeUserTranscript(trimmed);
+    const newItem = { id, kind: "user_said" as const, text: cleaned };
+    itemsRef.current = [...itemsRef.current, newItem];
+    setItems((prev) => [...prev, newItem]);
     setTextInput("");
+    maybeAdaptSessionLanguage(cleaned);
     if (!sessionActiveRef.current) {
       void (async () => {
         await ensurePlaybackUnlocked();
@@ -552,7 +652,7 @@ export default function TalkPage() {
     } else {
       clientRef.current?.sendText(trimmed);
     }
-  }, [textInput, isLocked, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession]);
+  }, [textInput, isLocked, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession, maybeAdaptSessionLanguage]);
 
   const handleMiomiHelp = useCallback(
     (topic: "pillars" | "niche" | "voice") => {
