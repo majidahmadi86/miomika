@@ -11,6 +11,12 @@ import { logError } from "@/lib/debug/log";
 export type LearningWord = {
   word_en: string;
   word_th: string;
+  th_romanization?: string | null;
+  en_ipa?: string | null;
+  emoji?: string | null;
+  cefr_level?: string | null;
+  example_th?: string | null;
+  example_en?: string | null;
   mastery_level: number;
   next_spiral_at: string | null;
 };
@@ -21,6 +27,7 @@ export type ProgressResponse = {
   conversationCount: number;
   streakDays: number;
   cefrLevel: string | null;
+  learningTargetLanguage: "th" | "en" | null;
   learningWords: LearningWord[];
 };
 
@@ -30,6 +37,7 @@ const ZEROED: ProgressResponse = {
   conversationCount: 0,
   streakDays: 0,
   cefrLevel: null,
+  learningTargetLanguage: null,
   learningWords: [],
 };
 
@@ -70,17 +78,22 @@ export async function GET() {
     const supabase = await createServiceClient();
 
     let cefrLevel: string | null = null;
+    let learningTargetLanguage: "th" | "en" | null = null;
     try {
       const { data: profileRow, error: cefrErr } = await supabase
         .from("profiles")
-        .select("cefr_level")
+        .select("cefr_level, learning_target_language")
         .eq("id", profile.id)
         .maybeSingle();
-      if (!cefrErr && profileRow && "cefr_level" in profileRow) {
-        cefrLevel = (profileRow.cefr_level as string | null) ?? null;
+      if (!cefrErr && profileRow) {
+        if ("cefr_level" in profileRow) {
+          cefrLevel = (profileRow.cefr_level as string | null) ?? null;
+        }
+        const rawTarget = profileRow.learning_target_language as string | null | undefined;
+        learningTargetLanguage = rawTarget === "th" || rawTarget === "en" ? rawTarget : null;
       }
     } catch (err) {
-      logError("progress.cefr", "cefr_level query failed", err);
+      logError("progress.cefr", "profile query failed", err);
     }
 
     const { count: wordsMastered, error: masteredErr } = await supabase
@@ -137,34 +150,62 @@ export async function GET() {
       .eq("user_id", profile.id)
       .is("mastered_at", null)
       .order("last_introduced_at", { ascending: false })
-      .limit(6);
+      .limit(100);
 
     if (learningWordsErr) throw learningWordsErr;
 
     const wordEns = (learningRows ?? []).map((r) => r.word_en as string);
-    const thaiByEn = new Map<string, string>();
+    type BankRow = {
+      word_en: string;
+      word_th: string;
+      th_romanization: string | null;
+      en_ipa: string | null;
+      emoji: string | null;
+      cefr_level: string | null;
+      example_th: string | null;
+      example_en: string | null;
+    };
+    const bankByEn = new Map<string, BankRow>();
 
     if (wordEns.length > 0) {
       const { data: bankRows, error: bankErr } = await supabase
         .from("vocabulary_bank")
-        .select("word_en, word_th")
+        .select("word_en, word_th, th_romanization, en_ipa, emoji, cefr_level, example_th, example_en")
         .in("word_en", wordEns);
 
       if (bankErr) throw bankErr;
 
       for (const row of bankRows ?? []) {
         if (row.word_en && row.word_th) {
-          thaiByEn.set(row.word_en as string, row.word_th as string);
+          bankByEn.set(row.word_en as string, {
+            word_en: row.word_en as string,
+            word_th: row.word_th as string,
+            th_romanization: (row.th_romanization as string | null) ?? null,
+            en_ipa: (row.en_ipa as string | null) ?? null,
+            emoji: (row.emoji as string | null) ?? null,
+            cefr_level: (row.cefr_level as string | null) ?? null,
+            example_th: (row.example_th as string | null) ?? null,
+            example_en: (row.example_en as string | null) ?? null,
+          });
         }
       }
     }
 
-    const learningWords: LearningWord[] = (learningRows ?? []).map((row) => ({
-      word_en: row.word_en as string,
-      word_th: thaiByEn.get(row.word_en as string) ?? row.word_en as string,
-      mastery_level: (row.mastery_level as number) ?? 0,
-      next_spiral_at: (row.next_spiral_at as string | null) ?? null,
-    }));
+    const learningWords: LearningWord[] = (learningRows ?? []).map((row) => {
+      const bank = bankByEn.get(row.word_en as string);
+      return {
+        word_en: row.word_en as string,
+        word_th: bank?.word_th ?? (row.word_en as string),
+        th_romanization: bank?.th_romanization ?? null,
+        en_ipa: bank?.en_ipa ?? null,
+        emoji: bank?.emoji ?? null,
+        cefr_level: bank?.cefr_level ?? null,
+        example_th: bank?.example_th ?? null,
+        example_en: bank?.example_en ?? null,
+        mastery_level: (row.mastery_level as number) ?? 0,
+        next_spiral_at: (row.next_spiral_at as string | null) ?? null,
+      };
+    });
 
     const payload: ProgressResponse = {
       wordsMastered: wordsMastered ?? 0,
@@ -172,6 +213,7 @@ export async function GET() {
       conversationCount: allSessionIds.size,
       streakDays,
       cefrLevel,
+      learningTargetLanguage,
       learningWords,
     };
 

@@ -35,10 +35,10 @@ import {
 import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config";
 import {
   cardDirectionForTarget,
-  replayTextForWord,
   teachWordToVocabularyEntry,
   type TeachWordResult,
 } from "@/lib/talk/teach-word-card";
+import { replayWordAudio } from "@/lib/talk/word-replay";
 import type { VocabularyEntry } from "@/components/talk/WordCardV3";
 
 /**
@@ -115,6 +115,7 @@ export default function TalkPage() {
   const [respLength, setRespLength] = useState<ResponseLength>("normal");
   const [conversationLang, setConversationLang] = useState<"th" | "en">("en");
   const [showGuestSheet, setShowGuestSheet] = useState(false);
+  const [guestSheetReason, setGuestSheetReason] = useState<"talk" | "save">("talk");
   const [guestExchangesRaw, setGuestExchangesRaw] = useState(readGuestExchanges);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -316,6 +317,11 @@ export default function TalkPage() {
     }
   }, [uiLang]);
 
+  const openGuestSignupSheet = useCallback((reason: "talk" | "save") => {
+    setGuestSheetReason(reason);
+    setShowGuestSheet(true);
+  }, []);
+
   const handleLiveMessage = useCallback((msg: LiveClientMessage) => {
     if (msg.type === "interrupted") {
       mediaRef.current?.stopAudioPlayback();
@@ -341,7 +347,7 @@ export default function TalkPage() {
           await mediaRef.current?.waitForPlaybackIdle();
           if (!mountedRef.current) return;
           teardownSessionRef.current();
-          setShowGuestSheet(true);
+          openGuestSignupSheet("talk");
         })();
         return;
       }
@@ -401,7 +407,7 @@ export default function TalkPage() {
         ]);
       }
     }
-  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn, maybeAdaptSessionLanguage]);
+  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn, maybeAdaptSessionLanguage, openGuestSignupSheet]);
 
   const teardownSession = useCallback(() => {
     sessionActiveRef.current = false;
@@ -611,9 +617,7 @@ export default function TalkPage() {
   }, []);
 
   const handleWordReplay = useCallback((word: VocabularyEntry) => {
-    unlockTtsPlayback();
-    const { text, lang } = replayTextForWord(word, sessionTargetLangRef.current);
-    void speak(text, lang);
+    void replayWordAudio(word, sessionTargetLangRef.current);
   }, []);
 
   const toggleExpand = useCallback((id: string) => {
@@ -640,7 +644,7 @@ export default function TalkPage() {
     primeAudio();
     if (!authReady) return;
     if (isLocked) {
-      setShowGuestSheet(true);
+      openGuestSignupSheet("talk");
       return;
     }
     if (sessionActiveRef.current) {
@@ -660,14 +664,14 @@ export default function TalkPage() {
       await ensurePlaybackUnlocked();
       await startLiveSession();
     })();
-  }, [authReady, isLocked, liveUiState, primeAudio, ensurePlaybackUnlocked, teardownSession, startLiveSession, startContinuousMic]);
+  }, [authReady, isLocked, liveUiState, primeAudio, ensurePlaybackUnlocked, teardownSession, startLiveSession, startContinuousMic, openGuestSignupSheet]);
 
   const handleSendText = useCallback(() => {
     const trimmed = textInput.trim();
     if (!trimmed) return;
     primeAudio();
     if (isLocked) {
-      setShowGuestSheet(true);
+      openGuestSignupSheet("talk");
       return;
     }
     beginGuestExchange();
@@ -688,14 +692,14 @@ export default function TalkPage() {
     } else {
       clientRef.current?.sendText(trimmed);
     }
-  }, [textInput, isLocked, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession, maybeAdaptSessionLanguage]);
+  }, [textInput, isLocked, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession, maybeAdaptSessionLanguage, openGuestSignupSheet]);
 
   const handleMiomiHelp = useCallback(
     (topic: "pillars" | "niche" | "voice") => {
       setAdjustOpen(false);
       primeAudio();
       if (isLocked) {
-        setShowGuestSheet(true);
+        openGuestSignupSheet("talk");
         return;
       }
       const text =
@@ -726,7 +730,7 @@ export default function TalkPage() {
         clientRef.current?.sendText(text);
       }
     },
-    [isLocked, uiLang, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession],
+    [isLocked, uiLang, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession, openGuestSignupSheet],
   );
 
   const orbState: OrbState = (() => {
@@ -894,6 +898,8 @@ export default function TalkPage() {
                   word={item.word}
                   direction={item.direction}
                   onReplayAudio={() => handleWordReplay(item.word)}
+                  saveState={isGuest ? "guest_prompt" : "saved"}
+                  onSaveTap={isGuest ? () => openGuestSignupSheet("save") : undefined}
                 />
               );
             }
@@ -1008,10 +1014,22 @@ export default function TalkPage() {
             </div>
             <div style={{ textAlign: "center", padding: "0 28px", marginBottom: "20px" }}>
               <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "22px", fontWeight: 600, color: "#1A1A18", margin: "0 0 8px", lineHeight: 1.3 }}>
-                {uiLang === "en" ? "Sign in to talk with Miomi~" : "สมัครเพื่อพูดคุยกับหนูค่า~"}
+                {guestSheetReason === "save"
+                  ? uiLang === "en"
+                    ? "Sign up to save your words~"
+                    : "สมัครเพื่อบันทึกคำศัพท์นะคะ~"
+                  : uiLang === "en"
+                    ? "Sign in to talk with Miomi~"
+                    : "สมัครเพื่อพูดคุยกับหนูค่า~"}
               </p>
               <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "14px", color: "#9A8B73", margin: 0, lineHeight: 1.5 }}>
-                {uiLang === "en" ? "Voice chat is for members — sign up free and I'll remember everything we learn" : "การพูดคุยเสียงสำหรับสมาชิกค่า — สมัครฟรี หนูจะจำทุกอย่างที่เราเรียนด้วยกัน"}
+                {guestSheetReason === "save"
+                  ? uiLang === "en"
+                    ? "Create a free account and Miomi will remember every word you learn together"
+                    : "สมัครฟรี หนูจะจำทุกคำที่เราเรียนด้วยกันไว้ให้ค่า"
+                  : uiLang === "en"
+                    ? "Voice chat is for members — sign up free and I'll remember everything we learn"
+                    : "การพูดคุยเสียงสำหรับสมาชิกค่า — สมัครฟรี หนูจะจำทุกอย่างที่เราเรียนด้วยกัน"}
               </p>
             </div>
             <div style={{ padding: "0 24px 24px", display: "flex", flexDirection: "column", gap: "10px" }}>

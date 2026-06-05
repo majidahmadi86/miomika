@@ -48,3 +48,28 @@ export function replayTextForWord(
   }
   return { text: word.word_th, lang: "th" };
 }
+
+export type PracticeWord = {
+  word_en: string;
+  word_th: string;
+  th_romanization?: string | null;
+  en_ipa?: string | null;
+  emoji?: string | null;
+  cefr_level?: string | null;
+  example_th?: string | null;
+  example_en?: string | null;
+};
+
+export function practiceWordToVocabularyEntry(word: PracticeWord): VocabularyEntry {
+  return {
+    id: word.word_en,
+    word_en: word.word_en,
+    word_th: word.word_th,
+    th_romanization: word.th_romanization ?? undefined,
+    en_ipa: word.en_ipa ?? undefined,
+    emoji: word.emoji ?? undefined,
+    cefr_level: word.cefr_level ?? undefined,
+    example_th: word.example_th ?? undefined,
+    example_en: word.example_en ?? undefined,
+  };
+}

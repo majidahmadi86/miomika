@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Volume2, Lightbulb, AlertCircle, ChevronDown, ChevronUp, Mic } from "lucide-react";
+import { Volume2, Lightbulb, AlertCircle, ChevronDown, ChevronUp, Mic, BookmarkCheck } from "lucide-react";
 import { getIconForCategory } from "@/lib/talk/imageCategoryMap";
 import { playWordAudio } from "@/lib/talk/speech";
 
@@ -33,15 +33,27 @@ export interface VocabularyEntry {
   register?: string;
 }
 
+export type WordCardSaveState = "saved" | "guest_prompt";
+
 interface WordCardV3Props {
   word: VocabularyEntry;
   direction: "th_to_en" | "en_to_th";
   onPronunciationCheck?: (word: VocabularyEntry) => void;
   /** When set, replay uses this instead of browser TTS (e.g. /api/talk/speak). */
   onReplayAudio?: () => void | Promise<void>;
+  /** Member: confirmed saved state. Guest: signup conversion hook. */
+  saveState?: WordCardSaveState;
+  onSaveTap?: () => void;
 }
 
-export function WordCardV3({ word, direction, onPronunciationCheck, onReplayAudio }: WordCardV3Props) {
+export function WordCardV3({
+  word,
+  direction,
+  onPronunciationCheck,
+  onReplayAudio,
+  saveState,
+  onSaveTap,
+}: WordCardV3Props) {
   const [expanded, setExpanded] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
 
@@ -315,6 +327,59 @@ export function WordCardV3({ word, direction, onPronunciationCheck, onReplayAudi
             <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#9A8B73", margin: 0 }}>
               {word.example_context}
             </p>
+          </motion.div>
+        )}
+
+        {saveState && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.20, delay: 0.76 }}
+            style={{ marginBottom: onPronunciationCheck ? "10px" : 0 }}
+          >
+            {saveState === "saved" ? (
+              <div
+                style={{
+                  width: "100%",
+                  height: "44px",
+                  borderRadius: "12px",
+                  background: "rgba(201,169,110,0.08)",
+                  border: "1px solid rgba(201,169,110,0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
+                <BookmarkCheck style={{ width: "16px", height: "16px", color: "#C9A96E" }} strokeWidth={2} />
+                <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#C9A96E" }}>
+                  {isThaiLearner ? "บันทึกแล้วค่า~" : "Saved~"}
+                </span>
+              </div>
+            ) : (
+              <motion.button
+                type="button"
+                onClick={onSaveTap}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  width: "100%",
+                  height: "44px",
+                  borderRadius: "12px",
+                  background: "#FFFFFF",
+                  border: "1.5px solid #C9A96E",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
+                <BookmarkCheck style={{ width: "16px", height: "16px", color: "#C9A96E" }} strokeWidth={2} />
+                <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#C9A96E" }}>
+                  {isThaiLearner ? "สมัครเพื่อบันทึกคำศัพท์" : "Sign up to save your words"}
+                </span>
+              </motion.button>
+            )}
           </motion.div>
         )}
 

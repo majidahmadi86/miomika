@@ -11,31 +11,19 @@ import {
   Trophy,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { WordCardV3 } from "@/components/talk/WordCardV3";
 import { useUILanguage } from "@/lib/i18n/client";
+import {
+  cardDirectionForTarget,
+  practiceWordToVocabularyEntry,
+  type PracticeWord,
+} from "@/lib/talk/teach-word-card";
+import { replayWordAudio } from "@/lib/talk/word-replay";
 import { me } from "@/lib/voice/warmth";
+import type { ProgressResponse } from "@/app/api/profile/progress/route";
 
-type LearningWord = {
-  word_en: string;
-  word_th: string;
-  mastery_level: number;
-  next_spiral_at: string | null;
-};
-
-type ProgressData = {
-  wordsMastered: number;
-  wordsLearning: number;
-  conversationCount: number;
-  streakDays: number;
-  cefrLevel: string | null;
-  learningWords: LearningWord[];
-};
-
-function masteryChip(level: number, lang: "th" | "en"): string {
-  if (level >= 2) return lang === "en" ? "Almost there" : "ใกล้แล้ว~";
-  if (level === 1) return lang === "en" ? "Step 2 of 3" : "ขั้น 2 จาก 3";
-  return lang === "en" ? "Step 1 of 3" : "ขั้น 1 จาก 3";
-}
+type ProgressData = ProgressResponse;
 
 function statDisplay(value: number): string {
   return value > 0 ? String(value) : "0";
@@ -66,6 +54,18 @@ export default function DashboardPage() {
   const conversationCount = progress?.conversationCount ?? 0;
   const learningWords = progress?.learningWords ?? [];
   const cefrLevel = progress?.cefrLevel ?? null;
+  const learningTarget = progress?.learningTargetLanguage ?? "th";
+  const cardDirection = useMemo(
+    () => cardDirectionForTarget(learningTarget),
+    [learningTarget],
+  );
+
+  const handlePracticeReplay = useCallback(
+    (word: PracticeWord) => {
+      void replayWordAudio(practiceWordToVocabularyEntry(word), learningTarget);
+    },
+    [learningTarget],
+  );
 
   const gridStats = [
     {
@@ -205,7 +205,10 @@ export default function DashboardPage() {
 
         <section className="rounded-xl border border-[#EAD0DB] bg-white p-3.5">
           <p className="text-[12px] font-medium text-[#1A1A1A]">
-            {uiLang === "en" ? "Words you're learning" : "คำศัพท์ที่กำลังเรียน"}
+            {uiLang === "en" ? "Practice & review" : "ฝึกทบทวน"}
+          </p>
+          <p className="mt-0.5 text-[10px] text-[#AAAAAA]">
+            {uiLang === "en" ? "Your saved words from Miomi" : "คำที่บันทึกจากการเรียนกับหนู"}
           </p>
           {learningWords.length === 0 ? (
             <div className="mt-4 flex flex-col items-center text-center">
@@ -215,10 +218,9 @@ export default function DashboardPage() {
                 aria-hidden
               />
               <p className="mt-2 text-[11px] text-[#888888]">
-                {me.progress.statWordsEmpty(uiLang)}
-              </p>
-              <p className="mt-0.5 text-[9px] text-[#AAAAAA]">
-                Words you learn will appear here~
+                {uiLang === "en"
+                  ? "Words you learn with Miomi show up here"
+                  : "คำที่เรียนกับหนูจะมาอยู่ตรงนี้นะคะ~"}
               </p>
               <Link
                 href="/talk"
@@ -229,27 +231,15 @@ export default function DashboardPage() {
               </Link>
             </div>
           ) : (
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 flex flex-col gap-2">
               {learningWords.map((w) => (
-                <div
+                <WordCardV3
                   key={w.word_en}
-                  className="rounded-xl border border-[#EDE8E0]/60 bg-white/70 p-3 backdrop-blur-[20px]"
-                  style={{
-                    boxShadow:
-                      "0 1px 2px rgba(26,26,24,0.04), 0 4px 16px rgba(26,26,24,0.06)",
-                  }}
-                >
-                  <p
-                    className="text-[16px] font-medium leading-tight text-[#1A1A1A]"
-                    style={{ fontFamily: "'Sarabun', 'Kanit', sans-serif" }}
-                  >
-                    {w.word_th}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-[#888888]">{w.word_en}</p>
-                  <span className="mt-2 inline-flex rounded-full bg-[#FDF5E0] px-2 py-0.5 text-[9px] font-medium text-[#B8860B]">
-                    {masteryChip(w.mastery_level, uiLang)}
-                  </span>
-                </div>
+                  word={practiceWordToVocabularyEntry(w)}
+                  direction={cardDirection}
+                  saveState="saved"
+                  onReplayAudio={() => handlePracticeReplay(w)}
+                />
               ))}
             </div>
           )}
