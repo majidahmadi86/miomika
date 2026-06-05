@@ -68,20 +68,33 @@ export class MiomiLiveClient {
       httpOptions: { apiVersion: "v1alpha" },
     });
 
+    let resolveOpen: (() => void) | undefined;
+    let rejectOpen: ((err: Error) => void) | undefined;
+    const openPromise = new Promise<void>((resolve, reject) => {
+      resolveOpen = resolve;
+      rejectOpen = reject;
+    });
+
     this.session = (await ai.live.connect({
       model: LIVE_MODEL,
       config: buildLiveConfig(voice),
       callbacks: {
         onopen: () => {
           this.connected = true;
+          resolveOpen?.();
           this.callbacks.onOpen?.();
           this.callbacks.onStatus?.({ status: "connected", voice, model: LIVE_MODEL });
         },
         onmessage: async (message) => {
-          await this.handleMessage(message);
+          try {
+            await this.handleMessage(message);
+          } catch {
+            /* tool / parse errors must never break the audio loop */
+          }
         },
         onerror: (e: { message?: string; code?: number; reason?: string }) => {
           const msg = e?.message ?? String(e);
+          rejectOpen?.(new Error(msg));
           this.callbacks.onError?.({
             error: msg,
             code: e?.code ?? null,
@@ -104,6 +117,8 @@ export class MiomiLiveClient {
         },
       },
     })) as unknown as LiveSession;
+
+    await openPromise;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Live SDK message shape is loosely typed
@@ -148,36 +163,46 @@ export class MiomiLiveClient {
     const functionResponses: { id?: string; name: string; response: unknown }[] = [];
 
     for (const fc of toolCall.functionCalls ?? []) {
-      if (fc.name !== "teach_word") continue;
+      let response: unknown = { ok: false, error: "unknown tool" };
 
-      const word = (fc.args?.word ?? fc.args?.Word ?? "") as string;
-      const resp = await fetch("/api/teach-word", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word }),
-      });
-      if (!resp.ok) {
-        const err = (await resp.json().catch(() => ({}))) as { error?: string };
-        throw new Error(err.error ?? `teach-word failed (${resp.status})`);
+      if (fc.name === "teach_word") {
+        try {
+          const word = (fc.args?.word ?? fc.args?.Word ?? "") as string;
+          const resp = await fetch("/api/teach-word", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ word }),
+          });
+          if (!resp.ok) {
+            const err = (await resp.json().catch(() => ({}))) as { error?: string };
+            response = { ok: false, error: err.error ?? `teach-word failed (${resp.status})` };
+          } else {
+            response = await resp.json();
+            this.callbacks.onMessage?.({
+              type: "tool_call",
+              name: fc.name,
+              args: fc.args ?? {},
+              result: response,
+            });
+          }
+        } catch (err) {
+          response = { ok: false, error: String(err) };
+        }
       }
-      const result = await resp.json();
-
-      this.callbacks.onMessage?.({
-        type: "tool_call",
-        name: fc.name,
-        args: fc.args ?? {},
-        result,
-      });
 
       functionResponses.push({
         id: fc.id,
         name: fc.name,
-        response: result,
+        response,
       });
     }
 
     if (functionResponses.length > 0 && this.session) {
-      await this.session.sendToolResponse({ functionResponses });
+      try {
+        await this.session.sendToolResponse({ functionResponses });
+      } catch {
+        /* Gemini must always get a best-effort ack; never throw upstream */
+      }
     }
   }
 
