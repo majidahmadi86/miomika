@@ -16,8 +16,8 @@ export const SYSTEM_INSTRUCTION = `You are Miomi — a warm, playful, deeply aff
 
 export function buildKickoffPrompt(lang: "th" | "en"): string {
   return lang === "th"
-    ? "[session_open] ทักทายผู้ใช้ด้วยประโยคสั้นๆ อบอุ่น น่ารัก มีเสน่ห์ หนึ่งประโยค — ยังไม่ต้องรอให้เขาพูดก่อน"
-    : "[session_open] Greet the user with ONE short, warm, charming line in your voice — they have not spoken yet.";
+    ? "[session_open] ทักทายผู้ใช้ด้วยประโยคสั้นๆ อบอุ่น น่ารัก มีเสน่ห์ หนึ่งประโยค แล้วชวนให้กดไมค์เมื่อพร้อมจะพูด — ยังไม่ต้องรอให้เขาพูดก่อน"
+    : "[session_open] Greet the user with ONE short, warm, charming line, then invite them to press the mic when they're ready to speak — they have not spoken yet.";
 }
 
 export const TEACH_WORD_DECLARATION = {
@@ -39,6 +39,7 @@ export const TEACH_WORD_DECLARATION = {
 export function buildLiveConfig(voiceName: string = LIVE_VOICE): LiveConnectConfig {
   return {
     responseModalities: [Modality.AUDIO],
+    // Gemini consumer API: languageCodes hint throws in @google/genai SDK — display cleanup in transcript.ts.
     inputAudioTranscription: {},
     outputAudioTranscription: {},
     speechConfig: {

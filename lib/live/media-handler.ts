@@ -1,18 +1,14 @@
 /**
- * PCM capture @ 16 kHz, playback @ 24 kHz — ported from spike-live/media-handler.js.
+ * PCM capture @ 16 kHz, playback @ 24 kHz via gapless AudioWorklet ring buffer.
  */
-const PLAYBACK_RATE = 24000;
-const SCHEDULE_AHEAD_S = 0.04;
-const CHUNK_FADE_SAMPLES = 64;
-
 export class MediaHandler {
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
-  private audioWorkletNode: AudioWorkletNode | null = null;
+  private captureWorklet: AudioWorkletNode | null = null;
+  private playbackWorklet: AudioWorkletNode | null = null;
   private inputGain: GainNode | null = null;
-  private nextStartTime = 0;
-  private scheduledSources: AudioBufferSourceNode[] = [];
   private playbackActive = false;
+  private playbackIdleTimer: ReturnType<typeof setTimeout> | null = null;
   isRecording = false;
 
   /** Call synchronously inside a user-gesture handler before any await. */
@@ -29,7 +25,7 @@ export class MediaHandler {
     }
   }
 
-  /** Resume + load worklet — must run from the gesture that starts a live session. */
+  /** Resume + load worklets — must run from the gesture that starts a live session. */
   async unlockPlayback(): Promise<void> {
     this.primeAudioContext();
     if (!this.audioContext) return;
@@ -41,10 +37,42 @@ export class MediaHandler {
     } catch {
       /* module already registered */
     }
+    try {
+      await this.audioContext.audioWorklet.addModule("/pcm-playback-processor.js");
+    } catch {
+      /* module already registered */
+    }
+    this.ensurePlaybackNode();
+  }
+
+  private ensurePlaybackNode(): void {
+    if (!this.audioContext || this.playbackWorklet) return;
+    this.playbackWorklet = new AudioWorkletNode(this.audioContext, "pcm-playback-processor");
+    this.playbackWorklet.connect(this.audioContext.destination);
   }
 
   async initializeAudio(): Promise<void> {
     await this.unlockPlayback();
+  }
+
+  private setMicMuted(muted: boolean): void {
+    if (this.inputGain) {
+      this.inputGain.gain.value = muted ? 0 : 1;
+    }
+  }
+
+  private markPlaybackActive(): void {
+    this.playbackActive = true;
+    this.setMicMuted(true);
+    if (this.playbackIdleTimer) {
+      clearTimeout(this.playbackIdleTimer);
+      this.playbackIdleTimer = null;
+    }
+    this.playbackIdleTimer = setTimeout(() => {
+      this.playbackActive = false;
+      this.setMicMuted(false);
+      this.playbackIdleTimer = null;
+    }, 280);
   }
 
   async startAudio(onAudioData: (pcm: ArrayBuffer) => void): Promise<void> {
@@ -61,9 +89,9 @@ export class MediaHandler {
     const source = this.audioContext.createMediaStreamSource(this.mediaStream);
     this.inputGain = this.audioContext.createGain();
     this.inputGain.gain.value = 1;
-    this.audioWorkletNode = new AudioWorkletNode(this.audioContext, "pcm-processor");
+    this.captureWorklet = new AudioWorkletNode(this.audioContext, "pcm-processor");
 
-    this.audioWorkletNode.port.onmessage = (event: MessageEvent<Float32Array>) => {
+    this.captureWorklet.port.onmessage = (event: MessageEvent<Float32Array>) => {
       if (!this.isRecording || this.playbackActive) return;
       const downsampled = this.downsampleBuffer(
         event.data,
@@ -75,10 +103,10 @@ export class MediaHandler {
     };
 
     source.connect(this.inputGain);
-    this.inputGain.connect(this.audioWorkletNode);
+    this.inputGain.connect(this.captureWorklet);
     const muteGain = this.audioContext.createGain();
     muteGain.gain.value = 0;
-    this.audioWorkletNode.connect(muteGain);
+    this.captureWorklet.connect(muteGain);
     muteGain.connect(this.audioContext.destination);
 
     this.isRecording = true;
@@ -90,34 +118,13 @@ export class MediaHandler {
       this.mediaStream.getTracks().forEach((t) => t.stop());
       this.mediaStream = null;
     }
-    if (this.audioWorkletNode) {
-      this.audioWorkletNode.disconnect();
-      this.audioWorkletNode = null;
+    if (this.captureWorklet) {
+      this.captureWorklet.disconnect();
+      this.captureWorklet = null;
     }
     if (this.inputGain) {
       this.inputGain.disconnect();
       this.inputGain = null;
-    }
-  }
-
-  private applyChunkFade(samples: Float32Array): void {
-    const fade = Math.min(CHUNK_FADE_SAMPLES, Math.floor(samples.length / 4));
-    if (fade < 2) return;
-    for (let i = 0; i < fade; i++) {
-      const t = i / fade;
-      samples[i] *= t;
-      samples[samples.length - 1 - i] *= t;
-    }
-  }
-
-  private onScheduledSourceEnded(ended: AudioBufferSourceNode): void {
-    const idx = this.scheduledSources.indexOf(ended);
-    if (idx > -1) this.scheduledSources.splice(idx, 1);
-    if (this.scheduledSources.length === 0) {
-      this.playbackActive = false;
-      if (this.audioContext) {
-        this.nextStartTime = this.audioContext.currentTime;
-      }
     }
   }
 
@@ -126,48 +133,22 @@ export class MediaHandler {
     if (this.audioContext.state === "suspended") {
       void this.audioContext.resume();
     }
+    this.ensurePlaybackNode();
+    if (!this.playbackWorklet) return;
 
     const pcmData = new Int16Array(arrayBuffer);
-    const float32Data = new Float32Array(pcmData.length);
-    for (let i = 0; i < pcmData.length; i++) {
-      float32Data[i] = pcmData[i] / 32768.0;
-    }
-    this.applyChunkFade(float32Data);
-
-    const buffer = this.audioContext.createBuffer(1, float32Data.length, PLAYBACK_RATE);
-    buffer.getChannelData(0).set(float32Data);
-
-    const source = this.audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(this.audioContext.destination);
-
-    const now = this.audioContext.currentTime;
-    if (this.scheduledSources.length === 0) {
-      this.nextStartTime = now + SCHEDULE_AHEAD_S;
-    } else if (this.nextStartTime < now) {
-      this.nextStartTime = now + SCHEDULE_AHEAD_S;
-    }
-    source.start(this.nextStartTime);
-    this.nextStartTime += buffer.duration;
-
-    this.playbackActive = true;
-    this.scheduledSources.push(source);
-    source.onended = () => this.onScheduledSourceEnded(source);
+    this.playbackWorklet.port.postMessage({ type: "pcm", data: pcmData }, [pcmData.buffer]);
+    this.markPlaybackActive();
   }
 
   stopAudioPlayback(): void {
-    this.scheduledSources.forEach((s) => {
-      try {
-        s.stop();
-      } catch {
-        /* ignore */
-      }
-    });
-    this.scheduledSources = [];
-    this.playbackActive = false;
-    if (this.audioContext) {
-      this.nextStartTime = this.audioContext.currentTime;
+    if (this.playbackIdleTimer) {
+      clearTimeout(this.playbackIdleTimer);
+      this.playbackIdleTimer = null;
     }
+    this.playbackActive = false;
+    this.setMicMuted(false);
+    this.playbackWorklet?.port.postMessage({ type: "clear" });
   }
 
   private downsampleBuffer(buffer: Float32Array, sampleRate: number, outSampleRate: number): Float32Array {

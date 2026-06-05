@@ -21,6 +21,7 @@ import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
 import { MiomiLiveClient, type LiveClientMessage } from "@/lib/live/miomi-client";
 import { MediaHandler } from "@/lib/live/media-handler";
+import { sanitizeUserTranscript } from "@/lib/live/transcript";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
 import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config";
 
@@ -87,6 +88,7 @@ export default function TalkPage() {
   const [guestExchangesRaw, setGuestExchangesRaw] = useState(readGuestExchanges);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [awaitingMic, setAwaitingMic] = useState(false);
   const [liveUiState, setLiveUiState] = useState<LiveUiState>("idle");
   const [debugOpen, setDebugOpen] = useState(false);
 
@@ -100,7 +102,9 @@ export default function TalkPage() {
   const sessionActiveRef = useRef(false);
   const mountedRef = useRef(true);
   const kickoffSentRef = useRef(false);
-  const micDeferredRef = useRef(false);
+  const kickoffPendingRef = useRef(false);
+  const awaitingMicRef = useRef(false);
+  const entryStartedRef = useRef(false);
   const handoffTurnRef = useRef(false);
   const invitationPendingRef = useRef(false);
   const guestExchangesRef = useRef(0);
@@ -111,7 +115,7 @@ export default function TalkPage() {
   const userExchangeCountedRef = useRef(false);
   const pendingHandoffContextRef = useRef(false);
 
-  const unlockAudio = useCallback(() => {
+  const primeAudio = useCallback(() => {
     if (!mediaRef.current) mediaRef.current = new MediaHandler();
     mediaRef.current.primeAudioContext();
     if (!audioUnlocked) setAudioUnlocked(true);
@@ -192,18 +196,20 @@ export default function TalkPage() {
   const appendTranscript = useCallback((role: "user" | "gemini", chunk: string) => {
     const fallback = uiLang;
     if (role === "user") {
+      const cleaned = sanitizeUserTranscript(chunk);
+      if (!cleaned) return;
       if (currentUserItemIdRef.current) {
         setItems((prev) =>
           prev.map((item) =>
             item.id === currentUserItemIdRef.current && item.kind === "user_said"
-              ? { ...item, text: item.text + chunk }
+              ? { ...item, text: item.text + cleaned }
               : item,
           ),
         );
       } else {
         const id = crypto.randomUUID();
         currentUserItemIdRef.current = id;
-        setItems((prev) => [...prev, { id, kind: "user_said", text: chunk }]);
+        setItems((prev) => [...prev, { id, kind: "user_said", text: cleaned }]);
       }
       return;
     }
@@ -251,9 +257,11 @@ export default function TalkPage() {
         setShowGuestSheet(true);
         return;
       }
-      if (micDeferredRef.current && sessionActiveRef.current) {
-        micDeferredRef.current = false;
-        void startContinuousMic();
+      if (kickoffPendingRef.current && sessionActiveRef.current) {
+        kickoffPendingRef.current = false;
+        awaitingMicRef.current = true;
+        setAwaitingMic(true);
+        setLiveUiState("idle");
         return;
       }
       if (handoffTurnRef.current) {
@@ -288,12 +296,15 @@ export default function TalkPage() {
         data: { args: msg.args, result: msg.result },
       });
     }
-  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn, startContinuousMic]);
+  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn]);
 
   const teardownSession = useCallback(() => {
     sessionActiveRef.current = false;
     kickoffSentRef.current = false;
-    micDeferredRef.current = false;
+    kickoffPendingRef.current = false;
+    awaitingMicRef.current = false;
+    entryStartedRef.current = false;
+    setAwaitingMic(false);
     handoffTurnRef.current = false;
     invitationPendingRef.current = false;
     userExchangeCountedRef.current = false;
@@ -352,7 +363,7 @@ export default function TalkPage() {
         });
         if (canvasRef.current) canvasRef.current.scrollTop = 0;
         clientRef.current.sendKickoff(conversationLangRef.current);
-        micDeferredRef.current = true;
+        kickoffPendingRef.current = true;
         setLiveUiState("speaking");
       } else {
         await startContinuousMic();
@@ -471,27 +482,47 @@ export default function TalkPage() {
     setExpandedItems(new Set());
   }, []);
 
+  const handleEnterTap = useCallback((e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("a, button, input, textarea")) return;
+    primeAudio();
+    if (!authReady || isLocked || sessionActiveRef.current || entryStartedRef.current) return;
+    entryStartedRef.current = true;
+    void (async () => {
+      await ensurePlaybackUnlocked();
+      await startLiveSession();
+    })();
+  }, [authReady, isLocked, primeAudio, ensurePlaybackUnlocked, startLiveSession]);
+
   const handleOrbTap = useCallback(() => {
-    unlockAudio();
+    primeAudio();
     if (!authReady) return;
     if (isLocked) {
       setShowGuestSheet(true);
       return;
     }
     if (sessionActiveRef.current) {
-      teardownSession();
+      if (liveUiState === "listening") {
+        teardownSession();
+        return;
+      }
+      if (awaitingMicRef.current) {
+        awaitingMicRef.current = false;
+        setAwaitingMic(false);
+        void startContinuousMic();
+        return;
+      }
       return;
     }
     void (async () => {
       await ensurePlaybackUnlocked();
       await startLiveSession();
     })();
-  }, [authReady, isLocked, unlockAudio, ensurePlaybackUnlocked, teardownSession, startLiveSession]);
+  }, [authReady, isLocked, liveUiState, primeAudio, ensurePlaybackUnlocked, teardownSession, startLiveSession, startContinuousMic]);
 
   const handleSendText = useCallback(() => {
     const trimmed = textInput.trim();
     if (!trimmed) return;
-    unlockAudio();
+    primeAudio();
     if (isLocked) {
       setShowGuestSheet(true);
       return;
@@ -499,7 +530,7 @@ export default function TalkPage() {
     beginGuestExchange();
     const id = crypto.randomUUID();
     currentUserItemIdRef.current = id;
-    setItems((prev) => [...prev, { id, kind: "user_said", text: trimmed }]);
+    setItems((prev) => [...prev, { id, kind: "user_said", text: sanitizeUserTranscript(trimmed) }]);
     setTextInput("");
     if (!sessionActiveRef.current) {
       void (async () => {
@@ -510,12 +541,12 @@ export default function TalkPage() {
     } else {
       clientRef.current?.sendText(trimmed);
     }
-  }, [textInput, isLocked, unlockAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession]);
+  }, [textInput, isLocked, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession]);
 
   const handleMiomiHelp = useCallback(
     (topic: "pillars" | "niche" | "voice") => {
       setAdjustOpen(false);
-      unlockAudio();
+      primeAudio();
       if (isLocked) {
         setShowGuestSheet(true);
         return;
@@ -548,7 +579,7 @@ export default function TalkPage() {
         clientRef.current?.sendText(text);
       }
     },
-    [isLocked, uiLang, unlockAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession],
+    [isLocked, uiLang, primeAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession],
   );
 
   const orbState: OrbState = (() => {
@@ -575,7 +606,12 @@ export default function TalkPage() {
     if (isLocked) {
       return uiLang === "th" ? "สมัครเพื่อพูดคุยต่อกับหนูค่า~" : "Sign in to keep talking with Miomi~";
     }
-    if (!audioUnlocked) return uiLang === "th" ? "แตะเพื่อเริ่มค่า~" : "tap anywhere to begin~";
+    if (!audioUnlocked) {
+      return uiLang === "th" ? "แตะเพื่อเริ่มค่า~" : "tap anywhere to begin~";
+    }
+    if (awaitingMic && liveUiState !== "speaking" && liveUiState !== "connecting") {
+      return uiLang === "th" ? "กดไมค์เมื่อพร้อมพูดค่า~" : "press the mic when you're ready~";
+    }
     if (liveUiState === "connecting") return uiLang === "th" ? "กำลังเชื่อมต่อค่า..." : "connecting...";
     if (liveUiState === "listening") return uiLang === "th" ? "กำลังฟังค่า..." : "I'm listening...";
     if (liveUiState === "speaking") return uiLang === "th" ? "หนูกำลังพูดค่า..." : "Miomi is talking...";
@@ -588,7 +624,7 @@ export default function TalkPage() {
   return (
     <TalkErrorBoundary>
     <div
-      onPointerDown={unlockAudio}
+      onPointerDown={handleEnterTap}
       style={{
         position: "relative",
         flex: 1,
@@ -765,7 +801,9 @@ export default function TalkPage() {
               ? uiLang === "en" ? "Sign in to keep talking" : "สมัครเพื่อพูดคุยต่อ"
               : orbState === "listening"
                 ? uiLang === "en" ? "Stop listening" : "หยุดฟัง"
-                : uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู"
+                : awaitingMic
+                  ? uiLang === "en" ? "Press mic to speak" : "กดไมค์เพื่อพูด"
+                  : uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู"
           }
         />
         {stateLabel ? (
