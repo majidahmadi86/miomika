@@ -27,8 +27,10 @@ export function isHiddenLiveTranscript(text: string): boolean {
     }
   }
 
-  if (norm.includes("stay with me") && norm.includes("free account")) return true;
-  if (norm.includes("อยู่กับหนู") && norm.includes("เปิดบัญชี")) return true;
+  if (norm.includes("stay with me") && (norm.includes("free account") || norm.includes("sign up free"))) return true;
+  if (norm.includes("pick up right where we left off")) return true;
+  if (norm.includes("อยู่กับหนู") && (norm.includes("เปิดบัญชี") || norm.includes("สมัครฟรี"))) return true;
+  if (norm.includes("เล่นต่อจากตรงนี้")) return true;
   return false;
 }
 

@@ -245,8 +245,12 @@ export default function TalkPage() {
       userExchangeCountedRef.current = false;
       if (invitationPendingRef.current) {
         invitationPendingRef.current = false;
-        teardownSessionRef.current();
-        setShowGuestSheet(true);
+        void (async () => {
+          await mediaRef.current?.waitForPlaybackIdle();
+          if (!mountedRef.current) return;
+          teardownSessionRef.current();
+          setShowGuestSheet(true);
+        })();
         return;
       }
       if (kickoffPendingRef.current && sessionActiveRef.current) {
@@ -258,7 +262,12 @@ export default function TalkPage() {
       }
       if (handoffTurnRef.current) {
         handoffTurnRef.current = false;
-        completeGuestLimitTurn();
+        void (async () => {
+          await mediaRef.current?.waitForPlaybackIdle();
+          if (!mountedRef.current || !sessionActiveRef.current) return;
+          completeGuestLimitTurn();
+        })();
+        return;
       }
       setLiveUiState(sessionActiveRef.current ? "listening" : "idle");
       return;
@@ -277,7 +286,7 @@ export default function TalkPage() {
       return;
     }
     if (msg.type === "gemini") {
-      if (invitationPendingRef.current || isHiddenLiveTranscript(msg.text)) return;
+      if (isHiddenLiveTranscript(msg.text)) return;
       appendTranscript("gemini", msg.text);
       return;
     }

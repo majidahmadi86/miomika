@@ -170,6 +170,25 @@ export class MediaHandler {
     }
   }
 
+  isPlaybackActive(): boolean {
+    return this.playbackActive || this.scheduledSources.length > 0;
+  }
+
+  /** Resolves once all scheduled PCM chunks have finished playing. */
+  waitForPlaybackIdle(): Promise<void> {
+    if (!this.isPlaybackActive()) return Promise.resolve();
+    return new Promise((resolve) => {
+      const poll = () => {
+        if (!this.isPlaybackActive()) {
+          resolve();
+          return;
+        }
+        requestAnimationFrame(poll);
+      };
+      poll();
+    });
+  }
+
   private downsampleBuffer(buffer: Float32Array, sampleRate: number, outSampleRate: number): Float32Array {
     if (outSampleRate === sampleRate) return buffer;
     const ratio = sampleRate / outSampleRate;
