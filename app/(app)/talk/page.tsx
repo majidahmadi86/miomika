@@ -16,6 +16,7 @@ import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
 import { pickIceBreaker } from "@/lib/voice/warmth";
+import { unlockTtsPlayback } from "@/lib/voice/tts";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
@@ -423,6 +424,20 @@ export default function TalkPage() {
   }, [items.length, authReady]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  /* eslint-disable react-hooks/set-state-in-effect -- voiced kickoff on /talk entry (SPA nav; AudioContext already unlocked) */
+  useEffect(() => {
+    if (!authReady || isLocked || items.length < 1) return;
+    if (sessionActiveRef.current || entryStartedRef.current) return;
+    entryStartedRef.current = true;
+    primeAudio();
+    unlockTtsPlayback();
+    void (async () => {
+      await ensurePlaybackUnlocked();
+      await startLiveSession();
+    })();
+  }, [authReady, isLocked, items.length, primeAudio, ensurePlaybackUnlocked, startLiveSession]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset on sign-in */
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -482,16 +497,11 @@ export default function TalkPage() {
     setExpandedItems(new Set());
   }, []);
 
-  const handleEnterTap = useCallback((e: React.PointerEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("a, button, input, textarea")) return;
     primeAudio();
-    if (!authReady || isLocked || sessionActiveRef.current || entryStartedRef.current) return;
-    entryStartedRef.current = true;
-    void (async () => {
-      await ensurePlaybackUnlocked();
-      await startLiveSession();
-    })();
-  }, [authReady, isLocked, primeAudio, ensurePlaybackUnlocked, startLiveSession]);
+    unlockTtsPlayback();
+  }, [primeAudio]);
 
   const handleOrbTap = useCallback(() => {
     primeAudio();
@@ -624,7 +634,7 @@ export default function TalkPage() {
   return (
     <TalkErrorBoundary>
     <div
-      onPointerDown={handleEnterTap}
+      onPointerDown={handlePointerDown}
       style={{
         position: "relative",
         flex: 1,
