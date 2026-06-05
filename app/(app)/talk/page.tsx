@@ -17,7 +17,7 @@ import { WordCardV3 } from "@/components/talk/WordCardV3";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
 import { pickIceBreaker } from "@/lib/voice/warmth";
-import { speak, unlockTtsPlayback } from "@/lib/voice/tts";
+import { unlockTtsPlayback } from "@/lib/voice/tts";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
@@ -100,9 +100,11 @@ function makeOpenerItem(): CanvasItem {
 }
 
 export default function TalkPage() {
-  const { isGuest, authReady } = useGuestExploration();
-  const { profile } = useProfile();
-  const canUseLive = authReady && (isGuest || !!profile);
+  const { isGuest, authReady: guestAuthReady } = useGuestExploration();
+  const { profile, authReady: profileAuthReady } = useProfile();
+  /** Members must wait for profile row — guest auth alone is not enough (entryStartedRef race). */
+  const canUseLive =
+    guestAuthReady && (isGuest || (profileAuthReady && !!profile));
 
   const [config, setConfig] = useState<TalkConfig>(() =>
     typeof window !== "undefined" ? loadTalkConfig() : DEFAULT_TALK_CONFIG,
@@ -170,8 +172,8 @@ export default function TalkPage() {
     logEvent({ kind: "mic", level: "info", message: "continuous mic started" });
   }, []);
 
-  const guestExchanges = authReady && !isGuest ? 0 : guestExchangesRaw;
-  const isLocked = authReady && isGuest && guestExchanges >= GUEST_EXCHANGE_LIMIT;
+  const guestExchanges = guestAuthReady && !isGuest ? 0 : guestExchangesRaw;
+  const isLocked = guestAuthReady && isGuest && guestExchanges >= GUEST_EXCHANGE_LIMIT;
 
   const setGuestExchanges = useCallback((updater: number | ((p: number) => number)) => {
     setGuestExchangesRaw((prev) => {
@@ -344,7 +346,7 @@ export default function TalkPage() {
       if (invitationPendingRef.current) {
         invitationPendingRef.current = false;
         void (async () => {
-          await mediaRef.current?.waitForPlaybackIdle();
+          await mediaRef.current?.waitForTurnAudioThenIdle();
           if (!mountedRef.current) return;
           teardownSessionRef.current();
           openGuestSignupSheet("talk");
@@ -363,7 +365,7 @@ export default function TalkPage() {
       if (handoffTurnRef.current) {
         handoffTurnRef.current = false;
         void (async () => {
-          await mediaRef.current?.waitForPlaybackIdle();
+          await mediaRef.current?.waitForTurnAudioThenIdle();
           if (!mountedRef.current || !sessionActiveRef.current) return;
           completeGuestLimitTurn();
         })();
@@ -497,6 +499,7 @@ export default function TalkPage() {
         message: "live session failed",
         data: { error: String(err) },
       });
+      entryStartedRef.current = false;
       teardownSession();
       setLiveUiState("error");
     }
@@ -535,7 +538,7 @@ export default function TalkPage() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
-    if (!authReady || isGuest) return;
+    if (!profileAuthReady || isGuest) return;
     const { uiLanguage, targetLanguage } = resolveSessionLanguages({
       isGuest: false,
       profileUiLang: profile?.ui_language ?? null,
@@ -548,18 +551,18 @@ export default function TalkPage() {
       sessionTargetLangRef.current = targetLanguage;
       conversationLangRef.current = uiLanguage;
     });
-  }, [authReady, isGuest, profile?.ui_language, profile?.learning_target_language]);
+  }, [profileAuthReady, isGuest, profile?.ui_language, profile?.learning_target_language]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
   useEffect(() => {
-    if (items.length > 0 || !authReady) return;
+    if (items.length > 0 || !guestAuthReady) return;
     setItems([makeOpenerItem()]);
-  }, [items.length, authReady]);
+  }, [items.length, guestAuthReady]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* eslint-disable react-hooks/set-state-in-effect -- LOCKED 2026-06-05: voiced icebreaker on /talk entry; mic is separate orb tap */
   useEffect(() => {
-    if (!authReady || isLocked || items.length < 1) return;
+    if (!canUseLive || isLocked || items.length < 1) return;
     if (sessionActiveRef.current || entryStartedRef.current) return;
     entryStartedRef.current = true;
     primeAudio();
@@ -568,18 +571,18 @@ export default function TalkPage() {
       await ensurePlaybackUnlocked();
       await startLiveSession();
     })();
-  }, [authReady, isLocked, items.length, primeAudio, ensurePlaybackUnlocked, startLiveSession]);
+  }, [canUseLive, isLocked, items.length, primeAudio, ensurePlaybackUnlocked, startLiveSession]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset on sign-in */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (authReady && !isGuest) {
+    if (guestAuthReady && !isGuest) {
       window.localStorage.removeItem(GUEST_COUNTER_KEY);
       setGuestExchangesRaw(0);
       guestExchangesRef.current = 0;
     }
-  }, [authReady, isGuest]);
+  }, [guestAuthReady, isGuest]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
@@ -616,8 +619,13 @@ export default function TalkPage() {
     }
   }, []);
 
-  const handleWordReplay = useCallback((word: VocabularyEntry) => {
-    void replayWordAudio(word, sessionTargetLangRef.current);
+  const handleWordReplay = useCallback(async (word: VocabularyEntry) => {
+    mediaRef.current?.setInputMuted(true);
+    try {
+      await replayWordAudio(word, sessionTargetLangRef.current);
+    } finally {
+      mediaRef.current?.setInputMuted(false);
+    }
   }, []);
 
   const toggleExpand = useCallback((id: string) => {
@@ -642,7 +650,7 @@ export default function TalkPage() {
 
   const handleOrbTap = useCallback(() => {
     primeAudio();
-    if (!authReady) return;
+    if (!guestAuthReady) return;
     if (isLocked) {
       openGuestSignupSheet("talk");
       return;
@@ -664,7 +672,7 @@ export default function TalkPage() {
       await ensurePlaybackUnlocked();
       await startLiveSession();
     })();
-  }, [authReady, isLocked, liveUiState, primeAudio, ensurePlaybackUnlocked, teardownSession, startLiveSession, startContinuousMic, openGuestSignupSheet]);
+  }, [guestAuthReady, isLocked, liveUiState, primeAudio, ensurePlaybackUnlocked, teardownSession, startLiveSession, startContinuousMic, openGuestSignupSheet]);
 
   const handleSendText = useCallback(() => {
     const trimmed = textInput.trim();
@@ -806,7 +814,7 @@ export default function TalkPage() {
         </Link>
 
         <div onClick={handleTitleTap} style={{ cursor: "default" }}>
-          {authReady && isGuest ? (
+          {guestAuthReady && isGuest ? (
             <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, color: "#9A8B73", background: "transparent", padding: "5px 12px" }}>
               {uiLang === "en"
                 ? `${Math.max(0, GUEST_EXCHANGE_LIMIT - guestExchanges)} left`

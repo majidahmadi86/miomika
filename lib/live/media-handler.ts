@@ -189,6 +189,35 @@ export class MediaHandler {
     });
   }
 
+  /**
+   * LOCKED 2026-06-05 ? turn_complete can arrive before Live PCM is scheduled.
+   * Wait for playback to start (if any), then drain fully before the invitation cue.
+   */
+  waitForTurnAudioThenIdle(maxWaitForStartMs = 3000): Promise<void> {
+    const start = Date.now();
+    return new Promise((resolve) => {
+      const poll = () => {
+        if (this.isPlaybackActive()) {
+          void this.waitForPlaybackIdle().then(resolve);
+          return;
+        }
+        if (Date.now() - start >= maxWaitForStartMs) {
+          resolve();
+          return;
+        }
+        requestAnimationFrame(poll);
+      };
+      poll();
+    });
+  }
+
+  /** Duck live mic while card replay TTS plays ? prevents speaker bleed confusing VAD. */
+  setInputMuted(muted: boolean): void {
+    if (this.inputGain) {
+      this.inputGain.gain.value = muted ? 0 : 1;
+    }
+  }
+
   private downsampleBuffer(buffer: Float32Array, sampleRate: number, outSampleRate: number): Float32Array {
     if (outSampleRate === sampleRate) return buffer;
     const ratio = sampleRate / outSampleRate;
