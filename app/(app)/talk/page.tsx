@@ -100,6 +100,7 @@ export default function TalkPage() {
   const sessionActiveRef = useRef(false);
   const mountedRef = useRef(true);
   const kickoffSentRef = useRef(false);
+  const micDeferredRef = useRef(false);
   const handoffTurnRef = useRef(false);
   const invitationPendingRef = useRef(false);
   const guestExchangesRef = useRef(0);
@@ -111,14 +112,25 @@ export default function TalkPage() {
   const pendingHandoffContextRef = useRef(false);
 
   const unlockAudio = useCallback(() => {
-    if (audioUnlocked) return;
-    setAudioUnlocked(true);
-    try {
-      new Audio().play().catch(() => {});
-    } catch {
-      /* ignore */
-    }
+    if (!mediaRef.current) mediaRef.current = new MediaHandler();
+    mediaRef.current.primeAudioContext();
+    if (!audioUnlocked) setAudioUnlocked(true);
   }, [audioUnlocked]);
+
+  const ensurePlaybackUnlocked = useCallback(async () => {
+    if (!mediaRef.current) mediaRef.current = new MediaHandler();
+    await mediaRef.current.unlockPlayback();
+    setAudioUnlocked(true);
+  }, []);
+
+  const startContinuousMic = useCallback(async () => {
+    if (!mediaRef.current) return;
+    await mediaRef.current.startAudio((pcm) => {
+      if (clientRef.current?.isConnected()) clientRef.current.sendAudio(pcm);
+    });
+    setLiveUiState("listening");
+    logEvent({ kind: "mic", level: "info", message: "continuous mic started" });
+  }, []);
 
   const guestExchanges = authReady && !isGuest ? 0 : guestExchangesRaw;
   const isLocked = authReady && isGuest && guestExchanges >= GUEST_EXCHANGE_LIMIT;
@@ -239,6 +251,11 @@ export default function TalkPage() {
         setShowGuestSheet(true);
         return;
       }
+      if (micDeferredRef.current && sessionActiveRef.current) {
+        micDeferredRef.current = false;
+        void startContinuousMic();
+        return;
+      }
       if (handoffTurnRef.current) {
         handoffTurnRef.current = false;
         completeGuestLimitTurn();
@@ -271,11 +288,12 @@ export default function TalkPage() {
         data: { args: msg.args, result: msg.result },
       });
     }
-  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn]);
+  }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn, startContinuousMic]);
 
   const teardownSession = useCallback(() => {
     sessionActiveRef.current = false;
     kickoffSentRef.current = false;
+    micDeferredRef.current = false;
     handoffTurnRef.current = false;
     invitationPendingRef.current = false;
     userExchangeCountedRef.current = false;
@@ -299,6 +317,7 @@ export default function TalkPage() {
     logEvent({ kind: "state", level: "info", message: "live session starting" });
 
     if (!mediaRef.current) mediaRef.current = new MediaHandler();
+    await mediaRef.current.unlockPlayback();
     if (!clientRef.current) {
       clientRef.current = new MiomiLiveClient({
         onOpen: () => {
@@ -316,24 +335,28 @@ export default function TalkPage() {
     }
 
     try {
-      await mediaRef.current.initializeAudio();
       await clientRef.current.connect();
       sessionActiveRef.current = true;
-      setItems((prev) =>
-        prev.length === 1 && prev[0]?.kind === "mini_cat" ? [] : prev,
-      );
       if (pendingHandoffContextRef.current) {
         clientRef.current.sendHiddenContext(LAST_TURN_HANDOFF);
         pendingHandoffContextRef.current = false;
+        await startContinuousMic();
       } else if (!kickoffSentRef.current) {
         kickoffSentRef.current = true;
+        setItems((prev) => {
+          if (prev.length === 1 && prev[0]?.kind === "mini_cat") {
+            currentGeminiItemIdRef.current = prev[0].id;
+            return [{ ...prev[0], textTh: "", textEn: "" }];
+          }
+          return prev;
+        });
+        if (canvasRef.current) canvasRef.current.scrollTop = 0;
         clientRef.current.sendKickoff(conversationLangRef.current);
+        micDeferredRef.current = true;
+        setLiveUiState("speaking");
+      } else {
+        await startContinuousMic();
       }
-      await mediaRef.current.startAudio((pcm) => {
-        if (clientRef.current?.isConnected()) clientRef.current.sendAudio(pcm);
-      });
-      setLiveUiState("listening");
-      logEvent({ kind: "mic", level: "info", message: "continuous mic started" });
     } catch (err) {
       logEvent({
         kind: "state",
@@ -344,7 +367,7 @@ export default function TalkPage() {
       teardownSession();
       setLiveUiState("error");
     }
-  }, [canUseLive, handleLiveMessage, teardownSession]);
+  }, [canUseLive, handleLiveMessage, teardownSession, startContinuousMic]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -401,9 +424,15 @@ export default function TalkPage() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
-    if (canvasRef.current) {
-      canvasRef.current.scrollTo({ top: canvasRef.current.scrollHeight, behavior: "smooth" });
-    }
+    const el = canvasRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      if (el.scrollHeight <= el.clientHeight + 4) {
+        el.scrollTop = 0;
+        return;
+      }
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    });
   }, [items]);
 
   const handleCycleLang = useCallback(() => {
@@ -453,8 +482,11 @@ export default function TalkPage() {
       teardownSession();
       return;
     }
-    void startLiveSession();
-  }, [authReady, isLocked, unlockAudio, teardownSession, startLiveSession]);
+    void (async () => {
+      await ensurePlaybackUnlocked();
+      await startLiveSession();
+    })();
+  }, [authReady, isLocked, unlockAudio, ensurePlaybackUnlocked, teardownSession, startLiveSession]);
 
   const handleSendText = useCallback(() => {
     const trimmed = textInput.trim();
@@ -471,13 +503,14 @@ export default function TalkPage() {
     setTextInput("");
     if (!sessionActiveRef.current) {
       void (async () => {
+        await ensurePlaybackUnlocked();
         await startLiveSession();
         clientRef.current?.sendText(trimmed);
       })();
     } else {
       clientRef.current?.sendText(trimmed);
     }
-  }, [textInput, isLocked, unlockAudio, beginGuestExchange, startLiveSession]);
+  }, [textInput, isLocked, unlockAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession]);
 
   const handleMiomiHelp = useCallback(
     (topic: "pillars" | "niche" | "voice") => {
@@ -505,6 +538,7 @@ export default function TalkPage() {
       setItems((prev) => [...prev, { id, kind: "user_said", text }]);
       if (!sessionActiveRef.current) {
         void (async () => {
+          await ensurePlaybackUnlocked();
           await startLiveSession();
           if (sessionActiveRef.current) {
             clientRef.current?.sendText(text);
@@ -514,7 +548,7 @@ export default function TalkPage() {
         clientRef.current?.sendText(text);
       }
     },
-    [isLocked, uiLang, unlockAudio, beginGuestExchange, startLiveSession],
+    [isLocked, uiLang, unlockAudio, ensurePlaybackUnlocked, beginGuestExchange, startLiveSession],
   );
 
   const orbState: OrbState = (() => {
@@ -636,11 +670,18 @@ export default function TalkPage() {
             overflowY: "auto",
             padding: "8px 14px 0",
             paddingRight: "52px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
           }}
         >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "flex-start",
+              alignItems: "stretch",
+              gap: "12px",
+              minHeight: "min-content",
+            }}
+          >
           {items.map((item) => {
             if (item.kind === "mini_cat") {
               return <MiniCatRow key={item.id} textTh={item.textTh} textEn={item.textEn} uiLang={uiLang} />;
@@ -651,7 +692,7 @@ export default function TalkPage() {
               const isExpanded = expandedItems.has(item.id);
               const display = !isLong || isExpanded ? fullText : fullText.slice(0, TRANSCRIPT_CLIP) + "…";
               return (
-                <div key={item.id} style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div key={item.id} style={{ display: "flex", justifyContent: "flex-end", alignSelf: "stretch", flexShrink: 0 }}>
                   <div style={{ maxWidth: "78%", background: "linear-gradient(135deg, rgba(232,199,122,0.16) 0%, rgba(232,199,122,0.06) 100%)", border: "0.5px solid rgba(232,199,122,0.3)", borderRadius: "18px 4px 18px 18px", padding: "11px 14px" }}>
                     <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "14px", color: "#1A1A18", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{display}</p>
                     {isLong && (
@@ -665,7 +706,8 @@ export default function TalkPage() {
             }
             return null;
           })}
-          <div style={{ height: "8px" }} />
+          <div style={{ height: "8px", flexShrink: 0 }} />
+          </div>
         </div>
       </div>
 
