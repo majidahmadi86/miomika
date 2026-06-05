@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Kanit, Quicksand, Sarabun } from "next/font/google";
+import { PwaUpdateManager } from "@/components/pwa/PwaUpdateManager";
+import { getBuildId } from "@/lib/pwa/build-id";
 import "./globals.css";
 
 const kanit = Kanit({
@@ -106,6 +108,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const buildId = getBuildId();
+
   return (
     <html
       lang="th"
@@ -120,15 +124,10 @@ export default function RootLayout({
         </div>
         <script
           dangerouslySetInnerHTML={{
-            __html: `
-      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          regs.forEach(function(reg) { reg.unregister(); });
-        }).catch(function() {});
-      }
-    `,
+            __html: `window.__MIOMIKA_BUILD_ID__=${JSON.stringify(buildId)};`,
           }}
         />
+        <PwaUpdateManager />
       </body>
     </html>
   );

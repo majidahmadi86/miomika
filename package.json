@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run predeploy && next build",
+    "build": "node scripts/generate-build-version.mjs && npm run predeploy && next build",
+    "generate:version": "node scripts/generate-build-version.mjs",
     "start": "next start",
     "lint": "eslint",
     "check:drift": "tsx scripts/check-drift.ts",

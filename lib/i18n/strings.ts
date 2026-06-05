@@ -107,6 +107,16 @@ const STRINGS = {
     en: "I work best on mobile~ Open on iPhone or Android for the full experience",
   },
 
+  // PWA update delivery
+  pwa_update_ready: {
+    th: "มีเวอร์ชันใหม่แล้วค่า — กดรีเฟรชเพื่ออัปเดต",
+    en: "New version ready — reload to update",
+  },
+  pwa_update_reload: {
+    th: "รีเฟรช",
+    en: "Reload",
+  },
+
   // Mic / unsupported browser
   mic_unsupported_chrome: {
     th: "เปิดใน Chrome เพื่อใช้เสียงค่า~",
