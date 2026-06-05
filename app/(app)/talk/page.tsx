@@ -22,7 +22,7 @@ import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
 import { MiomiLiveClient, type LiveClientMessage } from "@/lib/live/miomi-client";
 import { MediaHandler } from "@/lib/live/media-handler";
-import { sanitizeUserTranscript } from "@/lib/live/transcript";
+import { isHiddenLiveTranscript, sanitizeUserTranscript } from "@/lib/live/transcript";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
 import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config";
 
@@ -59,15 +59,6 @@ function detectReplyLang(text: string, fallback: "th" | "en"): "th" | "en" {
 function makeOpenerItem(): CanvasItem {
   const iceBreaker = pickIceBreaker();
   return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
-}
-
-function isInternalLivePrompt(text: string): boolean {
-  const t = text.trim();
-  return (
-    t.startsWith("[session_open]") ||
-    t.startsWith("[Speak exactly") ||
-    t.startsWith("LAST-TURN HAND-OFF:")
-  );
 }
 
 export default function TalkPage() {
@@ -278,7 +269,7 @@ export default function TalkPage() {
       return;
     }
     if (msg.type === "user") {
-      if (isInternalLivePrompt(msg.text)) return;
+      if (isHiddenLiveTranscript(msg.text)) return;
       if (!currentUserItemIdRef.current) {
         beginGuestExchange();
       }
@@ -286,6 +277,7 @@ export default function TalkPage() {
       return;
     }
     if (msg.type === "gemini") {
+      if (invitationPendingRef.current || isHiddenLiveTranscript(msg.text)) return;
       appendTranscript("gemini", msg.text);
       return;
     }
