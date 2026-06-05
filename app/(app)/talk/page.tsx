@@ -44,6 +44,13 @@ import {
   teachWordToVocabularyEntry,
   type TeachWordResult,
 } from "@/lib/talk/teach-word-card";
+import {
+  advanceAfterTurn,
+  buildPhaseNudge,
+  createTeachingModeState,
+  recordWordPick,
+  type TeachingModeState,
+} from "@/lib/talk/teaching-mode";
 import { replayWordAudio } from "@/lib/talk/word-replay";
 import type { VocabularyEntry } from "@/components/talk/WordCardV3";
 
@@ -152,6 +159,8 @@ export default function TalkPage() {
   const teardownSessionRef = useRef<() => void>(() => {});
   const userExchangeCountedRef = useRef(false);
   const pendingHandoffContextRef = useRef(false);
+  const teachingModeRef = useRef<TeachingModeState>(createTeachingModeState());
+  const wordPickThisTurnRef = useRef(false);
 
   const syncTeachWordContext = useCallback(() => {
     clientRef.current?.setTeachWordContext({
@@ -455,6 +464,19 @@ export default function TalkPage() {
         })();
         return;
       }
+      teachingModeRef.current = advanceAfterTurn(
+        teachingModeRef.current,
+        wordPickThisTurnRef.current,
+      );
+      wordPickThisTurnRef.current = false;
+      if (clientRef.current?.isConnected() && sessionActiveRef.current) {
+        clientRef.current.sendHiddenContext(
+          buildPhaseNudge(teachingModeRef.current, sessionUiLangRef.current, {
+            hasDueReview: !isGuestRef.current,
+            canIntroNew: true,
+          }),
+        );
+      }
       setLiveUiState(sessionActiveRef.current ? "listening" : "idle");
       return;
     }
@@ -480,19 +502,25 @@ export default function TalkPage() {
       appendTranscript("gemini", msg.text);
       return;
     }
-    if (msg.type === "tool_call" && msg.name === "get_word_to_teach") {
+    if (
+      msg.type === "tool_call" &&
+      (msg.name === "get_word_to_teach" || msg.name === "get_word_to_review")
+    ) {
       if (isReplayModelTurnSuspended()) return;
       const result = msg.result as TeachWordResult;
       logEvent({
         kind: "engine",
         level: "info",
-        message: "get_word_to_teach tool call",
+        message: `${msg.name} tool call`,
         data: { args: msg.args, result, phonetics_source: result.phonetics_source ?? null },
       });
       syncTeachWordContext();
       if (handoffTurnRef.current) return;
       const entry = teachWordToVocabularyEntry(result);
       if (entry) {
+        const pickKind = msg.name === "get_word_to_review" ? "review" : "new";
+        teachingModeRef.current = recordWordPick(teachingModeRef.current, pickKind);
+        wordPickThisTurnRef.current = true;
         const direction = cardDirectionForTarget(sessionTargetLangRef.current);
         const cardId = crypto.randomUUID();
         setItems((prev) => {
@@ -532,6 +560,8 @@ export default function TalkPage() {
     handoffGenerationRef.current += 1;
     userExchangeCountedRef.current = false;
     pendingHandoffContextRef.current = false;
+    teachingModeRef.current = createTeachingModeState();
+    wordPickThisTurnRef.current = false;
     mediaRef.current?.stopAudio();
     mediaRef.current?.stopAudioPlayback();
     clientRef.current?.disconnect();

@@ -11,7 +11,6 @@ import { resolvePhonetics } from "@/lib/brain/phonetics";
 import {
   introduceWord,
   pickWordToIntroduce,
-  pickWordToPractice,
 } from "@/lib/brain/teaching";
 import { createServiceClient } from "@/lib/supabase/service";
 import { log } from "@/lib/debug/log";
@@ -157,7 +156,7 @@ export async function POST(req: NextRequest) {
     learningTarget = sanitizeTargetLanguage(uiLanguage, requestTarget ?? "th");
   }
 
-  let word = await pickWordToIntroduce({
+  const word = await pickWordToIntroduce({
     userId,
     cefrLevel: isGuest ? "A1" : cefrLevel,
     learningTarget,
@@ -166,12 +165,7 @@ export async function POST(req: NextRequest) {
     tier,
   });
 
-  let mode: "introduce" | "practice" | "none" = word ? "introduce" : "none";
-
-  if (!word && userId) {
-    word = await pickWordToPractice({ userId, learningTarget });
-    if (word) mode = "practice";
-  }
+  const mode: "introduce" | "none" = word ? "introduce" : "none";
 
   log("teach-word", "get_word_to_teach", {
     userId: userId ?? "guest",

@@ -24,6 +24,17 @@ import {
   buildSystemInstruction,
 } from "../lib/live/live-config";
 import {
+  advanceAfterTurn,
+  buildTeachingModeContract,
+  cardContextForWord,
+  createTeachingModeState,
+  GET_WORD_TO_REVIEW_DECLARATION,
+  recommendWordPick,
+  recordWordPick,
+  shouldPreferReviewOverNew,
+  toolNameForPick,
+} from "../lib/talk/teaching-mode";
+import {
   newGeminiTranscriptItem,
   routeGeminiTranscriptChunk,
 } from "../lib/live/transcript-routing";
@@ -271,6 +282,17 @@ const replay = replayTextForWord(fridgeCard!, "th");
 assert(replay.text === "ตู้เย็น", "replay speaks target surface form");
 assert(!isVocabularySlug(replay.text), "replay text never contains slug");
 
+const contextTh = cardContextForWord(
+  { example_en: "The fridge is cold.", example_th: "ตู้เย็นเย็นมาก" },
+  "en",
+  "th",
+);
+assert(contextTh === "ตู้เย็นเย็นมาก", "card context prefers target example");
+assert(
+  !!teachWordToVocabularyEntry(sampleWord)?.example_en,
+  "card payload carries example_en",
+);
+
 // --- E. Voice/text match (transcript routing) ------------------------------
 
 section("Voice/text transcript routing");
@@ -296,6 +318,12 @@ assert(kickoffTh.includes("ภาษาไทย"), "kickoff th mandates Thai vo
 const sysEnTh = buildSystemInstruction("en", "th");
 assert(sysEnTh.includes("UI_LANGUAGE = English"), "system instruction UI=en");
 assert(sysEnTh.includes("TARGET_LANGUAGE = Thai"), "system instruction TARGET=th");
+assert(sysEnTh.includes("TEACHING MODE v1"), "system instruction includes teaching mode contract");
+assert(sysEnTh.includes("get_word_to_review"), "system instruction names Tool 3");
+assert(
+  buildTeachingModeContract("en", "th").includes("USE (not parrot)"),
+  "teaching contract mandates USE not parrot",
+);
 
 // --- F. Token policy (guest limited, key server-side) ----------------------
 
@@ -322,20 +350,6 @@ assert(
 assert(guestToken.sessionMinutes > memberToken.sessionMinutes, "guest session window ≥ member (backstop)");
 assert(guestToken.expireMinutes < memberToken.expireMinutes, "guest token expiry < member");
 
-const miomiClientSrc = readFileSync(
-  join(ROOT, "lib/live/miomi-client.ts"),
-  "utf8",
-);
-assert(
-  miomiClientSrc.includes('fetch("/api/live-token")'),
-  "client fetches ephemeral token from server",
-);
-assert(
-  !/process\.env\.GEMINI_API_KEY/.test(miomiClientSrc) &&
-    !/apiKey:\s*process\.env/.test(miomiClientSrc),
-  "GEMINI_API_KEY never wired in browser client (comments OK)",
-);
-
 const liveTokenRoute = readFileSync(
   join(ROOT, "app/api/live-token/route.ts"),
   "utf8",
@@ -345,7 +359,39 @@ assert(
   "API key stays server-side in live-token route",
 );
 
-// --- G. Live-test regressions (2026-06-05) ----------------------------------
+// --- G. Teaching mode v1 (lesson flow) --------------------------------------
+
+section("Teaching mode v1");
+
+let lesson = createTeachingModeState();
+assert(lesson.phase === "review", "lesson starts in review phase");
+assert(
+  recommendWordPick(lesson, { hasDueReview: true, canIntroNew: true }) === "review",
+  "review phase picks spiral word when due",
+);
+assert(
+  toolNameForPick("review") === "get_word_to_review",
+  "review pick maps to Tool 3",
+);
+
+lesson = recordWordPick(lesson, "new");
+assert(lesson.lastPickKind === "new", "recordWordPick tracks last kind");
+assert(
+  shouldPreferReviewOverNew(lesson, true),
+  "after NEW pick, prefer review when due (no new-only stream)",
+);
+lesson = { ...lesson, phase: "focus", focusWordsIntroduced: 1 };
+assert(
+  recommendWordPick(lesson, { hasDueReview: true, canIntroNew: true }) === "review",
+  "focus alternates to review after a new word when due",
+);
+
+lesson = advanceAfterTurn(createTeachingModeState(), true);
+assert(lesson.phase === "focus", "word pick advances review → focus");
+lesson = advanceAfterTurn({ ...createTeachingModeState(), phase: "use" }, false);
+assert(lesson.phase === "recap", "use phase advances to recap");
+
+// --- H. Live-test regressions (2026-06-05) ----------------------------------
 
 section("Live-test regressions");
 
@@ -363,12 +409,53 @@ const teachWordRouteSrc = readFileSync(
   "utf8",
 );
 assert(
-  teachWordRouteSrc.includes("pickWordToPractice"),
-  "teach-word falls back to pickWordToPractice when intro is null",
+  !teachWordRouteSrc.includes("pickWordToPractice"),
+  "teach-word is NEW-only; review via Tool 3",
 );
 assert(
-  teachWordRouteSrc.includes('mode = "practice"'),
-  "practice mode flagged when reviewing known word",
+  !teachWordRouteSrc.includes('mode = "practice"'),
+  "teach-word never returns practice mode",
+);
+
+const reviewWordRouteSrc = readFileSync(
+  join(ROOT, "app/api/review-word/route.ts"),
+  "utf8",
+);
+assert(
+  reviewWordRouteSrc.includes("pickWordToReview"),
+  "review-word uses pickWordToReview (Tool 3)",
+);
+assert(
+  reviewWordRouteSrc.includes('mode: "practice"'),
+  "review-word flags practice mode for spiral words",
+);
+
+const liveConfigSrc = readFileSync(join(ROOT, "lib/live/live-config.ts"), "utf8");
+assert(
+  liveConfigSrc.includes("GET_WORD_TO_REVIEW_DECLARATION"),
+  "live config declares Tool 3 get_word_to_review",
+);
+assert(
+  GET_WORD_TO_REVIEW_DECLARATION.name === "get_word_to_review",
+  "Tool 3 declaration name is get_word_to_review",
+);
+
+const miomiClientSrc = readFileSync(
+  join(ROOT, "lib/live/miomi-client.ts"),
+  "utf8",
+);
+assert(
+  miomiClientSrc.includes('fetch("/api/live-token")'),
+  "client fetches ephemeral token from server",
+);
+assert(
+  miomiClientSrc.includes("/api/review-word"),
+  "client handles Tool 3 via /api/review-word",
+);
+assert(
+  !/process\.env\.GEMINI_API_KEY/.test(miomiClientSrc) &&
+    !/apiKey:\s*process\.env/.test(miomiClientSrc),
+  "GEMINI_API_KEY never wired in browser client (comments OK)",
 );
 
 const mediaHandlerSrc = readFileSync(
@@ -419,6 +506,10 @@ assert(
   talkPageSrc.includes("invitationVoiceSentRef"),
   "CTA sheet requires voiced invitation (no silent handoff)",
 );
+assert(
+  talkPageSrc.includes("get_word_to_review") && talkPageSrc.includes("teaching-mode"),
+  "talk page wires Tool 3 + teaching mode state",
+);
 
 flow = createGuestFlowState(GUEST_EXCHANGE_LIMIT - 1);
 flow = beginGuestExchange(flow);
@@ -440,9 +531,7 @@ assert(flow.invitationCueCount === 0, "mic-stop never triggers invitation cue");
 flow = onInvitationDrained(flow);
 assert(flow.signupSheetCount === 0, "mic-stop never opens signup sheet");
 
-// --- H. Sanity on helpers ---------------------------------------------------
-
-section("Helpers");
+// --- I. Sanity on helpers ---------------------------------------------------
 assert(oppositeLanguage("en") === "th", "oppositeLanguage en→th");
 assert(normalizeLearningTarget("thai") === "th", "normalizeLearningTarget thai");
 

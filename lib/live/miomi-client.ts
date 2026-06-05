@@ -218,6 +218,30 @@ export class MiomiLiveClient {
         } catch (err) {
           response = { ok: false, error: String(err) };
         }
+      } else if (fc.name === "get_word_to_review") {
+        try {
+          const resp = await fetch("/api/review-word", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              learning_target: this.teachWordContext.learningTarget,
+            }),
+          });
+          if (!resp.ok) {
+            const err = (await resp.json().catch(() => ({}))) as { error?: string };
+            response = { ok: false, error: err.error ?? `review-word failed (${resp.status})` };
+          } else {
+            response = await resp.json();
+            this.callbacks.onMessage?.({
+              type: "tool_call",
+              name: fc.name,
+              args: fc.args ?? {},
+              result: response,
+            });
+          }
+        } catch (err) {
+          response = { ok: false, error: String(err) };
+        }
       }
 
       functionResponses.push({

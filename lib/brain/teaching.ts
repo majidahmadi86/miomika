@@ -181,10 +181,20 @@ export function selectDueReviewCandidate(
   return pool[0]?.word_en ?? null;
 }
 
+/** Tool 3 — due spiral review word from vocabulary_user_state (TEACHING MODE v1). */
+export async function pickWordToReview(args: {
+  userId: string;
+  learningTarget: "th" | "en" | null;
+  now?: Date;
+}): Promise<IntroducedWord | null> {
+  return pickWordToPractice(args);
+}
+
 /** When intro cap or bank is exhausted, practice a due word from vocabulary_user_state. */
 export async function pickWordToPractice(args: {
   userId: string;
   learningTarget: "th" | "en" | null;
+  now?: Date;
 }): Promise<IntroducedWord | null> {
   try {
     const supabase = await createServiceClient();
@@ -211,6 +221,7 @@ export async function pickWordToPractice(args: {
         next_spiral_at: (row.next_spiral_at as string | null) ?? null,
         mastery_level: (row.mastery_level as number) ?? 0,
       })),
+      args.now ?? new Date(),
     );
     if (!pickEn) return null;
 
