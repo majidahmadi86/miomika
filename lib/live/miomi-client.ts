@@ -165,13 +165,13 @@ export class MiomiLiveClient {
     for (const fc of toolCall.functionCalls ?? []) {
       let response: unknown = { ok: false, error: "unknown tool" };
 
-      if (fc.name === "teach_word") {
+      if (fc.name === "get_word_to_teach") {
         try {
-          const word = (fc.args?.word ?? fc.args?.Word ?? "") as string;
+          const topicHint = (fc.args?.topic_hint ?? fc.args?.topicHint ?? "") as string;
           const resp = await fetch("/api/teach-word", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ word }),
+            body: JSON.stringify({ topic_hint: topicHint || undefined }),
           });
           if (!resp.ok) {
             const err = (await resp.json().catch(() => ({}))) as { error?: string };

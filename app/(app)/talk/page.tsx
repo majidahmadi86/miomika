@@ -294,7 +294,7 @@ export default function TalkPage() {
       logEvent({
         kind: "engine",
         level: "info",
-        message: "teach_word tool call",
+        message: "get_word_to_teach tool call",
         data: { args: msg.args, result: msg.result },
       });
     }
