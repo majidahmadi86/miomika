@@ -13,10 +13,11 @@ import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMio
 import { MicRow } from "@/components/talk/MicRow";
 import { Toolbox, type ResponseLength } from "@/components/talk/Toolbox";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
+import { WordCardV3 } from "@/components/talk/WordCardV3";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
 import { pickIceBreaker } from "@/lib/voice/warmth";
-import { unlockTtsPlayback } from "@/lib/voice/tts";
+import { speak, unlockTtsPlayback } from "@/lib/voice/tts";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
@@ -32,6 +33,13 @@ import {
   resolveUiLanguage,
 } from "@/lib/brain/language";
 import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config";
+import {
+  cardDirectionForTarget,
+  replayTextForWord,
+  teachWordToVocabularyEntry,
+  type TeachWordResult,
+} from "@/lib/talk/teach-word-card";
+import type { VocabularyEntry } from "@/components/talk/WordCardV3";
 
 /**
  * LOCKED 2026-06-05 — /talk is audio-native Gemini Live (MiomiLiveClient + /api/live-token
@@ -41,7 +49,8 @@ import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config"
 
 type CanvasItem =
   | { id: string; kind: "mini_cat"; textTh: string; textEn: string }
-  | { id: string; kind: "user_said"; text: string };
+  | { id: string; kind: "user_said"; text: string }
+  | { id: string; kind: "word_card"; word: VocabularyEntry; direction: "th_to_en" | "en_to_th" };
 
 type LiveUiState = "idle" | "connecting" | "listening" | "speaking" | "error";
 
@@ -70,6 +79,7 @@ function canvasToMemory(
       memory.push({ role: "user", content: item.text });
       continue;
     }
+    if (item.kind === "word_card") continue;
     const content = [item.textEn, item.textTh].filter(Boolean).join(" ");
     if (content) memory.push({ role: "miomi", content });
   }
@@ -374,13 +384,22 @@ export default function TalkPage() {
       appendTranscript("gemini", msg.text);
       return;
     }
-    if (msg.type === "tool_call") {
+    if (msg.type === "tool_call" && msg.name === "get_word_to_teach") {
+      const result = msg.result as TeachWordResult;
       logEvent({
         kind: "engine",
         level: "info",
         message: "get_word_to_teach tool call",
-        data: { args: msg.args, result: msg.result },
+        data: { args: msg.args, result, phonetics_source: result.phonetics_source ?? null },
       });
+      const entry = teachWordToVocabularyEntry(result);
+      if (entry) {
+        const direction = cardDirectionForTarget(sessionTargetLangRef.current);
+        setItems((prev) => [
+          ...prev,
+          { id: crypto.randomUUID(), kind: "word_card", word: entry, direction },
+        ]);
+      }
     }
   }, [appendTranscript, beginGuestExchange, completeGuestLimitTurn, maybeAdaptSessionLanguage]);
 
@@ -589,6 +608,12 @@ export default function TalkPage() {
       taps.count = 0;
       setDebugOpen(true);
     }
+  }, []);
+
+  const handleWordReplay = useCallback((word: VocabularyEntry) => {
+    unlockTtsPlayback();
+    const { text, lang } = replayTextForWord(word, sessionTargetLangRef.current);
+    void speak(text, lang);
   }, []);
 
   const toggleExpand = useCallback((id: string) => {
@@ -860,6 +885,16 @@ export default function TalkPage() {
                     )}
                   </div>
                 </div>
+              );
+            }
+            if (item.kind === "word_card") {
+              return (
+                <WordCardV3
+                  key={item.id}
+                  word={item.word}
+                  direction={item.direction}
+                  onReplayAudio={() => handleWordReplay(item.word)}
+                />
               );
             }
             return null;

@@ -37,9 +37,11 @@ interface WordCardV3Props {
   word: VocabularyEntry;
   direction: "th_to_en" | "en_to_th";
   onPronunciationCheck?: (word: VocabularyEntry) => void;
+  /** When set, replay uses this instead of browser TTS (e.g. /api/talk/speak). */
+  onReplayAudio?: () => void | Promise<void>;
 }
 
-export function WordCardV3({ word, direction, onPronunciationCheck }: WordCardV3Props) {
+export function WordCardV3({ word, direction, onPronunciationCheck, onReplayAudio }: WordCardV3Props) {
   const [expanded, setExpanded] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
 
@@ -56,7 +58,11 @@ export function WordCardV3({ word, direction, onPronunciationCheck }: WordCardV3
   const handleAudio = async () => {
     if (audioPlaying) return;
     setAudioPlaying(true);
-    await playWordAudio(audioKey, primaryWord, audioLang);
+    if (onReplayAudio) {
+      await onReplayAudio();
+    } else {
+      await playWordAudio(audioKey, primaryWord, audioLang);
+    }
     setAudioPlaying(false);
   };
 

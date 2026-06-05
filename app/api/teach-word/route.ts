@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
+import { resolvePhonetics } from "@/lib/brain/phonetics";
 import { introduceWord, pickWordToIntroduce } from "@/lib/brain/teaching";
 import { createServiceClient } from "@/lib/supabase/service";
 import { log } from "@/lib/debug/log";
@@ -65,25 +66,31 @@ async function loadCefrLevel(userId: string): Promise<string | null> {
   }
 }
 
-async function loadBankExamples(wordEn: string): Promise<{
+async function loadBankExtras(wordEn: string): Promise<{
   example_th: string | null;
   example_en: string | null;
+  th_romanization: string | null;
+  en_ipa: string | null;
 }> {
   try {
     const supabase = await createServiceClient();
     const { data, error } = await supabase
       .from("vocabulary_bank")
-      .select("example_th, example_en")
+      .select("example_th, example_en, th_romanization, en_ipa")
       .eq("word_en", wordEn)
       .maybeSingle();
-    if (error || !data) return { example_th: null, example_en: null };
+    if (error || !data) {
+      return { example_th: null, example_en: null, th_romanization: null, en_ipa: null };
+    }
     return {
       example_th: (data.example_th as string | null) ?? null,
       example_en: (data.example_en as string | null) ?? null,
+      th_romanization: (data.th_romanization as string | null) ?? null,
+      en_ipa: (data.en_ipa as string | null) ?? null,
     };
   } catch (err) {
-    console.error("[teach-word] loadBankExamples failed:", err);
-    return { example_th: null, example_en: null };
+    console.error("[teach-word] loadBankExtras failed:", err);
+    return { example_th: null, example_en: null, th_romanization: null, en_ipa: null };
   }
 }
 
@@ -148,7 +155,19 @@ export async function POST(req: NextRequest) {
     await introduceWord({ userId, word });
   }
 
-  const examples = await loadBankExamples(word.word_en);
+  const bank = await loadBankExtras(word.word_en);
+  const phonetics = await resolvePhonetics({
+    word_th: word.word_th,
+    word_en: word.word_en,
+    learningTarget,
+    bankRomanization: bank.th_romanization,
+    bankIpa: bank.en_ipa,
+  });
+
+  log("teach-word", "phonetics", {
+    word_en: word.word_en,
+    source: phonetics.phonetics_source,
+  });
 
   return NextResponse.json({
     ok: true,
@@ -156,7 +175,11 @@ export async function POST(req: NextRequest) {
     word_th: word.word_th,
     emoji: word.emoji,
     cefr_level: word.cefr_level,
-    ...(examples.example_th ? { example_th: examples.example_th } : {}),
-    ...(examples.example_en ? { example_en: examples.example_en } : {}),
+    phonetics: phonetics.phonetics,
+    phonetics_source: phonetics.phonetics_source,
+    ...(phonetics.th_romanization ? { th_romanization: phonetics.th_romanization } : {}),
+    ...(phonetics.en_ipa ? { en_ipa: phonetics.en_ipa } : {}),
+    ...(bank.example_th ? { example_th: bank.example_th } : {}),
+    ...(bank.example_en ? { example_en: bank.example_en } : {}),
   });
 }
