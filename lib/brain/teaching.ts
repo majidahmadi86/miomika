@@ -136,6 +136,38 @@ function textContainsWord(userText: string, word: string): boolean {
   return new RegExp(`\\b${escaped}\\b`, "i").test(userText);
 }
 
+function isCardableVocabRow(row: VocabBankRow): boolean {
+  const word_en = (row.word_en ?? "").trim();
+  const word_th = (row.word_th ?? "").trim();
+  return !!word_en && !!word_th && !isVocabularySlug(word_en);
+}
+
+/** Rows missing gloss fields or carrying bank topic ids — never teach/card. */
+export function countUncardableBankRows(rows: VocabBankRow[]): number {
+  return rows.filter((row) => !isCardableVocabRow(row)).length;
+}
+
+/** Sorted cardable pick — skips slug/topic ids; used by pickWordToIntroduce + self-check. */
+export function pickIntroduceCandidate(
+  candidates: IntroducedWord[],
+  learningTarget: "th" | "en" | null,
+): IntroducedWord | null {
+  const sorted = [...candidates].sort(
+    (a, b) =>
+      scoreCandidate(b, learningTarget) - scoreCandidate(a, learningTarget),
+  );
+  for (const candidate of sorted) {
+    if (
+      candidate.word_en &&
+      candidate.word_th &&
+      !isVocabularySlug(candidate.word_en)
+    ) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 /** Pure bank filter — excludes known/session words; used by pickWordToIntroduce + self-check. */
 export function filterVocabCandidates(args: {
   rows: VocabBankRow[];
@@ -290,28 +322,21 @@ export async function pickWordToIntroduce(args: {
       return null;
     }
 
+    const bankRows = (data ?? []) as VocabBankRow[];
+    const uncardableCount = countUncardableBankRows(bankRows);
+    if (uncardableCount > 0) {
+      console.log(
+        `[teaching.pickWordToIntroduce] excluded ${uncardableCount} uncardable vocabulary_bank rows`,
+      );
+    }
+
     const candidates = filterVocabCandidates({
-      rows: (data ?? []) as VocabBankRow[],
+      rows: bankRows,
       learningTarget: args.learningTarget,
       exclude,
     });
 
-    if (candidates.length === 0) {
-      return null;
-    }
-
-    candidates.sort(
-      (a, b) =>
-        scoreCandidate(b, args.learningTarget) -
-        scoreCandidate(a, args.learningTarget),
-    );
-
-    const topScore = scoreCandidate(candidates[0], args.learningTarget);
-    const topTier = candidates.filter(
-      (c) => scoreCandidate(c, args.learningTarget) === topScore,
-    );
-    const pick = topTier[Math.floor(Math.random() * topTier.length)];
-    return pick ?? null;
+    return pickIntroduceCandidate(candidates, args.learningTarget);
   } catch (err) {
     console.error("[teaching.pickWordToIntroduce] failed:", err);
     return null;

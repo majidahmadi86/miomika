@@ -16,7 +16,9 @@ import {
   sanitizeTargetLanguage,
 } from "../lib/brain/language";
 import {
+  countUncardableBankRows,
   filterVocabCandidates,
+  pickIntroduceCandidate,
   selectDueReviewCandidate,
 } from "../lib/brain/teaching";
 import {
@@ -280,6 +282,27 @@ const thTarget = filterVocabCandidates({
 });
 assert(thTarget[0]?.word === "สวัสดี" || thTarget.some((w) => w.word_th.length > 0), "th target picks Thai surface form");
 
+const slugBankRows = [
+  { word_en: "general2", word_th: "ทั่วไป", cefr_level: "A1", emoji: "📚" },
+  { word_en: "fridge", word_th: "ตู้เย็น", cefr_level: "A1", emoji: "🧊" },
+  { word_en: "feeling_2", word_th: "ความรู้สึก", cefr_level: "A1" },
+];
+assert(
+  countUncardableBankRows(slugBankRows) === 2,
+  "countUncardableBankRows excludes slug word_en rows",
+);
+const slugCandidates = filterVocabCandidates({
+  rows: slugBankRows,
+  learningTarget: "th",
+  exclude: new Set(),
+});
+const slugPick = pickIntroduceCandidate(slugCandidates, "th");
+assert(slugPick?.word_en === "fridge", "pickIntroduceCandidate skips slug rows");
+assert(
+  !slugPick || !isVocabularySlug(slugPick.word_en),
+  "pickIntroduceCandidate never returns slug word_en",
+);
+
 // --- D. Cards (guest + member payloads) ------------------------------------
 
 section("Card payloads");
@@ -303,7 +326,16 @@ assert(cardDirectionForTarget("th") === "en_to_th", "th learner card direction e
 assert(cardDirectionForTarget("en") === "th_to_en", "en learner card direction th_to_en");
 
 assert(isVocabularySlug("home_stuff_22"), "home_stuff_22 is a vocabulary slug");
+assert(isVocabularySlug("general2"), "general2 is a vocabulary slug");
+assert(isVocabularySlug("general_info2"), "general_info2 is a vocabulary slug");
+assert(isVocabularySlug("feeling_2"), "feeling_2 is a vocabulary slug");
 assert(!isVocabularySlug("fridge"), "fridge is not a slug");
+assert(!isVocabularySlug("feeling"), "feeling is not a slug");
+assert(!isVocabularySlug("healthy"), "healthy is not a slug");
+assert(!isVocabularySlug("student"), "student is not a slug");
+assert(!isVocabularySlug("light"), "light is not a slug");
+assert(!isVocabularySlug("open"), "open is not a slug");
+assert(!isVocabularySlug("air conditioner"), "multi-word gloss is not a slug");
 assert(!isVocabularySlug("ตู้เย็น"), "Thai gloss is not a slug");
 
 assert(

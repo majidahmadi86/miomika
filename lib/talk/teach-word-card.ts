@@ -1,18 +1,16 @@
 import type { VocabularyEntry } from "@/components/talk/WordCardV3";
 
-/** Internal vocabulary_bank topic/category ids — never user-facing gloss or replay text. */
-const VOCAB_SLUG_RE =
-  /^[a-z][a-z0-9]*(?:_(?:stuff|food|travel|work|daily|greeting|social|market|health|school|business|home|family)(?:_\d+)?|\d+)$/;
+const SLUG_TOPIC_SUFFIX =
+  /_(?:stuff|food|travel|work|daily|greeting|social|market|health|school|business|home|family)$/;
 
+/** Internal vocabulary_bank topic/category ids — never user-facing gloss or replay text. */
 export function isVocabularySlug(text: string | null | undefined): boolean {
   const t = (text ?? "").trim().toLowerCase();
-  if (!t || /[\u0E00-\u0E7F\s]/.test(t)) return false;
-  if (!/^[a-z][a-z0-9_]*$/.test(t) || !t.includes("_")) return false;
-  if (VOCAB_SLUG_RE.test(t)) return true;
-  if (/_(?:stuff|food|travel|work|daily|greeting|social|market|health|school|business|home|family)(?:_\d+)?$/.test(t)) {
-    return true;
-  }
-  if (/_[0-9]+$/.test(t) && t.split("_").length >= 2) return true;
+  if (!t) return false;
+  if (/\s/.test(t) || /[\u0E00-\u0E7F]/.test(t)) return false;
+  if (!/^[a-z][a-z0-9_]*$/.test(t)) return false;
+  if (/[0-9]$/.test(t)) return true;
+  if (SLUG_TOPIC_SUFFIX.test(t)) return true;
   return false;
 }
 
