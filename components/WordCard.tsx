@@ -82,16 +82,32 @@ export function WordCard({ word, variant = "intro" }: WordCardProps) {
 
       {/* Main content row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-        {/* Emoji */}
+        {/* Target-script glyph placeholder until real images land */}
         <div
           style={{
-            fontSize: "36px",
-            lineHeight: 1,
+            width: "52px",
+            height: "52px",
             flexShrink: 0,
             marginTop: "2px",
+            background: "#FAFAF6",
+            border: "1px solid #E8E5DF",
+            borderRadius: "12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {word.emoji}
+          <span
+            style={{
+              fontFamily: "'Quicksand', sans-serif",
+              fontSize: "22px",
+              fontWeight: 600,
+              color: "#9A8B73",
+              lineHeight: 1,
+            }}
+          >
+            {word.word.charAt(0).toUpperCase()}
+          </span>
         </div>
 
         {/* Text block */}

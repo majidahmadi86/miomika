@@ -67,6 +67,11 @@ export function WordCardV3({
 
   // TODO(phase-3): move IconComponent lookup to a static map / hoisted helper.
   const IconComponent = getIconForCategory(word.image_category);
+  const glyphText =
+    /[\u0E00-\u0E7F]/.test(primaryWord) && primaryWord.length <= 4
+      ? primaryWord
+      : primaryWord.charAt(0).toUpperCase();
+  const glyphFont = isThaiLearner ? "'Quicksand', sans-serif" : "'Sarabun', sans-serif";
 
   const handleAudio = async () => {
     if (audioPlaying) return;
@@ -166,11 +171,17 @@ export function WordCardV3({
           }}>
             {IconComponent ? (
               <IconComponent style={{ width: "40px", height: "40px", color: "#9A8B73" }} strokeWidth={1.5} />
-            ) : word.emoji ? (
-              <span style={{ fontSize: "40px", lineHeight: 1 }}>{word.emoji}</span>
             ) : (
-              <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "28px", color: "#C4BDB5" }}>
-                {primaryWord.charAt(0).toUpperCase()}
+              <span
+                style={{
+                  fontFamily: glyphFont,
+                  fontSize: glyphText.length > 1 ? "26px" : "32px",
+                  fontWeight: 600,
+                  color: "#9A8B73",
+                  lineHeight: 1,
+                }}
+              >
+                {glyphText}
               </span>
             )}
           </div>
