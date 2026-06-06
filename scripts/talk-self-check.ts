@@ -61,6 +61,15 @@ import {
   replayTextForWord,
   teachWordToVocabularyEntry,
 } from "../lib/talk/teach-word-card";
+import {
+  buildExcludeSet,
+  buildLessonPlanFromRows,
+  countA1CardableWords,
+  countCardableRows,
+  pickPlanReviewWord,
+  planSizeForTier,
+  resolveTeachServe,
+} from "../lib/talk/lesson-plan";
 
 const ROOT = process.cwd();
 let passed = 0;
@@ -303,6 +312,110 @@ assert(
   "pickIntroduceCandidate never returns slug word_en",
 );
 
+// --- C2. Lesson plan (Stage 1 — deterministic ordered serving) -----------
+
+section("Lesson plan (Stage 1)");
+
+const planBankRows = [
+  {
+    word_en: "hello",
+    word_th: "สวัสดี",
+    cefr_level: "A1",
+    frequency_score: 90,
+    created_at: "2026-01-02T00:00:00Z",
+  },
+  {
+    word_en: "general2",
+    word_th: "ทั่วไป",
+    cefr_level: "A1",
+    frequency_score: 95,
+    created_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    word_en: "water",
+    word_th: "น้ำ",
+    cefr_level: "A1",
+    frequency_score: 80,
+    created_at: "2026-01-03T00:00:00Z",
+  },
+  {
+    word_en: "thanks",
+    word_th: "ขอบคุณ",
+    cefr_level: "A1",
+    frequency_score: 70,
+    created_at: "2026-01-04T00:00:00Z",
+  },
+  {
+    word_en: "tired",
+    word_th: "เหนื่อย",
+    cefr_level: "A1",
+    frequency_score: 60,
+    created_at: "2026-01-05T00:00:00Z",
+  },
+];
+
+const guestPlan = buildLessonPlanFromRows({
+  rows: planBankRows,
+  planSize: planSizeForTier("guest"),
+  exclude: buildExcludeSet([]),
+});
+assert(guestPlan.length === 3, "guest plan length = 3");
+assert(
+  guestPlan.every((id) => !isVocabularySlug(id)),
+  "buildLessonPlan returns only cardable word ids",
+);
+assert(
+  guestPlan[0] === "hello" && guestPlan[1] === "water" && guestPlan[2] === "thanks",
+  "plan ordered by frequency_score desc (slug skipped)",
+);
+
+assert(planSizeForTier("free") === 4, "free plan size = 4");
+assert(planSizeForTier("pro") === 6, "pro plan size = 6");
+assert(planSizeForTier("pro_max") === 6, "pro_max plan size = 6");
+
+const served: string[] = [];
+let introducedIdx = 0;
+for (let step = 0; step < guestPlan.length + 1; step += 1) {
+  const serve = resolveTeachServe({ plan: guestPlan, introducedIdx });
+  if (serve.kind === "lesson_complete") {
+    assert(step === guestPlan.length, "lesson_complete exactly when plan exhausted");
+    break;
+  }
+  assert(serve.kind === "word", "never null while words remain in plan");
+  assert(!served.includes(serve.wordId), "serving never repeats");
+  served.push(serve.wordId);
+  assert(serve.wordId === guestPlan[introducedIdx], "serving returns words in plan order");
+  introducedIdx = serve.introducedIdx + 1;
+}
+assert(served.length === 3, "guest plan exhausts in ≤3 new words");
+
+const reviewExclude = buildExcludeSet([]);
+let reviewPick = pickPlanReviewWord({
+  plan: guestPlan,
+  introducedIdx: 2,
+  exclude: reviewExclude,
+});
+assert(reviewPick === "hello", "review picks first introduced plan word");
+reviewExclude.add(reviewPick!.toLowerCase());
+reviewPick = pickPlanReviewWord({
+  plan: guestPlan,
+  introducedIdx: 2,
+  exclude: reviewExclude,
+});
+assert(reviewPick === "water", "review rotates to next introduced plan word");
+reviewExclude.add(reviewPick!.toLowerCase());
+reviewPick = pickPlanReviewWord({
+  plan: guestPlan,
+  introducedIdx: 2,
+  exclude: reviewExclude,
+});
+assert(reviewPick === null, "review returns null when introduced pool exhausted");
+
+assert(
+  countCardableRows(planBankRows, "A1") === 4,
+  "countCardableRows excludes slug rows at A1",
+);
+
 // --- D. Cards (guest + member payloads) ------------------------------------
 
 section("Card payloads");
@@ -510,8 +623,20 @@ const teachWordRouteSrc = readFileSync(
   "utf8",
 );
 assert(
-  !teachWordRouteSrc.includes("pickWordToPractice"),
-  "teach-word is NEW-only; review via Tool 3",
+  teachWordRouteSrc.includes("buildLessonPlan"),
+  "teach-word builds deterministic lesson plan",
+);
+assert(
+  teachWordRouteSrc.includes("resolveTeachServe"),
+  "teach-word cursor-serves plan by introduced_idx",
+);
+assert(
+  !teachWordRouteSrc.includes("pickWordToIntroduce"),
+  "teach-word no longer uses random pickWordToIntroduce",
+);
+assert(
+  teachWordRouteSrc.includes('mode: "lesson_complete"'),
+  "teach-word returns lesson_complete when plan exhausted",
 );
 assert(
   !teachWordRouteSrc.includes('mode = "practice"'),
@@ -523,16 +648,20 @@ const reviewWordRouteSrc = readFileSync(
   "utf8",
 );
 assert(
-  reviewWordRouteSrc.includes("pickWordToReview"),
-  "review-word uses pickWordToReview (Tool 3)",
+  reviewWordRouteSrc.includes("pickPlanReviewWord"),
+  "review-word rotates through introduced lesson-plan words",
 );
 assert(
   reviewWordRouteSrc.includes("exclude"),
   "review-word accepts session exclude list",
 );
 assert(
+  reviewWordRouteSrc.includes("lesson_plan"),
+  "review-word accepts lesson_plan from session",
+);
+assert(
   reviewWordRouteSrc.includes('mode: "practice"'),
-  "review-word flags practice mode for spiral words",
+  "review-word flags practice mode for plan review words",
 );
 
 const liveConfigSrc = readFileSync(join(ROOT, "lib/live/live-config.ts"), "utf8");
@@ -560,6 +689,18 @@ assert(
 assert(
   miomiClientSrc.includes("sessionReviewServed"),
   "client tracks review words served this session",
+);
+assert(
+  miomiClientSrc.includes("lessonPlan"),
+  "client carries lesson plan in teach context",
+);
+assert(
+  miomiClientSrc.includes("introducedIdx"),
+  "client carries introducedIdx cursor in teach context",
+);
+assert(
+  miomiClientSrc.includes("lesson_plan: this.teachWordContext.lessonPlan"),
+  "client sends lesson plan to review-word",
 );
 assert(
   miomiClientSrc.includes("exclude: [...this.sessionReviewServed]"),
@@ -686,7 +827,23 @@ assert(afterReply.phase === "invitation", "handoff invite phase after 5th reply 
 assert(oppositeLanguage("en") === "th", "oppositeLanguage en→th");
 assert(normalizeLearningTarget("thai") === "th", "normalizeLearningTarget thai");
 
-// --- Result -----------------------------------------------------------------
+// --- J. Live bank cardable count (optional) ---------------------------------
 
-console.log(`\n[check:talk] ${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+async function reportA1CardableInventory(): Promise<void> {
+  section("A1 cardable bank inventory (optional)");
+  const a1Cardable = await countA1CardableWords("th");
+  if (a1Cardable === null) {
+    console.log("  · skipped — SUPABASE_SERVICE_ROLE_KEY unavailable");
+    return;
+  }
+  console.log(`  · A1 active cardable words (teach_thai_to_english): ${a1Cardable}`);
+  assert(
+    a1Cardable >= 3,
+    `bank has ≥3 A1 cardable words for guest 3-word plan (found ${a1Cardable})`,
+  );
+}
+
+void reportA1CardableInventory().then(() => {
+  console.log(`\n[check:talk] ${passed} passed, ${failed} failed`);
+  process.exit(failed > 0 ? 1 : 0);
+});

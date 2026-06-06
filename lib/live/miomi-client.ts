@@ -51,6 +51,8 @@ type LiveSession = {
 export type TeachWordContext = {
   learningTarget: "th" | "en";
   sessionIntroduced: string[];
+  lessonPlan: string[];
+  introducedIdx: number;
 };
 
 export class MiomiLiveClient {
@@ -60,12 +62,17 @@ export class MiomiLiveClient {
   private teachWordContext: TeachWordContext = {
     learningTarget: "th",
     sessionIntroduced: [],
+    lessonPlan: [],
+    introducedIdx: 0,
   };
 
   constructor(private callbacks: LiveClientCallbacks) {}
 
-  setTeachWordContext(ctx: TeachWordContext): void {
-    this.teachWordContext = ctx;
+  setTeachWordContext(ctx: Partial<TeachWordContext> & Pick<TeachWordContext, "learningTarget" | "sessionIntroduced">): void {
+    this.teachWordContext = {
+      ...this.teachWordContext,
+      ...ctx,
+    };
   }
 
   async connect(opts?: {
@@ -79,6 +86,8 @@ export class MiomiLiveClient {
     this.teachWordContext = {
       learningTarget: targetLanguage,
       sessionIntroduced: this.teachWordContext.sessionIntroduced,
+      lessonPlan: [],
+      introducedIdx: 0,
     };
     this.sessionReviewServed.clear();
     // LOCKED 2026-06-05 — ephemeral token from server; GEMINI_API_KEY never in browser.
@@ -196,20 +205,38 @@ export class MiomiLiveClient {
       if (fc.name === "get_word_to_teach") {
         try {
           const topicHint = (fc.args?.topic_hint ?? fc.args?.topicHint ?? "") as string;
+          const body: Record<string, unknown> = {
+            topic_hint: topicHint || undefined,
+            learning_target: this.teachWordContext.learningTarget,
+            session_introduced: this.teachWordContext.sessionIntroduced,
+          };
+          if (this.teachWordContext.lessonPlan.length > 0) {
+            body.lesson_plan = this.teachWordContext.lessonPlan;
+            body.introduced_idx = this.teachWordContext.introducedIdx;
+          }
           const resp = await fetch("/api/teach-word", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              topic_hint: topicHint || undefined,
-              learning_target: this.teachWordContext.learningTarget,
-              session_introduced: this.teachWordContext.sessionIntroduced,
-            }),
+            body: JSON.stringify(body),
           });
           if (!resp.ok) {
             const err = (await resp.json().catch(() => ({}))) as { error?: string };
             response = { ok: false, error: err.error ?? `teach-word failed (${resp.status})` };
           } else {
             response = await resp.json();
+            const payload = response as {
+              lesson_plan?: string[];
+              introduced_idx?: number;
+              word_en?: string;
+            };
+            if (Array.isArray(payload.lesson_plan) && payload.lesson_plan.length > 0) {
+              this.teachWordContext.lessonPlan = payload.lesson_plan;
+            }
+            if (typeof payload.introduced_idx === "number") {
+              this.teachWordContext.introducedIdx = payload.introduced_idx;
+            } else if (payload.word_en) {
+              this.teachWordContext.introducedIdx += 1;
+            }
             this.callbacks.onMessage?.({
               type: "tool_call",
               name: fc.name,
@@ -227,6 +254,8 @@ export class MiomiLiveClient {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               learning_target: this.teachWordContext.learningTarget,
+              lesson_plan: this.teachWordContext.lessonPlan,
+              introduced_idx: this.teachWordContext.introducedIdx,
               exclude: [...this.sessionReviewServed],
             }),
           });

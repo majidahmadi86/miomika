@@ -40,8 +40,12 @@ function humanTargetSurface(word_en: string, word_th: string, target: "th" | "en
 
 export type TeachWordResult = {
   ok?: boolean;
+  mode?: "introduce" | "none" | "lesson_complete" | "practice";
+  lesson_plan?: string[];
+  introduced_idx?: number;
   word_en?: string;
   word_th?: string;
+  word?: null;
   emoji?: string | null;
   cefr_level?: string | null;
   example_th?: string | null;
