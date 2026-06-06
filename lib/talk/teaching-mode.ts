@@ -161,6 +161,8 @@ export function buildTeachingModeContract(
 - ลำดับ: ทบทวนคำที่เคยเรียน (REVIEW) → โฟกัสคำใหม่ 1–2 คำในบริบท (FOCUS) → ให้ผู้เรียนใช้คำ (USE) → สรุปอบอุ่น (RECAP). ห้ามสตรีมคำแยกๆ แบบสุ่ม
 - Tool 1 get_word_to_teach: คำใหม่เท่านั้น — เรียกก่อนสอนคำใหม่ทุกครั้ง
 - Tool 3 get_word_to_review: คำที่เคยเรียนและถึงเวลา spiral — เรียกเมื่อทบทวน ห้ามแต่งคำเอง
+- คำแรกของเซสชัน: สอนเป็นคำใหม่ — ห้ามเปิดด้วย "จำได้ไหม…" ถ้ายังไม่เคยสอนคำนั้นในเซสชันนี้
+- กรอบทบทวน ("จำคำนี้ได้ไหม…") ใช้เฉพาะคำจาก get_word_to_review หรือที่สอนไปแล้วในเซสชันเดียวกัน
 - บริบท + การใช้ (ไม่ใช่พูดตาม): ใส่ประโยคตัวอย่างจาก tool ในคำตอบ แล้วถามคำถามสั้นๆ ให้ผู้เรียนใช้คำ "${targetName}" — ห้ามขอให้พูดตามอย่างเดียว
 - สลับ NEW + REVIEW เมื่อมีคำทบทวนครบกำหนด — ห้ามสอนแต่คำใหม่ต่อเนื่อง`;
   }
@@ -169,6 +171,8 @@ export function buildTeachingModeContract(
 - Shape: quick REVIEW of a known word → FOCUS (1–2 related NEW words in context) → USE (learner applies the word) → warm RECAP. Not a random stream of isolated words.
 - Tool 1 get_word_to_teach: NEW words only — call before teaching any new vocabulary.
 - Tool 3 get_word_to_review: spiral review of a word the learner already met — call when resurfacing known words; never invent review vocabulary.
+- FIRST word of a session: teach as brand-new — NEVER open with "do you remember…" unless that exact word was already introduced earlier in THIS session.
+- REVIEW framing ("remember this word…") ONLY for words returned by get_word_to_review or already taught earlier in the same session.
 - CONTEXT + USE (not parrot): weave the tool's example sentence into your reply, then ask ONE tiny question so the learner USES the ${targetName} word (short answer or mini-sentence) — never "repeat after me" only.
 - MIX new + review when spiral words are due — not an endless new-only stream.`;
 }
