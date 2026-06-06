@@ -56,6 +56,7 @@ export type TeachWordContext = {
 export class MiomiLiveClient {
   private session: LiveSession | null = null;
   private connected = false;
+  private sessionReviewServed = new Set<string>();
   private teachWordContext: TeachWordContext = {
     learningTarget: "th",
     sessionIntroduced: [],
@@ -79,6 +80,7 @@ export class MiomiLiveClient {
       learningTarget: targetLanguage,
       sessionIntroduced: this.teachWordContext.sessionIntroduced,
     };
+    this.sessionReviewServed.clear();
     // LOCKED 2026-06-05 — ephemeral token from server; GEMINI_API_KEY never in browser.
     const tokenRes = await fetch("/api/live-token");
     if (!tokenRes.ok) {
@@ -225,6 +227,7 @@ export class MiomiLiveClient {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               learning_target: this.teachWordContext.learningTarget,
+              exclude: [...this.sessionReviewServed],
             }),
           });
           if (!resp.ok) {
@@ -232,6 +235,10 @@ export class MiomiLiveClient {
             response = { ok: false, error: err.error ?? `review-word failed (${resp.status})` };
           } else {
             response = await resp.json();
+            const pickedEn = (response as { word_en?: string }).word_en?.trim();
+            if (pickedEn) {
+              this.sessionReviewServed.add(pickedEn.toLowerCase());
+            }
             this.callbacks.onMessage?.({
               type: "tool_call",
               name: fc.name,

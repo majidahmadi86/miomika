@@ -47,9 +47,16 @@ async function loadBankExtras(wordEn: string): Promise<{
  */
 export async function POST(req: NextRequest) {
   let bodyLearningTarget: string | null = null;
+  let bodyExclude: string[] = [];
   try {
-    const body = (await req.json()) as { learning_target?: string };
+    const body = (await req.json()) as {
+      learning_target?: string;
+      exclude?: string[];
+    };
     bodyLearningTarget = body?.learning_target ?? null;
+    bodyExclude = Array.isArray(body?.exclude)
+      ? body.exclude.filter((w): w is string => typeof w === "string")
+      : [];
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -71,6 +78,7 @@ export async function POST(req: NextRequest) {
   const word = await pickWordToReview({
     userId: profile.id,
     learningTarget,
+    exclude: bodyExclude,
   });
 
   log("review-word", "get_word_to_review", {

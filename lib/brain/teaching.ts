@@ -195,11 +195,15 @@ export type ReviewCandidateRow = {
 export function selectDueReviewCandidate(
   rows: ReviewCandidateRow[],
   now: Date = new Date(),
+  exclude: Set<string> = new Set(),
 ): string | null {
-  if (rows.length === 0) return null;
+  const poolRows = rows.filter((row) => !exclude.has(row.word_en.toLowerCase()));
+  if (poolRows.length === 0) return null;
   const nowMs = now.getTime();
-  const scored = rows.map((row) => {
-    const dueAt = row.next_spiral_at ? new Date(row.next_spiral_at).getTime() : 0;
+  const scored = poolRows.map((row) => {
+    const dueAt = row.next_spiral_at
+      ? new Date(row.next_spiral_at).getTime()
+      : Number.POSITIVE_INFINITY;
     return {
       word_en: row.word_en,
       dueAt,
@@ -218,6 +222,7 @@ export async function pickWordToReview(args: {
   userId: string;
   learningTarget: "th" | "en" | null;
   now?: Date;
+  exclude?: string[];
 }): Promise<IntroducedWord | null> {
   return pickWordToPractice(args);
 }
@@ -227,6 +232,7 @@ export async function pickWordToPractice(args: {
   userId: string;
   learningTarget: "th" | "en" | null;
   now?: Date;
+  exclude?: string[];
 }): Promise<IntroducedWord | null> {
   try {
     const supabase = await createServiceClient();
@@ -247,6 +253,10 @@ export async function pickWordToPractice(args: {
       return null;
     }
 
+    const exclude = new Set(
+      (args.exclude ?? []).map((word) => word.toLowerCase()),
+    );
+
     const pickEn = selectDueReviewCandidate(
       (data ?? []).map((row) => ({
         word_en: row.word_en as string,
@@ -254,6 +264,7 @@ export async function pickWordToPractice(args: {
         mastery_level: (row.mastery_level as number) ?? 0,
       })),
       args.now ?? new Date(),
+      exclude,
     );
     if (!pickEn) return null;
 

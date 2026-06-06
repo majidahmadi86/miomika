@@ -482,9 +482,27 @@ const reviewRows = [
   { word_en: "hello", next_spiral_at: "2026-06-01T00:00:00Z", mastery_level: 1 },
   { word_en: "water", next_spiral_at: "2026-06-10T00:00:00Z", mastery_level: 0 },
   { word_en: "thanks", next_spiral_at: "2026-06-04T12:00:00Z", mastery_level: 2 },
+  { word_en: "unscheduled", next_spiral_at: null, mastery_level: 0 },
 ];
-const duePick = selectDueReviewCandidate(reviewRows, new Date("2026-06-05T12:00:00Z"));
+const reviewNow = new Date("2026-06-05T12:00:00Z");
+const duePick = selectDueReviewCandidate(reviewRows, reviewNow);
 assert(duePick === "hello", "null intro pick → earliest overdue review word");
+assert(
+  duePick !== "unscheduled",
+  "null next_spiral_at does not beat a real overdue review word",
+);
+const nextDuePick = selectDueReviewCandidate(
+  reviewRows,
+  reviewNow,
+  new Set(["hello"]),
+);
+assert(nextDuePick === "thanks", "excluding most-due word returns next overdue word");
+const exhaustedPick = selectDueReviewCandidate(
+  reviewRows,
+  reviewNow,
+  new Set(["hello", "thanks", "water", "unscheduled"]),
+);
+assert(exhaustedPick === null, "exhausted review pool returns null");
 assert(duePick !== "empty" && duePick !== "invented", "review path never returns made-up word");
 
 const teachWordRouteSrc = readFileSync(
@@ -507,6 +525,10 @@ const reviewWordRouteSrc = readFileSync(
 assert(
   reviewWordRouteSrc.includes("pickWordToReview"),
   "review-word uses pickWordToReview (Tool 3)",
+);
+assert(
+  reviewWordRouteSrc.includes("exclude"),
+  "review-word accepts session exclude list",
 );
 assert(
   reviewWordRouteSrc.includes('mode: "practice"'),
@@ -534,6 +556,14 @@ assert(
 assert(
   miomiClientSrc.includes("/api/review-word"),
   "client handles Tool 3 via /api/review-word",
+);
+assert(
+  miomiClientSrc.includes("sessionReviewServed"),
+  "client tracks review words served this session",
+);
+assert(
+  miomiClientSrc.includes("exclude: [...this.sessionReviewServed]"),
+  "client sends session exclude list to review-word",
 );
 assert(
   !/process\.env\.GEMINI_API_KEY/.test(miomiClientSrc) &&
