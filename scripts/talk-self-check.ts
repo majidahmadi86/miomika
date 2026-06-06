@@ -91,6 +91,11 @@ import {
   missingCardedPlanWords,
   shouldBackstopFocusNewWord,
 } from "../lib/talk/lesson-layer";
+import {
+  sortTranscriptItems,
+  TRANSCRIPT_GEMINI_ORDER,
+  TRANSCRIPT_USER_ORDER,
+} from "../lib/live/transcript-order";
 
 const ROOT = process.cwd();
 let passed = 0;
@@ -645,6 +650,15 @@ const appended = routeGeminiTranscriptChunk(
 );
 assert(appended.textEn === "Hello friend~" && appended.textTh === "", "chunks append to UI field only");
 
+const ordered = sortTranscriptItems([
+  { id: "g1", turnSeq: 1, roleOrder: TRANSCRIPT_GEMINI_ORDER },
+  { id: "u1", turnSeq: 1, roleOrder: TRANSCRIPT_USER_ORDER },
+  { id: "g0", turnSeq: 0, roleOrder: TRANSCRIPT_GEMINI_ORDER },
+]);
+assert(ordered[0]?.id === "g0", "transcript sort by turnSeq ascending");
+assert(ordered[1]?.id === "u1", "user bubble above gemini for same turnSeq");
+assert(ordered[2]?.id === "g1", "later turnSeq renders after earlier turn");
+
 const wordLockNudge = buildPhaseNudge(createTeachingModeState({ phase: "focus" }), "en", {
   hasDueReview: false,
   canIntroNew: true,
@@ -946,6 +960,14 @@ assert(
 assert(
   talkPageSrc.includes("runCardBackstop"),
   "talk page runs lesson card backstop",
+);
+assert(
+  talkPageSrc.includes("sortTranscriptItems"),
+  "talk page sorts transcript by turnSeq + roleOrder",
+);
+assert(
+  talkPageSrc.includes("pendingUserTextRef"),
+  "user transcript accumulates pending until turn_complete",
 );
 assert(
   talkPageSrc.includes("getLessonNudgeHints"),

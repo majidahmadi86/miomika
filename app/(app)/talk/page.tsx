@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
@@ -46,6 +46,12 @@ import {
   routeGeminiTranscriptChunk,
 } from "@/lib/live/transcript-routing";
 import {
+  sortTranscriptItems,
+  TRANSCRIPT_CARD_ORDER,
+  TRANSCRIPT_GEMINI_ORDER,
+  TRANSCRIPT_USER_ORDER,
+} from "@/lib/live/transcript-order";
+import {
   isLessonComplete,
   nextPlannedWord,
 } from "@/lib/talk/lesson-plan";
@@ -73,9 +79,16 @@ import type { VocabularyEntry } from "@/components/talk/WordCardV3";
  */
 
 type CanvasItem =
-  | { id: string; kind: "mini_cat"; textTh: string; textEn: string }
-  | { id: string; kind: "user_said"; text: string }
-  | { id: string; kind: "word_card"; word: VocabularyEntry; direction: "th_to_en" | "en_to_th" };
+  | { id: string; kind: "mini_cat"; textTh: string; textEn: string; turnSeq: number; roleOrder: number }
+  | { id: string; kind: "user_said"; text: string; turnSeq: number; roleOrder: number }
+  | {
+      id: string;
+      kind: "word_card";
+      word: VocabularyEntry;
+      direction: "th_to_en" | "en_to_th";
+      turnSeq: number;
+      roleOrder: number;
+    };
 
 type LiveUiState = "idle" | "connecting" | "listening" | "speaking" | "error";
 
@@ -113,7 +126,14 @@ function canvasToMemory(
 
 function makeOpenerItem(): CanvasItem {
   const iceBreaker = pickIceBreaker();
-  return { id: crypto.randomUUID(), kind: "mini_cat", textTh: iceBreaker.th, textEn: iceBreaker.en };
+  return {
+    id: crypto.randomUUID(),
+    kind: "mini_cat",
+    textTh: iceBreaker.th,
+    textEn: iceBreaker.en,
+    turnSeq: 0,
+    roleOrder: TRANSCRIPT_GEMINI_ORDER,
+  };
 }
 
 export default function TalkPage() {
@@ -173,6 +193,9 @@ export default function TalkPage() {
   const resumeLiveSessionRef = useRef<
     (snapshot: LiveSessionSnapshot, restoreMic: boolean) => Promise<void>
   >(async () => {});
+  const turnSeqRef = useRef(0);
+  const currentTurnSeqRef = useRef(0);
+  const pendingUserTextRef = useRef("");
   const cardedPlanWordsRef = useRef<Set<string>>(new Set());
   const planWordCacheRef = useRef<Map<string, TeachWordResult>>(new Map());
 
@@ -194,14 +217,21 @@ export default function TalkPage() {
     };
   }, []);
 
-  const pushWordCard = useCallback((entry: VocabularyEntry) => {
+  const pushWordCard = useCallback((entry: VocabularyEntry, turnSeq: number) => {
     markPlanWordCarded(cardedPlanWordsRef.current, entry.word_en);
     const direction = cardDirectionForTarget(sessionTargetLangRef.current);
     const cardId = crypto.randomUUID();
     setItems((prev) => {
       const next = [
         ...prev,
-        { id: cardId, kind: "word_card" as const, word: entry, direction },
+        {
+          id: cardId,
+          kind: "word_card" as const,
+          word: entry,
+          direction,
+          turnSeq,
+          roleOrder: TRANSCRIPT_CARD_ORDER,
+        },
       ];
       itemsRef.current = next;
       return next;
@@ -210,7 +240,7 @@ export default function TalkPage() {
   }, [syncTeachWordContext]);
 
   const fetchAndPushPlanCard = useCallback(
-    async (wordId: string, cached?: TeachWordResult) => {
+    async (wordId: string, turnSeq: number, cached?: TeachWordResult) => {
       const key = wordId.trim().toLowerCase();
       if (cardedPlanWordsRef.current.has(key)) return;
       let result = cached ?? planWordCacheRef.current.get(wordId);
@@ -241,7 +271,7 @@ export default function TalkPage() {
       }
       const entry = teachWordToVocabularyEntry(result);
       if (!entry) return;
-      pushWordCard(entry);
+      pushWordCard(entry, turnSeq);
     },
     [pushWordCard],
   );
@@ -250,13 +280,14 @@ export default function TalkPage() {
     async (preTurnState: TurnRuntime["state"]) => {
       const snap = clientRef.current?.getSessionSnapshot().teachWord;
       if (!snap || snap.lessonPlan.length === 0) return;
+      const turnSeq = currentTurnSeqRef.current;
       const missing = missingCardedPlanWords({
         plan: snap.lessonPlan,
         introducedIdx: snap.introducedIdx,
         carded: cardedPlanWordsRef.current,
       });
       for (const wordId of missing) {
-        await fetchAndPushPlanCard(wordId);
+        await fetchAndPushPlanCard(wordId, turnSeq);
       }
       if (
         shouldBackstopFocusNewWord({
@@ -271,16 +302,62 @@ export default function TalkPage() {
       ) {
         const nextWord = nextPlannedWord(snap.lessonPlan, snap.introducedIdx);
         if (nextWord) {
-          await fetchAndPushPlanCard(nextWord);
+          await fetchAndPushPlanCard(nextWord, turnSeq);
         }
       }
     },
     [fetchAndPushPlanCard],
   );
 
+  const commitUserTranscript = useCallback((): string => {
+    const finalText = sanitizeUserTranscript(pendingUserTextRef.current);
+    pendingUserTextRef.current = "";
+    if (!currentUserItemIdRef.current) {
+      if (!finalText) return "";
+      const id = crypto.randomUUID();
+      currentUserItemIdRef.current = id;
+      setItems((prev) => {
+        const next = [
+          ...prev,
+          {
+            id,
+            kind: "user_said" as const,
+            text: finalText,
+            turnSeq: currentTurnSeqRef.current,
+            roleOrder: TRANSCRIPT_USER_ORDER,
+          },
+        ];
+        itemsRef.current = next;
+        return next;
+      });
+      return finalText;
+    }
+    if (!finalText) {
+      const ghostId = currentUserItemIdRef.current;
+      currentUserItemIdRef.current = null;
+      setItems((prev) => {
+        const next = prev.filter((item) => item.id !== ghostId);
+        itemsRef.current = next;
+        return next;
+      });
+      return "";
+    }
+    setItems((prev) => {
+      const next = prev.map((item) =>
+        item.id === currentUserItemIdRef.current && item.kind === "user_said"
+          ? { ...item, text: finalText }
+          : item,
+      );
+      itemsRef.current = next;
+      return next;
+    });
+    return finalText;
+  }, []);
+
   const resetTranscriptIds = useCallback(() => {
     currentGeminiItemIdRef.current = null;
     currentUserItemIdRef.current = null;
+    pendingUserTextRef.current = "";
   }, []);
 
   const stopContinuousMic = useCallback(() => {
@@ -501,19 +578,20 @@ export default function TalkPage() {
     if (role === "user") {
       const cleaned = sanitizeUserTranscript(chunk);
       if (!cleaned) return;
-      if (currentUserItemIdRef.current) {
-        setItems((prev) =>
-          prev.map((item) =>
-            item.id === currentUserItemIdRef.current && item.kind === "user_said"
-              ? { ...item, text: item.text + cleaned }
-              : item,
-          ),
-        );
-      } else {
-        const id = crypto.randomUUID();
-        currentUserItemIdRef.current = id;
-        setItems((prev) => [...prev, { id, kind: "user_said", text: cleaned }]);
-      }
+      pendingUserTextRef.current += cleaned;
+      if (currentUserItemIdRef.current) return;
+      const id = crypto.randomUUID();
+      currentUserItemIdRef.current = id;
+      setItems((prev) => [
+        ...prev,
+        {
+          id,
+          kind: "user_said",
+          text: "",
+          turnSeq: currentTurnSeqRef.current,
+          roleOrder: TRANSCRIPT_USER_ORDER,
+        },
+      ]);
       return;
     }
 
@@ -539,6 +617,8 @@ export default function TalkPage() {
           kind: "mini_cat",
           textTh: routed.textTh,
           textEn: routed.textEn,
+          turnSeq: currentTurnSeqRef.current,
+          roleOrder: TRANSCRIPT_GEMINI_ORDER,
         },
       ]);
     }
@@ -570,13 +650,11 @@ export default function TalkPage() {
         discardSuspendedModelTurn();
         return;
       }
+      const finalUserText = commitUserTranscript();
       const preTurnState = { ...runtime.state };
       void runCardBackstop(preTurnState);
-      const lastUser = [...itemsRef.current]
-        .reverse()
-        .find((item): item is Extract<CanvasItem, { kind: "user_said" }> => item.kind === "user_said");
-      if (lastUser?.text) {
-        maybeAdaptSessionLanguages(lastUser.text);
+      if (finalUserText) {
+        maybeAdaptSessionLanguages(finalUserText);
       }
       dispatchTurn({ type: "turn_complete" });
       return;
@@ -591,6 +669,7 @@ export default function TalkPage() {
       if (isHiddenLiveTranscript(msg.text)) return;
       const isFirst = !currentUserItemIdRef.current;
       if (isFirst) {
+        currentTurnSeqRef.current = ++turnSeqRef.current;
         dispatchTurn({
           type: "user_transcript",
           text: msg.text,
@@ -631,7 +710,7 @@ export default function TalkPage() {
           ...runtime.state,
           teaching: recordWordPick(runtime.state.teaching, pickKind),
         };
-        pushWordCard(entry);
+        pushWordCard(entry, currentTurnSeqRef.current);
       }
       if (!suspended && !runtime.state.handoffArmed) {
         dispatchTurn({ type: "tool_result", name: msg.name, hadCard });
@@ -639,6 +718,7 @@ export default function TalkPage() {
     }
   }, [
     appendTranscript,
+    commitUserTranscript,
     discardSuspendedModelTurn,
     dispatchTurn,
     ensureTurnRuntime,
@@ -1098,10 +1178,17 @@ export default function TalkPage() {
       return;
     }
     dispatchTurn({ type: "guest_text_turn", isGuest: isGuestRef.current });
+    currentTurnSeqRef.current = ++turnSeqRef.current;
     const id = crypto.randomUUID();
     currentUserItemIdRef.current = id;
     const cleaned = sanitizeUserTranscript(trimmed);
-    const newItem = { id, kind: "user_said" as const, text: cleaned };
+    const newItem = {
+      id,
+      kind: "user_said" as const,
+      text: cleaned,
+      turnSeq: currentTurnSeqRef.current,
+      roleOrder: TRANSCRIPT_USER_ORDER,
+    };
     itemsRef.current = [...itemsRef.current, newItem];
     setItems((prev) => [...prev, newItem]);
     setTextInput("");
@@ -1148,9 +1235,19 @@ export default function TalkPage() {
               ? "Help me define my brand voice."
               : "ช่วยหนูกำหนดเสียงแบรนด์ให้หน่อยค่ะ";
       dispatchTurn({ type: "guest_text_turn", isGuest: isGuestRef.current });
+      currentTurnSeqRef.current = ++turnSeqRef.current;
       const id = crypto.randomUUID();
       currentUserItemIdRef.current = id;
-      setItems((prev) => [...prev, { id, kind: "user_said", text }]);
+      setItems((prev) => [
+        ...prev,
+        {
+          id,
+          kind: "user_said",
+          text,
+          turnSeq: currentTurnSeqRef.current,
+          roleOrder: TRANSCRIPT_USER_ORDER,
+        },
+      ]);
       if (!ensureTurnRuntime().state.sessionActive) {
         void (async () => {
           await ensurePlaybackUnlocked();
@@ -1214,6 +1311,8 @@ export default function TalkPage() {
     if (liveUiState === "error") return uiLang === "th" ? "ลองอีกครั้งนะคะ~" : "tap to try again~";
     return "";
   })();
+
+  const sortedCanvasItems = useMemo(() => sortTranscriptItems(items), [items]);
 
   const micStateForDebug = liveUiState === "connecting" ? "processing" : liveUiState === "listening" ? "listening" : liveUiState === "speaking" ? "speaking" : "idle";
 
@@ -1325,11 +1424,12 @@ export default function TalkPage() {
               minHeight: "min-content",
             }}
           >
-          {items.map((item) => {
+          {sortedCanvasItems.map((item) => {
             if (item.kind === "mini_cat") {
               return <MiniCatRow key={item.id} textTh={item.textTh} textEn={item.textEn} uiLang={uiLang} />;
             }
             if (item.kind === "user_said") {
+              if (!item.text.trim()) return null;
               const fullText = item.text;
               const isLong = fullText.length > TRANSCRIPT_CLIP;
               const isExpanded = expandedItems.has(item.id);
