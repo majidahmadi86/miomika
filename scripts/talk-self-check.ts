@@ -207,6 +207,44 @@ const afterMicStop = reduceTurn(flow, { type: "turn_complete" }).state;
 assert(!afterMicStop.invitationVoiceSent, "mic-stop never triggers invitation cue");
 assert(afterMicStop.phase !== "sheet", "mic-stop never opens signup sheet");
 
+section("Per-turn latency instrumentation");
+
+let lat = createTurnController(0, true);
+lat = reduceTurn(lat, { type: "model_audio" }).state;
+assert(lat.timings.model_audio_first == null, "kickoff model_audio does not anchor model_audio_first");
+
+lat = reduceTurn(lat, { type: "guest_text_turn", isGuest: true }).state;
+assert(lat.timings.user_turn_start != null, "user_turn_start anchored per turn");
+assert(lat.timings.model_audio_first == null, "model_audio_first cleared on user_turn_start");
+
+const turn1Audio = reduceTurn(lat, { type: "model_audio" });
+const turn1Timing = turn1Audio.effects.find(
+  (e): e is Extract<(typeof turn1Audio.effects)[number], { type: "log_timing" }> =>
+    e.type === "log_timing" && e.mark === "model_audio_first",
+);
+assert(turn1Timing != null, "first post-turn model_audio logs model_audio_first");
+assert(
+  typeof turn1Timing?.deltaMs === "number" && turn1Timing.deltaMs >= 0,
+  "model_audio_first deltaMs is non-negative vs user_turn_start",
+);
+lat = turn1Audio.state;
+
+lat = reduceTurn(lat, { type: "turn_complete" }).state;
+lat = reduceTurn(lat, { type: "guest_text_turn", isGuest: true }).state;
+assert(lat.timings.model_audio_first == null, "model_audio_first reset on next user_turn_start");
+
+const turn2Audio = reduceTurn(lat, { type: "model_audio" });
+const turn2Timing = turn2Audio.effects.find(
+  (e): e is Extract<(typeof turn2Audio.effects)[number], { type: "log_timing" }> =>
+    e.type === "log_timing" && e.mark === "model_audio_first",
+);
+assert(
+  turn2Timing != null &&
+    typeof turn2Timing.deltaMs === "number" &&
+    turn2Timing.deltaMs >= 0,
+  "second turn re-anchors model_audio_first with fresh deltaMs",
+);
+
 // --- C. Word pick (vocabulary_bank, exclude known) --------------------------
 
 section("Word pick");

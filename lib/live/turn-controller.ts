@@ -145,8 +145,21 @@ function markTiming(
   effects: TurnSideEffect[],
 ): TurnControllerState {
   const now = Date.now();
-  const prev = state.timings[mark];
-  const deltaMs = prev != null ? now - prev : state.currentTurnStart != null ? now - state.currentTurnStart : undefined;
+  let deltaMs: number | undefined;
+  if (mark === "user_turn_start") {
+    deltaMs = undefined;
+  } else if (mark === "model_audio_first") {
+    const anchor = state.timings.user_turn_start ?? state.currentTurnStart;
+    deltaMs = anchor != null ? now - anchor : undefined;
+  } else {
+    const prev = state.timings[mark];
+    deltaMs =
+      prev != null
+        ? now - prev
+        : state.currentTurnStart != null
+          ? now - state.currentTurnStart
+          : undefined;
+  }
   effects.push({ type: "log_timing", mark, deltaMs });
   return {
     ...state,
@@ -187,11 +200,15 @@ function beginUserExchange(
   if (state.guestExchanges >= GUEST_EXCHANGE_LIMIT) return state;
   if (state.userExchangeCounted) return state;
 
+  const turnStart = Date.now();
+  const turnTimings = { ...state.timings };
+  delete turnTimings.model_audio_first;
   let next: TurnControllerState = {
     ...state,
     userExchangeCounted: true,
     phase: "user_turn",
-    currentTurnStart: Date.now(),
+    currentTurnStart: turnStart,
+    timings: turnTimings,
   };
   next = markTiming(next, "user_turn_start", effects);
 
@@ -218,7 +235,11 @@ function beginUserExchange(
   return next;
 }
 
-function onModelOutput(state: TurnControllerState, effects: TurnSideEffect[]): TurnControllerState {
+function onModelOutput(
+  state: TurnControllerState,
+  effects: TurnSideEffect[],
+  opts: { captureFirstAudio?: boolean } = {},
+): TurnControllerState {
   let next = state;
   if (state.handoffArmed && !state.handoffReplyStarted) {
     next = { ...next, handoffReplyStarted: true, phase: "voiced_reply" };
@@ -227,7 +248,13 @@ function onModelOutput(state: TurnControllerState, effects: TurnSideEffect[]): T
   } else if (state.phase === "kickoff" || state.phase === "invitation") {
     next = { ...next, phase: "model_response" };
   }
-  if (!state.timings.model_audio_first) {
+  const captureFirstAudio = opts.captureFirstAudio ?? false;
+  if (
+    captureFirstAudio &&
+    state.currentTurnStart != null &&
+    state.timings.user_turn_start != null &&
+    state.timings.model_audio_first == null
+  ) {
     next = markTiming(next, "model_audio_first", effects);
   }
   effects.push({ type: "set_live_ui", ui: "speaking" });
@@ -369,7 +396,12 @@ export function reduceTurn(
       break;
     }
 
-    case "model_audio":
+    case "model_audio": {
+      if (next.micSuspended) break;
+      next = onModelOutput(next, effects, { captureFirstAudio: true });
+      break;
+    }
+
     case "model_transcript": {
       if (next.micSuspended) break;
       next = onModelOutput(next, effects);

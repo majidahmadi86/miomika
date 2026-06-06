@@ -40,11 +40,9 @@ function extractTurnLatency(events: DebugEvent[]): string | null {
   for (const event of events) {
     if (!event.message.startsWith("turn:model_audio_first")) continue;
     const data = event.data as { report?: string; deltaMs?: number | null } | undefined;
-    const reportLine = data?.report
-      ?.split("\n")
-      .find((line) => line.includes("user_turn → first_audio"));
-    if (reportLine) return reportLine;
-    if (data?.deltaMs != null) return `user_turn → first_audio: ${data.deltaMs}ms`;
+    if (typeof data?.deltaMs === "number" && data.deltaMs >= 0) {
+      return `user_turn → first_audio: ${data.deltaMs}ms`;
+    }
   }
   return null;
 }
