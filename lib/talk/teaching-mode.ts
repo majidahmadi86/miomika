@@ -164,7 +164,8 @@ export function buildTeachingModeContract(
 - คำแรกของเซสชัน: สอนเป็นคำใหม่ — ห้ามเปิดด้วย "จำได้ไหม…" ถ้ายังไม่เคยสอนคำนั้นในเซสชันนี้
 - กรอบทบทวน ("จำคำนี้ได้ไหม…") ใช้เฉพาะคำจาก get_word_to_review หรือที่สอนไปแล้วในเซสชันเดียวกัน
 - บริบท + การใช้ (ไม่ใช่พูดตาม): ใส่ประโยคตัวอย่างจาก tool ในคำตอบ แล้วถามคำถามสั้นๆ ให้ผู้เรียนใช้คำ "${targetName}" — ห้ามขอให้พูดตามอย่างเดียว
-- สลับ NEW + REVIEW เมื่อมีคำทบทวนครบกำหนด — ห้ามสอนแต่คำใหม่ต่อเนื่อง`;
+- สลับ NEW + REVIEW เมื่อมีคำทบทวนครบกำหนด — ห้ามสอนแต่คำใหม่ต่อเนื่อง
+- ล็อกแผน: สอนเฉพาะคำจาก get_word_to_teach / get_word_to_review เท่านั้น — ห้ามแนะนำคำเป้าหมายใหม่อื่นนอกแผน`;
   }
 
   return `TEACHING MODE v1 — lesson arc (always follow):
@@ -174,21 +175,45 @@ export function buildTeachingModeContract(
 - FIRST word of a session: teach as brand-new — NEVER open with "do you remember…" unless that exact word was already introduced earlier in THIS session.
 - REVIEW framing ("remember this word…") ONLY for words returned by get_word_to_review or already taught earlier in the same session.
 - CONTEXT + USE (not parrot): weave the tool's example sentence into your reply, then ask ONE tiny question so the learner USES the ${targetName} word (short answer or mini-sentence) — never "repeat after me" only.
-- MIX new + review when spiral words are due — not an endless new-only stream.`;
+- MIX new + review when spiral words are due — not an endless new-only stream.
+- PLAN LOCK: Teach ONLY words returned by get_word_to_teach / get_word_to_review. NEVER name, introduce, or teach any other new target vocabulary — even if it fits the topic. Off-plan target words are forbidden.`;
 }
+
+export type PhaseNudgeOpts = {
+  hasDueReview: boolean;
+  canIntroNew: boolean;
+  nextPlannedWord?: string | null;
+  lessonTopic?: string | null;
+  lessonComplete?: boolean;
+};
 
 export function buildPhaseNudge(
   state: TeachingModeState,
   ui: "th" | "en",
-  opts: { hasDueReview: boolean; canIntroNew: boolean },
+  opts: PhaseNudgeOpts,
 ): string {
   const pick = recommendWordPick(state, opts);
   const toolHint = pick ? toolNameForPick(pick) : "none (conversation only)";
+  const topicPart = opts.lessonTopic ? ` topic=${opts.lessonTopic}` : "";
+  const nextWord = opts.nextPlannedWord?.trim() ?? "";
 
   if (ui === "th") {
-    return `[lesson_phase] ระยะ=${state.phase} บทที่=${state.lessonNumber} เครื่องมือถัดไป=${toolHint}. ทำตาม TEACHING MODE v1 — ใช้ประโยคตัวอย่างจาก tool และถามให้ผู้เรียนใช้คำ ไม่ใช่พูดตาม`;
+    const wordLock =
+      pick === "new" && nextWord
+        ? ` คำถัดไป="${nextWord}" — สอนเฉพาะคำนี้เท่านั้น ห้ามแนะนำคำเป้าหมายใหม่อื่น`
+        : opts.lessonComplete
+          ? " บทเรียนครบแล้ว — ห้ามสอนคำใหม่"
+          : "";
+    return `[lesson_phase] ระยะ=${state.phase} บทที่=${state.lessonNumber}${topicPart} เครื่องมือถัดไป=${toolHint}.${wordLock} ทำตาม TEACHING MODE v1 — ใช้ประโยคตัวอย่างจาก tool และถามให้ผู้เรียนใช้คำ ไม่ใช่พูดตาม`;
   }
-  return `[lesson_phase] phase=${state.phase} lesson=${state.lessonNumber} next_tool=${toolHint}. Follow TEACHING MODE v1 — use the tool example as context and ask the learner to USE the word, not parrot.`;
+
+  const wordLock =
+    pick === "new" && nextWord
+      ? ` NEXT WORD ONLY="${nextWord}" — teach ONLY this word; never name or introduce any other new target word`
+      : opts.lessonComplete
+        ? " lesson_complete — do not introduce new vocabulary"
+        : "";
+  return `[lesson_phase] phase=${state.phase} lesson=${state.lessonNumber}${topicPart} next_tool=${toolHint}.${wordLock} Follow TEACHING MODE v1 — use the tool example as context and ask the learner to USE the word, not parrot.`;
 }
 
 /** Tool 3 — spiral review picker (backend: /api/review-word → pickWordToReview). */

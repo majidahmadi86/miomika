@@ -46,6 +46,16 @@ import {
   routeGeminiTranscriptChunk,
 } from "@/lib/live/transcript-routing";
 import {
+  isLessonComplete,
+  nextPlannedWord,
+} from "@/lib/talk/lesson-plan";
+import {
+  markPlanWordCarded,
+  missingCardedPlanWords,
+  shouldBackstopFocusNewWord,
+  teachResultWordId,
+} from "@/lib/talk/lesson-layer";
+import {
   cardDirectionForTarget,
   teachWordToVocabularyEntry,
   type TeachWordResult,
@@ -163,6 +173,8 @@ export default function TalkPage() {
   const resumeLiveSessionRef = useRef<
     (snapshot: LiveSessionSnapshot, restoreMic: boolean) => Promise<void>
   >(async () => {});
+  const cardedPlanWordsRef = useRef<Set<string>>(new Set());
+  const planWordCacheRef = useRef<Map<string, TeachWordResult>>(new Map());
 
   const syncTeachWordContext = useCallback(() => {
     clientRef.current?.setTeachWordContext({
@@ -170,6 +182,101 @@ export default function TalkPage() {
       sessionIntroduced: sessionIntroducedWords(itemsRef.current),
     });
   }, []);
+
+  const getLessonNudgeHints = useCallback(() => {
+    const snap = clientRef.current?.getSessionSnapshot().teachWord;
+    const plan = snap?.lessonPlan ?? [];
+    const idx = snap?.introducedIdx ?? 0;
+    return {
+      nextPlannedWord: nextPlannedWord(plan, idx),
+      lessonTopic: snap?.lessonTopic ?? null,
+      lessonComplete: isLessonComplete(plan, idx),
+    };
+  }, []);
+
+  const pushWordCard = useCallback((entry: VocabularyEntry) => {
+    markPlanWordCarded(cardedPlanWordsRef.current, entry.word_en);
+    const direction = cardDirectionForTarget(sessionTargetLangRef.current);
+    const cardId = crypto.randomUUID();
+    setItems((prev) => {
+      const next = [
+        ...prev,
+        { id: cardId, kind: "word_card" as const, word: entry, direction },
+      ];
+      itemsRef.current = next;
+      return next;
+    });
+    syncTeachWordContext();
+  }, [syncTeachWordContext]);
+
+  const fetchAndPushPlanCard = useCallback(
+    async (wordId: string, cached?: TeachWordResult) => {
+      const key = wordId.trim().toLowerCase();
+      if (cardedPlanWordsRef.current.has(key)) return;
+      let result = cached ?? planWordCacheRef.current.get(wordId);
+      if (!result?.word_en) {
+        const snap = clientRef.current?.getSessionSnapshot().teachWord;
+        if (!snap) return;
+        const idx = snap.lessonPlan.indexOf(wordId);
+        if (idx < 0 || idx !== snap.introducedIdx) return;
+        try {
+          const resp = await fetch("/api/teach-word", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              learning_target: snap.learningTarget,
+              session_introduced: snap.sessionIntroduced,
+              lesson_plan: snap.lessonPlan,
+              introduced_idx: snap.introducedIdx,
+            }),
+          });
+          if (!resp.ok) return;
+          result = (await resp.json()) as TeachWordResult;
+          clientRef.current?.applyTeachWordResponse(result);
+          const servedId = teachResultWordId(result);
+          if (servedId) planWordCacheRef.current.set(servedId, result);
+        } catch {
+          return;
+        }
+      }
+      const entry = teachWordToVocabularyEntry(result);
+      if (!entry) return;
+      pushWordCard(entry);
+    },
+    [pushWordCard],
+  );
+
+  const runCardBackstop = useCallback(
+    async (preTurnState: TurnRuntime["state"]) => {
+      const snap = clientRef.current?.getSessionSnapshot().teachWord;
+      if (!snap || snap.lessonPlan.length === 0) return;
+      const missing = missingCardedPlanWords({
+        plan: snap.lessonPlan,
+        introducedIdx: snap.introducedIdx,
+        carded: cardedPlanWordsRef.current,
+      });
+      for (const wordId of missing) {
+        await fetchAndPushPlanCard(wordId);
+      }
+      if (
+        shouldBackstopFocusNewWord({
+          teaching: preTurnState.teaching,
+          wordPickThisTurn: preTurnState.wordPickThisTurn,
+          hasDueReview: !isGuestRef.current,
+          canIntroNew: !isLessonComplete(snap.lessonPlan, snap.introducedIdx),
+          plan: snap.lessonPlan,
+          introducedIdx: snap.introducedIdx,
+          carded: cardedPlanWordsRef.current,
+        })
+      ) {
+        const nextWord = nextPlannedWord(snap.lessonPlan, snap.introducedIdx);
+        if (nextWord) {
+          await fetchAndPushPlanCard(nextWord);
+        }
+      }
+    },
+    [fetchAndPushPlanCard],
+  );
 
   const resetTranscriptIds = useCallback(() => {
     currentGeminiItemIdRef.current = null;
@@ -205,6 +312,8 @@ export default function TalkPage() {
     kickoffSentRef.current = false;
     entryStartedRef.current = false;
     lessonHadStartedRef.current = false;
+    cardedPlanWordsRef.current.clear();
+    planWordCacheRef.current.clear();
     mediaRef.current?.stopAudio();
     mediaRef.current?.stopAudioPlayback();
     clientRef.current?.disconnectIntentionally();
@@ -258,13 +367,14 @@ export default function TalkPage() {
             setLiveUiState("listening");
           },
           onStopMic: stopContinuousMic,
+          getLessonNudgeHints,
         },
         guestExchangesRef.current,
         isGuestRef.current,
       );
     }
     return turnRuntimeRef.current;
-  }, [openGuestSignupSheet, resetTranscriptIds, startContinuousMic, stopContinuousMic, teardownSessionIntentional]);
+  }, [openGuestSignupSheet, resetTranscriptIds, startContinuousMic, stopContinuousMic, teardownSessionIntentional, getLessonNudgeHints]);
 
   const dispatchTurn = useCallback(
     (event: Parameters<TurnRuntime["dispatch"]>[0]) => {
@@ -460,10 +570,12 @@ export default function TalkPage() {
         discardSuspendedModelTurn();
         return;
       }
+      const preTurnState = { ...runtime.state };
+      void runCardBackstop(preTurnState);
       const lastUser = [...itemsRef.current]
         .reverse()
         .find((item): item is Extract<CanvasItem, { kind: "user_said" }> => item.kind === "user_said");
-      if (lastUser) {
+      if (lastUser?.text) {
         maybeAdaptSessionLanguages(lastUser.text);
       }
       dispatchTurn({ type: "turn_complete" });
@@ -500,7 +612,6 @@ export default function TalkPage() {
       msg.type === "tool_call" &&
       (msg.name === "get_word_to_teach" || msg.name === "get_word_to_review")
     ) {
-      if (suspended) return;
       const result = msg.result as TeachWordResult;
       logEvent({
         kind: "engine",
@@ -509,7 +620,8 @@ export default function TalkPage() {
         data: { args: msg.args, result, phonetics_source: result.phonetics_source ?? null },
       });
       syncTeachWordContext();
-      if (runtime.state.handoffArmed) return;
+      const servedId = teachResultWordId(result);
+      if (servedId) planWordCacheRef.current.set(servedId, result);
       const entry = teachWordToVocabularyEntry(result);
       let hadCard = false;
       if (entry) {
@@ -519,19 +631,11 @@ export default function TalkPage() {
           ...runtime.state,
           teaching: recordWordPick(runtime.state.teaching, pickKind),
         };
-        const direction = cardDirectionForTarget(sessionTargetLangRef.current);
-        const cardId = crypto.randomUUID();
-        setItems((prev) => {
-          const next = [
-            ...prev,
-            { id: cardId, kind: "word_card" as const, word: entry, direction },
-          ];
-          itemsRef.current = next;
-          return next;
-        });
-        syncTeachWordContext();
+        pushWordCard(entry);
       }
-      dispatchTurn({ type: "tool_result", name: msg.name, hadCard });
+      if (!suspended && !runtime.state.handoffArmed) {
+        dispatchTurn({ type: "tool_result", name: msg.name, hadCard });
+      }
     }
   }, [
     appendTranscript,
@@ -539,7 +643,9 @@ export default function TalkPage() {
     dispatchTurn,
     ensureTurnRuntime,
     maybeAdaptSessionLanguages,
+    pushWordCard,
     resetTranscriptIds,
+    runCardBackstop,
     syncTeachWordContext,
   ]);
 
@@ -652,6 +758,7 @@ export default function TalkPage() {
           sessionIntroduced: sessionIntroducedWords(itemsRef.current),
           lessonPlan: [],
           introducedIdx: 0,
+          lessonTopic: null,
         },
         reviewServed: [],
       };

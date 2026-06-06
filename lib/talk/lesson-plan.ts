@@ -1,4 +1,4 @@
-// Pure lesson-plan logic for /talk teach path (Stage 1).
+// Pure lesson-plan logic for /talk teach path (Stage 2 — themed).
 // Deterministic ordered vocabulary serving — no turn-controller coupling.
 
 import { isVocabularySlug } from "@/lib/talk/teach-word-card";
@@ -12,6 +12,12 @@ export type LessonPlanBankRow = {
   emoji?: string | null;
   created_at?: string | null;
   frequency_score?: number | null;
+  topic?: string | null;
+};
+
+export type LessonPlanResult = {
+  plan: string[];
+  topic: string | null;
 };
 
 const PLAN_SIZE: Record<Tier, number> = {
@@ -27,6 +33,33 @@ const TIER_CEFR_FALLBACK: Record<Tier, string> = {
   pro: "B1",
   pro_max: "B1",
 };
+
+/** Guest-first engaging topics — deterministic pick order. */
+export const GUEST_STARTER_TOPICS: readonly string[] = [
+  "food",
+  "travel",
+  "daily_routine",
+  "shopping",
+  "family",
+  "feelings",
+];
+
+/** Member fallback topic order when no hint matches. */
+export const MEMBER_TOPIC_PICK_ORDER: readonly string[] = [
+  "food",
+  "travel",
+  "daily_routine",
+  "shopping",
+  "family",
+  "feelings",
+  "work",
+  "health",
+  "education",
+  "home_stuff",
+  "relationship",
+  "technology",
+  "appearance",
+];
 
 /** Rows missing gloss fields or carrying bank topic ids — never teach/card. */
 export function isCardableVocabRow(row: LessonPlanBankRow): boolean {
@@ -60,14 +93,70 @@ export function sortRowsForPlan(rows: LessonPlanBankRow[]): LessonPlanBankRow[] 
   });
 }
 
-/** Pure plan builder — cardable-only, excludes known words, capped at planSize. */
+export function countCardableByTopic(args: {
+  rows: LessonPlanBankRow[];
+  cefrLevel: string;
+  exclude: Set<string>;
+}): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const row of args.rows) {
+    if ((row.cefr_level ?? "").trim() !== args.cefrLevel) continue;
+    if (!isCardableVocabRow(row)) continue;
+    const word_en = (row.word_en ?? "").trim();
+    const word_th = (row.word_th ?? "").trim();
+    if (!word_en) continue;
+    const keys = [word_en, word_th].map((k) => k.toLowerCase());
+    if (keys.some((k) => args.exclude.has(k))) continue;
+    const topic = (row.topic ?? "").trim();
+    if (!topic) continue;
+    counts.set(topic, (counts.get(topic) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** One coherent lesson topic — enough cardable words at tier CEFR. */
+export function selectLessonTopic(args: {
+  rows: LessonPlanBankRow[];
+  planSize: number;
+  cefrLevel: string;
+  exclude: Set<string>;
+  tier: Tier;
+  topicHint?: string;
+}): string | null {
+  const counts = countCardableByTopic({
+    rows: args.rows,
+    cefrLevel: args.cefrLevel,
+    exclude: args.exclude,
+  });
+
+  const hint = args.topicHint?.trim().toLowerCase();
+  if (hint && (counts.get(hint) ?? 0) >= args.planSize) {
+    return hint;
+  }
+
+  const order =
+    args.tier === "guest" ? GUEST_STARTER_TOPICS : MEMBER_TOPIC_PICK_ORDER;
+  for (const topic of order) {
+    if ((counts.get(topic) ?? 0) >= args.planSize) return topic;
+  }
+
+  const eligible = [...counts.entries()]
+    .filter(([, n]) => n >= args.planSize)
+    .sort(([a], [b]) => a.localeCompare(b));
+  return eligible[0]?.[0] ?? null;
+}
+
+/** Pure plan builder — single topic, cardable-only, excludes known words, capped at planSize. */
 export function buildLessonPlanFromRows(args: {
   rows: LessonPlanBankRow[];
   planSize: number;
   exclude: Set<string>;
+  topic?: string | null;
 }): string[] {
+  const topicFilter = args.topic?.trim() ?? "";
   const plan: string[] = [];
   for (const row of sortRowsForPlan(args.rows)) {
+    if (topicFilter && (row.topic ?? "").trim() !== topicFilter) continue;
     if (!isCardableVocabRow(row)) continue;
     const word_en = (row.word_en ?? "").trim();
     const word_th = (row.word_th ?? "").trim();
@@ -97,6 +186,16 @@ export function resolveTeachServe(args: {
   return { kind: "word", wordId: plan[introducedIdx]!, introducedIdx };
 }
 
+/** Next planned word id — null only when lesson_complete. */
+export function nextPlannedWord(plan: string[], introducedIdx: number): string | null {
+  const serve = resolveTeachServe({ plan, introducedIdx });
+  return serve.kind === "word" ? serve.wordId : null;
+}
+
+export function isLessonComplete(plan: string[], introducedIdx: number): boolean {
+  return introducedIdx >= plan.length;
+}
+
 /** Rotate through plan[0..introducedIdx) skipping session review ledger excludes. */
 export function pickPlanReviewWord(args: {
   plan: string[];
@@ -120,14 +219,15 @@ export function countCardableRows(
   }).length;
 }
 
-/** Server: query vocabulary_bank and return ordered word_en ids = THE PLAN. */
+/** Server: query vocabulary_bank and return ordered word_en ids = THE PLAN (one topic). */
 export async function buildLessonPlan(args: {
   tier: Tier;
   cefrLevel: string | null;
   learningTarget: "th" | "en";
   alreadyIntroducedWords: string[];
   alreadyMasteredWords: string[];
-}): Promise<string[]> {
+  topicHint?: string;
+}): Promise<LessonPlanResult> {
   const planSize = planSizeForTier(args.tier);
   const cefr = args.cefrLevel?.trim() || TIER_CEFR_FALLBACK[args.tier];
   const exclude = buildExcludeSet([
@@ -140,13 +240,15 @@ export async function buildLessonPlan(args: {
     const supabase = await createServiceClient();
     const { data, error } = await supabase
       .from("vocabulary_bank")
-      .select("word_en, word_th, cefr_level, emoji, created_at, frequency_score")
+      .select(
+        "word_en, word_th, cefr_level, emoji, created_at, frequency_score, topic",
+      )
       .eq("status", "active")
       .eq("cefr_level", cefr)
       .eq(teachFlag, true)
       .order("frequency_score", { ascending: false })
       .order("created_at", { ascending: true })
-      .limit(200);
+      .limit(500);
 
     if (error) {
       console.error(
@@ -154,17 +256,30 @@ export async function buildLessonPlan(args: {
         error.message,
         error.details,
       );
-      return [];
+      return { plan: [], topic: null };
     }
 
-    return buildLessonPlanFromRows({
-      rows: (data ?? []) as LessonPlanBankRow[],
+    const rows = (data ?? []) as LessonPlanBankRow[];
+    const topic = selectLessonTopic({
+      rows,
+      planSize,
+      cefrLevel: cefr,
+      exclude,
+      tier: args.tier,
+      topicHint: args.topicHint,
+    });
+
+    const plan = buildLessonPlanFromRows({
+      rows,
       planSize,
       exclude,
+      topic,
     });
+
+    return { plan, topic };
   } catch (err) {
     console.error("[lesson-plan.buildLessonPlan] failed:", err);
-    return [];
+    return { plan: [], topic: null };
   }
 }
 
@@ -177,7 +292,7 @@ export async function countA1CardableWords(
     const teachFlag = teachFlagColumn(learningTarget);
     const { data, error } = await supabase
       .from("vocabulary_bank")
-      .select("word_en, word_th, cefr_level, frequency_score, created_at")
+      .select("word_en, word_th, cefr_level, frequency_score, created_at, topic")
       .eq("status", "active")
       .eq("cefr_level", "A1")
       .eq(teachFlag, true)

@@ -39,6 +39,7 @@ import {
 } from "../lib/live/session-continuity";
 import {
   advanceAfterTurn,
+  buildPhaseNudge,
   buildTeachingModeContract,
   cardContextForWord,
   createTeachingModeState,
@@ -78,10 +79,18 @@ import {
   buildLessonPlanFromRows,
   countA1CardableWords,
   countCardableRows,
+  GUEST_STARTER_TOPICS,
+  nextPlannedWord,
   pickPlanReviewWord,
   planSizeForTier,
   resolveTeachServe,
+  selectLessonTopic,
 } from "../lib/talk/lesson-plan";
+import {
+  markPlanWordCarded,
+  missingCardedPlanWords,
+  shouldBackstopFocusNewWord,
+} from "../lib/talk/lesson-layer";
 
 const ROOT = process.cwd();
 let passed = 0;
@@ -362,9 +371,9 @@ assert(
   "pickIntroduceCandidate never returns slug word_en",
 );
 
-// --- C2. Lesson plan (Stage 1 — deterministic ordered serving) -----------
+// --- C2. Lesson plan (Stage 2 — themed single-topic serving) ------------
 
-section("Lesson plan (Stage 1)");
+section("Lesson plan (Stage 2 themed)");
 
 const planBankRows = [
   {
@@ -373,6 +382,7 @@ const planBankRows = [
     cefr_level: "A1",
     frequency_score: 90,
     created_at: "2026-01-02T00:00:00Z",
+    topic: "food",
   },
   {
     word_en: "general2",
@@ -380,6 +390,7 @@ const planBankRows = [
     cefr_level: "A1",
     frequency_score: 95,
     created_at: "2026-01-01T00:00:00Z",
+    topic: "food",
   },
   {
     word_en: "water",
@@ -387,6 +398,7 @@ const planBankRows = [
     cefr_level: "A1",
     frequency_score: 80,
     created_at: "2026-01-03T00:00:00Z",
+    topic: "food",
   },
   {
     word_en: "thanks",
@@ -394,6 +406,7 @@ const planBankRows = [
     cefr_level: "A1",
     frequency_score: 70,
     created_at: "2026-01-04T00:00:00Z",
+    topic: "food",
   },
   {
     word_en: "tired",
@@ -401,13 +414,41 @@ const planBankRows = [
     cefr_level: "A1",
     frequency_score: 60,
     created_at: "2026-01-05T00:00:00Z",
+    topic: "travel",
+  },
+  {
+    word_en: "airport",
+    word_th: "สนามบิน",
+    cefr_level: "A1",
+    frequency_score: 55,
+    created_at: "2026-01-06T00:00:00Z",
+    topic: "travel",
+  },
+  {
+    word_en: "hotel",
+    word_th: "โรงแรม",
+    cefr_level: "A1",
+    frequency_score: 50,
+    created_at: "2026-01-07T00:00:00Z",
+    topic: "travel",
   },
 ];
+
+const guestTopic = selectLessonTopic({
+  rows: planBankRows,
+  planSize: planSizeForTier("guest"),
+  cefrLevel: "A1",
+  exclude: buildExcludeSet([]),
+  tier: "guest",
+});
+assert(guestTopic === "food", "guest picks engaging starter topic food when enough cardable words");
+assert(GUEST_STARTER_TOPICS[0] === "food", "food is first guest starter topic");
 
 const guestPlan = buildLessonPlanFromRows({
   rows: planBankRows,
   planSize: planSizeForTier("guest"),
   exclude: buildExcludeSet([]),
+  topic: guestTopic,
 });
 assert(guestPlan.length === 3, "guest plan length = 3");
 assert(
@@ -415,8 +456,56 @@ assert(
   "buildLessonPlan returns only cardable word ids",
 );
 assert(
+  guestPlan.every((id) => {
+    const row = planBankRows.find((r) => r.word_en === id);
+    return row?.topic === "food";
+  }),
+  "themed plan uses one topic only",
+);
+assert(
   guestPlan[0] === "hello" && guestPlan[1] === "water" && guestPlan[2] === "thanks",
-  "plan ordered by frequency_score desc (slug skipped)",
+  "plan ordered by frequency_score desc within topic (slug skipped)",
+);
+
+assert(nextPlannedWord(guestPlan, 0) === "hello", "nextPlannedWord never null mid-lesson");
+assert(nextPlannedWord(guestPlan, 3) === null, "nextPlannedWord null at lesson_complete");
+
+const carded = new Set<string>();
+assert(
+  missingCardedPlanWords({ plan: guestPlan, introducedIdx: 2, carded }).join() === "hello,water",
+  "missingCardedPlanWords finds served words without cards",
+);
+markPlanWordCarded(carded, "hello");
+assert(
+  missingCardedPlanWords({ plan: guestPlan, introducedIdx: 2, carded }).join() === "water",
+  "card dedup — marked words drop out of missing list",
+);
+
+const backstopCarded = new Set<string>();
+const focusState = createTeachingModeState({ phase: "focus" });
+assert(
+  shouldBackstopFocusNewWord({
+    teaching: focusState,
+    wordPickThisTurn: false,
+    hasDueReview: false,
+    canIntroNew: true,
+    plan: guestPlan,
+    introducedIdx: 0,
+    carded: backstopCarded,
+  }),
+  "focus backstop when model skipped tool and next word uncarded",
+);
+assert(
+  !shouldBackstopFocusNewWord({
+    teaching: focusState,
+    wordPickThisTurn: true,
+    hasDueReview: false,
+    canIntroNew: true,
+    plan: guestPlan,
+    introducedIdx: 0,
+    carded,
+  }),
+  "no backstop when tool already carded the word",
 );
 
 assert(planSizeForTier("free") === 4, "free plan size = 4");
@@ -462,7 +551,7 @@ reviewPick = pickPlanReviewWord({
 assert(reviewPick === null, "review returns null when introduced pool exhausted");
 
 assert(
-  countCardableRows(planBankRows, "A1") === 4,
+  countCardableRows(planBankRows, "A1") === 6,
   "countCardableRows excludes slug rows at A1",
 );
 
@@ -555,6 +644,21 @@ const appended = routeGeminiTranscriptChunk(
   "friend~",
 );
 assert(appended.textEn === "Hello friend~" && appended.textTh === "", "chunks append to UI field only");
+
+const wordLockNudge = buildPhaseNudge(createTeachingModeState({ phase: "focus" }), "en", {
+  hasDueReview: false,
+  canIntroNew: true,
+  nextPlannedWord: "water",
+  lessonTopic: "food",
+});
+assert(
+  wordLockNudge.includes('NEXT WORD ONLY="water"'),
+  "phase nudge names exact next planned word",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("PLAN LOCK"),
+  "teaching contract forbids off-plan target words",
+);
 
 const kickoffEnFirst = buildKickoffPrompt("en", "first_time");
 const kickoffThFirst = buildKickoffPrompt("th", "first_time");
@@ -692,8 +796,12 @@ const teachWordRouteSrc = readFileSync(
   "utf8",
 );
 assert(
-  teachWordRouteSrc.includes("buildLessonPlan"),
-  "teach-word builds deterministic lesson plan",
+  teachWordRouteSrc.includes("lesson_topic"),
+  "teach-word returns lesson_topic with plan",
+);
+assert(
+  teachWordRouteSrc.includes("selectLessonTopic") || teachWordRouteSrc.includes("buildLessonPlan"),
+  "teach-word builds themed lesson plan",
 );
 assert(
   teachWordRouteSrc.includes("resolveTeachServe"),
@@ -764,6 +872,14 @@ assert(
   "client carries lesson plan in teach context",
 );
 assert(
+  miomiClientSrc.includes("lessonTopic"),
+  "client carries lesson topic in teach context",
+);
+assert(
+  miomiClientSrc.includes("applyTeachWordResponse"),
+  "client applies teach-word payload for card backstop",
+);
+assert(
   miomiClientSrc.includes("introducedIdx"),
   "client carries introducedIdx cursor in teach context",
 );
@@ -826,6 +942,18 @@ assert(
   talkPageSrc.includes("suspendMicSend(true)") &&
     talkPageSrc.includes("shouldForwardMicToGemini"),
   "card replay suspends mic send during TTS",
+);
+assert(
+  talkPageSrc.includes("runCardBackstop"),
+  "talk page runs lesson card backstop",
+);
+assert(
+  talkPageSrc.includes("getLessonNudgeHints"),
+  "turn runtime passes lesson nudge hints",
+);
+assert(
+  !/tool_call[\s\S]{0,120}if \(suspended\) return/.test(talkPageSrc),
+  "tool_call card path never skipped by mic-suspend guard",
 );
 assert(
   talkPageSrc.includes("discardSuspendedModelTurn"),

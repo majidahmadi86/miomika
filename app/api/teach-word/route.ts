@@ -186,15 +186,19 @@ export async function POST(req: NextRequest) {
 
   let lessonPlan = clientLessonPlan;
   let introducedIdx = clientIntroducedIdx ?? 0;
+  let lessonTopic: string | null = null;
 
   if (lessonPlan.length === 0) {
-    lessonPlan = await buildLessonPlan({
+    const built = await buildLessonPlan({
       tier,
       cefrLevel: isGuest ? "A1" : cefrLevel,
       learningTarget,
       alreadyIntroducedWords: introduced,
       alreadyMasteredWords: mastered,
+      topicHint: topicHint || undefined,
     });
+    lessonPlan = built.plan;
+    lessonTopic = built.topic;
     introducedIdx = 0;
   }
 
@@ -214,6 +218,7 @@ export async function POST(req: NextRequest) {
       word: null,
       mode: "lesson_complete",
       lesson_plan: lessonPlan,
+      lesson_topic: lessonTopic,
       introduced_idx: introducedIdx,
     });
   }
@@ -236,6 +241,7 @@ export async function POST(req: NextRequest) {
       word: null,
       mode: "none",
       lesson_plan: lessonPlan,
+      lesson_topic: lessonTopic,
       introduced_idx: introducedIdx,
     });
   }
@@ -273,6 +279,7 @@ export async function POST(req: NextRequest) {
     ok: true,
     mode,
     lesson_plan: lessonPlan,
+    lesson_topic: lessonTopic,
     introduced_idx: nextIntroducedIdx,
     word_en: word.word_en,
     word_th: word.word_th,

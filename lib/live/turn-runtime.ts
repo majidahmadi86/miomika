@@ -34,6 +34,10 @@ export type TurnRuntimeDeps = TurnRuntimeCallbacks & {
   getMedia: () => MediaHandler | null;
   getUiLang: () => "th" | "en";
   getKickoffAudience?: () => "first_time" | "returning";
+  getLessonNudgeHints?: () => Pick<
+    TurnContext,
+    "nextPlannedWord" | "lessonTopic" | "lessonComplete"
+  >;
   isGuest: () => boolean;
 };
 
@@ -53,7 +57,12 @@ export class TurnRuntime {
   }
 
   ctx(): TurnContext {
-    return { uiLang: this.deps.getUiLang(), isGuest: this.deps.isGuest() };
+    const lessonHints = this.deps.getLessonNudgeHints?.() ?? {};
+    return {
+      uiLang: this.deps.getUiLang(),
+      isGuest: this.deps.isGuest(),
+      ...lessonHints,
+    };
   }
 
   dispatch(event: TurnEvent): TurnControllerState {

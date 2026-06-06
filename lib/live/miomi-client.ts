@@ -70,6 +70,7 @@ export type TeachWordContext = {
   sessionIntroduced: string[];
   lessonPlan: string[];
   introducedIdx: number;
+  lessonTopic: string | null;
 };
 
 export type LiveSessionSnapshot = {
@@ -88,6 +89,7 @@ export class MiomiLiveClient {
     sessionIntroduced: [],
     lessonPlan: [],
     introducedIdx: 0,
+    lessonTopic: null,
   };
 
   constructor(private callbacks: LiveClientCallbacks) {
@@ -101,6 +103,25 @@ export class MiomiLiveClient {
       ...this.teachWordContext,
       ...ctx,
     };
+  }
+
+  applyTeachWordResponse(payload: {
+    lesson_plan?: string[];
+    lesson_topic?: string | null;
+    introduced_idx?: number;
+    word_en?: string;
+  }): void {
+    if (Array.isArray(payload.lesson_plan) && payload.lesson_plan.length > 0) {
+      this.teachWordContext.lessonPlan = payload.lesson_plan;
+    }
+    if (payload.lesson_topic !== undefined) {
+      this.teachWordContext.lessonTopic = payload.lesson_topic;
+    }
+    if (typeof payload.introduced_idx === "number") {
+      this.teachWordContext.introducedIdx = payload.introduced_idx;
+    } else if (payload.word_en) {
+      this.teachWordContext.introducedIdx += 1;
+    }
   }
 
   getSessionSnapshot(): LiveSessionSnapshot {
@@ -141,6 +162,7 @@ export class MiomiLiveClient {
         sessionIntroduced: this.teachWordContext.sessionIntroduced,
         lessonPlan: [],
         introducedIdx: 0,
+        lessonTopic: null,
       };
       this.sessionReviewServed.clear();
     }
@@ -287,17 +309,11 @@ export class MiomiLiveClient {
             response = await resp.json();
             const payload = response as {
               lesson_plan?: string[];
+              lesson_topic?: string | null;
               introduced_idx?: number;
               word_en?: string;
             };
-            if (Array.isArray(payload.lesson_plan) && payload.lesson_plan.length > 0) {
-              this.teachWordContext.lessonPlan = payload.lesson_plan;
-            }
-            if (typeof payload.introduced_idx === "number") {
-              this.teachWordContext.introducedIdx = payload.introduced_idx;
-            } else if (payload.word_en) {
-              this.teachWordContext.introducedIdx += 1;
-            }
+            this.applyTeachWordResponse(payload);
             this.callbacks.onMessage?.({
               type: "tool_call",
               name: fc.name,

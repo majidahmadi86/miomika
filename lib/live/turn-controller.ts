@@ -180,10 +180,14 @@ function maybeSendPhaseNudge(
   uiLang: "th" | "en",
   isGuest: boolean,
   effects: TurnSideEffect[],
+  lessonHints: Pick<TurnContext, "nextPlannedWord" | "lessonTopic" | "lessonComplete"> = {},
 ): TurnControllerState {
   const nudge = buildPhaseNudge(state.teaching, uiLang, {
     hasDueReview: !isGuest,
-    canIntroNew: true,
+    canIntroNew: !lessonHints.lessonComplete,
+    nextPlannedWord: lessonHints.nextPlannedWord,
+    lessonTopic: lessonHints.lessonTopic,
+    lessonComplete: lessonHints.lessonComplete,
   });
   const key = `${state.teaching.phase}:${state.teaching.lessonNumber}`;
   if (state.lastPhaseNudged === key) return state;
@@ -266,6 +270,7 @@ function finishNormalTurn(
   uiLang: "th" | "en",
   isGuest: boolean,
   effects: TurnSideEffect[],
+  ctx: TurnContext,
 ): TurnControllerState {
   const teaching = advanceAfterTurn(state.teaching, state.wordPickThisTurn);
   let next: TurnControllerState = {
@@ -276,7 +281,11 @@ function finishNormalTurn(
     currentTurnStart: null,
   };
   next = markTiming(next, "turn_complete", effects);
-  next = maybeSendPhaseNudge(next, uiLang, isGuest, effects);
+  next = maybeSendPhaseNudge(next, uiLang, isGuest, effects, {
+    nextPlannedWord: ctx.nextPlannedWord,
+    lessonTopic: ctx.lessonTopic,
+    lessonComplete: ctx.lessonComplete,
+  });
   effects.push({ type: "reset_transcript_ids" });
   effects.push({ type: "clear_user_exchange_counted" });
   next = clearExchangeCounted(next);
@@ -287,6 +296,9 @@ function finishNormalTurn(
 export type TurnContext = {
   uiLang: "th" | "en";
   isGuest: boolean;
+  nextPlannedWord?: string | null;
+  lessonTopic?: string | null;
+  lessonComplete?: boolean;
 };
 
 /** Pure reducer — context carries UI lang + guest flag for nudges and CTA. */
@@ -457,7 +469,7 @@ export function reduceTurn(
         break;
       }
 
-      next = finishNormalTurn(next, uiLang, isGuest, effects);
+      next = finishNormalTurn(next, uiLang, isGuest, effects, ctx);
       next = { ...next, phase: "render" };
       next = markTiming(next, "render_commit", effects);
       break;
