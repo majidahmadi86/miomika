@@ -10,6 +10,8 @@ import {
   detectExplicitUiLanguageRequest,
   normalizeLearningTarget,
   oppositeLanguage,
+  resolveLiveSessionLanguages,
+  resolveProfileUiAnchor,
   resolveSessionLanguages,
   resolveTargetLanguage,
   resolveUiLanguage,
@@ -168,15 +170,53 @@ assert(uiTargetPractice === "en", "target-language practice does not flip UI");
 
 const uiExplicitThai = resolveUiLanguage({
   profileUiLang: "en",
-  userInput: "Please explain in Thai from now on",
+  userInput: "Please speak to me in Thai from now on",
   memory: [],
   learningTargetLanguage: "th",
 });
 assert(uiExplicitThai === "th", "explicit UI switch request is honored");
 
 assert(
-  detectExplicitUiLanguageRequest("speak Thai please") === "th",
-  "detectExplicitUiLanguageRequest catches speak Thai",
+  detectExplicitUiLanguageRequest("speak to me in Thai") === "th",
+  "detectExplicitUiLanguageRequest: speak to me in Thai",
+);
+assert(
+  detectExplicitUiLanguageRequest("reply in Thai") === "th",
+  "detectExplicitUiLanguageRequest: reply in Thai",
+);
+assert(
+  detectExplicitUiLanguageRequest("switch to Thai") === "th",
+  "detectExplicitUiLanguageRequest: switch to Thai",
+);
+assert(
+  detectExplicitUiLanguageRequest("explain the Thai word for cat") === null,
+  "detectExplicitUiLanguageRequest rejects Thai word-for query",
+);
+assert(
+  detectExplicitUiLanguageRequest("how do you say dog in Thai") === null,
+  "detectExplicitUiLanguageRequest rejects how-do-you-say query",
+);
+assert(
+  detectExplicitUiLanguageRequest("what's water in Thai") === null,
+  "detectExplicitUiLanguageRequest rejects what's-X-in-Thai query",
+);
+
+assert(
+  resolveProfileUiAnchor({ isGuest: true, profileUiLang: null, sessionUiLang: "th" }) === "en",
+  "guest UI anchor hard-locked to en",
+);
+assert(
+  resolveProfileUiAnchor({ isGuest: false, profileUiLang: null, sessionUiLang: "en" }) === "en",
+  "member null ui_language keeps session UI anchor",
+);
+assert(
+  resolveLiveSessionLanguages({
+    isGuest: false,
+    profileUiLang: null,
+    profileTarget: "th",
+    sessionUiLang: "en",
+  }).uiLanguage === "en",
+  "member null ui_language cold connect keeps session UI",
 );
 
 // --- B. Guest 5-turn flow (turn controller) -------------------------------
@@ -815,8 +855,19 @@ assert(
   "talk page wires Tool 3 + teaching mode state",
 );
 assert(
-  talkPageSrc.includes("handleHeaderPointerDown") && talkPageSrc.includes("setDebugOpen(true)"),
-  "debug overlay opens via header triple-tap pointer handler",
+  talkPageSrc.includes("maybeAdaptSessionLanguages") &&
+    /if \(isGuestRef\.current\) return/.test(talkPageSrc),
+  "guest maybeAdaptSessionLanguages is a no-op",
+);
+assert(
+  talkPageSrc.includes("sessionUiLangRef.current = next") &&
+    talkPageSrc.includes("handleCycleLang"),
+  "handleCycleLang syncs sessionUiLangRef",
+);
+assert(
+  talkPageSrc.includes("resolveLiveSessionLanguages") &&
+    talkPageSrc.includes("resolveProfileUiAnchor"),
+  "talk page uses anchored session language helpers",
 );
 
 section("Session transport continuity");

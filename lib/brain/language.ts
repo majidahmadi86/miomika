@@ -5,21 +5,28 @@ export type DetectedLang = "th" | "en" | "mixed";
 const LEARN_INTENT_RE =
   /(?:teach me|i want to learn|สอน|เรียน)\s*(?:thai|english|ไทย|อังกฤษ|ภาษาไทย|ภาษาอังกฤษ)/i;
 
-/** Explicit UI-language switch — practicing the target language is NOT a switch. */
-const UI_SWITCH_RE =
-  /(?:speak|talk|explain|reply|switch|use|in)\s+(?:to\s+)?(?:thai|english|ไทย|อังกฤษ)|(?:พูด|คุย|อธิบาย|ตอบ).*(?:ไทย|อังกฤษ)|(?:ภาษาไทย|ภาษาอังกฤษ)\s*(?:หน่อย|ได้ไหม|please)|ไทยหน่อย/i;
+/** Target-content questions — must NOT flip conversation UI language. */
+function isTargetContentQuestion(lower: string): boolean {
+  if (/how do you say\b/.test(lower)) return true;
+  if (/\bword\s+for\b/.test(lower) && /(?:thai|english|ไทย|อังกฤษ)/i.test(lower)) return true;
+  if (/\b(?:the|a|this)\s+(?:thai|english|ไทย|อังกฤษ)\s+word\b/.test(lower)) return true;
+  if (/\bwhat(?:'s| is)\s+.+\s+in\s+(?:thai|english|ไทย|อังกฤษ)\b/.test(lower)) return true;
+  if (/\bsay\s+.+\s+in\s+(?:thai|english|ไทย|อังกฤษ)\b/.test(lower)) return true;
+  if (/\bexplain\s+(?:the\s+)?(?:thai|english|ไทย|อังกฤษ)\b/.test(lower)) return true;
+  return false;
+}
+
+/** Genuine conversation-medium switch — how Miomi talks to the user, not teaching queries. */
+const UI_MEDIUM_SWITCH_RE =
+  /(?:speak|talk|reply|respond|switch|use)\b(?:\s+\w+){0,5}\s*(?:to\s+)?(?:me\s+)?(?:in\s+)?(?:thai|english|ไทย|อังกฤษ)|(?:switch\s+to\s+(?:thai|english|ไทย|อังกฤษ))|(?:use\s+(?:thai|english|ไทย|อังกฤษ)\s+with\s+me)|(?:in\s+(?:thai|english|ไทย|อังกฤษ)\s+please)|(?:ภาษาไทย|ภาษาอังกฤษ)\s*(?:หน่อย|ได้ไหม|please)|(?:พูด|คุย|ตอบ)(?:\s+\w+){0,3}\s*(?:กับ|to)?\s*(?:me|หนู|ฉัน)?\s*(?:in\s+)?(?:ไทย|อังกฤษ)|ไทยหน่อย/i;
 
 export function detectExplicitUiLanguageRequest(text: string): "th" | "en" | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
   const lower = trimmed.toLowerCase();
-  if (/(?:พูด|คุย|สอน|อธิบาย|ตอบ).*ไทย|ไทยหน่อย/.test(trimmed)) return "th";
-  if (/(?:พูด|คุย|สอน|อธิบาย|ตอบ).*(?:อังกฤษ|english)/i.test(trimmed)) return "en";
-  if (/speak.*(thai|ไทย)|in thai|switch.*thai|explain.*thai|reply.*thai/.test(lower)) return "th";
-  if (/speak.*english|in english|switch.*english|explain.*english|reply.*english/.test(lower)) {
-    return "en";
-  }
-  if (UI_SWITCH_RE.test(trimmed)) {
+  if (isTargetContentQuestion(lower)) return null;
+
+  if (UI_MEDIUM_SWITCH_RE.test(trimmed)) {
     if (/thai|ไทย|ภาษาไทย/i.test(trimmed)) return "th";
     if (/english|อังกฤษ|ภาษาอังกฤษ/i.test(trimmed)) return "en";
   }
@@ -218,6 +225,49 @@ export function resolveSessionLanguages(args: {
     return { uiLanguage: "en", targetLanguage: "th" };
   }
   const uiLanguage = normalizeUiLanguage(args.profileUiLang);
+  const profileTarget = normalizeLearningTarget(args.profileTarget);
+  return {
+    uiLanguage,
+    targetLanguage: sanitizeTargetLanguage(uiLanguage, profileTarget),
+  };
+}
+
+/** UI anchor for adaptation — guests are hard-locked; null profile keeps session UI. */
+export function resolveProfileUiAnchor(args: {
+  isGuest: boolean;
+  profileUiLang: string | null;
+  sessionUiLang: "th" | "en";
+}): "th" | "en" {
+  if (args.isGuest) {
+    return resolveSessionLanguages({
+      isGuest: true,
+      profileUiLang: null,
+      profileTarget: null,
+    }).uiLanguage;
+  }
+  if (args.profileUiLang) {
+    return normalizeUiLanguage(args.profileUiLang);
+  }
+  return args.sessionUiLang;
+}
+
+/** Live connect — null/unknown profile UI keeps the session's resolved language. */
+export function resolveLiveSessionLanguages(args: {
+  isGuest: boolean;
+  profileUiLang: string | null;
+  profileTarget: string | null;
+  sessionUiLang: "th" | "en";
+}): { uiLanguage: "th" | "en"; targetLanguage: "th" | "en" } {
+  if (args.isGuest) {
+    return resolveSessionLanguages({
+      isGuest: true,
+      profileUiLang: null,
+      profileTarget: null,
+    });
+  }
+  const uiLanguage = args.profileUiLang
+    ? normalizeUiLanguage(args.profileUiLang)
+    : args.sessionUiLang;
   const profileTarget = normalizeLearningTarget(args.profileTarget);
   return {
     uiLanguage,

@@ -36,8 +36,8 @@ import {
   detectLanguage,
   detectPracticeAttempt,
   normalizeLearningTarget,
-  normalizeUiLanguage,
-  resolveSessionLanguages,
+  resolveLiveSessionLanguages,
+  resolveProfileUiAnchor,
   resolveTargetLanguage,
   resolveUiLanguage,
 } from "@/lib/brain/language";
@@ -334,15 +334,19 @@ export default function TalkPage() {
 
   const maybeAdaptSessionLanguages = useCallback(
     (userInput: string) => {
+      if (isGuestRef.current) return;
+
       const trimmed = userInput.trim();
       if (!trimmed) return;
 
       const memory = canvasToMemory(itemsRef.current);
       const sessionUi = sessionUiLangRef.current;
       const targetLang = sessionTargetLangRef.current;
-      const profileUiAnchor = isGuestRef.current
-        ? sessionUi
-        : normalizeUiLanguage(profile?.ui_language ?? null);
+      const profileUiAnchor = resolveProfileUiAnchor({
+        isGuest: false,
+        profileUiLang: profile?.ui_language ?? null,
+        sessionUiLang: sessionUi,
+      });
       const profileTarget = normalizeLearningTarget(profile?.learning_target_language ?? null);
 
       const isPracticeAttempt = detectPracticeAttempt({
@@ -695,10 +699,11 @@ export default function TalkPage() {
     }
 
     try {
-      const { uiLanguage, targetLanguage } = resolveSessionLanguages({
+      const { uiLanguage, targetLanguage } = resolveLiveSessionLanguages({
         isGuest: isGuestRef.current,
         profileUiLang: profile?.ui_language ?? null,
         profileTarget: profile?.learning_target_language ?? null,
+        sessionUiLang: sessionUiLangRef.current,
       });
       sessionUiLangRef.current = uiLanguage;
       sessionTargetLangRef.current = targetLanguage;
@@ -762,24 +767,27 @@ export default function TalkPage() {
       setGuestExchangesRaw(parsed);
       guestExchangesRef.current = parsed;
     }
-    const { uiLanguage } = resolveSessionLanguages({
-      isGuest: true,
-      profileUiLang: null,
-      profileTarget: null,
+    const { uiLanguage, targetLanguage } = resolveLiveSessionLanguages({
+      isGuest: isGuestRef.current,
+      profileUiLang: profile?.ui_language ?? null,
+      profileTarget: profile?.learning_target_language ?? null,
+      sessionUiLang: sessionUiLangRef.current,
     });
     setUiLang(uiLanguage);
     setConversationLang(uiLanguage);
     sessionUiLangRef.current = uiLanguage;
+    sessionTargetLangRef.current = targetLanguage;
     conversationLangRef.current = uiLanguage;
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!profileAuthReady || isGuest) return;
-    const { uiLanguage, targetLanguage } = resolveSessionLanguages({
+    const { uiLanguage, targetLanguage } = resolveLiveSessionLanguages({
       isGuest: false,
       profileUiLang: profile?.ui_language ?? null,
       profileTarget: profile?.learning_target_language ?? null,
+      sessionUiLang: sessionUiLangRef.current,
     });
     queueMicrotask(() => {
       setConversationLang(uiLanguage);
@@ -836,8 +844,11 @@ export default function TalkPage() {
 
   const handleCycleLang = useCallback(() => {
     const next: "th" | "en" = conversationLang === "th" ? "en" : "th";
+    sessionUiLangRef.current = next;
+    conversationLangRef.current = next;
     setConversationLang(next);
     setUiLang(next);
+    clientRef.current?.sendLanguageContext(next, sessionTargetLangRef.current);
     void updateUiLanguage(next);
   }, [conversationLang]);
 
