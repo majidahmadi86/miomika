@@ -21,10 +21,17 @@ import { unlockTtsPlayback } from "@/lib/voice/tts";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
-import { MiomiLiveClient, type LiveClientMessage } from "@/lib/live/miomi-client";
+import { MiomiLiveClient, type LiveClientCloseDetail, type LiveClientErrorDetail, type LiveClientMessage, type LiveSessionSnapshot } from "@/lib/live/miomi-client";
 import { MediaHandler } from "@/lib/live/media-handler";
 import { isHiddenLiveTranscript, sanitizeUserTranscript } from "@/lib/live/transcript";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
+import {
+  canAttemptTransportReconnect,
+  classifyLiveClose,
+  nextResumeWordHint,
+  resolveKickoffAudience,
+  shouldIgnoreClientEpoch,
+} from "@/lib/live/session-continuity";
 import {
   detectLanguage,
   detectPracticeAttempt,
@@ -122,6 +129,7 @@ export default function TalkPage() {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [awaitingMic, setAwaitingMic] = useState(false);
+  const [awaitingContinueTap, setAwaitingContinueTap] = useState(false);
   const [liveUiState, setLiveUiState] = useState<LiveUiState>("idle");
   const [debugOpen, setDebugOpen] = useState(false);
 
@@ -143,6 +151,18 @@ export default function TalkPage() {
   const sessionUiLangRef = useRef<"th" | "en">("en");
   const sessionTargetLangRef = useRef<"th" | "en">("th");
   const itemsRef = useRef<CanvasItem[]>([]);
+  const liveClientEpochRef = useRef<string | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectInFlightRef = useRef(false);
+  const wasListeningBeforeDropRef = useRef(false);
+  const lessonHadStartedRef = useRef(false);
+  const liveUiStateRef = useRef<LiveUiState>("idle");
+  const lastSessionSnapshotRef = useRef<LiveSessionSnapshot | null>(null);
+  const handleLiveMessageRef = useRef<(msg: LiveClientMessage) => void>(() => {});
+  const handleClientCloseRef = useRef<(detail: LiveClientCloseDetail) => Promise<void>>(async () => {});
+  const resumeLiveSessionRef = useRef<
+    (snapshot: LiveSessionSnapshot, restoreMic: boolean) => Promise<void>
+  >(async () => {});
 
   const syncTeachWordContext = useCallback(() => {
     clientRef.current?.setTeachWordContext({
@@ -177,13 +197,19 @@ export default function TalkPage() {
     setShowGuestSheet(true);
   }, []);
 
-  const teardownSession = useCallback(() => {
+  const teardownSessionIntentional = useCallback(() => {
+    reconnectInFlightRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    setAwaitingContinueTap(false);
+    lastSessionSnapshotRef.current = null;
     kickoffSentRef.current = false;
     entryStartedRef.current = false;
+    lessonHadStartedRef.current = false;
     mediaRef.current?.stopAudio();
     mediaRef.current?.stopAudioPlayback();
-    clientRef.current?.disconnect();
+    clientRef.current?.disconnectIntentionally();
     clientRef.current = null;
+    liveClientEpochRef.current = null;
     resetTranscriptIds();
     turnRuntimeRef.current?.reset(guestExchangesRef.current, isGuestRef.current);
     setLiveUiState("idle");
@@ -197,6 +223,11 @@ export default function TalkPage() {
           getClient: () => clientRef.current,
           getMedia: () => mediaRef.current,
           getUiLang: () => sessionUiLangRef.current,
+          getKickoffAudience: () =>
+            resolveKickoffAudience(
+              isGuestRef.current,
+              sessionIntroducedWords(itemsRef.current).length,
+            ),
           isGuest: () => isGuestRef.current,
           isMounted: () => mountedRef.current,
           onLiveUi: (ui: LiveUiPhase) => setLiveUiState(ui),
@@ -209,7 +240,7 @@ export default function TalkPage() {
             }
           },
           onOpenGuestSheet: openGuestSignupSheet,
-          onTeardown: teardownSession,
+          onTeardown: teardownSessionIntentional,
           onResetTranscriptIds: resetTranscriptIds,
           onKickoffCanvas: () => {
             kickoffSentRef.current = true;
@@ -233,7 +264,7 @@ export default function TalkPage() {
       );
     }
     return turnRuntimeRef.current;
-  }, [openGuestSignupSheet, resetTranscriptIds, startContinuousMic, stopContinuousMic, teardownSession]);
+  }, [openGuestSignupSheet, resetTranscriptIds, startContinuousMic, stopContinuousMic, teardownSessionIntentional]);
 
   const dispatchTurn = useCallback(
     (event: Parameters<TurnRuntime["dispatch"]>[0]) => {
@@ -241,6 +272,30 @@ export default function TalkPage() {
     },
     [ensureTurnRuntime],
   );
+
+  const wireLiveClient = useCallback((client: MiomiLiveClient) => {
+    liveClientEpochRef.current = client.epochId;
+    clientRef.current = client;
+  }, []);
+
+  const createLiveClient = useCallback((): MiomiLiveClient => {
+    return new MiomiLiveClient({
+      onOpen: () => {
+        logEvent({ kind: "state", level: "info", message: "live connected" });
+      },
+      onMessage: (msg) => handleLiveMessageRef.current(msg),
+      onClose: (detail) => {
+        void handleClientCloseRef.current(detail);
+      },
+      onError: (detail: LiveClientErrorDetail) => {
+        if (shouldIgnoreClientEpoch(detail.epochId, liveClientEpochRef.current)) return;
+        logEvent({ kind: "state", level: "error", message: "live error", data: detail });
+        if (!ensureTurnRuntime().state.sessionActive) {
+          setLiveUiState("error");
+        }
+      },
+    });
+  }, [ensureTurnRuntime]);
 
   const primeAudio = useCallback(() => {
     if (!mediaRef.current) mediaRef.current = new MediaHandler();
@@ -484,7 +539,150 @@ export default function TalkPage() {
     syncTeachWordContext,
   ]);
 
-  const startLiveSession = useCallback(async () => {
+  const resumeLiveSession = useCallback(
+    async (snapshot: LiveSessionSnapshot, restoreMic: boolean) => {
+      if (!canUseLive || reconnectInFlightRef.current) return;
+      reconnectInFlightRef.current = true;
+      setAwaitingContinueTap(false);
+      setLiveUiState("connecting");
+      logEvent({ kind: "state", level: "info", message: "live session resuming", data: { restoreMic } });
+
+      if (!mediaRef.current) mediaRef.current = new MediaHandler();
+      await mediaRef.current.unlockPlayback();
+
+      const client = createLiveClient();
+      client.restoreSessionSnapshot(snapshot);
+      wireLiveClient(client);
+
+      try {
+        const uiLanguage = sessionUiLangRef.current;
+        const targetLanguage = sessionTargetLangRef.current;
+        await client.connect({ uiLanguage, targetLanguage, resume: true });
+        syncTeachWordContext();
+        lessonHadStartedRef.current = true;
+        dispatchTurn({
+          type: "session_connected",
+          isGuest: isGuestRef.current,
+          guestExchanges: guestExchangesRef.current,
+          skipKickoff: true,
+        });
+        const nextWord = nextResumeWordHint(
+          snapshot.teachWord.lessonPlan,
+          snapshot.teachWord.introducedIdx,
+        );
+        client.sendResume(uiLanguage, nextWord);
+        if (!restoreMic) {
+          stopContinuousMic();
+          setLiveUiState("idle");
+        }
+        reconnectAttemptsRef.current = 0;
+        logEvent({ kind: "state", level: "info", message: "live session resumed" });
+      } catch (err) {
+        reconnectAttemptsRef.current += 1;
+        logEvent({
+          kind: "state",
+          level: "error",
+          message: "live session resume failed",
+          data: { error: String(err), attempts: reconnectAttemptsRef.current },
+        });
+        clientRef.current = null;
+        liveClientEpochRef.current = null;
+        if (canAttemptTransportReconnect(reconnectAttemptsRef.current)) {
+          void resumeLiveSessionRef.current(snapshot, restoreMic);
+        } else {
+          setAwaitingContinueTap(true);
+          setLiveUiState("idle");
+        }
+      } finally {
+        reconnectInFlightRef.current = false;
+      }
+    },
+    [
+      canUseLive,
+      createLiveClient,
+      wireLiveClient,
+      syncTeachWordContext,
+      dispatchTurn,
+      stopContinuousMic,
+    ],
+  );
+
+  const handleClientClose = useCallback(
+    async (detail: LiveClientCloseDetail) => {
+      if (shouldIgnoreClientEpoch(detail.epochId, liveClientEpochRef.current)) {
+        logEvent({
+          kind: "state",
+          level: "info",
+          message: "live close ignored (stale epoch)",
+          data: { epochId: detail.epochId, current: liveClientEpochRef.current },
+        });
+        return;
+      }
+
+      const closeKind = classifyLiveClose(detail.intentionalClose);
+      logEvent({
+        kind: "state",
+        level: closeKind === "transport" ? "warn" : "info",
+        message: "live websocket closed",
+        data: {
+          closeKind,
+          code: detail.code,
+          reason: detail.reason,
+          wasClean: detail.wasClean,
+        },
+      });
+
+      if (closeKind === "intentional") {
+        return;
+      }
+
+      const runtime = ensureTurnRuntime();
+      if (!runtime.state.sessionActive && !lessonHadStartedRef.current) {
+        teardownSessionIntentional();
+        return;
+      }
+
+      const snapshot = clientRef.current?.getSessionSnapshot() ?? {
+        teachWord: {
+          learningTarget: sessionTargetLangRef.current,
+          sessionIntroduced: sessionIntroducedWords(itemsRef.current),
+          lessonPlan: [],
+          introducedIdx: 0,
+        },
+        reviewServed: [],
+      };
+      wasListeningBeforeDropRef.current =
+        liveUiStateRef.current === "listening" || (mediaRef.current?.isRecording ?? false);
+      mediaRef.current?.stopAudioPlayback();
+      mediaRef.current?.stopAudio();
+      lastSessionSnapshotRef.current = snapshot;
+      clientRef.current = null;
+      liveClientEpochRef.current = null;
+
+      if (!canAttemptTransportReconnect(reconnectAttemptsRef.current)) {
+        setAwaitingContinueTap(true);
+        setLiveUiState("idle");
+        return;
+      }
+
+      reconnectAttemptsRef.current += 1;
+      await resumeLiveSession(snapshot, wasListeningBeforeDropRef.current);
+    },
+    [ensureTurnRuntime, teardownSessionIntentional],
+  );
+
+  useEffect(() => {
+    handleLiveMessageRef.current = handleLiveMessage;
+    handleClientCloseRef.current = handleClientClose;
+    resumeLiveSessionRef.current = resumeLiveSession;
+  }, [handleLiveMessage, handleClientClose, resumeLiveSession]);
+
+  const startLiveSession = useCallback(async (opts?: { resumeSnapshot?: LiveSessionSnapshot; restoreMic?: boolean }) => {
+    if (opts?.resumeSnapshot) {
+      await resumeLiveSession(opts.resumeSnapshot, opts.restoreMic ?? false);
+      return;
+    }
+
     const runtime = ensureTurnRuntime();
     if (!canUseLive || runtime.state.sessionActive) return;
     dispatchTurn({ type: "session_connect_start" });
@@ -493,19 +691,7 @@ export default function TalkPage() {
     if (!mediaRef.current) mediaRef.current = new MediaHandler();
     await mediaRef.current.unlockPlayback();
     if (!clientRef.current) {
-      clientRef.current = new MiomiLiveClient({
-        onOpen: () => {
-          logEvent({ kind: "state", level: "info", message: "live connected" });
-        },
-        onMessage: handleLiveMessage,
-        onClose: () => {
-          teardownSession();
-        },
-        onError: (detail) => {
-          logEvent({ kind: "state", level: "error", message: "live error", data: detail });
-          setLiveUiState("error");
-        },
-      });
+      wireLiveClient(createLiveClient());
     }
 
     try {
@@ -520,8 +706,9 @@ export default function TalkPage() {
       setConversationLang(uiLanguage);
       setUiLang(uiLanguage);
 
-      await clientRef.current.connect({ uiLanguage, targetLanguage });
+      await clientRef.current!.connect({ uiLanguage, targetLanguage, resume: false });
       syncTeachWordContext();
+      lessonHadStartedRef.current = true;
       dispatchTurn({
         type: "session_connected",
         isGuest: isGuestRef.current,
@@ -536,26 +723,32 @@ export default function TalkPage() {
         data: { error: String(err) },
       });
       entryStartedRef.current = false;
-      teardownSession();
+      teardownSessionIntentional();
       setLiveUiState("error");
     }
   }, [
     canUseLive,
     dispatchTurn,
     ensureTurnRuntime,
-    handleLiveMessage,
-    teardownSession,
+    createLiveClient,
+    wireLiveClient,
+    resumeLiveSession,
+    teardownSessionIntentional,
     profile,
     syncTeachWordContext,
   ]);
 
   useEffect(() => {
+    liveUiStateRef.current = liveUiState;
+  }, [liveUiState]);
+
+  useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      teardownSession();
+      teardownSessionIntentional();
     };
-  }, [teardownSession]);
+  }, [teardownSessionIntentional]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- hydrate localStorage + navigator prefs on mount */
   useEffect(() => {
@@ -723,7 +916,31 @@ export default function TalkPage() {
       openGuestSignupSheet("talk");
       return;
     }
+    if (awaitingContinueTap && lastSessionSnapshotRef.current) {
+      void (async () => {
+        await ensurePlaybackUnlocked();
+        reconnectAttemptsRef.current = 0;
+        await resumeLiveSession(
+          lastSessionSnapshotRef.current!,
+          wasListeningBeforeDropRef.current,
+        );
+      })();
+      return;
+    }
     const runtime = ensureTurnRuntime();
+    if (runtime.state.sessionActive && !clientRef.current?.isConnected()) {
+      if (lastSessionSnapshotRef.current) {
+        void (async () => {
+          await ensurePlaybackUnlocked();
+          reconnectAttemptsRef.current = 0;
+          await resumeLiveSession(
+            lastSessionSnapshotRef.current!,
+            wasListeningBeforeDropRef.current,
+          );
+        })();
+      }
+      return;
+    }
     if (runtime.state.sessionActive) {
       if (liveUiState === "listening") {
         dispatchTurn({ type: "orb_mic_stop" });
@@ -742,6 +959,7 @@ export default function TalkPage() {
   }, [
     guestAuthReady,
     isLocked,
+    awaitingContinueTap,
     liveUiState,
     awaitingMic,
     primeAudio,
@@ -749,6 +967,7 @@ export default function TalkPage() {
     dispatchTurn,
     ensureTurnRuntime,
     startLiveSession,
+    resumeLiveSession,
     openGuestSignupSheet,
   ]);
 
@@ -864,6 +1083,9 @@ export default function TalkPage() {
     }
     if (!audioUnlocked) {
       return uiLang === "th" ? "แตะเพื่อเริ่มค่า~" : "tap anywhere to begin~";
+    }
+    if (awaitingContinueTap) {
+      return uiLang === "th" ? "แตะเพื่อเรียนต่อค่า~" : "Tap to continue~";
     }
     if (awaitingMic && liveUiState !== "speaking" && liveUiState !== "connecting") {
       return uiLang === "th" ? "กดไมค์เมื่อพร้อมพูดค่า~" : "press the mic when you're ready~";
@@ -1080,6 +1302,8 @@ export default function TalkPage() {
               ? uiLang === "en" ? "Sign in to keep talking" : "สมัครเพื่อพูดคุยต่อ"
               : orbState === "listening"
                 ? uiLang === "en" ? "Stop listening" : "หยุดฟัง"
+              : awaitingContinueTap
+                ? uiLang === "en" ? "Tap to continue" : "แตะเพื่อเรียนต่อ"
                 : awaitingMic
                   ? uiLang === "en" ? "Press mic to speak" : "กดไมค์เพื่อพูด"
                   : uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู"

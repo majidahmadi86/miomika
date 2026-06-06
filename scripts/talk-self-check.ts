@@ -23,8 +23,18 @@ import {
 } from "../lib/brain/teaching";
 import {
   buildKickoffPrompt,
+  buildResumePrompt,
   buildSystemInstruction,
 } from "../lib/live/live-config";
+import {
+  canAttemptTransportReconnect,
+  classifyLiveClose,
+  kickoffPromptIsFirstTimeSafe,
+  MAX_TRANSPORT_RECONNECTS,
+  nextResumeWordHint,
+  resolveKickoffAudience,
+  shouldIgnoreClientEpoch,
+} from "../lib/live/session-continuity";
 import {
   advanceAfterTurn,
   buildTeachingModeContract,
@@ -506,10 +516,29 @@ const appended = routeGeminiTranscriptChunk(
 );
 assert(appended.textEn === "Hello friend~" && appended.textTh === "", "chunks append to UI field only");
 
-const kickoffEn = buildKickoffPrompt("en");
-const kickoffTh = buildKickoffPrompt("th");
-assert(kickoffEn.includes("ENGLISH"), "kickoff en mandates English voice");
-assert(kickoffTh.includes("ภาษาไทย"), "kickoff th mandates Thai voice");
+const kickoffEnFirst = buildKickoffPrompt("en", "first_time");
+const kickoffThFirst = buildKickoffPrompt("th", "first_time");
+const kickoffEnReturning = buildKickoffPrompt("en", "returning");
+assert(kickoffEnFirst.includes("ENGLISH"), "kickoff en mandates English voice");
+assert(kickoffThFirst.includes("ภาษาไทย"), "kickoff th mandates Thai voice");
+assert(kickoffPromptIsFirstTimeSafe(kickoffEnFirst), "first-time en kickoff has no false familiarity");
+assert(kickoffPromptIsFirstTimeSafe(kickoffThFirst), "first-time th kickoff has no false familiarity");
+assert(
+  /welcome back|welcome-back/i.test(kickoffEnReturning),
+  "returning-member en kickoff may welcome back",
+);
+assert(
+  resolveKickoffAudience(true, 0) === "first_time",
+  "guest kickoff audience is first_time",
+);
+assert(
+  resolveKickoffAudience(false, 2) === "returning",
+  "member with session words gets returning kickoff",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("FIRST word of a session"),
+  "teaching contract forbids remember framing on first word",
+);
 
 const sysEnTh = buildSystemInstruction("en", "th");
 assert(sysEnTh.includes("UI_LANGUAGE = English"), "system instruction UI=en");
@@ -788,6 +817,62 @@ assert(
 assert(
   talkPageSrc.includes("handleHeaderPointerDown") && talkPageSrc.includes("setDebugOpen(true)"),
   "debug overlay opens via header triple-tap pointer handler",
+);
+
+section("Session transport continuity");
+
+assert(classifyLiveClose(true) === "intentional", "deliberate close classified intentional");
+assert(classifyLiveClose(false) === "transport", "unexpected close classified transport");
+assert(
+  shouldIgnoreClientEpoch("old-epoch", "current-epoch"),
+  "epoch guard ignores stale instance close",
+);
+assert(
+  !shouldIgnoreClientEpoch("same-epoch", "same-epoch"),
+  "epoch guard accepts current instance close",
+);
+assert(
+  canAttemptTransportReconnect(0) && canAttemptTransportReconnect(1),
+  "transport reconnect allowed within budget",
+);
+assert(
+  !canAttemptTransportReconnect(MAX_TRANSPORT_RECONNECTS),
+  "transport reconnect blocked when budget exhausted",
+);
+assert(
+  nextResumeWordHint(["hello", "water", "thanks"], 1) === "water",
+  "resume hint points at plan cursor",
+);
+const resumeEn = buildResumePrompt("en", "water");
+assert(
+  resumeEn.includes("session_resume") && resumeEn.includes("do NOT greet again"),
+  "resume prompt forbids re-greeting",
+);
+assert(
+  miomiClientSrc.includes("const resume = opts.resume ?? false") &&
+    /if \(resume\)[\s\S]{0,160}learningTarget/.test(miomiClientSrc) &&
+    /else \{[\s\S]{0,220}lessonPlan: \[\]/.test(miomiClientSrc),
+  "resume preserves lesson plan; cold start clears it",
+);
+assert(
+  miomiClientSrc.includes("disconnectIntentionally") && miomiClientSrc.includes("intentionalClose"),
+  "client marks intentional close",
+);
+assert(
+  miomiClientSrc.includes("epochId") && talkPageSrc.includes("shouldIgnoreClientEpoch"),
+  "page ignores stale client epoch",
+);
+assert(
+  talkPageSrc.includes("skipKickoff: true") && talkPageSrc.includes("sendResume"),
+  "transport resume skips kickoff and sends resume prompt",
+);
+assert(
+  talkPageSrc.includes("awaitingContinueTap") && talkPageSrc.includes("Tap to continue"),
+  "exhausted reconnect shows tap-to-continue (not cold greeting)",
+);
+assert(
+  talkPageSrc.includes("live websocket closed") && talkPageSrc.includes("code: detail.code"),
+  "websocket close code + reason logged",
 );
 
 const swSrc = readFileSync(join(ROOT, "public/sw.js"), "utf8");

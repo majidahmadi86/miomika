@@ -52,9 +52,28 @@ LANGUAGE CONTRACT — non-negotiable:
   );
 }
 
-export function buildKickoffPrompt(lang: "th" | "en"): string {  return lang === "th"
-    ? "[session_open] ทักทายผู้ใช้ด้วยประโยคสั้นๆ อบอุ่น น่ารัก มีเสน่ห์ หนึ่งประโยคเป็นภาษาไทยเท่านั้น แล้วชวนให้กดไมค์เมื่อพร้อมจะพูด — ยังไม่ต้องรอให้เขาพูดก่อน"
-    : "[session_open] Greet the user with ONE short, warm, charming line in ENGLISH only — then invite them to press the mic when they're ready to speak. Do NOT greet in Thai. User has not spoken yet.";
+import type { KickoffAudience } from "@/lib/live/session-continuity";
+
+export function buildKickoffPrompt(
+  lang: "th" | "en",
+  audience: KickoffAudience = "first_time",
+): string {
+  if (audience === "returning") {
+    return lang === "th"
+      ? "[session_open] ทักทายผู้ใช้ที่กลับมาอีกครั้งด้วยประโยคสั้นๆ อบอุ่น ยินดีต้อนรับกลับ — หนึ่งประโยคเป็นภาษาไทยเท่านั้น แล้วชวนให้กดไมค์เมื่อพร้อมจะพูด"
+      : "[session_open] Welcome them back with ONE short, warm line in ENGLISH only — friendly welcome-back energy — then invite them to press the mic when ready. Do NOT greet in Thai.";
+  }
+  return lang === "th"
+    ? "[session_open] ทักทายผู้ใช้ครั้งแรกด้วยประโยคสั้นๆ อบอุ่น น่ารัก เป็นมิตร — เหมือนพบกันครั้งแรก ห้ามพูดว่าคิดถึงหรือรอคอย — หนึ่งประโยคเป็นภาษาไทยเท่านั้น แล้วชวนให้กดไมค์เมื่อพร้อมจะพูด"
+    : "[session_open] First meeting — greet with ONE short, warm, friendly welcome in ENGLISH only. Do NOT say you missed them, have been waiting, or welcome back. Do NOT use recall or review framing. Then invite them to press the mic when ready. Do NOT greet in Thai.";
+}
+
+/** Mid-lesson transport resume — never re-run entry icebreaker. */
+export function buildResumePrompt(lang: "th" | "en", nextWord: string | null): string {
+  const wordHint = nextWord?.trim() || "the next lesson word";
+  return lang === "th"
+    ? `[session_resume] กำลังเรียนอยู่กลางบท — ห้ามทักทายใหม่หรือบอกให้กดไมค์; ต่ออย่างอบอุ่นจากที่ค้างไว้; คำถัดไปคือ ${wordHint}`
+    : `[session_resume] You're mid-lesson; do NOT greet again or ask them to press the mic; continue warmly where you left off; the next word is ${wordHint}.`;
 }
 
 /** LOCKED 2026-06-05 — Tool 1: wired to lib/brain/teaching.ts via /api/teach-word. */

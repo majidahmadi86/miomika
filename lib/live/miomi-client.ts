@@ -6,7 +6,9 @@ import {
   LIVE_VOICE,
   buildKickoffPrompt,
   buildLiveConfig,
+  buildResumePrompt,
 } from "@/lib/live/live-config";
+import { createLiveClientEpoch } from "@/lib/live/session-continuity";
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -30,11 +32,26 @@ export type LiveClientMessage =
   | { type: "turn_complete" }
   | { type: "tool_call"; name: string; args: Record<string, unknown>; result: unknown };
 
+export type LiveClientCloseDetail = {
+  epochId: string;
+  intentionalClose: boolean;
+  code: number | null;
+  reason: string;
+  wasClean: boolean | null;
+};
+
+export type LiveClientErrorDetail = {
+  epochId: string;
+  error: string;
+  code: number | null;
+  reason: string;
+};
+
 export type LiveClientCallbacks = {
   onOpen?: () => void;
   onMessage?: (msg: LiveClientMessage) => void;
-  onClose?: (detail: { code: number | null; reason: string; wasClean: boolean | null }) => void;
-  onError?: (detail: { error: string; code: number | null; reason: string }) => void;
+  onClose?: (detail: LiveClientCloseDetail) => void;
+  onError?: (detail: LiveClientErrorDetail) => void;
   onStatus?: (msg: { status: string; voice?: string; model?: string; code?: number | null; reason?: string }) => void;
 };
 
@@ -55,9 +72,16 @@ export type TeachWordContext = {
   introducedIdx: number;
 };
 
+export type LiveSessionSnapshot = {
+  teachWord: TeachWordContext;
+  reviewServed: string[];
+};
+
 export class MiomiLiveClient {
+  readonly epochId: string;
   private session: LiveSession | null = null;
   private connected = false;
+  private intentionalClose = false;
   private sessionReviewServed = new Set<string>();
   private teachWordContext: TeachWordContext = {
     learningTarget: "th",
@@ -66,31 +90,63 @@ export class MiomiLiveClient {
     introducedIdx: 0,
   };
 
-  constructor(private callbacks: LiveClientCallbacks) {}
+  constructor(private callbacks: LiveClientCallbacks) {
+    this.epochId = createLiveClientEpoch();
+  }
 
-  setTeachWordContext(ctx: Partial<TeachWordContext> & Pick<TeachWordContext, "learningTarget" | "sessionIntroduced">): void {
+  setTeachWordContext(
+    ctx: Partial<TeachWordContext> & Pick<TeachWordContext, "learningTarget" | "sessionIntroduced">,
+  ): void {
     this.teachWordContext = {
       ...this.teachWordContext,
       ...ctx,
     };
   }
 
-  async connect(opts?: {
+  getSessionSnapshot(): LiveSessionSnapshot {
+    return {
+      teachWord: { ...this.teachWordContext, sessionIntroduced: [...this.teachWordContext.sessionIntroduced] },
+      reviewServed: [...this.sessionReviewServed],
+    };
+  }
+
+  restoreSessionSnapshot(snapshot: LiveSessionSnapshot): void {
+    this.teachWordContext = {
+      ...snapshot.teachWord,
+      sessionIntroduced: [...snapshot.teachWord.sessionIntroduced],
+      lessonPlan: [...snapshot.teachWord.lessonPlan],
+    };
+    this.sessionReviewServed = new Set(snapshot.reviewServed);
+  }
+
+  async connect(opts: {
     voice?: string;
     uiLanguage: "th" | "en";
     targetLanguage: "th" | "en";
+    resume?: boolean;
   }): Promise<void> {
-    const voice = opts?.voice ?? LIVE_VOICE;
-    const uiLanguage = opts?.uiLanguage ?? "en";
-    const targetLanguage = opts?.targetLanguage ?? "th";
-    this.teachWordContext = {
-      learningTarget: targetLanguage,
-      sessionIntroduced: this.teachWordContext.sessionIntroduced,
-      lessonPlan: [],
-      introducedIdx: 0,
-    };
-    this.sessionReviewServed.clear();
-    // LOCKED 2026-06-05 — ephemeral token from server; GEMINI_API_KEY never in browser.
+    const voice = opts.voice ?? LIVE_VOICE;
+    const uiLanguage = opts.uiLanguage ?? "en";
+    const targetLanguage = opts.targetLanguage ?? "th";
+    const resume = opts.resume ?? false;
+
+    if (resume) {
+      this.teachWordContext = {
+        ...this.teachWordContext,
+        learningTarget: targetLanguage,
+      };
+    } else {
+      this.teachWordContext = {
+        learningTarget: targetLanguage,
+        sessionIntroduced: this.teachWordContext.sessionIntroduced,
+        lessonPlan: [],
+        introducedIdx: 0,
+      };
+      this.sessionReviewServed.clear();
+    }
+
+    this.intentionalClose = false;
+
     const tokenRes = await fetch("/api/live-token");
     if (!tokenRes.ok) {
       const err = (await tokenRes.json().catch(() => ({}))) as { error?: string };
@@ -110,6 +166,8 @@ export class MiomiLiveClient {
       resolveOpen = resolve;
       rejectOpen = reject;
     });
+
+    const boundEpoch = this.epochId;
 
     this.session = (await ai.live.connect({
       model: LIVE_MODEL,
@@ -132,6 +190,7 @@ export class MiomiLiveClient {
           const msg = e?.message ?? String(e);
           rejectOpen?.(new Error(msg));
           this.callbacks.onError?.({
+            epochId: boundEpoch,
             error: msg,
             code: e?.code ?? null,
             reason: e?.reason ?? "",
@@ -139,7 +198,9 @@ export class MiomiLiveClient {
         },
         onclose: (e: { code?: number; reason?: string; wasClean?: boolean }) => {
           this.connected = false;
-          const detail = {
+          const detail: LiveClientCloseDetail = {
+            epochId: boundEpoch,
+            intentionalClose: this.intentionalClose,
             code: e?.code ?? null,
             reason: e?.reason ?? "",
             wasClean: e?.wasClean ?? null,
@@ -315,10 +376,19 @@ export class MiomiLiveClient {
   }
 
   /** Trigger Miomi's opening greeting on connect — not shown as user speech. */
-  sendKickoff(lang: "th" | "en"): void {
+  sendKickoff(lang: "th" | "en", audience: "first_time" | "returning" = "first_time"): void {
     if (!this.session || !this.connected) return;
     this.session.sendClientContent({
-      turns: [{ role: "user", parts: [{ text: buildKickoffPrompt(lang) }] }],
+      turns: [{ role: "user", parts: [{ text: buildKickoffPrompt(lang, audience) }] }],
+      turnComplete: true,
+    });
+  }
+
+  /** Mid-lesson resume after transport drop — not shown as user speech. */
+  sendResume(lang: "th" | "en", nextWord: string | null): void {
+    if (!this.session || !this.connected) return;
+    this.session.sendClientContent({
+      turns: [{ role: "user", parts: [{ text: buildResumePrompt(lang, nextWord) }] }],
       turnComplete: true,
     });
   }
@@ -379,7 +449,15 @@ export class MiomiLiveClient {
     this.session = null;
   }
 
+  /** Deliberate teardown — classifies onClose as intentional (invitation, unmount). */
+  disconnectIntentionally(): void {
+    this.intentionalClose = true;
+    this.disconnect();
+  }
+
   isConnected(): boolean {
     return this.connected;
   }
 }
+
+export { createLiveClientEpoch };

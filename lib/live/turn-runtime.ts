@@ -33,6 +33,7 @@ export type TurnRuntimeDeps = TurnRuntimeCallbacks & {
   getClient: () => MiomiLiveClient | null;
   getMedia: () => MediaHandler | null;
   getUiLang: () => "th" | "en";
+  getKickoffAudience?: () => "first_time" | "returning";
   isGuest: () => boolean;
 };
 
@@ -84,7 +85,7 @@ export class TurnRuntime {
           break;
         case "send_kickoff":
           this.deps.onKickoffCanvas();
-          client?.sendKickoff(effect.lang);
+          client?.sendKickoff(effect.lang, this.deps.getKickoffAudience?.() ?? "first_time");
           break;
         case "send_hidden_context":
           client?.sendHiddenContext(effect.text);
