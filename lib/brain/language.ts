@@ -220,12 +220,25 @@ export function resolveSessionLanguages(args: {
   isGuest: boolean;
   profileUiLang: string | null;
   profileTarget: string | null;
+  /** Guest cookie pick — target language they chose to practice. */
+  guestPracticeTarget?: "th" | "en" | null;
+  /** TalkConfig.teach.learning — member fallback when profile target unset. */
+  teachLearningTarget?: "th" | "en" | null;
 }): { uiLanguage: "th" | "en"; targetLanguage: "th" | "en" } {
   if (args.isGuest) {
+    const pick = normalizeLearningTarget(args.guestPracticeTarget ?? null);
+    if (pick) {
+      return {
+        uiLanguage: oppositeLanguage(pick),
+        targetLanguage: pick,
+      };
+    }
     return { uiLanguage: "en", targetLanguage: "th" };
   }
   const uiLanguage = normalizeUiLanguage(args.profileUiLang);
-  const profileTarget = normalizeLearningTarget(args.profileTarget);
+  const profileTarget =
+    normalizeLearningTarget(args.profileTarget) ??
+    normalizeLearningTarget(args.teachLearningTarget ?? null);
   return {
     uiLanguage,
     targetLanguage: sanitizeTargetLanguage(uiLanguage, profileTarget),
@@ -237,12 +250,14 @@ export function resolveProfileUiAnchor(args: {
   isGuest: boolean;
   profileUiLang: string | null;
   sessionUiLang: "th" | "en";
+  guestPracticeTarget?: "th" | "en" | null;
 }): "th" | "en" {
   if (args.isGuest) {
     return resolveSessionLanguages({
       isGuest: true,
       profileUiLang: null,
       profileTarget: null,
+      guestPracticeTarget: args.guestPracticeTarget,
     }).uiLanguage;
   }
   if (args.profileUiLang) {
@@ -257,18 +272,23 @@ export function resolveLiveSessionLanguages(args: {
   profileUiLang: string | null;
   profileTarget: string | null;
   sessionUiLang: "th" | "en";
+  guestPracticeTarget?: "th" | "en" | null;
+  teachLearningTarget?: "th" | "en" | null;
 }): { uiLanguage: "th" | "en"; targetLanguage: "th" | "en" } {
   if (args.isGuest) {
     return resolveSessionLanguages({
       isGuest: true,
       profileUiLang: null,
       profileTarget: null,
+      guestPracticeTarget: args.guestPracticeTarget,
     });
   }
   const uiLanguage = args.profileUiLang
     ? normalizeUiLanguage(args.profileUiLang)
     : args.sessionUiLang;
-  const profileTarget = normalizeLearningTarget(args.profileTarget);
+  const profileTarget =
+    normalizeLearningTarget(args.profileTarget) ??
+    normalizeLearningTarget(args.teachLearningTarget ?? null);
   return {
     uiLanguage,
     targetLanguage: sanitizeTargetLanguage(uiLanguage, profileTarget),

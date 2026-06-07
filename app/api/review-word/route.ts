@@ -5,6 +5,7 @@ import { getServerProfile } from "@/lib/auth/get-server-profile";
 import {
   normalizeLearningTarget,
   normalizeUiLanguage,
+  resolveSessionLanguages,
   sanitizeTargetLanguage,
 } from "@/lib/brain/language";
 import { resolvePhonetics } from "@/lib/brain/phonetics";
@@ -15,6 +16,7 @@ import {
   buildExcludeSet,
   pickPlanReviewWord,
 } from "@/lib/talk/lesson-plan";
+import { GUEST_PRACTICE_TARGET_COOKIE, parseGuestPracticeTarget } from "@/lib/talk/guest-practice-lang";
 
 async function loadWordFromBank(wordEn: string): Promise<{
   word_en: string;
@@ -95,17 +97,32 @@ export async function POST(req: NextRequest) {
   const profile = await getServerProfile();
   const isGuest = !profile;
 
-  const uiLanguage = isGuest
-    ? "en"
-    : normalizeUiLanguage(profile!.ui_language ?? null);
-  const profileTarget = isGuest
-    ? null
-    : normalizeLearningTarget(profile!.learning_target_language);
-  const requestTarget = normalizeLearningTarget(bodyLearningTarget);
-  const learningTarget = sanitizeTargetLanguage(
-    uiLanguage,
-    requestTarget ?? profileTarget,
-  );
+  let uiLanguage: "th" | "en";
+  let learningTarget: "th" | "en";
+
+  if (profile) {
+    uiLanguage = normalizeUiLanguage(profile.ui_language ?? null);
+    const profileTarget = normalizeLearningTarget(profile.learning_target_language);
+    const requestTarget = normalizeLearningTarget(bodyLearningTarget);
+    learningTarget = sanitizeTargetLanguage(
+      uiLanguage,
+      requestTarget ?? profileTarget,
+    );
+  } else {
+    const guestCookieTarget = parseGuestPracticeTarget(
+      req.cookies.get(GUEST_PRACTICE_TARGET_COOKIE)?.value ?? null,
+    );
+    const requestTarget =
+      normalizeLearningTarget(bodyLearningTarget) ?? guestCookieTarget;
+    const guestSession = resolveSessionLanguages({
+      isGuest: true,
+      profileUiLang: null,
+      profileTarget: null,
+      guestPracticeTarget: requestTarget,
+    });
+    uiLanguage = guestSession.uiLanguage;
+    learningTarget = guestSession.targetLanguage;
+  }
 
   if (clientLessonPlan.length === 0 || clientIntroducedIdx <= 0) {
     log("review-word", "get_word_to_review", {

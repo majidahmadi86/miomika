@@ -15,6 +15,7 @@ import { Toolbox, type ResponseLength } from "@/components/talk/Toolbox";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { WordCardV3 } from "@/components/talk/WordCardV3";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
+import { GuestPracticePick } from "@/components/talk/GuestPracticePick";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
 import { pickIceBreaker } from "@/lib/voice/warmth";
 import { unlockTtsPlayback } from "@/lib/voice/tts";
@@ -71,6 +72,11 @@ import { recordWordPick } from "@/lib/talk/teaching-mode";
 import { TurnRuntime, isReplaySuspended } from "@/lib/live/turn-runtime";
 import type { LiveUiPhase } from "@/lib/live/turn-controller";
 import { replayWordAudio } from "@/lib/talk/word-replay";
+import {
+  readGuestPracticeTargetCookie,
+  suggestedGuestPracticeTarget,
+  writeGuestPracticeTargetCookie,
+} from "@/lib/talk/guest-practice-lang";
 import type { VocabularyEntry } from "@/components/talk/WordCardV3";
 
 /**
@@ -163,6 +169,9 @@ export default function TalkPage() {
   const [awaitingContinueTap, setAwaitingContinueTap] = useState(false);
   const [liveUiState, setLiveUiState] = useState<LiveUiState>("idle");
   const [debugOpen, setDebugOpen] = useState(false);
+  const [guestPracticeReady, setGuestPracticeReady] = useState(false);
+  const [showGuestPracticePick, setShowGuestPracticePick] = useState(false);
+  const [guestPracticeSuggested, setGuestPracticeSuggested] = useState<"th" | "en">("th");
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false);
@@ -181,6 +190,7 @@ export default function TalkPage() {
   const conversationLangRef = useRef<"th" | "en">("en");
   const sessionUiLangRef = useRef<"th" | "en">("en");
   const sessionTargetLangRef = useRef<"th" | "en">("th");
+  const guestPracticeTargetRef = useRef<"th" | "en" | null>(null);
   const itemsRef = useRef<CanvasItem[]>([]);
   const liveClientEpochRef = useRef<string | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -207,6 +217,36 @@ export default function TalkPage() {
       sessionIntroduced: sessionIntroducedWords(itemsRef.current),
     });
   }, []);
+
+  const applySessionLanguages = useCallback(
+    (guestTarget?: "th" | "en" | null) => {
+      const { uiLanguage, targetLanguage } = resolveLiveSessionLanguages({
+        isGuest: isGuestRef.current,
+        profileUiLang: profile?.ui_language ?? null,
+        profileTarget: profile?.learning_target_language ?? null,
+        sessionUiLang: sessionUiLangRef.current,
+        guestPracticeTarget: guestTarget ?? guestPracticeTargetRef.current,
+        teachLearningTarget: config.teach.learning,
+      });
+      sessionUiLangRef.current = uiLanguage;
+      sessionTargetLangRef.current = targetLanguage;
+      conversationLangRef.current = uiLanguage;
+      setConversationLang(uiLanguage);
+      setUiLang(uiLanguage);
+    },
+    [profile?.ui_language, profile?.learning_target_language, config.teach.learning],
+  );
+
+  const handleGuestPracticePick = useCallback(
+    (target: "th" | "en") => {
+      writeGuestPracticeTargetCookie(target);
+      guestPracticeTargetRef.current = target;
+      applySessionLanguages(target);
+      setShowGuestPracticePick(false);
+      setGuestPracticeReady(true);
+    },
+    [applySessionLanguages],
+  );
 
   const getLessonNudgeHints = useCallback(() => {
     const snap = clientRef.current?.getSessionSnapshot().teachWord;
@@ -535,6 +575,7 @@ export default function TalkPage() {
         isGuest: false,
         profileUiLang: profile?.ui_language ?? null,
         sessionUiLang: sessionUi,
+        guestPracticeTarget: guestPracticeTargetRef.current,
       });
       const profileTarget = normalizeLearningTarget(profile?.learning_target_language ?? null);
 
@@ -900,6 +941,8 @@ export default function TalkPage() {
         profileUiLang: profile?.ui_language ?? null,
         profileTarget: profile?.learning_target_language ?? null,
         sessionUiLang: sessionUiLangRef.current,
+        guestPracticeTarget: guestPracticeTargetRef.current,
+        teachLearningTarget: config.teach.learning,
       });
       sessionUiLangRef.current = uiLanguage;
       sessionTargetLangRef.current = targetLanguage;
@@ -936,6 +979,7 @@ export default function TalkPage() {
     resumeLiveSession,
     teardownSessionIntentional,
     profile,
+    config.teach.learning,
     syncTeachWordContext,
   ]);
 
@@ -963,36 +1007,41 @@ export default function TalkPage() {
       setGuestExchangesRaw(parsed);
       guestExchangesRef.current = parsed;
     }
-    const { uiLanguage, targetLanguage } = resolveLiveSessionLanguages({
-      isGuest: isGuestRef.current,
-      profileUiLang: profile?.ui_language ?? null,
-      profileTarget: profile?.learning_target_language ?? null,
-      sessionUiLang: sessionUiLangRef.current,
-    });
-    setUiLang(uiLanguage);
-    setConversationLang(uiLanguage);
-    sessionUiLangRef.current = uiLanguage;
-    sessionTargetLangRef.current = targetLanguage;
-    conversationLangRef.current = uiLanguage;
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  /* eslint-disable react-hooks/set-state-in-effect -- guest practice pick or cookie restore */
+  useEffect(() => {
+    if (!guestAuthReady) return;
+    if (!isGuest) {
+      setGuestPracticeReady(true);
+      setShowGuestPracticePick(false);
+      return;
+    }
+    const stored = readGuestPracticeTargetCookie();
+    if (stored) {
+      guestPracticeTargetRef.current = stored;
+      applySessionLanguages(stored);
+      setGuestPracticeReady(true);
+      setShowGuestPracticePick(false);
+    } else {
+      setGuestPracticeSuggested(suggestedGuestPracticeTarget());
+      setShowGuestPracticePick(true);
+      setGuestPracticeReady(false);
+    }
+  }, [guestAuthReady, isGuest, applySessionLanguages]);
+
   useEffect(() => {
     if (!profileAuthReady || isGuest) return;
-    const { uiLanguage, targetLanguage } = resolveLiveSessionLanguages({
-      isGuest: false,
-      profileUiLang: profile?.ui_language ?? null,
-      profileTarget: profile?.learning_target_language ?? null,
-      sessionUiLang: sessionUiLangRef.current,
-    });
-    queueMicrotask(() => {
-      setConversationLang(uiLanguage);
-      setUiLang(uiLanguage);
-      sessionUiLangRef.current = uiLanguage;
-      sessionTargetLangRef.current = targetLanguage;
-      conversationLangRef.current = uiLanguage;
-    });
-  }, [profileAuthReady, isGuest, profile?.ui_language, profile?.learning_target_language]);
+    applySessionLanguages();
+  }, [
+    profileAuthReady,
+    isGuest,
+    profile?.ui_language,
+    profile?.learning_target_language,
+    config.teach.learning,
+    applySessionLanguages,
+  ]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
   useEffect(() => {
@@ -1004,6 +1053,7 @@ export default function TalkPage() {
   /* eslint-disable react-hooks/set-state-in-effect -- LOCKED 2026-06-05: voiced icebreaker on /talk entry; mic is separate orb tap */
   useEffect(() => {
     if (!canUseLive || isLocked || items.length < 1) return;
+    if (!guestPracticeReady) return;
     if (turnRuntimeRef.current?.state.sessionActive || entryStartedRef.current) return;
     entryStartedRef.current = true;
     primeAudio();
@@ -1012,7 +1062,7 @@ export default function TalkPage() {
       await ensurePlaybackUnlocked();
       await startLiveSession();
     })();
-  }, [canUseLive, isLocked, items.length, primeAudio, ensurePlaybackUnlocked, startLiveSession]);
+  }, [canUseLive, isLocked, items.length, guestPracticeReady, primeAudio, ensurePlaybackUnlocked, startLiveSession]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* eslint-disable react-hooks/set-state-in-effect -- guest counter reset on sign-in */
@@ -1037,6 +1087,30 @@ export default function TalkPage() {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     });
   }, [items]);
+
+  const handleAdjustSave = useCallback(
+    (c: TalkConfig) => {
+      setConfig(c);
+      saveTalkConfig(c);
+      const { uiLanguage, targetLanguage } = resolveLiveSessionLanguages({
+        isGuest: isGuestRef.current,
+        profileUiLang: profile?.ui_language ?? null,
+        profileTarget: profile?.learning_target_language ?? null,
+        sessionUiLang: sessionUiLangRef.current,
+        guestPracticeTarget: guestPracticeTargetRef.current,
+        teachLearningTarget: c.teach.learning,
+      });
+      sessionUiLangRef.current = uiLanguage;
+      sessionTargetLangRef.current = targetLanguage;
+      conversationLangRef.current = uiLanguage;
+      setConversationLang(uiLanguage);
+      setUiLang(uiLanguage);
+      clientRef.current?.sendLanguageContext(uiLanguage, targetLanguage);
+      syncTeachWordContext();
+      setAdjustOpen(false);
+    },
+    [profile?.ui_language, profile?.learning_target_language, syncTeachWordContext],
+  );
 
   const handleCycleLang = useCallback(() => {
     const next: "th" | "en" = conversationLang === "th" ? "en" : "th";
@@ -1565,10 +1639,17 @@ export default function TalkPage() {
         open={adjustOpen}
         config={config}
         uiLang={uiLang}
-        onSave={(c) => { setConfig(c); saveTalkConfig(c); setAdjustOpen(false); }}
+        onSave={handleAdjustSave}
         onClose={() => setAdjustOpen(false)}
         onMiomiHelp={handleMiomiHelp}
       />
+
+      {showGuestPracticePick && (
+        <GuestPracticePick
+          suggested={guestPracticeSuggested}
+          onPick={handleGuestPracticePick}
+        />
+      )}
 
       {showGuestSheet && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ position: "fixed", inset: 0, background: "rgba(26,26,24,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>

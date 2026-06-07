@@ -18,6 +18,13 @@ import {
   sanitizeTargetLanguage,
 } from "../lib/brain/language";
 import {
+  GUEST_PRACTICE_TARGET_COOKIE,
+  parseGuestPracticeTarget,
+  readGuestPracticeTargetFromCookieHeader,
+  sessionLanguagesFromGuestPick,
+  suggestedGuestPracticeTarget,
+} from "../lib/talk/guest-practice-lang";
+import {
   countUncardableBankRows,
   filterVocabCandidates,
   pickIntroduceCandidate,
@@ -126,8 +133,63 @@ const guestSession = resolveSessionLanguages({
   profileUiLang: null,
   profileTarget: null,
 });
-assert(guestSession.uiLanguage === "en", "guest UI=en");
-assert(guestSession.targetLanguage === "th", "guest TARGET=th");
+assert(guestSession.uiLanguage === "en", "guest no-pick fallback UI=en");
+assert(guestSession.targetLanguage === "th", "guest no-pick fallback TARGET=th");
+
+const guestLearnTh = resolveSessionLanguages({
+  isGuest: true,
+  profileUiLang: null,
+  profileTarget: null,
+  guestPracticeTarget: "th",
+});
+assert(
+  guestLearnTh.uiLanguage === "en" && guestLearnTh.targetLanguage === "th",
+  "guest pick Thai → UI en, target th",
+);
+const guestLearnEn = resolveSessionLanguages({
+  isGuest: true,
+  profileUiLang: null,
+  profileTarget: null,
+  guestPracticeTarget: "en",
+});
+assert(
+  guestLearnEn.uiLanguage === "th" && guestLearnEn.targetLanguage === "en",
+  "guest pick English → UI th, target en",
+);
+
+assert(
+  sessionLanguagesFromGuestPick("en").uiLanguage === "th",
+  "sessionLanguagesFromGuestPick en → ui th",
+);
+assert(
+  sessionLanguagesFromGuestPick("th").targetLanguage === "th",
+  "sessionLanguagesFromGuestPick th → target th",
+);
+assert(
+  parseGuestPracticeTarget("english") === "en",
+  "parseGuestPracticeTarget english → en",
+);
+assert(
+  readGuestPracticeTargetFromCookieHeader(
+    `${GUEST_PRACTICE_TARGET_COOKIE}=th; ui-language=en`,
+  ) === "th",
+  "cookie header round-trip guest practice target",
+);
+assert(
+  typeof suggestedGuestPracticeTarget() === "string",
+  "suggestedGuestPracticeTarget returns th or en",
+);
+
+const memberTeachEn = resolveSessionLanguages({
+  isGuest: false,
+  profileUiLang: "th",
+  profileTarget: null,
+  teachLearningTarget: "en",
+});
+assert(
+  memberTeachEn.targetLanguage === "en",
+  "member TalkConfig.teach.learning=en when profile target unset",
+);
 
 const memberEnTh = resolveSessionLanguages({
   isGuest: false,
@@ -218,8 +280,17 @@ assert(
 );
 
 assert(
+  resolveProfileUiAnchor({
+    isGuest: true,
+    profileUiLang: null,
+    sessionUiLang: "th",
+    guestPracticeTarget: "en",
+  }) === "th",
+  "guest UI anchor follows practice pick (English → ui th)",
+);
+assert(
   resolveProfileUiAnchor({ isGuest: true, profileUiLang: null, sessionUiLang: "th" }) === "en",
-  "guest UI anchor hard-locked to en",
+  "guest no-pick UI anchor fallback en",
 );
 assert(
   resolveProfileUiAnchor({ isGuest: false, profileUiLang: null, sessionUiLang: "en" }) === "en",
@@ -1070,6 +1141,24 @@ assert(
   talkPageSrc.includes("sessionUiLangRef.current = next") &&
     talkPageSrc.includes("handleCycleLang"),
   "handleCycleLang syncs sessionUiLangRef",
+);
+assert(
+  talkPageSrc.includes("GuestPracticePick") &&
+    talkPageSrc.includes("guestPracticeTargetRef") &&
+    talkPageSrc.includes("writeGuestPracticeTargetCookie"),
+  "talk page wires guest practice pick + cookie",
+);
+assert(
+  talkPageSrc.includes("teachLearningTarget: config.teach.learning") ||
+    talkPageSrc.includes("teachLearningTarget: c.teach.learning"),
+  "TalkConfig.teach.learning reaches session language resolution",
+);
+const languageSrc = readFileSync(join(ROOT, "lib/brain/language.ts"), "utf8");
+assert(
+  !/if \(args\.isGuest\)[\s\S]{0,120}return \{ uiLanguage: "en", targetLanguage: "th" \}/.test(
+    languageSrc,
+  ),
+  "resolveSessionLanguages guest branch derives from pick, not hardcoded en/th only",
 );
 assert(
   talkPageSrc.includes("resolveLiveSessionLanguages") &&
