@@ -118,6 +118,7 @@ import {
 import { sanitizeModelTranscript } from "../lib/live/transcript";
 import {
   sortTranscriptItems,
+  TRANSCRIPT_CARD_ORDER,
   TRANSCRIPT_GEMINI_ORDER,
   TRANSCRIPT_USER_ORDER,
 } from "../lib/live/transcript-order";
@@ -659,6 +660,21 @@ const perExchangeCarded = new Set<string>();
 assert(claimLessonWordCard(perExchangeCarded, "eat"), "claim accepts first eat card");
 assert(!claimLessonWordCard(perExchangeCarded, "eat"), "claim rejects duplicate eat in same exchange");
 assert(perExchangeCarded.size === 1, "one-card-per-word guarantee holds under repeat claim");
+
+const oneWordOneCardItems = [
+  {
+    id: "c1",
+    kind: "word_card" as const,
+    word: { word_en: "hello", word_th: "สวัสดี" },
+    direction: "en_to_th" as const,
+    turnSeq: 2,
+    roleOrder: TRANSCRIPT_CARD_ORDER,
+  },
+];
+assert(
+  oneWordOneCardItems.filter((i) => i.word.word_en.toLowerCase() === "hello").length === 1,
+  "one taught word yields exactly one card item on canvas",
+);
 
 assert(planSizeForTier("free") === 4, "free plan size = 4");
 assert(planSizeForTier("pro") === 6, "pro plan size = 6");
@@ -1226,6 +1242,10 @@ assert(
 assert(
   talkPageSrc.includes("runCardBackstop"),
   "talk page runs lesson card backstop",
+);
+assert(
+  /runCardBackstop[\s\S]{0,400}cardsThisTurn\.length > 0/.test(talkPageSrc),
+  "backstop skips when a card already exists for this exchange",
 );
 assert(
   talkPageSrc.includes("sortTranscriptItems"),

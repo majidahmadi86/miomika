@@ -286,6 +286,10 @@ export default function TalkPage() {
       const snap = clientRef.current?.getSessionSnapshot().teachWord;
       if (!snap || snap.lessonPlan.length === 0) return;
       const turnSeq = currentTurnSeqRef.current;
+      const cardsThisTurn = itemsRef.current.filter(
+        (item) => item.kind === "word_card" && item.turnSeq === turnSeq,
+      );
+      if (cardsThisTurn.length > 0) return;
       const wordIds = planBackstopCardWords({
         teaching: preTurnState.teaching,
         wordPickThisTurn: preTurnState.wordPickThisTurn,
