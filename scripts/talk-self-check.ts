@@ -850,6 +850,19 @@ assert(
   "open first-time kickoff mandates mic press (th)",
 );
 assert(
+  kickoffEnFirst.includes("ONE short warm sentence") &&
+    kickoffEnFirst.includes("Do NOT use two sentences"),
+  "open first-time kickoff is exactly one sentence (en)",
+);
+assert(
+  kickoffThFirst.includes("หนึ่งประโยค") && kickoffThFirst.includes("ห้ามใช้สองประโยค"),
+  "open first-time kickoff is exactly one sentence (th)",
+);
+assert(
+  !/ONE or TWO short sentences/i.test(kickoffEnFirst),
+  "open first-time kickoff no longer allows two sentences (en)",
+);
+assert(
   !/ready to learn your first|ready to learn\?/i.test(kickoffEnFirst.split(/Do NOT/i)[0] ?? kickoffEnFirst),
   "open first-time kickoff has no learning agenda (en)",
 );
