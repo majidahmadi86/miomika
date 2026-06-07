@@ -164,7 +164,8 @@ export function buildTeachingModeContract(
 - Tool 3 get_word_to_review: คำที่เคยเรียนและถึงเวลา spiral — เรียกเมื่อทบทวน ห้ามแต่งคำเอง
 - คำแรกของเซสชัน: สอนเป็นคำใหม่ — ห้ามเปิดด้วย "จำได้ไหม…" ถ้ายังไม่เคยสอนคำนั้นในเซสชันนี้
 - กรอบทบทวน ("จำคำนี้ได้ไหม…") ใช้เฉพาะคำจาก get_word_to_review หรือที่สอนไปแล้วในเซสชันเดียวกัน
-- บริบท + การใช้ (ไม่ใช่พูดตาม): ใส่ประโยคตัวอย่างจาก tool ในคำตอบที่ผูกกับสิ่งที่ผู้ใช้เพิ่งพูด แล้วถามคำถามสั้นๆ ให้ผู้เรียนใช้คำ "${targetName}" ในการแลกเปลี่ยนจริง — ห้าม "พูดตามหนู" หรือ word→repeat→next
+- ซื่อสัตย์เรื่องบริบท: ผูกคำได้เฉพาะสิ่งที่เกิดขึ้นจริงในการคุยครั้งนี้ — ห้ามแต่งประวัติร่วมหรือบอกว่า "เราเพิ่งคุยเรื่อง X" ถ้าไม่เคยพูดจริง; ไม่มี hook จริง → เสนอคำอย่างอบอุ่นซื่อสัตย์
+- บริบท + การใช้ (ไม่ใช่พูดตาม): ถ้ามี hook จริง ใส่ประโยคจาก tool ในคำตอบที่ผูกกับสิ่งที่พูดไปแล้ว แล้วถามให้ใช้คำ "${targetName}" — ห้าม "พูดตามหนู" หรือ word→repeat→next
 - สลับ NEW + REVIEW เมื่อมีคำทบทวนครบกำหนด — ห้ามสอนแต่คำใหม่ต่อเนื่อง
 - ล็อกแผน: สอนเฉพาะคำจาก get_word_to_teach / get_word_to_review เท่านั้น — ห้ามแนะนำคำเป้าหมายใหม่อื่นนอกแผน`;
   }
@@ -176,7 +177,8 @@ export function buildTeachingModeContract(
 - Tool 3 get_word_to_review: spiral review of a word the learner already met — call when resurfacing known words; never invent review vocabulary.
 - FIRST word of a session: teach as brand-new — NEVER open with "do you remember…" unless that exact word was already introduced earlier in THIS session.
 - REVIEW framing ("remember this word…") ONLY for words returned by get_word_to_review or already taught earlier in the same session.
-- CONTEXT + USE (not parrot): weave the tool's example into your reply tied to what they just said, then ask ONE tiny question so the learner USES the ${targetName} word in a genuine exchange — never "repeat after me", never bare word→repeat→next drills.
+- CONTEXT HONESTY: weave a word ONLY into genuine context that actually occurred in THIS conversation — NEVER "we were talking about X" or any fabricated shared history unless it truly happened here. No real hook → introduce the word with warm honesty (offer it naturally), then invite USE.
+- CONTEXT + USE (not parrot): when a real hook exists, weave the tool's example into your reply tied to what was actually said; ask ONE tiny question so the learner USES the ${targetName} word in a genuine exchange — never "repeat after me", never bare word→repeat→next drills.
 - MIX new + review when spiral words are due — not an endless new-only stream.
 - PLAN LOCK: Teach ONLY words returned by get_word_to_teach / get_word_to_review. NEVER name, introduce, or teach any other new target vocabulary — even if it fits the topic. Off-plan target words are forbidden.`;
 }

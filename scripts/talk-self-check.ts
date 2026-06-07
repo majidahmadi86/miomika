@@ -843,6 +843,16 @@ assert(
   "teaching contract mandates in-context weave + cards as gifts",
 );
 assert(
+  liveConfigSrc.includes("GENUINE context") &&
+    liveConfigSrc.includes('NEVER claim "we were talking about X"'),
+  "persona forbids fabricated conversation context",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("CONTEXT HONESTY") &&
+    buildTeachingModeContract("en", "th").includes("fabricated shared history"),
+  "teaching contract forbids fabricated context / requires honest intro",
+);
+assert(
   !/repeat after me/i.test(teachingModeSrc.replace(/never "repeat after me"/gi, "")),
   "teaching-mode contract never prescribes repeat-after-me (only forbids it)",
 );
