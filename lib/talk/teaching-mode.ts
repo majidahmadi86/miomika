@@ -6,6 +6,13 @@
 
 export type LessonPhase = "review" | "focus" | "use" | "recap";
 export type WordPickKind = "new" | "review";
+export type ExplicitLessonRequest = "new_word" | "show_card";
+
+const EXPLICIT_NEW_WORD_RE =
+  /(?:new\s+word|another\s+word|next\s+word|teach\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?word|give\s+me\s+(?:a\s+)?(?:new\s+)?word|learn\s+(?:a\s+)?new\s+word|คำใหม่|สอนคำใหม่|เรียนคำใหม่|เอาคำใหม่|ขอคำใหม่)/i;
+
+const EXPLICIT_SHOW_CARD_RE =
+  /(?:show\s+(?:me\s+)?(?:the\s+)?(?:word\s+)?card|see\s+(?:the\s+)?card|display\s+(?:the\s+)?card|where(?:'s| is)\s+(?:the\s+)?card|แสดง(?:บัตร|การ์ด)|ดูบัตร|ขอดูบัตร|บัตร(?:คำ)?(?:หน่อย|ได้ไหม))/i;
 
 export type TeachingModeState = {
   phase: LessonPhase;
@@ -44,11 +51,38 @@ export function toolNameForPick(
   return kind === "review" ? "get_word_to_review" : "get_word_to_teach";
 }
 
+/** Clear user ask for the next plan word or its card — overrides review-leaning phase machine. */
+export function detectExplicitLessonWordRequest(text: string): ExplicitLessonRequest | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  if (EXPLICIT_SHOW_CARD_RE.test(trimmed)) return "show_card";
+  if (EXPLICIT_NEW_WORD_RE.test(trimmed)) return "new_word";
+  return null;
+}
+
+export function buildExplicitLessonRequestNudge(
+  kind: ExplicitLessonRequest,
+  ui: "th" | "en",
+  nextWord: string,
+): string {
+  const wordLock = `SYSTEM-SERVED WORD="${nextWord}"`;
+  if (ui === "th") {
+    return kind === "show_card"
+      ? `[explicit_request] ผู้ใช้ขอดูบัตร — ระบบส่งคำ+บัตร ${wordLock} แล้ว สอนเฉพาะคำนี้ ห้ามทบทวน เบี่ยงเบน หรือแต่งคำใหม่ หนูเล่าให้อบอุ่นเท่านั้น`
+      : `[explicit_request] ผู้ใช้ขอคำใหม่ — ระบบส่งคำ+บัตร ${wordLock} แล้ว เรียก get_word_to_teach แล้วสอนเฉพาะคำนี้ ห้ามทบทวน เบี่ยงเบน หรือถามเยอะ หนูเล่าให้อบอุ่นเท่านั้น`;
+  }
+  return kind === "show_card"
+    ? `[explicit_request] User asked to see the card — SYSTEM already served word+card ${wordLock}. Teach ONLY this word warmly; do NOT review, deflect, or invent vocabulary. Narrate the system word — warmth is tone only.`
+    : `[explicit_request] User asked for a NEW word — SYSTEM already served word+card ${wordLock}. Call get_word_to_teach and teach ONLY this word; do NOT deflect to review or pile on questions. Narrate warmly — word+card are system-owned.`;
+}
+
 /** Which tool to call next — null when the phase is conversational (use/recap). */
 export function recommendWordPick(
   state: TeachingModeState,
-  opts: { hasDueReview: boolean; canIntroNew: boolean },
+  opts: { hasDueReview: boolean; canIntroNew: boolean; forceNewWord?: boolean },
 ): WordPickKind | null {
+  if (opts.forceNewWord && opts.canIntroNew) return "new";
+
   if (state.phase === "use" || state.phase === "recap") return null;
 
   if (state.phase === "review") {
@@ -159,7 +193,9 @@ export function buildTeachingModeContract(
   if (ui === "th") {
     return `TEACHING MODE v1 — โครงบทเรียน (ทำตามเสมอ):
 - หนูเป็นเพื่อนก่อน — คุยตามผู้ใช้; บัตรคำเป็นของขวญเล็กๆ ไม่ใช่จุดหมายของห้อง
+- ระบบเป็นเจ้าของคำ+บัตร: หนูเล่าให้อบอุ่นเท่านั้น — ห้ามแต่งหรือตั้งชื่อคำเป้าหมายที่ระบบยังไม่ส่ง
 - ลำดับ: ทบทวนคำที่เคยเรียน (REVIEW) → โฟกัสคำใหม่ 1–2 คำในบริบท (FOCUS) → ให้ผู้เรียนใช้คำ (USE) → สรุปอบอุ่น (RECAP). ห้ามสตรีมคำแยกๆ แบบสุ่ม
+- คำขอชัดเจน ("คำใหม่" / "ดูบัตร"): ระบบส่งคำถัดไป+บัตรทันที — สอนคำนั้น ห้ามเบี่ยงไปทบทวน
 - Tool 1 get_word_to_teach: คำใหม่เท่านั้น — เรียกก่อนสอนคำใหม่ทุกครั้ง
 - Tool 3 get_word_to_review: คำที่เคยเรียนและถึงเวลา spiral — เรียกเมื่อทบทวน ห้ามแต่งคำเอง
 - คำแรกของเซสชัน: สอนเป็นคำใหม่ — ห้ามเปิดด้วย "จำได้ไหม…" ถ้ายังไม่เคยสอนคำนั้นในเซสชันนี้
@@ -172,7 +208,9 @@ export function buildTeachingModeContract(
 
   return `TEACHING MODE v1 — lesson arc (always follow):
 - COMPANION FIRST — follow the user; word cards are little gifts, not the main event
+- SYSTEM OWNS WORD + CARD: you NARRATE warmly only — NEVER name or teach a target word the system did not serve this turn. Warmth = tone; word + card are deterministic, not yours to invent.
 - Shape: quick REVIEW of a known word → FOCUS (1–2 related NEW words in context) → USE (learner applies the word in a real exchange) → warm RECAP. Not a random stream of isolated words.
+- EXPLICIT REQUESTS ("new word" / "show me the card"): SYSTEM serves the NEXT plan word + card immediately — teach THAT word only; do NOT deflect to review or ignore the ask.
 - Tool 1 get_word_to_teach: NEW words only — call before teaching any new vocabulary.
 - Tool 3 get_word_to_review: spiral review of a word the learner already met — call when resurfacing known words; never invent review vocabulary.
 - FIRST word of a session: teach as brand-new — NEVER open with "do you remember…" unless that exact word was already introduced earlier in THIS session.
@@ -189,6 +227,8 @@ export type PhaseNudgeOpts = {
   nextPlannedWord?: string | null;
   lessonTopic?: string | null;
   lessonComplete?: boolean;
+  /** User explicitly asked for the next plan word — overrides review-leaning. */
+  explicitNewWordRequest?: boolean;
 };
 
 export function buildPhaseNudge(
@@ -196,7 +236,11 @@ export function buildPhaseNudge(
   ui: "th" | "en",
   opts: PhaseNudgeOpts,
 ): string {
-  const pick = recommendWordPick(state, opts);
+  const pick = recommendWordPick(state, {
+    hasDueReview: opts.hasDueReview,
+    canIntroNew: opts.canIntroNew,
+    forceNewWord: opts.explicitNewWordRequest,
+  });
   const toolHint = pick ? toolNameForPick(pick) : "none (conversation only)";
   const topicPart = opts.lessonTopic ? ` topic=${opts.lessonTopic}` : "";
   const nextWord = opts.nextPlannedWord?.trim() ?? "";

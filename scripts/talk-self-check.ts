@@ -46,16 +46,19 @@ import {
 } from "../lib/live/member-context";
 import {
   advanceAfterTurn,
+  buildExplicitLessonRequestNudge,
   buildPhaseNudge,
   buildTeachingModeContract,
   cardContextForWord,
   createTeachingModeState,
+  detectExplicitLessonWordRequest,
   GET_WORD_TO_REVIEW_DECLARATION,
   recommendWordPick,
   recordWordPick,
   shouldPreferReviewOverNew,
   toolNameForPick,
 } from "../lib/talk/teaching-mode";
+import { sanitizeUserTranscript } from "../lib/live/transcript";
 import {
   newGeminiTranscriptItem,
   routeGeminiTranscriptChunk,
@@ -1246,6 +1249,67 @@ assert(
     talkPageSrc.includes("teachLearningTarget: c.teach.learning"),
   "TalkConfig.teach.learning reaches session language resolution",
 );
+
+section("Warmth + discipline harness");
+
+assert(
+  detectExplicitLessonWordRequest("teach me a new word please") === "new_word",
+  "explicit new-word request detected",
+);
+assert(
+  detectExplicitLessonWordRequest("show me the card") === "show_card",
+  "explicit show-card request detected",
+);
+assert(
+  detectExplicitLessonWordRequest("ขอดูบัตรหน่อยค่ะ") === "show_card",
+  "explicit show-card request detected (Thai)",
+);
+assert(
+  detectExplicitLessonWordRequest("how do you say water in Thai") === null,
+  "target-content question is not an explicit lesson request",
+);
+assert(
+  recommendWordPick(createTeachingModeState({ phase: "review" }), {
+    hasDueReview: true,
+    canIntroNew: true,
+    forceNewWord: true,
+  }) === "new",
+  "forceNewWord overrides review-leaning phase machine",
+);
+const explicitNudge = buildExplicitLessonRequestNudge("new_word", "en", "water");
+assert(
+  explicitNudge.includes('SYSTEM-SERVED WORD="water"') &&
+    explicitNudge.includes("do NOT deflect to review"),
+  "explicit request nudge locks system-served word and forbids review deflection",
+);
+assert(
+  liveConfigSrc.includes("SYSTEM OWNS WORD + CARD") &&
+    liveConfigSrc.includes("Warmth = tone only"),
+  "persona declares system-owned word+card; warmth is tone only",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("SYSTEM OWNS WORD + CARD"),
+  "teaching contract declares system-owned word+card",
+);
+assert(
+  buildSystemInstruction("en", "th").includes("fabricate shared history") ||
+    buildSystemInstruction("en", "th").includes("NEVER claim"),
+  "system instruction forbids fabricated conversation context",
+);
+assert(
+  sanitizeUserTranscript("hello नमस्ते world") === "hello world",
+  "sanitizer strips Devanagari from English speech",
+);
+assert(
+  sanitizeUserTranscript("สวัสดี 你好") === "สวัสดี",
+  "sanitizer strips CJK from Thai speech",
+);
+assert(
+  talkPageSrc.includes("honorExplicitLessonRequest") &&
+    talkPageSrc.includes("detectExplicitLessonWordRequest"),
+  "talk page honors explicit new-word / show-card requests",
+);
+
 const languageSrc = readFileSync(join(ROOT, "lib/brain/language.ts"), "utf8");
 assert(
   languageSrc.includes("browserUiLang") &&

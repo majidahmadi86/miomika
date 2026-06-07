@@ -68,7 +68,11 @@ import {
   teachWordToVocabularyEntry,
   type TeachWordResult,
 } from "@/lib/talk/teach-word-card";
-import { recordWordPick } from "@/lib/talk/teaching-mode";
+import {
+  buildExplicitLessonRequestNudge,
+  detectExplicitLessonWordRequest,
+  recordWordPick,
+} from "@/lib/talk/teaching-mode";
 import { TurnRuntime, isReplaySuspended } from "@/lib/live/turn-runtime";
 import type { LiveUiPhase } from "@/lib/live/turn-controller";
 import { replayWordAudio } from "@/lib/talk/word-replay";
@@ -592,13 +596,43 @@ export default function TalkPage() {
     [profile?.ui_language, profile?.learning_target_language, config.teach.learning, syncTeachWordContext],
   );
 
+  const honorExplicitLessonRequest = useCallback(
+    async (userText: string) => {
+      const kind = detectExplicitLessonWordRequest(userText);
+      if (!kind) return;
+      const client = clientRef.current;
+      if (!client?.isConnected()) return;
+      const snap = client.getSessionSnapshot().teachWord;
+      if (!snap.lessonPlan.length || isLessonComplete(snap.lessonPlan, snap.introducedIdx)) {
+        return;
+      }
+      const nextWord = nextPlannedWord(snap.lessonPlan, snap.introducedIdx);
+      if (!nextWord) return;
+
+      await fetchAndPushPlanCard(nextWord, currentTurnSeqRef.current);
+
+      const runtime = ensureTurnRuntime();
+      runtime.state = {
+        ...runtime.state,
+        teaching: recordWordPick(runtime.state.teaching, "new"),
+      };
+      client.sendHiddenContext(
+        buildExplicitLessonRequestNudge(kind, sessionUiLangRef.current, nextWord),
+      );
+    },
+    [ensureTurnRuntime, fetchAndPushPlanCard],
+  );
+
   const finalizeUserInputTranscript = useCallback(() => {
     if (userInputFinalizedRef.current) return "";
     userInputFinalizedRef.current = true;
     const finalUserText = commitUserTranscript();
-    if (finalUserText) maybeAdaptSessionLanguages(finalUserText);
+    if (finalUserText) {
+      maybeAdaptSessionLanguages(finalUserText);
+      void honorExplicitLessonRequest(finalUserText);
+    }
     return finalUserText;
-  }, [commitUserTranscript, maybeAdaptSessionLanguages]);
+  }, [commitUserTranscript, honorExplicitLessonRequest, maybeAdaptSessionLanguages]);
 
   const appendTranscript = useCallback((role: "user" | "gemini", chunk: string) => {
     if (role === "user") {
@@ -1233,6 +1267,7 @@ export default function TalkPage() {
     setItems((prev) => [...prev, newItem]);
     setTextInput("");
     maybeAdaptSessionLanguages(cleaned);
+    void honorExplicitLessonRequest(cleaned);
     if (!ensureTurnRuntime().state.sessionActive) {
       void (async () => {
         await ensurePlaybackUnlocked();
@@ -1251,6 +1286,7 @@ export default function TalkPage() {
     ensureTurnRuntime,
     startLiveSession,
     maybeAdaptSessionLanguages,
+    honorExplicitLessonRequest,
     openGuestSignupSheet,
   ]);
 
