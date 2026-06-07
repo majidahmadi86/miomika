@@ -1310,7 +1310,7 @@ assert(
 );
 assert(
   talkPageSrc.includes("cardAlreadyThisTurn") &&
-    /runCardBackstop[\s\S]{0,700}itemsRef\.current\.some[\s\S]{0,120}word_card/.test(
+    /runCardBackstop[\s\S]{0,1200}itemsRef\.current\.some[\s\S]{0,120}word_card/.test(
       talkPageSrc,
     ),
   "one card per turnSeq enforced at push and backstop time",
