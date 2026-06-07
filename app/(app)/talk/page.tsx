@@ -56,7 +56,8 @@ import {
   nextPlannedWord,
 } from "@/lib/talk/lesson-plan";
 import {
-  markPlanWordCarded,
+  claimLessonWordCard,
+  isLessonWordCarded,
   missingCardedPlanWords,
   shouldBackstopFocusNewWord,
   teachResultWordId,
@@ -196,6 +197,7 @@ export default function TalkPage() {
   const turnSeqRef = useRef(0);
   const currentTurnSeqRef = useRef(0);
   const pendingUserTextRef = useRef("");
+  const userInputFinalizedRef = useRef(false);
   const cardedPlanWordsRef = useRef<Set<string>>(new Set());
   const planWordCacheRef = useRef<Map<string, TeachWordResult>>(new Map());
 
@@ -218,7 +220,7 @@ export default function TalkPage() {
   }, []);
 
   const pushWordCard = useCallback((entry: VocabularyEntry, turnSeq: number) => {
-    markPlanWordCarded(cardedPlanWordsRef.current, entry.word_en);
+    if (!claimLessonWordCard(cardedPlanWordsRef.current, entry.word_en)) return;
     const direction = cardDirectionForTarget(sessionTargetLangRef.current);
     const cardId = crypto.randomUUID();
     setItems((prev) => {
@@ -241,8 +243,7 @@ export default function TalkPage() {
 
   const fetchAndPushPlanCard = useCallback(
     async (wordId: string, turnSeq: number, cached?: TeachWordResult) => {
-      const key = wordId.trim().toLowerCase();
-      if (cardedPlanWordsRef.current.has(key)) return;
+      if (isLessonWordCarded(cardedPlanWordsRef.current, wordId)) return;
       let result = cached ?? planWordCacheRef.current.get(wordId);
       if (!result?.word_en) {
         const snap = clientRef.current?.getSessionSnapshot().teachWord;
@@ -358,6 +359,7 @@ export default function TalkPage() {
     currentGeminiItemIdRef.current = null;
     currentUserItemIdRef.current = null;
     pendingUserTextRef.current = "";
+    userInputFinalizedRef.current = false;
   }, []);
 
   const stopContinuousMic = useCallback(() => {
@@ -574,6 +576,14 @@ export default function TalkPage() {
     [profile?.ui_language, profile?.learning_target_language, syncTeachWordContext],
   );
 
+  const finalizeUserInputTranscript = useCallback(() => {
+    if (userInputFinalizedRef.current) return "";
+    userInputFinalizedRef.current = true;
+    const finalUserText = commitUserTranscript();
+    if (finalUserText) maybeAdaptSessionLanguages(finalUserText);
+    return finalUserText;
+  }, [commitUserTranscript, maybeAdaptSessionLanguages]);
+
   const appendTranscript = useCallback((role: "user" | "gemini", chunk: string) => {
     if (role === "user") {
       const cleaned = sanitizeUserTranscript(chunk);
@@ -650,12 +660,8 @@ export default function TalkPage() {
         discardSuspendedModelTurn();
         return;
       }
-      const finalUserText = commitUserTranscript();
       const preTurnState = { ...runtime.state };
       void runCardBackstop(preTurnState);
-      if (finalUserText) {
-        maybeAdaptSessionLanguages(finalUserText);
-      }
       dispatchTurn({ type: "turn_complete" });
       return;
     }
@@ -678,11 +684,15 @@ export default function TalkPage() {
         });
       }
       appendTranscript("user", msg.text);
+      if (msg.finished) finalizeUserInputTranscript();
       return;
     }
     if (msg.type === "gemini") {
       if (suspended) return;
       if (isHiddenLiveTranscript(msg.text)) return;
+      if (!userInputFinalizedRef.current && pendingUserTextRef.current) {
+        finalizeUserInputTranscript();
+      }
       dispatchTurn({ type: "model_transcript", text: msg.text });
       appendTranscript("gemini", msg.text);
       return;
@@ -718,11 +728,10 @@ export default function TalkPage() {
     }
   }, [
     appendTranscript,
-    commitUserTranscript,
     discardSuspendedModelTurn,
     dispatchTurn,
     ensureTurnRuntime,
-    maybeAdaptSessionLanguages,
+    finalizeUserInputTranscript,
     pushWordCard,
     resetTranscriptIds,
     runCardBackstop,

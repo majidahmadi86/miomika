@@ -87,6 +87,8 @@ import {
   selectLessonTopic,
 } from "../lib/talk/lesson-plan";
 import {
+  claimLessonWordCard,
+  isLessonWordCarded,
   markPlanWordCarded,
   missingCardedPlanWords,
   shouldBackstopFocusNewWord,
@@ -385,6 +387,7 @@ const planBankRows = [
     word_en: "hello",
     word_th: "สวัสดี",
     cefr_level: "A1",
+    difficulty_score: 10,
     frequency_score: 90,
     created_at: "2026-01-02T00:00:00Z",
     topic: "food",
@@ -393,6 +396,7 @@ const planBankRows = [
     word_en: "general2",
     word_th: "ทั่วไป",
     cefr_level: "A1",
+    difficulty_score: 5,
     frequency_score: 95,
     created_at: "2026-01-01T00:00:00Z",
     topic: "food",
@@ -401,40 +405,55 @@ const planBankRows = [
     word_en: "water",
     word_th: "น้ำ",
     cefr_level: "A1",
+    difficulty_score: 20,
     frequency_score: 80,
     created_at: "2026-01-03T00:00:00Z",
+    topic: "food",
+  },
+  {
+    word_en: "good morning",
+    word_th: "สวัสดีตอนเช้า",
+    cefr_level: "A1",
+    difficulty_score: 25,
+    frequency_score: 95,
+    prerequisite_words: ["hello"],
+    created_at: "2026-01-04T00:00:00Z",
     topic: "food",
   },
   {
     word_en: "thanks",
     word_th: "ขอบคุณ",
     cefr_level: "A1",
+    difficulty_score: 30,
     frequency_score: 70,
-    created_at: "2026-01-04T00:00:00Z",
+    created_at: "2026-01-05T00:00:00Z",
     topic: "food",
   },
   {
     word_en: "tired",
     word_th: "เหนื่อย",
     cefr_level: "A1",
+    difficulty_score: 40,
     frequency_score: 60,
-    created_at: "2026-01-05T00:00:00Z",
+    created_at: "2026-01-06T00:00:00Z",
     topic: "travel",
   },
   {
     word_en: "airport",
     word_th: "สนามบิน",
     cefr_level: "A1",
+    difficulty_score: 50,
     frequency_score: 55,
-    created_at: "2026-01-06T00:00:00Z",
+    created_at: "2026-01-07T00:00:00Z",
     topic: "travel",
   },
   {
     word_en: "hotel",
     word_th: "โรงแรม",
     cefr_level: "A1",
+    difficulty_score: 55,
     frequency_score: 50,
-    created_at: "2026-01-07T00:00:00Z",
+    created_at: "2026-01-08T00:00:00Z",
     topic: "travel",
   },
 ];
@@ -468,8 +487,19 @@ assert(
   "themed plan uses one topic only",
 );
 assert(
-  guestPlan[0] === "hello" && guestPlan[1] === "water" && guestPlan[2] === "thanks",
-  "plan ordered by frequency_score desc within topic (slug skipped)",
+  guestPlan[0] === "hello" && guestPlan[1] === "water" && guestPlan[2] === "good morning",
+  "plan ordered easiest-first; basic greeting before phrase (slug skipped)",
+);
+const guestDifficulties = guestPlan.map(
+  (id) => planBankRows.find((r) => r.word_en === id)?.difficulty_score ?? 0,
+);
+assert(
+  guestDifficulties.every((d, i) => i === 0 || d >= guestDifficulties[i - 1]!),
+  "plan difficulty_score is non-decreasing within built plan",
+);
+assert(
+  guestPlan.indexOf("hello") < guestPlan.indexOf("good morning"),
+  "prerequisite greeting orders before dependent phrase",
 );
 
 assert(nextPlannedWord(guestPlan, 0) === "hello", "nextPlannedWord never null mid-lesson");
@@ -486,8 +516,25 @@ assert(
   "card dedup — marked words drop out of missing list",
 );
 
-const backstopCarded = new Set<string>();
+const dedupCarded = new Set<string>();
 const focusState = createTeachingModeState({ phase: "focus" });
+assert(claimLessonWordCard(dedupCarded, "hello"), "claimLessonWordCard accepts first card");
+assert(!claimLessonWordCard(dedupCarded, "Hello"), "claimLessonWordCard rejects duplicate normalized id");
+assert(isLessonWordCarded(dedupCarded, "hello"), "isLessonWordCarded sees claimed word");
+assert(
+  !shouldBackstopFocusNewWord({
+    teaching: focusState,
+    wordPickThisTurn: false,
+    hasDueReview: false,
+    canIntroNew: true,
+    plan: guestPlan,
+    introducedIdx: 0,
+    carded: dedupCarded,
+  }),
+  "backstop skips word when tool already claimed card synchronously",
+);
+
+const backstopCarded = new Set<string>();
 assert(
   shouldBackstopFocusNewWord({
     teaching: focusState,
@@ -556,7 +603,7 @@ reviewPick = pickPlanReviewWord({
 assert(reviewPick === null, "review returns null when introduced pool exhausted");
 
 assert(
-  countCardableRows(planBankRows, "A1") === 6,
+  countCardableRows(planBankRows, "A1") === 7,
   "countCardableRows excludes slug rows at A1",
 );
 
@@ -966,8 +1013,18 @@ assert(
   "talk page sorts transcript by turnSeq + roleOrder",
 );
 assert(
-  talkPageSrc.includes("pendingUserTextRef"),
-  "user transcript accumulates pending until turn_complete",
+  talkPageSrc.includes("pendingUserTextRef") &&
+    talkPageSrc.includes("finalizeUserInputTranscript") &&
+    talkPageSrc.includes("userInputFinalizedRef"),
+  "user transcript commits on user-input-final before turn_complete",
+);
+assert(
+  talkPageSrc.includes("claimLessonWordCard"),
+  "talk page uses shared lesson card dedup claim",
+);
+assert(
+  miomiClientSrc.includes("inputTranscription.finished"),
+  "live client forwards user input transcription finished flag",
 );
 assert(
   talkPageSrc.includes("getLessonNudgeHints"),

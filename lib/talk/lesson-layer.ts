@@ -48,6 +48,23 @@ export function shouldBackstopFocusNewWord(args: {
   return !args.carded.has(normalizeWordKey(next));
 }
 
+/** Shared per-lesson set — exactly one card per normalized word (tool + backstop). */
+export function isLessonWordCarded(carded: Set<string>, wordId: string): boolean {
+  const key = normalizeWordKey(wordId);
+  return !!key && carded.has(key);
+}
+
+/**
+ * Synchronous claim before any word_card append.
+ * Returns false when the word already has a card (repeat tool call or backstop race).
+ */
+export function claimLessonWordCard(carded: Set<string>, wordId: string): boolean {
+  const key = normalizeWordKey(wordId);
+  if (!key || carded.has(key)) return false;
+  carded.add(key);
+  return true;
+}
+
 export function markPlanWordCarded(carded: Set<string>, wordId: string): void {
   const key = normalizeWordKey(wordId);
   if (key) carded.add(key);

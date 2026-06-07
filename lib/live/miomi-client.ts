@@ -27,7 +27,7 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 export type LiveClientMessage =
   | { type: "interrupted" }
   | { type: "audio"; data: ArrayBuffer }
-  | { type: "user"; text: string }
+  | { type: "user"; text: string; finished?: boolean }
   | { type: "gemini"; text: string }
   | { type: "turn_complete" }
   | { type: "tool_call"; name: string; args: Record<string, unknown>; result: unknown };
@@ -260,8 +260,12 @@ export class MiomiLiveClient {
       }
     }
 
-    if (sc?.inputTranscription?.text) {
-      this.callbacks.onMessage?.({ type: "user", text: sc.inputTranscription.text });
+    if (sc?.inputTranscription) {
+      const text = sc.inputTranscription.text ?? "";
+      const finished = sc.inputTranscription.finished === true;
+      if (text || finished) {
+        this.callbacks.onMessage?.({ type: "user", text, finished });
+      }
     }
     if (sc?.outputTranscription?.text) {
       this.callbacks.onMessage?.({ type: "gemini", text: sc.outputTranscription.text });

@@ -12,6 +12,8 @@ export type LessonPlanBankRow = {
   emoji?: string | null;
   created_at?: string | null;
   frequency_score?: number | null;
+  difficulty_score?: number | null;
+  prerequisite_words?: string[] | string | null;
   topic?: string | null;
 };
 
@@ -82,15 +84,52 @@ export function buildExcludeSet(words: string[]): Set<string> {
   return new Set(words.map((w) => w.trim().toLowerCase()).filter(Boolean));
 }
 
-/** Deterministic order: frequency_score desc, then created_at asc. */
+/** Parse prerequisite_words from bank row (JSON array or comma-separated). */
+export function parsePrerequisiteWords(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((w) => String(w).trim().toLowerCase()).filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed) as unknown;
+        if (Array.isArray(parsed)) {
+          return parsed.map((w) => String(w).trim().toLowerCase()).filter(Boolean);
+        }
+      } catch {
+        /* fall through to comma split */
+      }
+    }
+    return trimmed.split(",").map((w) => w.trim().toLowerCase()).filter(Boolean);
+  }
+  return [];
+}
+
+/** Easiest-first: difficulty_score asc, frequency_score desc, created_at asc. */
+export function compareRowsForPlan(a: LessonPlanBankRow, b: LessonPlanBankRow): number {
+  const diffDiff = (a.difficulty_score ?? 0) - (b.difficulty_score ?? 0);
+  if (diffDiff !== 0) return diffDiff;
+  const freqDiff = (b.frequency_score ?? 0) - (a.frequency_score ?? 0);
+  if (freqDiff !== 0) return freqDiff;
+  const aCreated = (a.created_at ?? "").trim();
+  const bCreated = (b.created_at ?? "").trim();
+  return aCreated.localeCompare(bCreated);
+}
+
 export function sortRowsForPlan(rows: LessonPlanBankRow[]): LessonPlanBankRow[] {
-  return [...rows].sort((a, b) => {
-    const freqDiff = (b.frequency_score ?? 0) - (a.frequency_score ?? 0);
-    if (freqDiff !== 0) return freqDiff;
-    const aCreated = (a.created_at ?? "").trim();
-    const bCreated = (b.created_at ?? "").trim();
-    return aCreated.localeCompare(bCreated);
-  });
+  return [...rows].sort(compareRowsForPlan);
+}
+
+function prereqsSatisfied(
+  row: LessonPlanBankRow,
+  planKeys: Set<string>,
+  exclude: Set<string>,
+): boolean {
+  const prereqs = parsePrerequisiteWords(row.prerequisite_words);
+  return prereqs.every((p) => planKeys.has(p) || exclude.has(p));
 }
 
 export function countCardableByTopic(args: {
@@ -146,7 +185,7 @@ export function selectLessonTopic(args: {
   return eligible[0]?.[0] ?? null;
 }
 
-/** Pure plan builder — single topic, cardable-only, excludes known words, capped at planSize. */
+/** Pure plan builder — single topic, easiest-first with prerequisite order, capped at planSize. */
 export function buildLessonPlanFromRows(args: {
   rows: LessonPlanBankRow[];
   planSize: number;
@@ -154,8 +193,8 @@ export function buildLessonPlanFromRows(args: {
   topic?: string | null;
 }): string[] {
   const topicFilter = args.topic?.trim() ?? "";
-  const plan: string[] = [];
-  for (const row of sortRowsForPlan(args.rows)) {
+  const pool: LessonPlanBankRow[] = [];
+  for (const row of args.rows) {
     if (topicFilter && (row.topic ?? "").trim() !== topicFilter) continue;
     if (!isCardableVocabRow(row)) continue;
     const word_en = (row.word_en ?? "").trim();
@@ -163,9 +202,23 @@ export function buildLessonPlanFromRows(args: {
     if (!word_en) continue;
     const keys = [word_en, word_th].map((k) => k.toLowerCase());
     if (keys.some((k) => args.exclude.has(k))) continue;
-    if (plan.includes(word_en)) continue;
+    if (pool.some((r) => (r.word_en ?? "").trim() === word_en)) continue;
+    pool.push(row);
+  }
+
+  const plan: string[] = [];
+  const planKeys = new Set<string>();
+  const remaining = [...pool];
+
+  while (plan.length < args.planSize && remaining.length > 0) {
+    const ready = remaining.filter((row) => prereqsSatisfied(row, planKeys, args.exclude));
+    if (ready.length === 0) break;
+    ready.sort(compareRowsForPlan);
+    const pick = ready[0]!;
+    const word_en = (pick.word_en ?? "").trim();
     plan.push(word_en);
-    if (plan.length >= args.planSize) break;
+    planKeys.add(word_en.toLowerCase());
+    remaining.splice(remaining.indexOf(pick), 1);
   }
   return plan;
 }
@@ -241,11 +294,12 @@ export async function buildLessonPlan(args: {
     const { data, error } = await supabase
       .from("vocabulary_bank")
       .select(
-        "word_en, word_th, cefr_level, emoji, created_at, frequency_score, topic",
+        "word_en, word_th, cefr_level, emoji, created_at, frequency_score, difficulty_score, prerequisite_words, topic",
       )
       .eq("status", "active")
       .eq("cefr_level", cefr)
       .eq(teachFlag, true)
+      .order("difficulty_score", { ascending: true })
       .order("frequency_score", { ascending: false })
       .order("created_at", { ascending: true })
       .limit(500);
