@@ -1349,11 +1349,14 @@ assert(
   warmthSrc.includes("TALK_FREE_LIMIT_CONTINUE") &&
     warmthSrc.includes("voice-to-text") &&
     warmthSrc.includes("reply in text"),
-  "free limit message tells user typing/voice-to-text stays with text replies",
+  "free-member limit copy tells user typing/voice-to-text stays with text replies",
 );
 assert(
-  talkPageSrc.includes("TALK_FREE_LIMIT_CONTINUE") && talkPageSrc.includes("free limit reached"),
-  "talk page wires free-limit message at limit-reached point",
+  talkPageSrc.includes("GUIDANCE_GUEST_LIMIT_HIT") &&
+    talkPageSrc.includes("freeLimitLoggedRef") &&
+    talkPageSrc.includes("free limit reached") &&
+    !/if \(isLocked\)[\s\S]{0,120}TALK_FREE_LIMIT_CONTINUE/.test(talkPageSrc),
+  "guest locked state shows signup handoff prompt; free-limit log fires once",
 );
 assert(
   turnRuntimeSrc.includes("waitForHandoffReplyDrain") &&

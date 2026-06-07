@@ -24,7 +24,7 @@ import {
 } from "@/lib/talk/session-canvas";
 import { useUILanguage } from "@/lib/i18n/client";
 import { unlockTtsPlayback } from "@/lib/voice/tts";
-import { pickPhrase, TALK_FREE_LIMIT_CONTINUE } from "@/lib/voice/warmth";
+import { GUIDANCE_GUEST_LIMIT_HIT, pickPhrase } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
@@ -156,6 +156,7 @@ export default function TalkPage() {
   const guestExchangesRef = useRef(0);
   const isGuestRef = useRef(false);
   const isLockedRef = useRef(false);
+  const freeLimitLoggedRef = useRef(false);
   const conversationLangRef = useRef<"th" | "en">("th");
   const sessionUiLangRef = useRef<"th" | "en">("th");
   const sessionTargetLangRef = useRef<"th" | "en">("en");
@@ -421,7 +422,12 @@ export default function TalkPage() {
             if (typeof window !== "undefined") {
               window.localStorage.setItem(GUEST_COUNTER_KEY, String(n));
             }
-            if (isGuestRef.current && n >= GUEST_EXCHANGE_LIMIT) {
+            if (
+              isGuestRef.current &&
+              n >= GUEST_EXCHANGE_LIMIT &&
+              !freeLimitLoggedRef.current
+            ) {
+              freeLimitLoggedRef.current = true;
               logEvent({
                 kind: "state",
                 level: "info",
@@ -1376,14 +1382,14 @@ export default function TalkPage() {
   const fuelZap = 64;
   const fuelBrain = 45;
 
-  const freeLimitMessage = useMemo(
-    () => pickPhrase(TALK_FREE_LIMIT_CONTINUE, { lang: uiLang }),
+  const guestSignupPrompt = useMemo(
+    () => pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang: uiLang }),
     [uiLang],
   );
 
   const stateLabel = (() => {
     if (isLocked) {
-      return freeLimitMessage;
+      return guestSignupPrompt;
     }
     if (!audioUnlocked) {
       return uiLang === "th" ? "แตะเพื่อเริ่มค่า~" : "tap anywhere to begin~";
