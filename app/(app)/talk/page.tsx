@@ -30,9 +30,9 @@ import {
   canAttemptTransportReconnect,
   classifyLiveClose,
   nextResumeWordHint,
-  resolveKickoffAudience,
   shouldIgnoreClientEpoch,
 } from "@/lib/live/session-continuity";
+import { resolveKickoffAudience, type MemberContextBundle } from "@/lib/live/member-context";
 import {
   detectLanguage,
   detectPracticeAttempt,
@@ -202,6 +202,7 @@ export default function TalkPage() {
   const pendingUserTextRef = useRef("");
   const userInputFinalizedRef = useRef(false);
   const cardedPlanWordsRef = useRef<Set<string>>(new Set());
+  const memberContextRef = useRef<MemberContextBundle | null>(null);
   const planWordCacheRef = useRef<Map<string, TeachWordResult>>(new Map());
 
   const syncTeachWordContext = useCallback(() => {
@@ -408,6 +409,7 @@ export default function TalkPage() {
     reconnectAttemptsRef.current = 0;
     setAwaitingContinueTap(false);
     lastSessionSnapshotRef.current = null;
+    memberContextRef.current = null;
     kickoffSentRef.current = false;
     entryStartedRef.current = false;
     lessonHadStartedRef.current = false;
@@ -432,10 +434,7 @@ export default function TalkPage() {
           getMedia: () => mediaRef.current,
           getUiLang: () => sessionUiLangRef.current,
           getKickoffAudience: () =>
-            resolveKickoffAudience(
-              isGuestRef.current,
-              sessionIntroducedWords(itemsRef.current).length,
-            ),
+            resolveKickoffAudience(isGuestRef.current, memberContextRef.current),
           isGuest: () => isGuestRef.current,
           isMounted: () => mountedRef.current,
           onLiveUi: (ui: LiveUiPhase) => setLiveUiState(ui),
@@ -774,6 +773,7 @@ export default function TalkPage() {
         const uiLanguage = sessionUiLangRef.current;
         const targetLanguage = sessionTargetLangRef.current;
         await client.connect({ uiLanguage, targetLanguage, resume: true });
+        memberContextRef.current = client.getMemberContext();
         syncTeachWordContext();
         lessonHadStartedRef.current = true;
         dispatchTurn({
@@ -928,6 +928,7 @@ export default function TalkPage() {
       setUiLang(uiLanguage);
 
       await clientRef.current!.connect({ uiLanguage, targetLanguage, resume: false });
+      memberContextRef.current = clientRef.current!.getMemberContext();
       syncTeachWordContext();
       lessonHadStartedRef.current = true;
       dispatchTurn({

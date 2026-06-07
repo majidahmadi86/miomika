@@ -8,6 +8,7 @@ import {
   buildLiveConfig,
   buildResumePrompt,
 } from "@/lib/live/live-config";
+import { type MemberContextBundle } from "@/lib/live/member-context";
 import { createLiveClientEpoch } from "@/lib/live/session-continuity";
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -91,9 +92,14 @@ export class MiomiLiveClient {
     introducedIdx: 0,
     lessonTopic: null,
   };
+  private memberContext: MemberContextBundle | null = null;
 
   constructor(private callbacks: LiveClientCallbacks) {
     this.epochId = createLiveClientEpoch();
+  }
+
+  getMemberContext(): MemberContextBundle | null {
+    return this.memberContext;
   }
 
   setTeachWordContext(
@@ -174,7 +180,12 @@ export class MiomiLiveClient {
       const err = (await tokenRes.json().catch(() => ({}))) as { error?: string };
       throw new Error(err.error ?? `Token fetch failed (${tokenRes.status})`);
     }
-    const { token } = (await tokenRes.json()) as { token?: string };
+    const tokenPayload = (await tokenRes.json()) as {
+      token?: string;
+      memberContext?: MemberContextBundle | null;
+    };
+    const { token, memberContext } = tokenPayload;
+    this.memberContext = memberContext ?? null;
     if (!token) throw new Error("No ephemeral token in /api/live-token response");
 
     const ai = new GoogleGenAI({
@@ -193,7 +204,7 @@ export class MiomiLiveClient {
 
     this.session = (await ai.live.connect({
       model: LIVE_MODEL,
-      config: buildLiveConfig(voice, uiLanguage, targetLanguage),
+      config: buildLiveConfig(voice, uiLanguage, targetLanguage, this.memberContext),
       callbacks: {
         onopen: () => {
           this.connected = true;
@@ -396,10 +407,18 @@ export class MiomiLiveClient {
   }
 
   /** Trigger Miomi's opening greeting on connect — not shown as user speech. */
-  sendKickoff(lang: "th" | "en", audience: "first_time" | "returning" = "first_time"): void {
+  sendKickoff(
+    lang: "th" | "en",
+    audience: "first_time" | "returning" = "first_time",
+  ): void {
     if (!this.session || !this.connected) return;
     this.session.sendClientContent({
-      turns: [{ role: "user", parts: [{ text: buildKickoffPrompt(lang, audience) }] }],
+      turns: [
+        {
+          role: "user",
+          parts: [{ text: buildKickoffPrompt(lang, audience, this.memberContext) }],
+        },
+      ],
       turnComplete: true,
     });
   }

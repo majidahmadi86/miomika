@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
+import { assembleMemberContext } from "@/lib/live/member-context";
 import { LIVE_MODEL } from "@/lib/live/live-config";
 import { liveTokenDurations } from "@/lib/live/token-policy";
 import { log, logError } from "@/lib/debug/log";
@@ -56,14 +57,24 @@ export async function GET() {
       return NextResponse.json({ error: "Token mint failed" }, { status: 500 });
     }
 
-    if (profile) void touchLastSeen(profile.id);
+    let memberContext = null;
+    if (profile) {
+      memberContext = await assembleMemberContext(profile);
+      void touchLastSeen(profile.id);
+    }
 
     log("live-token", "minted ephemeral token", {
       guest: isGuest,
       userId: profile?.id ?? null,
       model: LIVE_MODEL,
+      returning: memberContext?.isReturning ?? false,
     });
-    return NextResponse.json({ token: name, model: LIVE_MODEL, guest: isGuest });
+    return NextResponse.json({
+      token: name,
+      model: LIVE_MODEL,
+      guest: isGuest,
+      memberContext,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logError("live-token", "mint failed", err, { error: msg, guest: isGuest });

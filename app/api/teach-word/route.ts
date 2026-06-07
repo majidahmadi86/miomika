@@ -17,56 +17,7 @@ import {
   resolveTeachServe,
 } from "@/lib/talk/lesson-plan";
 import type { Tier } from "@/lib/auth/get-server-profile";
-
-async function loadVocabLists(userId: string): Promise<{
-  introduced: string[];
-  mastered: string[];
-}> {
-  const introduced: string[] = [];
-  const mastered: string[] = [];
-  try {
-    const supabase = await createServiceClient();
-    const { data, error } = await supabase
-      .from("vocabulary_user_state")
-      .select("word_en, mastered_at")
-      .eq("user_id", userId);
-
-    if (error) {
-      console.error(
-        "[teach-word] vocabulary_user_state query failed:",
-        error.message,
-        error.details,
-      );
-      return { introduced, mastered };
-    }
-
-    for (const row of data ?? []) {
-      const word = (row.word_en as string | null) ?? null;
-      if (!word) continue;
-      if (row.mastered_at) mastered.push(word);
-      else introduced.push(word);
-    }
-  } catch (err) {
-    console.error("[teach-word] loadVocabLists failed:", err);
-  }
-  return { introduced, mastered };
-}
-
-async function loadCefrLevel(userId: string): Promise<string | null> {
-  try {
-    const supabase = await createServiceClient();
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("cefr_level")
-      .eq("id", userId)
-      .maybeSingle();
-    if (error || !data) return null;
-    return (data.cefr_level as string | null) ?? null;
-  } catch (err) {
-    console.error("[teach-word] loadCefrLevel failed:", err);
-    return null;
-  }
-}
+import { loadCefrLevel, loadVocabLists } from "@/lib/vocab/user-state-read";
 
 async function loadWordFromBank(wordEn: string): Promise<{
   word_en: string;

@@ -4,6 +4,11 @@ import {
   GET_WORD_TO_REVIEW_DECLARATION,
 } from "@/lib/talk/teaching-mode";
 import { buildContentHonestyContract } from "@/lib/brain/language";
+import {
+  buildKickoffMemberHints,
+  buildMemberContextBlock,
+  type MemberContextBundle,
+} from "@/lib/live/member-context";
 
 export const LIVE_MODEL = "gemini-3.1-flash-live-preview";
 /** LOCKED 2026-06-05 — Miomi persona voice (Leda). Do not change without ear-verify on /talk. */
@@ -32,10 +37,13 @@ export function appendTeachingModeInstruction(
 export function buildSystemInstruction(
   ui: "th" | "en",
   target: "th" | "en" | null,
+  memberContext?: MemberContextBundle | null,
 ): string {
   const uiName = ui === "en" ? "English" : "Thai";
   const targetName =
     target === "en" ? "English" : target === "th" ? "Thai" : "their target language";
+
+  const memberBlock = buildMemberContextBlock(memberContext, ui);
 
   return appendTeachingModeInstruction(
     `${PERSONA_CORE}
@@ -49,7 +57,7 @@ LANGUAGE CONTRACT — non-negotiable:
 - PRACTICE EXCEPTION: when the user repeats a TARGET word or short phrase you just taught, stay in UI_LANGUAGE — celebrate warmly, do not flip into TARGET.
 - Assume the learner is a beginner in TARGET unless they clearly demonstrate fluency.
 
-${buildContentHonestyContract(ui)}`,
+${buildContentHonestyContract(ui)}${memberBlock ? `\n\n${memberBlock}` : ""}`,
     ui,
     target,
   );
@@ -60,11 +68,15 @@ import type { KickoffAudience } from "@/lib/live/session-continuity";
 export function buildKickoffPrompt(
   lang: "th" | "en",
   audience: KickoffAudience = "first_time",
+  memberContext?: MemberContextBundle | null,
 ): string {
+  const memberHints = buildKickoffMemberHints(memberContext, lang);
+  const hintSuffix = memberHints ? ` ${memberHints}` : "";
+
   if (audience === "returning") {
     return lang === "th"
-      ? "[session_open] ทักทายผู้ใช้ที่กลับมาอีกครั้งด้วยประโยคสั้นๆ อบอุ่น ยินดีต้อนรับกลับ — หนึ่งประโยคเป็นภาษาไทยเท่านั้น ไม่มีวาระ ไม่ใส่แผนการสอน ไม่พูดถึงไมค์"
-      : "[session_open] Welcome them back with ONE short, warm companion hello in ENGLISH only — friendly welcome-back energy, zero agenda, no learning pitch, no mic invite. Do NOT greet in Thai.";
+      ? `[session_open] ทักทายผู้ใช้ที่กลับมาอีกครั้งด้วยประโยคสั้นๆ อบอุ่น ยินดีต้อนรับกลับ — หนึ่งประโยคเป็นภาษาไทยเท่านั้น ไม่มีวาระ ไม่ใส่แผนการสอน ไม่พูดถึงไมค์${hintSuffix}`
+      : `[session_open] Welcome them back with ONE short, warm companion hello in ENGLISH only — friendly welcome-back energy, zero agenda, no learning pitch, no mic invite. Do NOT greet in Thai.${hintSuffix}`;
   }
   return lang === "th"
     ? "[session_open] ทักทายผู้ใช้ครั้งแรกด้วยประโยคสั้นๆ อบอุ่น น่ารัก เป็นเพื่อน — เหมือนพบกันครั้งแรก ห้ามพูดว่าคิดถึงหรือรอคอย อย่าใส่วาระสอนหรือพูดถึงไมค์ — หนึ่งประโยคเป็นภาษาไทยเท่านั้น"
@@ -99,6 +111,7 @@ export function buildLiveConfig(
   voiceName: string = LIVE_VOICE,
   uiLanguage: "th" | "en" = "en",
   targetLanguage: "th" | "en" | null = "th",
+  memberContext?: MemberContextBundle | null,
 ): LiveConnectConfig {
   return {
     responseModalities: [Modality.AUDIO],
@@ -110,7 +123,7 @@ export function buildLiveConfig(
         prebuiltVoiceConfig: { voiceName },
       },
     },
-    systemInstruction: buildSystemInstruction(uiLanguage, targetLanguage),
+    systemInstruction: buildSystemInstruction(uiLanguage, targetLanguage, memberContext),
     tools: [
       {
         functionDeclarations: [

@@ -36,9 +36,14 @@ import {
   kickoffPromptIsFirstTimeSafe,
   MAX_TRANSPORT_RECONNECTS,
   nextResumeWordHint,
-  resolveKickoffAudience,
   shouldIgnoreClientEpoch,
 } from "../lib/live/session-continuity";
+import {
+  buildMemberContextBlock,
+  isReturningMember,
+  resolveKickoffAudience,
+  type MemberContextBundle,
+} from "../lib/live/member-context";
 import {
   advanceAfterTurn,
   buildPhaseNudge,
@@ -809,12 +814,65 @@ assert(
   "returning-member en kickoff may welcome back",
 );
 assert(
-  resolveKickoffAudience(true, 0) === "first_time",
+  resolveKickoffAudience(true, null) === "first_time",
   "guest kickoff audience is first_time",
 );
+const newMemberBundle: MemberContextBundle = {
+  displayName: null,
+  uiLanguage: "en",
+  targetLanguage: "th",
+  level: "A2",
+  wordsIntroducedCount: 0,
+  wordsMasteredCount: 0,
+  recentWords: [],
+  isReturning: false,
+  lastSeenAt: null,
+  hoursSinceLastVisit: null,
+};
+const returningMemberBundle: MemberContextBundle = {
+  displayName: "Mike",
+  uiLanguage: "en",
+  targetLanguage: "th",
+  level: "A2",
+  wordsIntroducedCount: 5,
+  wordsMasteredCount: 2,
+  recentWords: [{ word_en: "water", word_th: "น้ำ" }],
+  isReturning: true,
+  lastSeenAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
+  hoursSinceLastVisit: 48,
+};
 assert(
-  resolveKickoffAudience(false, 2) === "returning",
-  "member with session words gets returning kickoff",
+  resolveKickoffAudience(false, newMemberBundle) === "first_time",
+  "member with no prior history gets first_time kickoff",
+);
+assert(
+  resolveKickoffAudience(false, returningMemberBundle) === "returning",
+  "member with real history gets returning kickoff",
+);
+assert(
+  isReturningMember({ wordsIntroducedCount: 3, lastSeenAt: null, hoursSinceLastVisit: null }),
+  "prior introduced words mark returning",
+);
+assert(
+  !isReturningMember({ wordsIntroducedCount: 0, lastSeenAt: null, hoursSinceLastVisit: null }),
+  "empty history is not returning",
+);
+const kickoffReturningNamed = buildKickoffPrompt("en", "returning", returningMemberBundle);
+assert(kickoffReturningNamed.includes("Mike"), "returning kickoff carries real member name hint");
+const memberBlock = buildMemberContextBlock(returningMemberBundle, "en");
+assert(memberBlock.includes("never invent"), "member context block asserts honesty rule");
+assert(
+  buildSystemInstruction("en", "th", returningMemberBundle).includes("MEMBER CONTEXT"),
+  "system instruction injects member bundle for members",
+);
+assert(
+  !buildSystemInstruction("en", "th", null).includes("MEMBER CONTEXT"),
+  "guest/no bundle omits member context from system instruction",
+);
+const liveTokenSrc = readFileSync(join(ROOT, "app/api/live-token/route.ts"), "utf8");
+assert(
+  liveTokenSrc.includes("assembleMemberContext") && liveTokenSrc.includes("memberContext"),
+  "live-token prefetches member context bundle at connect",
 );
 assert(
   buildTeachingModeContract("en", "th").includes("FIRST word of a session"),

@@ -40,15 +40,7 @@ export function nextResumeWordHint(plan: string[], introducedIdx: number): strin
 
 export type KickoffAudience = "first_time" | "returning";
 
-/** Guest = first_time; member with prior words this canvas = returning. */
-export function resolveKickoffAudience(
-  isGuest: boolean,
-  sessionIntroducedWordCount: number,
-): KickoffAudience {
-  if (isGuest) return "first_time";
-  if (sessionIntroducedWordCount > 0) return "returning";
-  return "first_time";
-}
+export { resolveKickoffAudience } from "@/lib/live/member-context";
 
 const FIRST_TIME_FORBIDDEN = /missed you|waiting for you|welcome back|remember/i;
 
