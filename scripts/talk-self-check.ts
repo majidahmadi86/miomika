@@ -97,6 +97,10 @@ import {
   selectLessonTopic,
 } from "../lib/talk/lesson-plan";
 import {
+  buildContentIntentNudge,
+  detectLessonContentIntent,
+} from "../lib/talk/lesson-intent";
+import {
   claimLessonWordCard,
   isLessonWordCarded,
   markPlanWordCarded,
@@ -1308,6 +1312,86 @@ assert(
   talkPageSrc.includes("honorExplicitLessonRequest") &&
     talkPageSrc.includes("detectExplicitLessonWordRequest"),
   "talk page honors explicit new-word / show-card requests",
+);
+
+section("Concise + content intent harness");
+
+assert(
+  liveConfigSrc.includes("no option-dumping") &&
+    liveConfigSrc.includes("at most ONE soft question"),
+  "persona contract enforces brevity and max-one-question",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("CONCISE") &&
+    buildTeachingModeContract("en", "th").includes("CONTENT FOLLOW"),
+  "teaching contract enforces concise replies and content follow",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("were you having basil") ||
+    buildTeachingModeContract("en", "th").includes("fabricated present-moment"),
+  "teaching contract forbids fabricated present-context",
+);
+
+const dailyIntent = detectLessonContentIntent("NOT food — give me daily phrases instead");
+assert(dailyIntent?.topicHint === "daily_routine", "daily phrases maps to daily_routine topic");
+assert(
+  dailyIntent?.excludeTopics.includes("food") === true,
+  "NOT food adds food to excludeTopics",
+);
+assert(dailyIntent?.shouldRebuild === true, "stated intent triggers rebuild");
+
+const rejectFoodOnly = detectLessonContentIntent("no more food please");
+assert(
+  rejectFoodOnly?.excludeTopics.includes("food") === true,
+  "no more food rejects food topic",
+);
+
+const travelTopic = selectLessonTopic({
+  rows: planBankRows,
+  planSize: planSizeForTier("guest"),
+  cefrLevel: "A1",
+  exclude: buildExcludeSet([]),
+  tier: "guest",
+  excludeTopics: ["food"],
+});
+assert(travelTopic === "travel", "excludeTopics skips food and picks travel");
+
+assert(
+  detectExplicitLessonWordRequest("give me a phrase to practice") === "new_word",
+  "give me a phrase to practice is honored as new_word",
+);
+assert(
+  detectExplicitLessonWordRequest("show me a card to practice") === "show_card",
+  "card to practice is honored as show_card",
+);
+
+const contentNudge = buildContentIntentNudge(
+  { topicHint: "daily_routine", excludeTopics: ["food"], shouldRebuild: true },
+  "en",
+  "daily_routine",
+  "wake up",
+);
+assert(
+  contentNudge.includes("rebuilt lesson") && contentNudge.includes("excluded=food"),
+  "content intent nudge names rebuilt topic and exclusions",
+);
+
+assert(
+  talkPageSrc.includes("honorContentIntent") &&
+    talkPageSrc.includes("detectLessonContentIntent"),
+  "talk page honors stated content intent",
+);
+assert(
+  teachWordRouteSrc.includes("exclude_topics") && teachWordRouteSrc.includes("rebuild_plan"),
+  "teach-word accepts exclude_topics and rebuild_plan",
+);
+assert(
+  teachWordRouteSrc.includes("plan_only"),
+  "teach-word supports plan-only rebuild without serving a word",
+);
+assert(
+  miomiClientSrc.includes("excludeTopics"),
+  "live client carries excludeTopics in teach context",
 );
 
 const languageSrc = readFileSync(join(ROOT, "lib/brain/language.ts"), "utf8");

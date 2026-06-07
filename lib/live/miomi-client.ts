@@ -72,6 +72,8 @@ export type TeachWordContext = {
   lessonPlan: string[];
   introducedIdx: number;
   lessonTopic: string | null;
+  topicHint: string | null;
+  excludeTopics: string[];
 };
 
 export type LiveSessionSnapshot = {
@@ -91,6 +93,8 @@ export class MiomiLiveClient {
     lessonPlan: [],
     introducedIdx: 0,
     lessonTopic: null,
+    topicHint: null,
+    excludeTopics: [],
   };
   private memberContext: MemberContextBundle | null = null;
 
@@ -169,6 +173,8 @@ export class MiomiLiveClient {
         lessonPlan: [],
         introducedIdx: 0,
         lessonTopic: null,
+        topicHint: null,
+        excludeTopics: [],
       };
       this.sessionReviewServed.clear();
     }
@@ -302,12 +308,18 @@ export class MiomiLiveClient {
 
       if (fc.name === "get_word_to_teach") {
         try {
-          const topicHint = (fc.args?.topic_hint ?? fc.args?.topicHint ?? "") as string;
+          const topicHint = (fc.args?.topic_hint ??
+            fc.args?.topicHint ??
+            this.teachWordContext.topicHint ??
+            "") as string;
           const body: Record<string, unknown> = {
             topic_hint: topicHint || undefined,
             learning_target: this.teachWordContext.learningTarget,
             session_introduced: this.teachWordContext.sessionIntroduced,
           };
+          if (this.teachWordContext.excludeTopics.length > 0) {
+            body.exclude_topics = this.teachWordContext.excludeTopics;
+          }
           if (this.teachWordContext.lessonPlan.length > 0) {
             body.lesson_plan = this.teachWordContext.lessonPlan;
             body.introduced_idx = this.teachWordContext.introducedIdx;

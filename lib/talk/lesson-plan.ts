@@ -161,6 +161,8 @@ export function selectLessonTopic(args: {
   exclude: Set<string>;
   tier: Tier;
   topicHint?: string;
+  /** Topics the user rejected — never pick these */
+  excludeTopics?: string[];
 }): string | null {
   const counts = countCardableByTopic({
     rows: args.rows,
@@ -168,19 +170,24 @@ export function selectLessonTopic(args: {
     exclude: args.exclude,
   });
 
+  const rejected = new Set(
+    (args.excludeTopics ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean),
+  );
+
   const hint = args.topicHint?.trim().toLowerCase();
-  if (hint && (counts.get(hint) ?? 0) >= args.planSize) {
+  if (hint && !rejected.has(hint) && (counts.get(hint) ?? 0) >= args.planSize) {
     return hint;
   }
 
   const order =
     args.tier === "guest" ? GUEST_STARTER_TOPICS : MEMBER_TOPIC_PICK_ORDER;
   for (const topic of order) {
+    if (rejected.has(topic)) continue;
     if ((counts.get(topic) ?? 0) >= args.planSize) return topic;
   }
 
   const eligible = [...counts.entries()]
-    .filter(([, n]) => n >= args.planSize)
+    .filter(([t, n]) => !rejected.has(t) && n >= args.planSize)
     .sort(([a], [b]) => a.localeCompare(b));
   return eligible[0]?.[0] ?? null;
 }
@@ -280,6 +287,7 @@ export async function buildLessonPlan(args: {
   alreadyIntroducedWords: string[];
   alreadyMasteredWords: string[];
   topicHint?: string;
+  excludeTopics?: string[];
 }): Promise<LessonPlanResult> {
   const planSize = planSizeForTier(args.tier);
   const cefr = args.cefrLevel?.trim() || TIER_CEFR_FALLBACK[args.tier];
@@ -321,6 +329,7 @@ export async function buildLessonPlan(args: {
       exclude,
       tier: args.tier,
       topicHint: args.topicHint,
+      excludeTopics: args.excludeTopics,
     });
 
     const plan = buildLessonPlanFromRows({

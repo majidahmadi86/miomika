@@ -73,6 +73,10 @@ import {
   detectExplicitLessonWordRequest,
   recordWordPick,
 } from "@/lib/talk/teaching-mode";
+import {
+  buildContentIntentNudge,
+  detectLessonContentIntent,
+} from "@/lib/talk/lesson-intent";
 import { TurnRuntime, isReplaySuspended } from "@/lib/live/turn-runtime";
 import type { LiveUiPhase } from "@/lib/live/turn-controller";
 import { replayWordAudio } from "@/lib/talk/word-replay";
@@ -596,6 +600,65 @@ export default function TalkPage() {
     [profile?.ui_language, profile?.learning_target_language, config.teach.learning, syncTeachWordContext],
   );
 
+  const honorContentIntent = useCallback(
+    async (userText: string) => {
+      const intent = detectLessonContentIntent(userText);
+      if (!intent?.shouldRebuild) return;
+      const client = clientRef.current;
+      if (!client?.isConnected()) return;
+      const snap = client.getSessionSnapshot().teachWord;
+      const currentTopic = snap.lessonTopic;
+      const rejectedCurrent =
+        currentTopic != null && intent.excludeTopics.includes(currentTopic);
+      const topicChanged =
+        intent.topicHint != null && intent.topicHint !== currentTopic;
+      if (!rejectedCurrent && !topicChanged && intent.excludeTopics.length === 0) {
+        return;
+      }
+
+      try {
+        const resp = await fetch("/api/teach-word", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            learning_target: snap.learningTarget,
+            session_introduced: snap.sessionIntroduced,
+            topic_hint: intent.topicHint || undefined,
+            exclude_topics: intent.excludeTopics,
+            rebuild_plan: true,
+            plan_only: true,
+          }),
+        });
+        if (!resp.ok) return;
+        const result = (await resp.json()) as TeachWordResult & {
+          lesson_plan?: string[];
+          lesson_topic?: string | null;
+          introduced_idx?: number;
+        };
+        client.applyTeachWordResponse(result);
+        client.setTeachWordContext({
+          learningTarget: snap.learningTarget,
+          sessionIntroduced: snap.sessionIntroduced,
+          topicHint: intent.topicHint,
+          excludeTopics: intent.excludeTopics,
+        });
+        cardedPlanWordsRef.current.clear();
+        planWordCacheRef.current.clear();
+
+        const newTopic = result.lesson_topic ?? intent.topicHint;
+        const plan = result.lesson_plan ?? [];
+        const idx = result.introduced_idx ?? 0;
+        const nextWord = nextPlannedWord(plan, idx);
+        client.sendHiddenContext(
+          buildContentIntentNudge(intent, sessionUiLangRef.current, newTopic, nextWord),
+        );
+      } catch {
+        /* never break audio */
+      }
+    },
+    [],
+  );
+
   const honorExplicitLessonRequest = useCallback(
     async (userText: string) => {
       const kind = detectExplicitLessonWordRequest(userText);
@@ -629,10 +692,11 @@ export default function TalkPage() {
     const finalUserText = commitUserTranscript();
     if (finalUserText) {
       maybeAdaptSessionLanguages(finalUserText);
+      void honorContentIntent(finalUserText);
       void honorExplicitLessonRequest(finalUserText);
     }
     return finalUserText;
-  }, [commitUserTranscript, honorExplicitLessonRequest, maybeAdaptSessionLanguages]);
+  }, [commitUserTranscript, honorContentIntent, honorExplicitLessonRequest, maybeAdaptSessionLanguages]);
 
   const appendTranscript = useCallback((role: "user" | "gemini", chunk: string) => {
     if (role === "user") {
@@ -899,6 +963,8 @@ export default function TalkPage() {
           lessonPlan: [],
           introducedIdx: 0,
           lessonTopic: null,
+          topicHint: null,
+          excludeTopics: [],
         },
         reviewServed: [],
       };
@@ -1267,6 +1333,7 @@ export default function TalkPage() {
     setItems((prev) => [...prev, newItem]);
     setTextInput("");
     maybeAdaptSessionLanguages(cleaned);
+    void honorContentIntent(cleaned);
     void honorExplicitLessonRequest(cleaned);
     if (!ensureTurnRuntime().state.sessionActive) {
       void (async () => {
@@ -1286,6 +1353,7 @@ export default function TalkPage() {
     ensureTurnRuntime,
     startLiveSession,
     maybeAdaptSessionLanguages,
+    honorContentIntent,
     honorExplicitLessonRequest,
     openGuestSignupSheet,
   ]);

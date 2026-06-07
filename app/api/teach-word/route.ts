@@ -76,6 +76,9 @@ function parseIntroducedIdx(body: unknown): number | null {
  */
 export async function POST(req: NextRequest) {
   let topicHint = "";
+  let excludeTopics: string[] = [];
+  let rebuildPlan = false;
+  let planOnly = false;
   let bodyLearningTarget: string | null = null;
   let sessionIntroduced: string[] = [];
   let clientLessonPlan: string[] = [];
@@ -84,12 +87,26 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       topic_hint?: string;
       topicHint?: string;
+      exclude_topics?: string[];
+      excludeTopics?: string[];
+      rebuild_plan?: boolean;
+      rebuildPlan?: boolean;
+      plan_only?: boolean;
+      planOnly?: boolean;
       learning_target?: string;
       session_introduced?: string[];
       lesson_plan?: string[];
       introduced_idx?: number;
     };
     topicHint = String(body?.topic_hint ?? body?.topicHint ?? "").trim();
+    const rawExclude = body?.exclude_topics ?? body?.excludeTopics;
+    if (Array.isArray(rawExclude)) {
+      excludeTopics = rawExclude.filter(
+        (t): t is string => typeof t === "string" && t.trim().length > 0,
+      );
+    }
+    rebuildPlan = body?.rebuild_plan === true || body?.rebuildPlan === true;
+    planOnly = body?.plan_only === true || body?.planOnly === true;
     bodyLearningTarget = body?.learning_target ?? null;
     if (Array.isArray(body?.session_introduced)) {
       sessionIntroduced = body.session_introduced.filter(
@@ -137,8 +154,8 @@ export async function POST(req: NextRequest) {
     learningTarget = sanitizeTargetLanguage(browserUi, requestTarget);
   }
 
-  let lessonPlan = clientLessonPlan;
-  let introducedIdx = clientIntroducedIdx ?? 0;
+  let lessonPlan = rebuildPlan ? [] : clientLessonPlan;
+  let introducedIdx = rebuildPlan ? 0 : (clientIntroducedIdx ?? 0);
   let lessonTopic: string | null = null;
 
   if (lessonPlan.length === 0) {
@@ -149,10 +166,22 @@ export async function POST(req: NextRequest) {
       alreadyIntroducedWords: introduced,
       alreadyMasteredWords: mastered,
       topicHint: topicHint || undefined,
+      excludeTopics: excludeTopics.length > 0 ? excludeTopics : undefined,
     });
     lessonPlan = built.plan;
     lessonTopic = built.topic;
     introducedIdx = 0;
+  }
+
+  if (planOnly) {
+    return NextResponse.json({
+      ok: true,
+      word: null,
+      mode: "plan_only",
+      lesson_plan: lessonPlan,
+      lesson_topic: lessonTopic,
+      introduced_idx: 0,
+    });
   }
 
   const serve = resolveTeachServe({ plan: lessonPlan, introducedIdx });
