@@ -667,6 +667,18 @@ const backstopOne = planBackstopCardWords({
 });
 assert(backstopOne.length === 1, "backstop pushes at most one card per exchange");
 assert(backstopOne[0] === "chicken", "backstop fills first missing introduced word only");
+assert(
+  planBackstopCardWords({
+    teaching: focusState,
+    wordPickThisTurn: false,
+    hasDueReview: false,
+    canIntroNew: true,
+    plan: guestPlan,
+    introducedIdx: 0,
+    carded: new Set<string>(),
+  }).length === 0,
+  "backstop never introduces unserved plan word",
+);
 
 const perExchangeCarded = new Set<string>();
 assert(claimLessonWordCard(perExchangeCarded, "eat"), "claim accepts first eat card");
@@ -1295,6 +1307,20 @@ assert(
 assert(
   /runCardBackstop[\s\S]{0,400}cardsThisTurn\.length > 0/.test(talkPageSrc),
   "backstop skips when a card already exists for this exchange",
+);
+assert(
+  talkPageSrc.includes("cardAlreadyThisTurn") &&
+    /runCardBackstop[\s\S]{0,700}itemsRef\.current\.some[\s\S]{0,120}word_card/.test(
+      talkPageSrc,
+    ),
+  "one card per turnSeq enforced at push and backstop time",
+);
+const lessonLayerSrc = readFileSync(join(ROOT, "lib/talk/lesson-layer.ts"), "utf8");
+assert(
+  !/export function planBackstopCardWords[\s\S]{0,500}shouldBackstopFocusNewWord/.test(
+    lessonLayerSrc,
+  ),
+  "backstop only re-pushes cards for model-served words missing from canvas",
 );
 assert(
   talkPageSrc.includes("sortTranscriptItems"),

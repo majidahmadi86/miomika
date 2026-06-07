@@ -97,19 +97,5 @@ export function planBackstopCardWords(args: {
   });
   if (missing.length > 0) return [missing[0]!];
 
-  if (
-    shouldBackstopFocusNewWord({
-      teaching: args.teaching,
-      wordPickThisTurn: false,
-      hasDueReview: args.hasDueReview,
-      canIntroNew: args.canIntroNew,
-      plan: args.plan,
-      introducedIdx: args.introducedIdx,
-      carded: args.carded,
-    })
-  ) {
-    const next = nextPlannedWord(args.plan, args.introducedIdx);
-    return next ? [next] : [];
-  }
   return [];
 }

@@ -217,6 +217,10 @@ export default function TalkPage() {
   }, []);
 
   const pushWordCard = useCallback((entry: VocabularyEntry, turnSeq: number) => {
+    const cardAlreadyThisTurn = itemsRef.current.some(
+      (item) => item.kind === "word_card" && item.turnSeq === turnSeq,
+    );
+    if (cardAlreadyThisTurn) return;
     if (!claimLessonWordCard(cardedPlanWordsRef.current, entry.word_en)) return;
     const direction = cardDirectionForTarget(sessionTargetLangRef.current);
     const cardId = crypto.randomUUID();
@@ -302,6 +306,13 @@ export default function TalkPage() {
         carded: cardedPlanWordsRef.current,
       });
       for (const wordId of wordIds) {
+        if (
+          itemsRef.current.some(
+            (item) => item.kind === "word_card" && item.turnSeq === turnSeq,
+          )
+        ) {
+          break;
+        }
         await fetchAndPushPlanCard(wordId, turnSeq);
       }
     },
