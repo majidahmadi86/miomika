@@ -677,6 +677,8 @@ export default function TalkPage() {
     if (msg.type === "turn_complete") {
       if (suspended) {
         discardSuspendedModelTurn();
+        mediaRef.current?.signalModelTurnComplete();
+        void mediaRef.current?.endModelTurnWhenDrained();
         return;
       }
       const preTurnState = { ...runtime.state };
@@ -1139,6 +1141,7 @@ export default function TalkPage() {
       await replayWordAudio(word, sessionTargetLangRef.current);
     } finally {
       mediaRef.current?.suspendMicSend(false);
+      void mediaRef.current?.endModelTurnWhenDrained();
       dispatchTurn({ type: "replay_suspend", suspended: false });
     }
   }, [discardSuspendedModelTurn, dispatchTurn]);

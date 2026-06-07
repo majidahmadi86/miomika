@@ -142,6 +142,7 @@ export class TurnRuntime {
         case "wait_invitation_drain": {
           void (async () => {
             await media?.waitForTurnAudioThenIdle();
+            media?.clearModelTurnGate("invitation drain idle");
             if (!this.deps.isMounted()) return;
             if (!this.state.invitationPending) return;
             this.dispatch({ type: "playback_idle", context: "invitation" });

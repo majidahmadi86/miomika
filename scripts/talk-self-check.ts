@@ -1179,6 +1179,15 @@ assert(
   /waitForHandoffReplyDrain\(maxWaitForStartMs = 2500/.test(mediaHandlerSrc),
   "handoff drain wait capped at 2.5s",
 );
+assert(
+  mediaHandlerSrc.includes("tickModelTurnWatchdog") &&
+    mediaHandlerSrc.includes("modelTurnActive watchdog force-clear"),
+  "model-turn watchdog force-clears stuck gate after 1500ms idle",
+);
+assert(
+  mediaHandlerSrc.includes("clearModelTurnGate"),
+  "media handler exposes clearModelTurnGate for invitation drain",
+);
 
 const talkPageSrc = readFileSync(join(ROOT, "app/(app)/talk/page.tsx"), "utf8");
 const turnControllerSrc = readFileSync(join(ROOT, "lib/live/turn-controller.ts"), "utf8");
@@ -1253,6 +1262,21 @@ assert(
     talkPageSrc.includes("invitationFinishing") &&
     talkPageSrc.includes("endModelTurnWhenDrained"),
   "handoff + invitation drains own model-turn gate; normal turns still endModelTurnWhenDrained",
+);
+assert(
+  /if \(suspended\)[\s\S]{0,220}signalModelTurnComplete[\s\S]{0,120}endModelTurnWhenDrained/.test(
+    talkPageSrc,
+  ),
+  "suspended turn_complete reconciles model-turn gate before early return",
+);
+assert(
+  /handleWordReplay[\s\S]{0,600}endModelTurnWhenDrained/.test(talkPageSrc),
+  "card replay drain clears model-turn gate so mic can reopen",
+);
+assert(
+  turnRuntimeSrc.includes("clearModelTurnGate") &&
+    turnRuntimeSrc.includes("invitation drain idle"),
+  "invitation path clears modelTurnActive after audio idle (matches handoff)",
 );
 assert(
   talkPageSrc.includes("phase === \"invitation\"") &&

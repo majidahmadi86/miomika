@@ -21,7 +21,13 @@ export class MediaHandler {
   private pendingAfterDrain: Array<() => void> = [];
   private micSendSuspended = false;
   private lastMicForward: boolean | null = null;
+  private modelTurnIdleSince: number | null = null;
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
   isRecording = false;
+
+  constructor() {
+    this.watchdogTimer = setInterval(() => this.tickModelTurnWatchdog(), 200);
+  }
 
   private logMicForwardFlip(): void {
     const forward = this.shouldForwardMicToGemini();
@@ -49,6 +55,39 @@ export class MediaHandler {
       data: { reason },
     });
     this.logMicForwardFlip();
+  }
+
+  /** Force-clear model-turn gate (invitation drain, watchdog). */
+  clearModelTurnGate(reason: string): void {
+    this.setModelTurnActive(false, reason);
+    this.turnCompleteReceived = false;
+    this.modelTurnIdleSince = null;
+    this.flushDeferredAfterDrain();
+  }
+
+  private tickModelTurnWatchdog(): void {
+    if (!this.modelTurnActive) {
+      this.modelTurnIdleSince = null;
+      return;
+    }
+    if (this.isPlaybackActive()) {
+      this.modelTurnIdleSince = null;
+      return;
+    }
+    const now = Date.now();
+    if (this.modelTurnIdleSince === null) {
+      this.modelTurnIdleSince = now;
+      return;
+    }
+    if (now - this.modelTurnIdleSince >= 1500) {
+      logEvent({
+        kind: "state",
+        level: "warn",
+        message: "modelTurnActive watchdog force-clear",
+        data: { idleMs: now - this.modelTurnIdleSince },
+      });
+      this.clearModelTurnGate("watchdog idle 1500ms");
+    }
   }
 
   /** True when mic PCM may be forwarded to Gemini (harness + replay guard). */
