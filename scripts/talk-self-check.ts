@@ -1573,6 +1573,18 @@ assert(
   "sanitizer strips CJK from Thai speech",
 );
 assert(
+  sanitizeUserTranscript("สวัสดี hello").length > 0,
+  "mixed Thai/English utterance survives sanitize non-empty",
+);
+assert(
+  sanitizeUserTranscript("hello world").length > 0,
+  "plain English utterance survives sanitize non-empty",
+);
+assert(
+  sanitizeUserTranscript("สวัสดีครับ").length > 0,
+  "plain Thai utterance survives sanitize non-empty",
+);
+assert(
   talkPageSrc.includes("honorExplicitLessonRequest") &&
     talkPageSrc.includes("detectExplicitLessonWordRequest"),
   "talk page honors explicit new-word / show-card requests",

@@ -46,7 +46,11 @@ export function isHiddenLiveTranscript(text: string): boolean {
  * (SDK throws if set); display-side cleanup is the supported fallback.
  */
 export function sanitizeUserTranscript(text: string): string {
-  return text.replace(FOREIGN_SCRIPT_BLOCK, "").replace(/\s{2,}/g, " ").trim();
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  const cleaned = trimmed.replace(FOREIGN_SCRIPT_BLOCK, "").replace(/\s{2,}/g, " ").trim();
+  if (!cleaned) return trimmed;
+  return cleaned;
 }
 
 /** Strip markdown from model speech/display — target words live on the card, not in bold. */
