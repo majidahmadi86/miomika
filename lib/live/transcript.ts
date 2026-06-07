@@ -48,3 +48,15 @@ export function isHiddenLiveTranscript(text: string): boolean {
 export function sanitizeUserTranscript(text: string): string {
   return text.replace(FOREIGN_SCRIPT_BLOCK, "").replace(/\s{2,}/g, " ").trim();
 }
+
+/** Strip markdown from model speech/display — target words live on the card, not in bold. */
+export function sanitizeModelTranscript(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/_{1,2}(.*?)_{1,2}/g, "$1")
+    .replace(/#{1,6}\s/g, "")
+    .replace(/`(.*?)`/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}

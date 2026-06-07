@@ -74,3 +74,42 @@ export function teachResultWordId(result: TeachWordResult): string | null {
   const id = result.word_en?.trim();
   return id || null;
 }
+
+/**
+ * Words the card backstop may push on turn_complete — at most one per exchange.
+ * Skips entirely when the tool already carded this turn (wordPickThisTurn).
+ */
+export function planBackstopCardWords(args: {
+  teaching: TeachingModeState;
+  wordPickThisTurn: boolean;
+  hasDueReview: boolean;
+  canIntroNew: boolean;
+  plan: string[];
+  introducedIdx: number;
+  carded: Set<string>;
+}): string[] {
+  if (args.wordPickThisTurn) return [];
+
+  const missing = missingCardedPlanWords({
+    plan: args.plan,
+    introducedIdx: args.introducedIdx,
+    carded: args.carded,
+  });
+  if (missing.length > 0) return [missing[0]!];
+
+  if (
+    shouldBackstopFocusNewWord({
+      teaching: args.teaching,
+      wordPickThisTurn: false,
+      hasDueReview: args.hasDueReview,
+      canIntroNew: args.canIntroNew,
+      plan: args.plan,
+      introducedIdx: args.introducedIdx,
+      carded: args.carded,
+    })
+  ) {
+    const next = nextPlannedWord(args.plan, args.introducedIdx);
+    return next ? [next] : [];
+  }
+  return [];
+}

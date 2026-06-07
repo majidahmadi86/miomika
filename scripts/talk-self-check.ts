@@ -104,9 +104,18 @@ import {
   isLessonWordCarded,
   markPlanWordCarded,
   missingCardedPlanWords,
+  planBackstopCardWords,
   shouldBackstopFocusNewWord,
 } from "../lib/talk/lesson-layer";
 import { simulateGuestFiveTurnFlow } from "../lib/talk/guest-flow";
+import { simulateGuestCtaViaTurnRuntime } from "../lib/live/guest-cta-runtime";
+import {
+  appendGeminiTranscriptChunk,
+  bindKickoffToOpener,
+  countSessionGreetingBubbles,
+  makeSessionOpenerShell,
+} from "../lib/talk/session-canvas";
+import { sanitizeModelTranscript } from "../lib/live/transcript";
 import {
   sortTranscriptItems,
   TRANSCRIPT_GEMINI_ORDER,
@@ -619,6 +628,37 @@ assert(
   }),
   "no backstop when tool already carded the word",
 );
+
+const eatChickenPlan = ["eat", "chicken"];
+const eatCarded = new Set<string>(["eat"]);
+assert(
+  planBackstopCardWords({
+    teaching: focusState,
+    wordPickThisTurn: true,
+    hasDueReview: false,
+    canIntroNew: true,
+    plan: eatChickenPlan,
+    introducedIdx: 2,
+    carded: eatCarded,
+  }).length === 0,
+  "backstop pushes zero cards when tool already carded this exchange (กิน+ไก่ regression)",
+);
+const backstopOne = planBackstopCardWords({
+  teaching: focusState,
+  wordPickThisTurn: false,
+  hasDueReview: false,
+  canIntroNew: true,
+  plan: eatChickenPlan,
+  introducedIdx: 2,
+  carded: eatCarded,
+});
+assert(backstopOne.length === 1, "backstop pushes at most one card per exchange");
+assert(backstopOne[0] === "chicken", "backstop fills first missing introduced word only");
+
+const perExchangeCarded = new Set<string>();
+assert(claimLessonWordCard(perExchangeCarded, "eat"), "claim accepts first eat card");
+assert(!claimLessonWordCard(perExchangeCarded, "eat"), "claim rejects duplicate eat in same exchange");
+assert(perExchangeCarded.size === 1, "one-card-per-word guarantee holds under repeat claim");
 
 assert(planSizeForTier("free") === 4, "free plan size = 4");
 assert(planSizeForTier("pro") === 6, "pro plan size = 6");
@@ -1280,6 +1320,47 @@ assert(
   "TalkConfig.teach.learning reaches session language resolution",
 );
 
+section("Single greeting bubble harness");
+
+const openerShell = makeSessionOpenerShell("greeting-opener", 0);
+assert(openerShell.textTh === "" && openerShell.textEn === "", "session opener has no silent pre-filled text");
+const kickoffBind = bindKickoffToOpener([openerShell]);
+assert(kickoffBind.geminiItemId === "greeting-opener", "kickoff binds model stream to opener bubble id");
+let greetingItems = kickoffBind.items;
+let greetingGeminiId: string | null = kickoffBind.geminiItemId;
+const greetingAppend = appendGeminiTranscriptChunk(
+  greetingItems,
+  greetingGeminiId,
+  "Hi~ tap the mic when you're ready!",
+  0,
+);
+greetingItems = greetingAppend.items;
+greetingGeminiId = greetingAppend.currentGeminiItemId;
+assert(countSessionGreetingBubbles(greetingItems) === 1, "exactly one greeting bubble on session start");
+assert(
+  greetingItems[0]?.textEn.includes("tap the mic"),
+  "greeting bubble text matches spoken kickoff (not a separate silent bubble)",
+);
+
+section("No markdown in speech/display harness");
+
+assert(
+  sanitizeModelTranscript("try **อร่อย** today") === "try อร่อย today",
+  "sanitizeModelTranscript strips bold markdown from Thai target word",
+);
+assert(
+  !/\*+/.test(sanitizeModelTranscript("She said **hello** nicely")),
+  "sanitizeModelTranscript removes all asterisk markdown",
+);
+assert(
+  liveConfigSrc.includes("Never use markdown") && liveConfigSrc.includes("plain text only"),
+  "persona forbids markdown in spoken lines",
+);
+assert(
+  talkPageSrc.includes("appendGeminiTranscriptChunk"),
+  "talk page routes model transcript through session-canvas sanitizer",
+);
+
 section("Warmth + discipline harness");
 
 assert(
@@ -1550,7 +1631,17 @@ async function reportA1CardableInventory(): Promise<void> {
   );
 }
 
-void reportA1CardableInventory().then(() => {
+async function runAsyncHarness(): Promise<void> {
+  section("Guest CTA via TurnRuntime (effect path)");
+  const ctaRuntime = await simulateGuestCtaViaTurnRuntime();
+  assert(ctaRuntime.exchanges === GUEST_EXCHANGE_LIMIT, "TurnRuntime: CTA after exactly 5 exchanges");
+  assert(ctaRuntime.invitationCueCount === 1, "TurnRuntime: spoken invitation cue once at exchange 5");
+  assert(ctaRuntime.signupSheetCount === 1, "TurnRuntime: signup sheet opens after invitation drain");
+  assert(ctaRuntime.phase === "sheet", "TurnRuntime: ends on sheet phase");
+
+  await reportA1CardableInventory();
   console.log(`\n[check:talk] ${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);
-});
+}
+
+void runAsyncHarness();

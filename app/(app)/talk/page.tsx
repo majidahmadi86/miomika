@@ -16,7 +16,12 @@ import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { WordCardV3 } from "@/components/talk/WordCardV3";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
-import { pickCompanionOpener } from "@/lib/voice/warmth";
+import {
+  appendGeminiTranscriptChunk,
+  bindKickoffToOpener,
+  makeSessionOpenerShell,
+  type SessionMiniCatItem,
+} from "@/lib/talk/session-canvas";
 import { useUILanguage } from "@/lib/i18n/client";
 import { unlockTtsPlayback } from "@/lib/voice/tts";
 import { logEvent } from "@/lib/debug/event-bus";
@@ -35,13 +40,8 @@ import {
 import { resolveKickoffAudience, type MemberContextBundle } from "@/lib/live/member-context";
 import { resolveLiveSessionLanguages } from "@/lib/brain/language";
 import {
-  newGeminiTranscriptItem,
-  routeGeminiTranscriptChunk,
-} from "@/lib/live/transcript-routing";
-import {
   sortTranscriptItems,
   TRANSCRIPT_CARD_ORDER,
-  TRANSCRIPT_GEMINI_ORDER,
   TRANSCRIPT_USER_ORDER,
 } from "@/lib/live/transcript-order";
 import {
@@ -51,8 +51,7 @@ import {
 import {
   claimLessonWordCard,
   isLessonWordCarded,
-  missingCardedPlanWords,
-  shouldBackstopFocusNewWord,
+  planBackstopCardWords,
   teachResultWordId,
 } from "@/lib/talk/lesson-layer";
 import {
@@ -110,16 +109,8 @@ function sessionIntroducedWords(items: CanvasItem[]): string[] {
     .map((item) => item.word.word_en);
 }
 
-function makeOpenerItem(uiLang: "th" | "en"): CanvasItem {
-  const text = pickCompanionOpener(uiLang);
-  return {
-    id: crypto.randomUUID(),
-    kind: "mini_cat",
-    textTh: uiLang === "th" ? text : "",
-    textEn: uiLang === "en" ? text : "",
-    turnSeq: 0,
-    roleOrder: TRANSCRIPT_GEMINI_ORDER,
-  };
+function makeOpenerItem(): CanvasItem {
+  return makeSessionOpenerShell(crypto.randomUUID(), 0);
 }
 
 export default function TalkPage() {
@@ -286,29 +277,17 @@ export default function TalkPage() {
       const snap = clientRef.current?.getSessionSnapshot().teachWord;
       if (!snap || snap.lessonPlan.length === 0) return;
       const turnSeq = currentTurnSeqRef.current;
-      const missing = missingCardedPlanWords({
+      const wordIds = planBackstopCardWords({
+        teaching: preTurnState.teaching,
+        wordPickThisTurn: preTurnState.wordPickThisTurn,
+        hasDueReview: !isGuestRef.current,
+        canIntroNew: !isLessonComplete(snap.lessonPlan, snap.introducedIdx),
         plan: snap.lessonPlan,
         introducedIdx: snap.introducedIdx,
         carded: cardedPlanWordsRef.current,
       });
-      for (const wordId of missing) {
+      for (const wordId of wordIds) {
         await fetchAndPushPlanCard(wordId, turnSeq);
-      }
-      if (
-        shouldBackstopFocusNewWord({
-          teaching: preTurnState.teaching,
-          wordPickThisTurn: preTurnState.wordPickThisTurn,
-          hasDueReview: !isGuestRef.current,
-          canIntroNew: !isLessonComplete(snap.lessonPlan, snap.introducedIdx),
-          plan: snap.lessonPlan,
-          introducedIdx: snap.introducedIdx,
-          carded: cardedPlanWordsRef.current,
-        })
-      ) {
-        const nextWord = nextPlannedWord(snap.lessonPlan, snap.introducedIdx);
-        if (nextWord) {
-          await fetchAndPushPlanCard(nextWord, turnSeq);
-        }
       }
     },
     [fetchAndPushPlanCard],
@@ -435,9 +414,13 @@ export default function TalkPage() {
           onKickoffCanvas: () => {
             kickoffSentRef.current = true;
             setItems((prev) => {
-              if (prev.length === 1 && prev[0]?.kind === "mini_cat") {
-                currentGeminiItemIdRef.current = prev[0].id;
-                return [{ ...prev[0], textTh: "", textEn: "" }];
+              const openers = prev.filter(
+                (item): item is SessionMiniCatItem => item.kind === "mini_cat",
+              );
+              const { items: nextOpeners, geminiItemId } = bindKickoffToOpener(openers);
+              if (geminiItemId) currentGeminiItemIdRef.current = geminiItemId;
+              if (nextOpeners.length === 1 && prev.length === 1 && prev[0]?.kind === "mini_cat") {
+                return [nextOpeners[0]!];
               }
               return prev;
             });
@@ -645,32 +628,20 @@ export default function TalkPage() {
       return;
     }
 
-    if (currentGeminiItemIdRef.current) {
-      setItems((prev) =>
-        prev.map((item) => {
-          if (item.id !== currentGeminiItemIdRef.current || item.kind !== "mini_cat") return item;
-          return {
-            ...item,
-            ...routeGeminiTranscriptChunk(item, chunk),
-          };
-        }),
+    setItems((prev) => {
+      const miniCats = prev.filter(
+        (item): item is SessionMiniCatItem => item.kind === "mini_cat",
       );
-    } else {
-      const id = crypto.randomUUID();
-      currentGeminiItemIdRef.current = id;
-      const routed = newGeminiTranscriptItem(chunk);
-      setItems((prev) => [
-        ...prev,
-        {
-          id,
-          kind: "mini_cat",
-          textTh: routed.textTh,
-          textEn: routed.textEn,
-          turnSeq: currentTurnSeqRef.current,
-          roleOrder: TRANSCRIPT_GEMINI_ORDER,
-        },
-      ]);
-    }
+      const others = prev.filter((item) => item.kind !== "mini_cat");
+      const { items: nextMiniCats, currentGeminiItemId } = appendGeminiTranscriptChunk(
+        miniCats,
+        currentGeminiItemIdRef.current,
+        chunk,
+        currentTurnSeqRef.current,
+      );
+      currentGeminiItemIdRef.current = currentGeminiItemId;
+      return sortTranscriptItems([...others, ...nextMiniCats]);
+    });
   }, []);
 
   const discardSuspendedModelTurn = useCallback(() => {
@@ -1045,7 +1016,7 @@ export default function TalkPage() {
   /* eslint-disable react-hooks/set-state-in-effect -- session ice-breaker on fresh /talk open */
   useEffect(() => {
     if (items.length > 0 || !guestAuthReady) return;
-    setItems([makeOpenerItem(browserUiLangRef.current)]);
+    setItems([makeOpenerItem()]);
   }, [items.length, guestAuthReady]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -1167,7 +1138,7 @@ export default function TalkPage() {
   }, []);
 
   const handleClear = useCallback(() => {
-    setItems([makeOpenerItem(sessionUiLangRef.current)]);
+    setItems([makeOpenerItem()]);
     setExpandedItems(new Set());
   }, []);
 
