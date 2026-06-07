@@ -502,6 +502,8 @@ export function reduceTurn(
 
     case "interrupted": {
       effects.push({ type: "reset_transcript_ids" });
+      effects.push({ type: "clear_user_exchange_counted" });
+      next = clearExchangeCounted(next);
       effects.push({ type: "set_live_ui", ui: next.sessionActive ? "listening" : "idle" });
       next = { ...next, phase: next.sessionActive ? "listening" : "idle" };
       break;

@@ -348,6 +348,18 @@ const afterMicStop = reduceTurn(flow, { type: "turn_complete" }).state;
 assert(!afterMicStop.invitationVoiceSent, "mic-stop never triggers invitation cue");
 assert(afterMicStop.phase !== "sheet", "mic-stop never opens signup sheet");
 
+flow = createTurnController(0, true);
+flow = reduceTurn(flow, { type: "guest_text_turn", isGuest: true }).state;
+const exchangesBeforeInterrupt = flow.guestExchanges;
+flow = { ...flow, userExchangeCounted: true };
+const interrupted = reduceTurn(flow, { type: "interrupted" });
+assert(!interrupted.state.userExchangeCounted, "interrupted clears userExchangeCounted");
+flow = reduceTurn(interrupted.state, { type: "guest_text_turn", isGuest: true }).state;
+assert(
+  flow.guestExchanges === exchangesBeforeInterrupt + 1,
+  "after interrupted, next user turn increments guestExchanges",
+);
+
 section("Guest CTA at exchange 5 (guest-flow harness)");
 const guestCtaSim = simulateGuestFiveTurnFlow();
 assert(guestCtaSim.exchanges === GUEST_EXCHANGE_LIMIT, "guest-flow: CTA after exactly 5 exchanges");
@@ -1373,6 +1385,12 @@ assert(
   talkPageSrc.includes("orb_mic_stop") &&
     !/liveUiState === "listening"\)[\s\S]{0,120}teardownSession/.test(talkPageSrc),
   "mic-stop uses turn controller orb_mic_stop, not full teardown",
+);
+assert(
+  turnControllerSrc.includes('case "interrupted"') &&
+    /case "interrupted"[\s\S]{0,280}clearExchangeCounted/.test(turnControllerSrc) &&
+    /case "interrupted"[\s\S]{0,280}clear_user_exchange_counted/.test(turnControllerSrc),
+  "interrupted turn end clears userExchangeCounted for next exchange count",
 );
 assert(
   turnControllerSrc.includes("invitationVoiceSent"),
