@@ -33,6 +33,7 @@ export async function simulateGuestCtaViaTurnRuntime(): Promise<{
     waitForTurnAudioThenIdle: async () => {},
     signalModelTurnComplete: () => {},
     endModelTurnWhenDrained: async () => {},
+    clearModelTurnGate: () => {},
     isMicSendSuspended: () => false,
   } as unknown as MediaHandler;
 

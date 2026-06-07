@@ -24,6 +24,7 @@ import {
 } from "@/lib/talk/session-canvas";
 import { useUILanguage } from "@/lib/i18n/client";
 import { unlockTtsPlayback } from "@/lib/voice/tts";
+import { pickPhrase, TALK_FREE_LIMIT_CONTINUE } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
@@ -419,6 +420,14 @@ export default function TalkPage() {
             setGuestExchangesRaw(n);
             if (typeof window !== "undefined") {
               window.localStorage.setItem(GUEST_COUNTER_KEY, String(n));
+            }
+            if (isGuestRef.current && n >= GUEST_EXCHANGE_LIMIT) {
+              logEvent({
+                kind: "state",
+                level: "info",
+                message: "free limit reached",
+                data: { guestExchanges: n, limit: GUEST_EXCHANGE_LIMIT },
+              });
             }
           },
           onOpenGuestSheet: openGuestSignupSheet,
@@ -1367,9 +1376,14 @@ export default function TalkPage() {
   const fuelZap = 64;
   const fuelBrain = 45;
 
+  const freeLimitMessage = useMemo(
+    () => pickPhrase(TALK_FREE_LIMIT_CONTINUE, { lang: uiLang }),
+    [uiLang],
+  );
+
   const stateLabel = (() => {
     if (isLocked) {
-      return uiLang === "th" ? "สมัครเพื่อพูดคุยต่อกับหนูค่า~" : "Sign in to keep talking with Miomi~";
+      return freeLimitMessage;
     }
     if (!audioUnlocked) {
       return uiLang === "th" ? "แตะเพื่อเริ่มค่า~" : "tap anywhere to begin~";

@@ -1221,6 +1221,30 @@ assert(
 const talkPageSrc = readFileSync(join(ROOT, "app/(app)/talk/page.tsx"), "utf8");
 const turnControllerSrc = readFileSync(join(ROOT, "lib/live/turn-controller.ts"), "utf8");
 const turnRuntimeSrc = readFileSync(join(ROOT, "lib/live/turn-runtime.ts"), "utf8");
+const sessionCanvasSrc = readFileSync(join(ROOT, "lib/talk/session-canvas.ts"), "utf8");
+assert(
+  miomiClientSrc.includes("gemini transcript chunk (raw)"),
+  "miomi-client logs raw gemini transcript chunks",
+);
+assert(
+  sessionCanvasSrc.includes("appendGeminiTranscriptChunk raw delta"),
+  "session-canvas logs routed transcript deltas",
+);
+assert(
+  mediaHandlerSrc.includes("modelTurnActive=") &&
+    mediaHandlerSrc.includes("shouldForwardMicToGemini="),
+  "media-handler logs modelTurnActive transitions and mic-forward flips",
+);
+assert(
+  talkPageSrc.includes('message: "pushWordCard"') &&
+    talkPageSrc.includes("model first-audio emit"),
+  "talk page logs word cards and model audio emit",
+);
+assert(
+  turnRuntimeSrc.includes("greeting kickoff emit") &&
+    turnRuntimeSrc.includes("handoff/invitation CTA speak_exact fire"),
+  "turn runtime logs greeting kickoff and handoff/invitation CTA",
+);
 assert(
   talkPageSrc.includes("TurnRuntime") && talkPageSrc.includes("dispatchTurn"),
   "talk page uses deterministic turn controller",
@@ -1320,6 +1344,16 @@ const warmthSrc = readFileSync(join(ROOT, "lib/voice/warmth.ts"), "utf8");
 assert(
   warmthSrc.includes("กดไมค์") && warmthSrc.includes("tap the mic"),
   "canvas icebreaker tells user to press the mic",
+);
+assert(
+  warmthSrc.includes("TALK_FREE_LIMIT_CONTINUE") &&
+    warmthSrc.includes("voice-to-text") &&
+    warmthSrc.includes("reply in text"),
+  "free limit message tells user typing/voice-to-text stays with text replies",
+);
+assert(
+  talkPageSrc.includes("TALK_FREE_LIMIT_CONTINUE") && talkPageSrc.includes("free limit reached"),
+  "talk page wires free-limit message at limit-reached point",
 );
 assert(
   turnRuntimeSrc.includes("waitForHandoffReplyDrain") &&

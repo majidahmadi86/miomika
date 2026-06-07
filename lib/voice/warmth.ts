@@ -206,6 +206,18 @@ export const GUIDANCE_GUEST_LIMIT_HIT: WarmPhrase[] = [
   },
 ];
 
+/** Guest free-voice limit on /talk — typing + voice-to-text stay; replies become text. */
+export const TALK_FREE_LIMIT_CONTINUE: WarmPhrase[] = [
+  {
+    th: "ครบโควตาเสียงฟรีแล้วค่า~ พิมพ์หรือใช้เสียงเป็นข้อความต่อได้นะ หนูตอบเป็นข้อความให้ค่า",
+    en: "You've hit the free voice limit~ keep going by typing or voice-to-text — I'll reply in text.",
+  },
+  {
+    th: "ไมค์เสียงหมดแล้วค่า~ แต่พิมพ์หรือพูดเป็นข้อความได้เลย หนูยังตอบให้อยู่นะ",
+    en: "Voice chat is paused~ you can still type or use voice-to-text and I'll answer in text.",
+  },
+];
+
 export const GUIDANCE_IDLE: WarmPhrase[] = [
   { th: "ติดอะไรหรือเปล่าคะ~? ลองคำใหม่ด้วยกันไหม", en: "Stuck on something~? Want to try a new word together?" },
   { th: "หนูช่วยได้นะคะ~ บอกหนูสิคะ", en: "I can help~ just tell me" },
