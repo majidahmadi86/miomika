@@ -8,6 +8,8 @@ import { join } from "node:path";
 import { GUEST_EXCHANGE_LIMIT } from "../lib/ai/limits";
 import {
   detectExplicitUiLanguageRequest,
+  detectUnsupportedTeachingRequest,
+  buildContentHonestyContract,
   normalizeLearningTarget,
   oppositeLanguage,
   resolveLiveSessionLanguages,
@@ -17,13 +19,6 @@ import {
   resolveUiLanguage,
   sanitizeTargetLanguage,
 } from "../lib/brain/language";
-import {
-  GUEST_PRACTICE_TARGET_COOKIE,
-  parseGuestPracticeTarget,
-  readGuestPracticeTargetFromCookieHeader,
-  sessionLanguagesFromGuestPick,
-  suggestedGuestPracticeTarget,
-} from "../lib/talk/guest-practice-lang";
 import {
   countUncardableBankRows,
   filterVocabCandidates,
@@ -128,62 +123,38 @@ function section(title: string): void {
 
 section("Language resolution");
 
-const guestSession = resolveSessionLanguages({
+const guestEnBrowser = resolveSessionLanguages({
   isGuest: true,
   profileUiLang: null,
   profileTarget: null,
+  browserUiLang: "en",
 });
-assert(guestSession.uiLanguage === "en", "guest no-pick fallback UI=en");
-assert(guestSession.targetLanguage === "th", "guest no-pick fallback TARGET=th");
+assert(guestEnBrowser.uiLanguage === "en", "guest browser en → UI en");
+assert(guestEnBrowser.targetLanguage === "th", "guest browser en → default target th");
 
-const guestLearnTh = resolveSessionLanguages({
+const guestThBrowser = resolveSessionLanguages({
   isGuest: true,
   profileUiLang: null,
   profileTarget: null,
-  guestPracticeTarget: "th",
+  browserUiLang: "th",
 });
-assert(
-  guestLearnTh.uiLanguage === "en" && guestLearnTh.targetLanguage === "th",
-  "guest pick Thai → UI en, target th",
-);
-const guestLearnEn = resolveSessionLanguages({
-  isGuest: true,
-  profileUiLang: null,
-  profileTarget: null,
-  guestPracticeTarget: "en",
-});
-assert(
-  guestLearnEn.uiLanguage === "th" && guestLearnEn.targetLanguage === "en",
-  "guest pick English → UI th, target en",
-);
+assert(guestThBrowser.uiLanguage === "th", "guest browser th → UI th");
+assert(guestThBrowser.targetLanguage === "en", "guest browser th → default target en");
 
 assert(
-  sessionLanguagesFromGuestPick("en").uiLanguage === "th",
-  "sessionLanguagesFromGuestPick en → ui th",
+  detectUnsupportedTeachingRequest("teach me Spanish please"),
+  "detectUnsupportedTeachingRequest flags Spanish",
 );
 assert(
-  sessionLanguagesFromGuestPick("th").targetLanguage === "th",
-  "sessionLanguagesFromGuestPick th → target th",
-);
-assert(
-  parseGuestPracticeTarget("english") === "en",
-  "parseGuestPracticeTarget english → en",
-);
-assert(
-  readGuestPracticeTargetFromCookieHeader(
-    `${GUEST_PRACTICE_TARGET_COOKIE}=th; ui-language=en`,
-  ) === "th",
-  "cookie header round-trip guest practice target",
-);
-assert(
-  typeof suggestedGuestPracticeTarget() === "string",
-  "suggestedGuestPracticeTarget returns th or en",
+  buildContentHonestyContract("en").includes("Thai↔English"),
+  "content honesty contract names supported pair",
 );
 
 const memberTeachEn = resolveSessionLanguages({
   isGuest: false,
   profileUiLang: "th",
   profileTarget: null,
+  browserUiLang: "en",
   teachLearningTarget: "en",
 });
 assert(
@@ -195,6 +166,7 @@ const memberEnTh = resolveSessionLanguages({
   isGuest: false,
   profileUiLang: "en",
   profileTarget: "th",
+  browserUiLang: "th",
 });
 assert(memberEnTh.uiLanguage === "en", "member UI=en from profile");
 assert(memberEnTh.targetLanguage === "th", "member TARGET=th from profile");
@@ -203,6 +175,7 @@ const memberEnEn = resolveSessionLanguages({
   isGuest: false,
   profileUiLang: "en",
   profileTarget: "en",
+  browserUiLang: "th",
 });
 assert(memberEnEn.targetLanguage === "th", "member UI=en + profile target=en → teaches th (never own language)");
 
@@ -221,6 +194,14 @@ const teachEnglish = resolveTargetLanguage({
   uiLanguage: "th",
 });
 assert(teachEnglish === "en", '"learn English" with UI=th → target=en');
+
+const helpEnglish = resolveTargetLanguage({
+  userInput: "help my English",
+  memory: [],
+  profileTarget: null,
+  uiLanguage: "th",
+});
+assert(helpEnglish === "en", '"help my English" with UI=th → target=en');
 
 assert(
   sanitizeTargetLanguage("en", "en") === "th",
@@ -281,20 +262,18 @@ assert(
 
 assert(
   resolveProfileUiAnchor({
-    isGuest: true,
     profileUiLang: null,
     sessionUiLang: "th",
-    guestPracticeTarget: "en",
   }) === "th",
-  "guest UI anchor follows practice pick (English → ui th)",
+  "null profile UI anchor keeps browser-seeded session UI",
 );
 assert(
-  resolveProfileUiAnchor({ isGuest: true, profileUiLang: null, sessionUiLang: "th" }) === "en",
-  "guest no-pick UI anchor fallback en",
+  resolveProfileUiAnchor({ profileUiLang: null, sessionUiLang: "en" }) === "en",
+  "session UI anchor follows browser seed",
 );
 assert(
-  resolveProfileUiAnchor({ isGuest: false, profileUiLang: null, sessionUiLang: "en" }) === "en",
-  "member null ui_language keeps session UI anchor",
+  resolveProfileUiAnchor({ profileUiLang: "th", sessionUiLang: "en" }) === "th",
+  "profile ui_language is adaptation anchor when set",
 );
 assert(
   resolveLiveSessionLanguages({
@@ -302,8 +281,20 @@ assert(
     profileUiLang: null,
     profileTarget: "th",
     sessionUiLang: "en",
+    browserUiLang: "en",
   }).uiLanguage === "en",
   "member null ui_language cold connect keeps session UI",
+);
+assert(
+  resolveLiveSessionLanguages({
+    isGuest: true,
+    profileUiLang: null,
+    profileTarget: null,
+    sessionUiLang: "th",
+    browserUiLang: "th",
+    sessionTargetLang: "en",
+  }).targetLanguage === "en",
+  "guest live session intent target reaches lesson direction",
 );
 
 // --- B. Guest 5-turn flow (turn controller) -------------------------------
@@ -797,6 +788,20 @@ const kickoffThFirst = buildKickoffPrompt("th", "first_time");
 const kickoffEnReturning = buildKickoffPrompt("en", "returning");
 assert(kickoffEnFirst.includes("ENGLISH"), "kickoff en mandates English voice");
 assert(kickoffThFirst.includes("ภาษาไทย"), "kickoff th mandates Thai voice");
+assert(
+  !/press the mic|then invite them to press|invite them to press the mic/i.test(
+    kickoffEnFirst,
+  ),
+  "open first-time kickoff has no mic invite (en)",
+);
+assert(
+  !/ready to learn your first|ready to learn\?/i.test(kickoffEnFirst),
+  "open first-time kickoff has no learning agenda (en)",
+);
+assert(
+  !/invite.*mic|learning agenda/i.test(kickoffThFirst),
+  "open kickoff has no mic invite or learning agenda (th prompt)",
+);
 assert(kickoffPromptIsFirstTimeSafe(kickoffEnFirst), "first-time en kickoff has no false familiarity");
 assert(kickoffPromptIsFirstTimeSafe(kickoffThFirst), "first-time th kickoff has no false familiarity");
 assert(
@@ -1134,19 +1139,24 @@ assert(
 );
 assert(
   talkPageSrc.includes("maybeAdaptSessionLanguages") &&
-    /if \(isGuestRef\.current\) return/.test(talkPageSrc),
-  "guest maybeAdaptSessionLanguages is a no-op",
+    !/if \(isGuestRef\.current\) return/.test(talkPageSrc),
+  "guest + member in-conversation intent adaptation enabled",
 );
 assert(
-  talkPageSrc.includes("sessionUiLangRef.current = next") &&
-    talkPageSrc.includes("handleCycleLang"),
-  "handleCycleLang syncs sessionUiLangRef",
+  !talkPageSrc.includes("GuestPracticePick") &&
+    !talkPageSrc.includes("handleCycleLang") &&
+    !talkPageSrc.includes("onCycleLang"),
+  "no language toggle or guest practice picker",
 );
 assert(
-  talkPageSrc.includes("GuestPracticePick") &&
-    talkPageSrc.includes("guestPracticeTargetRef") &&
-    talkPageSrc.includes("writeGuestPracticeTargetCookie"),
-  "talk page wires guest practice pick + cookie",
+  talkPageSrc.includes("useUILanguage") && talkPageSrc.includes("browserUiLangRef"),
+  "talk page seeds session from browser ui-language",
+);
+assert(
+  talkPageSrc.includes("sessionTargetLangRef") &&
+    talkPageSrc.includes("syncTeachWordContext") &&
+    talkPageSrc.includes("sessionTargetLang: sessionTargetLangRef.current"),
+  "resolved target wired end-to-end to teach-word context",
 );
 assert(
   talkPageSrc.includes("teachLearningTarget: config.teach.learning") ||
@@ -1155,15 +1165,22 @@ assert(
 );
 const languageSrc = readFileSync(join(ROOT, "lib/brain/language.ts"), "utf8");
 assert(
-  !/if \(args\.isGuest\)[\s\S]{0,120}return \{ uiLanguage: "en", targetLanguage: "th" \}/.test(
-    languageSrc,
-  ),
-  "resolveSessionLanguages guest branch derives from pick, not hardcoded en/th only",
+  languageSrc.includes("browserUiLang") &&
+    !/if \(args\.isGuest\)[\s\S]{0,200}return \{ uiLanguage: "en", targetLanguage: "th" \}/.test(
+      languageSrc,
+    ),
+  "resolveSessionLanguages seeds from browser, not hardcoded guest en/th",
 );
 assert(
   talkPageSrc.includes("resolveLiveSessionLanguages") &&
     talkPageSrc.includes("resolveProfileUiAnchor"),
   "talk page uses anchored session language helpers",
+);
+const teachWordRoute = readFileSync(join(ROOT, "app/api/teach-word/route.ts"), "utf8");
+assert(
+  teachWordRoute.includes("UI_LANGUAGE_COOKIE") &&
+    !teachWordRoute.includes("GUEST_PRACTICE_TARGET_COOKIE"),
+  "teach-word guest path uses browser ui-language cookie",
 );
 
 section("Session transport continuity");

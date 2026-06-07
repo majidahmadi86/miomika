@@ -2,18 +2,15 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Type, Globe, Keyboard } from "lucide-react";
+import { Type, Keyboard } from "lucide-react";
 
 export type ResponseLength = "short" | "normal" | "detailed";
-export type ResponseLang = "th" | "en" | "both";
 
 interface ToolboxProps {
   length: ResponseLength;
-  lang: ResponseLang;
   keyboardMode: boolean;
   uiLang: "th" | "en";
   onCycleLength: () => void;
-  onCycleLang: () => void;
   onToggleKeyboard: () => void;
 }
 
@@ -24,11 +21,9 @@ const iconVariants = {
 
 export function Toolbox({
   length,
-  lang,
   keyboardMode,
   uiLang,
   onCycleLength,
-  onCycleLang,
   onToggleKeyboard,
 }: ToolboxProps) {
   const [lastPressedId, setLastPressedId] = useState<string | null>(null);
@@ -70,15 +65,6 @@ export function Toolbox({
         label={length === "short" ? "S" : length === "detailed" ? "L" : "M"}
         title={uiLang === "en" ? `Length: ${length}` : "ความยาว"}
         onClick={() => { markPressed("length"); onCycleLength(); }}
-      />
-      <ToolBtn
-        id="lang"
-        Icon={Globe}
-        active={lang !== "both"}
-        isPressed={lastPressedId === "lang"}
-        label={lang === "both" ? "T+E" : lang.toUpperCase()}
-        title={uiLang === "en" ? `Lang: ${lang}` : "ภาษา"}
-        onClick={() => { markPressed("lang"); onCycleLang(); }}
       />
     </div>
   );

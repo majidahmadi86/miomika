@@ -3,7 +3,13 @@
 export type DetectedLang = "th" | "en" | "mixed";
 
 const LEARN_INTENT_RE =
-  /(?:teach me|i want to learn|สอน|เรียน)\s*(?:thai|english|ไทย|อังกฤษ|ภาษาไทย|ภาษาอังกฤษ)/i;
+  /(?:teach me|i want to learn|help(?:\s+me)?(?:\s+with)?\s+my|สอน|เรียน)\s*(?:thai|english|ไทย|อังกฤษ|ภาษาไทย|ภาษาอังกฤษ)/i;
+
+/** Languages we have curated teaching content for today. */
+export const SUPPORTED_TEACHING_LANGS = ["th", "en"] as const;
+
+const UNSUPPORTED_TEACH_RE =
+  /(?:teach me|i want to learn|help(?:\s+me)?(?:\s+with)?\s+my|learn|study|practice|สอน|เรียน|ฝึก)\s*(?:me\s+)?(?:to\s+speak\s+)?(?:spanish|french|japanese|chinese|mandarin|korean|german|italian|portuguese|arabic|hindi|russian|vietnamese|ภาษาสเปน|ภาษาฝรั่งเศส|ภาษาญี่ปุ่น|ภาษาจีน|ภาษาเกาหลี)/i;
 
 /** Target-content questions — must NOT flip conversation UI language. */
 function isTargetContentQuestion(lower: string): boolean {
@@ -216,81 +222,81 @@ export function sanitizeTargetLanguage(
   return oppositeLanguage(uiLanguage);
 }
 
+export function detectUnsupportedTeachingRequest(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  return UNSUPPORTED_TEACH_RE.test(trimmed);
+}
+
+export function buildContentHonestyContract(ui: "th" | "en"): string {
+  if (ui === "th") {
+    return `CONTENT HONESTY — เนื้อหาสอนภาษา:
+- วันนี้หนูมีบทเรียนไทย↔อังกฤษเท่านั้น — ห้ามแกล้งสอนภาษาอื่น
+- ถ้าขอภาษาที่ยังไม่มี ให้ตอบอบอุ่นและซื่อสัตย์ บอกว่ายังไม่พร้อม แล้วเสนอสิ่งที่หนูสอนได้ (ไทยหรืออังกฤษ) หรือชวนคุยเล่นแทน
+- ห้ามสอนคำศัพท์ภาษาอื่นแม้รู้ — อธิบายข้อจำกัดอย่างอบอุ่น`;
+  }
+  return `CONTENT HONESTY — teaching scope:
+- Today Miomika teaching content is Thai↔English ONLY — never fake other languages
+- If they ask for a language we don't have yet, stay warm and honest: say it's coming, offer what you CAN teach (Thai or English), or just chat
+- Do NOT teach vocabulary in unsupported languages even if you know it — explain the limit warmly`;
+}
+
 export function resolveSessionLanguages(args: {
   isGuest: boolean;
   profileUiLang: string | null;
   profileTarget: string | null;
-  /** Guest cookie pick — target language they chose to practice. */
-  guestPracticeTarget?: "th" | "en" | null;
+  /** Browser ui-language cookie / Accept-Language seed. */
+  browserUiLang: "th" | "en";
+  /** Live session target after in-conversation intent (guest + member). */
+  sessionTargetLang?: "th" | "en" | null;
   /** TalkConfig.teach.learning — member fallback when profile target unset. */
   teachLearningTarget?: "th" | "en" | null;
 }): { uiLanguage: "th" | "en"; targetLanguage: "th" | "en" } {
-  if (args.isGuest) {
-    const pick = normalizeLearningTarget(args.guestPracticeTarget ?? null);
-    if (pick) {
-      return {
-        uiLanguage: oppositeLanguage(pick),
-        targetLanguage: pick,
-      };
-    }
-    return { uiLanguage: "en", targetLanguage: "th" };
-  }
-  const uiLanguage = normalizeUiLanguage(args.profileUiLang);
+  const uiLanguage =
+    !args.isGuest && args.profileUiLang
+      ? normalizeUiLanguage(args.profileUiLang)
+      : args.browserUiLang;
   const profileTarget =
     normalizeLearningTarget(args.profileTarget) ??
     normalizeLearningTarget(args.teachLearningTarget ?? null);
+  const sessionTarget = normalizeLearningTarget(args.sessionTargetLang ?? null);
   return {
     uiLanguage,
-    targetLanguage: sanitizeTargetLanguage(uiLanguage, profileTarget),
+    targetLanguage: sanitizeTargetLanguage(uiLanguage, sessionTarget ?? profileTarget),
   };
 }
 
-/** UI anchor for adaptation — guests are hard-locked; null profile keeps session UI. */
+/** UI anchor for adaptation — profile when set; else browser-seeded session UI. */
 export function resolveProfileUiAnchor(args: {
-  isGuest: boolean;
   profileUiLang: string | null;
   sessionUiLang: "th" | "en";
-  guestPracticeTarget?: "th" | "en" | null;
 }): "th" | "en" {
-  if (args.isGuest) {
-    return resolveSessionLanguages({
-      isGuest: true,
-      profileUiLang: null,
-      profileTarget: null,
-      guestPracticeTarget: args.guestPracticeTarget,
-    }).uiLanguage;
-  }
   if (args.profileUiLang) {
     return normalizeUiLanguage(args.profileUiLang);
   }
   return args.sessionUiLang;
 }
 
-/** Live connect — null/unknown profile UI keeps the session's resolved language. */
+/** Live connect — null profile UI keeps the browser-seeded session language. */
 export function resolveLiveSessionLanguages(args: {
   isGuest: boolean;
   profileUiLang: string | null;
   profileTarget: string | null;
   sessionUiLang: "th" | "en";
-  guestPracticeTarget?: "th" | "en" | null;
+  browserUiLang: "th" | "en";
+  sessionTargetLang?: "th" | "en" | null;
   teachLearningTarget?: "th" | "en" | null;
 }): { uiLanguage: "th" | "en"; targetLanguage: "th" | "en" } {
-  if (args.isGuest) {
-    return resolveSessionLanguages({
-      isGuest: true,
-      profileUiLang: null,
-      profileTarget: null,
-      guestPracticeTarget: args.guestPracticeTarget,
-    });
-  }
-  const uiLanguage = args.profileUiLang
-    ? normalizeUiLanguage(args.profileUiLang)
-    : args.sessionUiLang;
+  const uiLanguage =
+    !args.isGuest && args.profileUiLang
+      ? normalizeUiLanguage(args.profileUiLang)
+      : args.sessionUiLang;
   const profileTarget =
     normalizeLearningTarget(args.profileTarget) ??
     normalizeLearningTarget(args.teachLearningTarget ?? null);
+  const sessionTarget = normalizeLearningTarget(args.sessionTargetLang ?? null);
   return {
     uiLanguage,
-    targetLanguage: sanitizeTargetLanguage(uiLanguage, profileTarget),
+    targetLanguage: sanitizeTargetLanguage(uiLanguage, sessionTarget ?? profileTarget),
   };
 }

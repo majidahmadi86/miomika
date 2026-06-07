@@ -313,10 +313,10 @@ export function pickMasteryAdvanced(word: string, lang: Language): string {
 export type IceBreaker = { th: string; en: string; mood: "playful" | "warm" | "curious" | "sleepy" };
 
 export const ICE_BREAKERS_FIRST: IceBreaker[] = [
-  { th: "อ๊ะ! สวัสดีค่า~ หนูชื่อมิโอมิ ดีใจที่ได้เจอนะคะ", en: "Oh! Hi there~ I'm Miomi. So happy to finally meet you!", mood: "playful" },
-  { th: "สวัสดีค่า~ หนูมิโอมิเองค่ะ มาเป็นเพื่อนเรียนภาษากันไหม~", en: "Hi~ I'm Miomi! Want to be friends and learn together?", mood: "playful" },
-  { th: "เย้~ มีเพื่อนใหม่! หนูชื่อมิโอมิค่า อยากรู้จักคุณจังเลย", en: "Yay~ a new friend! I'm Miomi, and I'd love to get to know you.", mood: "playful" },
-  { th: "หวัดดีค่า~ หนูชื่อมิโอมิ มานั่งคุยกับหนูหน่อยสิคะ", en: "Hello~ I'm Miomi. Come sit and chat with me?", mood: "warm" },
+  { th: "อ๊ะ! สวัสดีค่า~ หนูชื่อมิโอมิ ดีใจที่ได้เจอนะคะ", en: "Oh! Hi there~ I'm Miomi. So happy to meet you!", mood: "playful" },
+  { th: "สวัสดีค่า~ หนูมิโอมิเองค่ะ มานั่งคุยกันไหม~", en: "Hi~ I'm Miomi. Come sit and chat with me?", mood: "playful" },
+  { th: "เย้~ มีเพื่อนใหม่! หนูชื่อมิโอมิค่า อยากรู้จักคุณจังเลย", en: "Yay~ a new friend! I'm Miomi — I'd love to get to know you.", mood: "playful" },
+  { th: "หวัดดีค่า~ หนูชื่อมิโอมิ อยู่ตรงนี้นะคะ", en: "Hello~ I'm Miomi. I'm right here with you.", mood: "warm" },
 ];
 
 export const ICE_BREAKERS_RETURNING: IceBreaker[] = [
@@ -342,6 +342,12 @@ export function pickIceBreaker(): IceBreaker {
   if (next === lastIdx && pool.length > 1) next = (next + 1) % pool.length;
   window.localStorage.setItem(key, String(next));
   return pool[next];
+}
+
+/** Open companion hello in the user's UI language — warm, zero agenda. */
+export function pickCompanionOpener(uiLang: "th" | "en"): string {
+  const ice = pickIceBreaker();
+  return uiLang === "th" ? ice.th : ice.en;
 }
 
 // ============================================================================

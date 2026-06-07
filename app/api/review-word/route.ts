@@ -5,9 +5,9 @@ import { getServerProfile } from "@/lib/auth/get-server-profile";
 import {
   normalizeLearningTarget,
   normalizeUiLanguage,
-  resolveSessionLanguages,
   sanitizeTargetLanguage,
 } from "@/lib/brain/language";
+import { UI_LANGUAGE_COOKIE } from "@/lib/i18n/server";
 import { resolvePhonetics } from "@/lib/brain/phonetics";
 import { rowToIntroducedWord } from "@/lib/brain/teaching";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -16,7 +16,6 @@ import {
   buildExcludeSet,
   pickPlanReviewWord,
 } from "@/lib/talk/lesson-plan";
-import { GUEST_PRACTICE_TARGET_COOKIE, parseGuestPracticeTarget } from "@/lib/talk/guest-practice-lang";
 
 async function loadWordFromBank(wordEn: string): Promise<{
   word_en: string;
@@ -109,19 +108,12 @@ export async function POST(req: NextRequest) {
       requestTarget ?? profileTarget,
     );
   } else {
-    const guestCookieTarget = parseGuestPracticeTarget(
-      req.cookies.get(GUEST_PRACTICE_TARGET_COOKIE)?.value ?? null,
+    const browserUi = normalizeUiLanguage(
+      req.cookies.get(UI_LANGUAGE_COOKIE)?.value ?? null,
     );
-    const requestTarget =
-      normalizeLearningTarget(bodyLearningTarget) ?? guestCookieTarget;
-    const guestSession = resolveSessionLanguages({
-      isGuest: true,
-      profileUiLang: null,
-      profileTarget: null,
-      guestPracticeTarget: requestTarget,
-    });
-    uiLanguage = guestSession.uiLanguage;
-    learningTarget = guestSession.targetLanguage;
+    const requestTarget = normalizeLearningTarget(bodyLearningTarget);
+    uiLanguage = browserUi;
+    learningTarget = sanitizeTargetLanguage(browserUi, requestTarget);
   }
 
   if (clientLessonPlan.length === 0 || clientIntroducedIdx <= 0) {
