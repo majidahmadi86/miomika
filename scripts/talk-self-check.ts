@@ -830,6 +830,22 @@ assert(
   buildTeachingModeContract("en", "th").includes("USE (not parrot)"),
   "teaching contract mandates USE not parrot",
 );
+const liveConfigSrc = readFileSync(join(ROOT, "lib/live/live-config.ts"), "utf8");
+const teachingModeSrc = readFileSync(join(ROOT, "lib/talk/teaching-mode.ts"), "utf8");
+assert(
+  liveConfigSrc.includes("COMPANION FIRST") &&
+    liveConfigSrc.includes('NEVER "repeat after me"'),
+  "persona core is companion-first and forbids repeat-after-me drills",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("weave") &&
+    buildTeachingModeContract("en", "th").includes("little gifts"),
+  "teaching contract mandates in-context weave + cards as gifts",
+);
+assert(
+  !/repeat after me/i.test(teachingModeSrc.replace(/never "repeat after me"/gi, "")),
+  "teaching-mode contract never prescribes repeat-after-me (only forbids it)",
+);
 
 // --- F. Token policy (guest limited, key server-side) ----------------------
 
@@ -978,7 +994,6 @@ assert(
   "review-word flags practice mode for plan review words",
 );
 
-const liveConfigSrc = readFileSync(join(ROOT, "lib/live/live-config.ts"), "utf8");
 assert(
   liveConfigSrc.includes("GET_WORD_TO_REVIEW_DECLARATION"),
   "live config declares Tool 3 get_word_to_review",
