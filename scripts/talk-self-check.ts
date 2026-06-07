@@ -1358,7 +1358,26 @@ assert(
 );
 assert(
   talkPageSrc.includes("appendGeminiTranscriptChunk"),
-  "talk page routes model transcript through session-canvas sanitizer",
+  "talk page routes model transcript through session-canvas",
+);
+const miniCatRowSrc = readFileSync(join(ROOT, "components/talk/MiniCatRow.tsx"), "utf8");
+assert(
+  miniCatRowSrc.includes("sanitizeModelTranscript"),
+  "MiniCatRow sanitizes full bubble text once at render",
+);
+const mashedDeltas = ["I", "'m", " sorry", " about", " that"];
+let mashedItems = [makeSessionOpenerShell("mashed-opener", 1)];
+let mashedGeminiId: string | null = null;
+for (const delta of mashedDeltas) {
+  const step = appendGeminiTranscriptChunk(mashedItems, mashedGeminiId, delta, 1);
+  mashedItems = step.items;
+  mashedGeminiId = step.currentGeminiItemId;
+}
+const mashedBubble = mashedItems[0]!;
+const mashedDisplay = sanitizeModelTranscript(mashedBubble.textEn);
+assert(
+  mashedDisplay === "I'm sorry about that",
+  "inter-chunk spaces preserved: deltas render as one sentence",
 );
 
 section("Warmth + discipline harness");

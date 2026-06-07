@@ -3,7 +3,6 @@ import {
   newGeminiTranscriptItem,
   routeGeminiTranscriptChunk,
 } from "@/lib/live/transcript-routing";
-import { sanitizeModelTranscript } from "@/lib/live/transcript";
 import { TRANSCRIPT_GEMINI_ORDER } from "@/lib/live/transcript-order";
 
 export type SessionMiniCatItem = {
@@ -55,25 +54,25 @@ export function appendGeminiTranscriptChunk(
   chunk: string,
   turnSeq: number,
 ): { items: SessionMiniCatItem[]; currentGeminiItemId: string } {
-  const cleaned = sanitizeModelTranscript(chunk);
-  logEvent({
-    kind: "engine",
-    level: "info",
-    message: "appendGeminiTranscriptChunk post-sanitize",
-    data: { raw: chunk, cleaned },
-  });
-  if (!cleaned) {
+  if (!chunk) {
     return {
       items,
       currentGeminiItemId: currentGeminiItemId ?? items.find((i) => i.kind === "mini_cat")?.id ?? "",
     };
   }
 
+  logEvent({
+    kind: "engine",
+    level: "info",
+    message: "appendGeminiTranscriptChunk raw delta",
+    data: { chunk },
+  });
+
   if (currentGeminiItemId) {
     return {
       items: items.map((item) => {
         if (item.id !== currentGeminiItemId || item.kind !== "mini_cat") return item;
-        return { ...item, ...routeGeminiTranscriptChunk(item, cleaned) };
+        return { ...item, ...routeGeminiTranscriptChunk(item, chunk) };
       }),
       currentGeminiItemId,
     };
@@ -84,7 +83,7 @@ export function appendGeminiTranscriptChunk(
       ? items[0]
       : null;
   if (loneOpener) {
-    const routed = newGeminiTranscriptItem(cleaned);
+    const routed = newGeminiTranscriptItem(chunk);
     return {
       items: [{ ...loneOpener, ...routed }],
       currentGeminiItemId: loneOpener.id,
@@ -92,7 +91,7 @@ export function appendGeminiTranscriptChunk(
   }
 
   const id = crypto.randomUUID();
-  const routed = newGeminiTranscriptItem(cleaned);
+  const routed = newGeminiTranscriptItem(chunk);
   return {
     items: [
       ...items,

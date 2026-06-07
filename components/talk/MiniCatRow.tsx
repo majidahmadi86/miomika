@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { sanitizeModelTranscript } from "@/lib/live/transcript";
 
 interface MiniCatRowProps {
   textTh: string;
@@ -10,6 +11,8 @@ interface MiniCatRowProps {
 }
 
 export function MiniCatRow({ textTh, textEn, uiLang, state = "idle" }: MiniCatRowProps) {
+  const displayTh = sanitizeModelTranscript(textTh);
+  const displayEn = sanitizeModelTranscript(textEn);
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
       <div
@@ -50,7 +53,7 @@ export function MiniCatRow({ textTh, textEn, uiLang, state = "idle" }: MiniCatRo
         }}
       >
         <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13.5px", color: "#1A1A18", lineHeight: 1.5, margin: 0 }}>
-          {[textEn, textTh].filter(Boolean).join(" ") || (uiLang === "en" ? textEn : textTh)}
+          {[displayEn, displayTh].filter(Boolean).join(" ") || (uiLang === "en" ? displayEn : displayTh)}
         </p>
       </div>
       <style>{`
