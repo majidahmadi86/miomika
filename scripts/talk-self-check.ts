@@ -1131,8 +1131,10 @@ const mediaHandlerSrc = readFileSync(
 assert(
   mediaHandlerSrc.includes("micSendSuspended") &&
     mediaHandlerSrc.includes("shouldForwardMicToGemini") &&
-    mediaHandlerSrc.includes("isMicSendSuspended"),
-  "replay guard suspends mic PCM to Gemini",
+    mediaHandlerSrc.includes("isMicSendSuspended") &&
+    mediaHandlerSrc.includes("modelTurnActive") &&
+    mediaHandlerSrc.includes("deferUntilPlaybackIdle"),
+  "replay guard suspends mic PCM to Gemini; model-turn gate spans inter-chunk gaps",
 );
 assert(
   mediaHandlerSrc.includes("waitForHandoffReplyDrain"),
@@ -1166,9 +1168,16 @@ assert(
   "phase nudge deduped — not sent every turn",
 );
 assert(
+  turnRuntimeSrc.includes("deferUntilPlaybackIdle") &&
+    turnRuntimeSrc.includes("send_hidden_context"),
+  "phase nudges defer until playback drains",
+);
+assert(
   talkPageSrc.includes("suspendMicSend(true)") &&
-    talkPageSrc.includes("shouldForwardMicToGemini"),
-  "card replay suspends mic send during TTS",
+    talkPageSrc.includes("shouldForwardMicToGemini") &&
+    talkPageSrc.includes("signalModelTurnComplete") &&
+    talkPageSrc.includes("endModelTurnWhenDrained"),
+  "card replay suspends mic send during TTS; model turn drains before mic reopens",
 );
 assert(
   talkPageSrc.includes("runCardBackstop"),

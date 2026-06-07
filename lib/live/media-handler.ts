@@ -13,12 +13,20 @@ export class MediaHandler {
   private nextStartTime = 0;
   private scheduledSources: AudioBufferSourceNode[] = [];
   private playbackActive = false;
+  /** True from first model PCM chunk until turn_complete + full drain — gates mic across inter-chunk gaps. */
+  private modelTurnActive = false;
+  private turnCompleteReceived = false;
+  private pendingAfterDrain: Array<() => void> = [];
   private micSendSuspended = false;
   isRecording = false;
 
   /** True when mic PCM may be forwarded to Gemini (harness + replay guard). */
   shouldForwardMicToGemini(): boolean {
-    return this.isRecording && !this.playbackActive && !this.micSendSuspended;
+    return this.isRecording && !this.modelTurnActive && !this.micSendSuspended;
+  }
+
+  isModelTurnActive(): boolean {
+    return this.modelTurnActive;
   }
 
   /** Card replay / speaker-bleed guard ? model turns during suspension must be discarded. */
@@ -138,6 +146,11 @@ export class MediaHandler {
       void this.audioContext.resume();
     }
 
+    if (!this.modelTurnActive) {
+      this.turnCompleteReceived = false;
+    }
+    this.modelTurnActive = true;
+
     const pcmData = new Int16Array(arrayBuffer);
     const float32Data = new Float32Array(pcmData.length);
     for (let i = 0; i < pcmData.length; i++) {
@@ -176,9 +189,41 @@ export class MediaHandler {
     });
     this.scheduledSources = [];
     this.playbackActive = false;
+    this.modelTurnActive = false;
+    this.turnCompleteReceived = false;
     if (this.audioContext) {
       this.nextStartTime = this.audioContext.currentTime;
     }
+    this.flushDeferredAfterDrain();
+  }
+
+  /** Call when Gemini signals turn_complete — mic stays gated until PCM fully drains. */
+  signalModelTurnComplete(): void {
+    this.turnCompleteReceived = true;
+  }
+
+  /** Waits for scheduled PCM (including post–turn_complete chunks), then clears model-turn gate. */
+  async endModelTurnWhenDrained(maxWaitForStartMs = 3000): Promise<void> {
+    if (!this.turnCompleteReceived && !this.modelTurnActive) return;
+    await this.waitForTurnAudioThenIdle(maxWaitForStartMs);
+    this.modelTurnActive = false;
+    this.turnCompleteReceived = false;
+    this.flushDeferredAfterDrain();
+  }
+
+  /** Queue side effects (hidden nudges) until model output has fully drained. */
+  deferUntilPlaybackIdle(fn: () => void): void {
+    if (this.modelTurnActive || this.isPlaybackActive()) {
+      this.pendingAfterDrain.push(fn);
+      return;
+    }
+    fn();
+  }
+
+  private flushDeferredAfterDrain(): void {
+    if (this.modelTurnActive || this.isPlaybackActive()) return;
+    const batch = this.pendingAfterDrain.splice(0);
+    for (const fn of batch) fn();
   }
 
   isPlaybackActive(): boolean {

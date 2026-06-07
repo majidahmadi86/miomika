@@ -649,8 +649,10 @@ export default function TalkPage() {
         const plan = result.lesson_plan ?? [];
         const idx = result.introduced_idx ?? 0;
         const nextWord = nextPlannedWord(plan, idx);
-        client.sendHiddenContext(
-          buildContentIntentNudge(intent, sessionUiLangRef.current, newTopic, nextWord),
+        mediaRef.current?.deferUntilPlaybackIdle(() =>
+          client.sendHiddenContext(
+            buildContentIntentNudge(intent, sessionUiLangRef.current, newTopic, nextWord),
+          ),
         );
       } catch {
         /* never break audio */
@@ -679,8 +681,10 @@ export default function TalkPage() {
         ...runtime.state,
         teaching: recordWordPick(runtime.state.teaching, "new"),
       };
-      client.sendHiddenContext(
-        buildExplicitLessonRequestNudge(kind, sessionUiLangRef.current, nextWord),
+      mediaRef.current?.deferUntilPlaybackIdle(() =>
+        client.sendHiddenContext(
+          buildExplicitLessonRequestNudge(kind, sessionUiLangRef.current, nextWord),
+        ),
       );
     },
     [ensureTurnRuntime, fetchAndPushPlanCard],
@@ -776,7 +780,9 @@ export default function TalkPage() {
       }
       const preTurnState = { ...runtime.state };
       void runCardBackstop(preTurnState);
+      mediaRef.current?.signalModelTurnComplete();
       dispatchTurn({ type: "turn_complete" });
+      void mediaRef.current?.endModelTurnWhenDrained();
       return;
     }
     if (msg.type === "audio") {

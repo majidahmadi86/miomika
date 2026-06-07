@@ -97,7 +97,7 @@ export class TurnRuntime {
           client?.sendKickoff(effect.lang, this.deps.getKickoffAudience?.() ?? "first_time");
           break;
         case "send_hidden_context":
-          client?.sendHiddenContext(effect.text);
+          media?.deferUntilPlaybackIdle(() => client?.sendHiddenContext(effect.text));
           break;
         case "send_hidden_turn":
           client?.sendHiddenTurn(effect.text);
