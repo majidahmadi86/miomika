@@ -313,10 +313,26 @@ export function pickMasteryAdvanced(word: string, lang: Language): string {
 export type IceBreaker = { th: string; en: string; mood: "playful" | "warm" | "curious" | "sleepy" };
 
 export const ICE_BREAKERS_FIRST: IceBreaker[] = [
-  { th: "อ๊ะ! สวัสดีค่า~ หนูชื่อมิโอมิ ดีใจที่ได้เจอนะคะ", en: "Oh! Hi there~ I'm Miomi. So happy to meet you!", mood: "playful" },
-  { th: "สวัสดีค่า~ หนูมิโอมิเองค่ะ มานั่งคุยกันไหม~", en: "Hi~ I'm Miomi. Come sit and chat with me?", mood: "playful" },
-  { th: "เย้~ มีเพื่อนใหม่! หนูชื่อมิโอมิค่า อยากรู้จักคุณจังเลย", en: "Yay~ a new friend! I'm Miomi — I'd love to get to know you.", mood: "playful" },
-  { th: "หวัดดีค่า~ หนูชื่อมิโอมิ อยู่ตรงนี้นะคะ", en: "Hello~ I'm Miomi. I'm right here with you.", mood: "warm" },
+  {
+    th: "อ๊ะ! หนูชื่อมิโอมิค่า~ ดีใจที่ได้เจอ กดไมค์แล้วมาคุยกันนะคะ",
+    en: "Oh~ I'm Miomi! So happy to meet you — tap the mic when you're ready to chat.",
+    mood: "playful",
+  },
+  {
+    th: "สวัสดีค่า~ หนูมิโอมิเอง อยากรู้จักคุณจัง กดไมค์แล้วเริ่มเล่าให้หนูฟังนะ",
+    en: "Hi~ I'm Miomi. I'd love to get to know you — press the mic and tell me anything.",
+    mood: "playful",
+  },
+  {
+    th: "เย้~ มีเพื่อนใหม่! หนูมิโอมิค่า กดไมค์แล้วมานั่งคุยกันไหม~",
+    en: "Yay~ a new friend! I'm Miomi — tap the mic and come chat with me~",
+    mood: "playful",
+  },
+  {
+    th: "หวัดดีค่า~ หนูมิโอมิอยู่ตรงนี้นะ กดไมค์แล้วเริ่มคุยกันได้เลยค่า",
+    en: "Hey~ Miomi's right here with you. Press the mic whenever you want to talk.",
+    mood: "warm",
+  },
 ];
 
 export const ICE_BREAKERS_RETURNING: IceBreaker[] = [
@@ -344,7 +360,7 @@ export function pickIceBreaker(): IceBreaker {
   return pool[next];
 }
 
-/** Open companion hello in the user's UI language — warm, zero agenda. */
+/** Open companion hello in the user's UI language — warm invite + mic cue. */
 export function pickCompanionOpener(uiLang: "th" | "en"): string {
   const ice = pickIceBreaker();
   return uiLang === "th" ? ice.th : ice.en;
