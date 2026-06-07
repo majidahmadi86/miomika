@@ -703,7 +703,13 @@ export default function TalkPage() {
       void runCardBackstop(preTurnState);
       mediaRef.current?.signalModelTurnComplete();
       dispatchTurn({ type: "turn_complete" });
-      void mediaRef.current?.endModelTurnWhenDrained();
+      const handoffReplyFinishing =
+        preTurnState.handoffArmed && preTurnState.handoffReplyStarted;
+      const invitationFinishing =
+        preTurnState.invitationPending && preTurnState.invitationVoiceSent;
+      if (!handoffReplyFinishing && !invitationFinishing) {
+        void mediaRef.current?.endModelTurnWhenDrained();
+      }
       return;
     }
     if (msg.type === "audio") {
@@ -1205,6 +1211,16 @@ export default function TalkPage() {
     }
     if (runtime.state.sessionActive) {
       if (liveUiState === "listening") {
+        const s = runtime.state;
+        if (
+          s.handoffArmed ||
+          s.invitationPending ||
+          s.phase === "handoff" ||
+          s.phase === "voiced_reply" ||
+          s.phase === "invitation"
+        ) {
+          return;
+        }
         dispatchTurn({ type: "orb_mic_stop" });
         return;
       }

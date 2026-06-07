@@ -80,7 +80,7 @@ export class TurnRuntime {
     this.deps.onAwaitingMic(s.awaitingMic);
   }
 
-  private applyEffects(effects: TurnSideEffect[], genAtStart: number): void {
+  private applyEffects(effects: TurnSideEffect[], _genAtStart: number): void {
     const client = this.deps.getClient();
     const media = this.deps.getMedia();
 
@@ -124,21 +124,19 @@ export class TurnRuntime {
           this.deps.onTeardown();
           break;
         case "wait_handoff_drain": {
-          const gen = genAtStart;
           void (async () => {
             await media?.waitForHandoffReplyDrain();
             if (!this.deps.isMounted()) return;
-            if (gen !== this.state.sessionGeneration) return;
+            if (this.state.phase !== "invitation") return;
             this.dispatch({ type: "playback_idle", context: "handoff" });
           })();
           break;
         }
         case "wait_invitation_drain": {
-          const gen = genAtStart;
           void (async () => {
             await media?.waitForTurnAudioThenIdle();
             if (!this.deps.isMounted()) return;
-            if (gen !== this.state.sessionGeneration) return;
+            if (!this.state.invitationPending) return;
             this.dispatch({ type: "playback_idle", context: "invitation" });
           })();
           break;

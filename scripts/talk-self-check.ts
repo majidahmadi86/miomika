@@ -106,6 +106,7 @@ import {
   missingCardedPlanWords,
   shouldBackstopFocusNewWord,
 } from "../lib/talk/lesson-layer";
+import { simulateGuestFiveTurnFlow } from "../lib/talk/guest-flow";
 import {
   sortTranscriptItems,
   TRANSCRIPT_GEMINI_ORDER,
@@ -336,6 +337,12 @@ flow = reduceTurn(flow, { type: "orb_mic_stop" }).state;
 const afterMicStop = reduceTurn(flow, { type: "turn_complete" }).state;
 assert(!afterMicStop.invitationVoiceSent, "mic-stop never triggers invitation cue");
 assert(afterMicStop.phase !== "sheet", "mic-stop never opens signup sheet");
+
+section("Guest CTA at exchange 5 (guest-flow harness)");
+const guestCtaSim = simulateGuestFiveTurnFlow();
+assert(guestCtaSim.exchanges === GUEST_EXCHANGE_LIMIT, "guest-flow: CTA after exactly 5 exchanges");
+assert(guestCtaSim.invitationCueCount === 1, "guest-flow: spoken invitation cue fires once at exchange 5");
+assert(guestCtaSim.signupSheetCount === 1, "guest-flow: signup sheet opens after invitation drain");
 
 section("Per-turn latency instrumentation");
 
@@ -779,18 +786,20 @@ const kickoffEnReturning = buildKickoffPrompt("en", "returning");
 assert(kickoffEnFirst.includes("ENGLISH"), "kickoff en mandates English voice");
 assert(kickoffThFirst.includes("ภาษาไทย"), "kickoff th mandates Thai voice");
 assert(
-  !/press the mic|then invite them to press|invite them to press the mic/i.test(
-    kickoffEnFirst,
-  ),
-  "open first-time kickoff has no mic invite (en)",
+  /press the mic|กดไมค์/i.test(kickoffEnFirst),
+  "open first-time kickoff mandates mic press (en)",
 );
 assert(
-  !/ready to learn your first|ready to learn\?/i.test(kickoffEnFirst),
+  /press the mic|กดไมค์/i.test(kickoffThFirst),
+  "open first-time kickoff mandates mic press (th)",
+);
+assert(
+  !/ready to learn your first|ready to learn\?/i.test(kickoffEnFirst.split(/Do NOT/i)[0] ?? kickoffEnFirst),
   "open first-time kickoff has no learning agenda (en)",
 );
 assert(
-  !/invite.*mic|learning agenda/i.test(kickoffThFirst),
-  "open kickoff has no mic invite or learning agenda (th prompt)",
+  !/วาระสอน/i.test(kickoffThFirst.split(/ห้าม/i)[0] ?? kickoffThFirst),
+  "open first-time kickoff has no teaching agenda (th)",
 );
 assert(kickoffPromptIsFirstTimeSafe(kickoffEnFirst), "first-time en kickoff has no false familiarity");
 assert(kickoffPromptIsFirstTimeSafe(kickoffThFirst), "first-time th kickoff has no false familiarity");
@@ -1200,9 +1209,26 @@ assert(
   "model output during replay-suspension is dropped, not queued",
 );
 assert(
+  talkPageSrc.includes("handoffReplyFinishing") &&
+    talkPageSrc.includes("invitationFinishing") &&
+    talkPageSrc.includes("endModelTurnWhenDrained"),
+  "handoff + invitation drains own model-turn gate; normal turns still endModelTurnWhenDrained",
+);
+assert(
+  talkPageSrc.includes("phase === \"invitation\"") &&
+    talkPageSrc.includes("orb_mic_stop"),
+  "mic-stop suppressed during guest handoff tail (avoids sessionGeneration bump)",
+);
+const warmthSrc = readFileSync(join(ROOT, "lib/voice/warmth.ts"), "utf8");
+assert(
+  warmthSrc.includes("กดไมค์") && warmthSrc.includes("tap the mic"),
+  "canvas icebreaker tells user to press the mic",
+);
+assert(
   turnRuntimeSrc.includes("waitForHandoffReplyDrain") &&
-    turnControllerSrc.includes("handoffReplyStarted"),
-  "5th-exchange reply is voiced before invitation handoff",
+    turnControllerSrc.includes("handoffReplyStarted") &&
+    turnRuntimeSrc.includes('phase !== "invitation"'),
+  "5th-exchange reply is voiced before invitation handoff; drain keyed on invitation phase",
 );
 assert(
   turnControllerSrc.includes("send_hidden_turn") &&

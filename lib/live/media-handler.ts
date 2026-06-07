@@ -250,23 +250,20 @@ export class MediaHandler {
    * invitation sendSpeakExact cannot interrupt voiced handoff audio.
    */
   waitForHandoffReplyDrain(maxWaitForStartMs = 2500, settleMs = 120): Promise<void> {
-    const start = Date.now();
-    return new Promise((resolve) => {
-      const poll = () => {
-        if (this.isPlaybackActive()) {
-          void this.waitForPlaybackIdle().then(() => {
+    return this.waitForTurnAudioThenIdle(maxWaitForStartMs)
+      .then(
+        () =>
+          new Promise<void>((resolve) => {
             setTimeout(resolve, settleMs);
-          });
-          return;
+          }),
+      )
+      .then(() => {
+        if (this.turnCompleteReceived || this.modelTurnActive) {
+          this.modelTurnActive = false;
+          this.turnCompleteReceived = false;
+          this.flushDeferredAfterDrain();
         }
-        if (Date.now() - start >= maxWaitForStartMs) {
-          resolve();
-          return;
-        }
-        requestAnimationFrame(poll);
-      };
-      poll();
-    });
+      });
   }
 
   /**
