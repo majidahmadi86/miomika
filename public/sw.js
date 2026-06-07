@@ -1,6 +1,6 @@
-/* Miomika service worker — generated 2026-06-05T18:53:40.442Z */
+/* Miomika service worker — generated 2026-06-07T16:39:35.541Z */
 const CACHE_PREFIX = "miomika";
-const BUILD_ID = "aa9c55e61f39";
+const BUILD_ID = "f44b2f4d9317";
 
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
