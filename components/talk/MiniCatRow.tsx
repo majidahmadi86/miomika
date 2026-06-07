@@ -50,13 +50,8 @@ export function MiniCatRow({ textTh, textEn, uiLang, state = "idle" }: MiniCatRo
         }}
       >
         <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13.5px", color: "#1A1A18", lineHeight: 1.5, margin: 0 }}>
-          {uiLang === "en" ? textEn : textTh}
+          {[textEn, textTh].filter(Boolean).join(" ") || (uiLang === "en" ? textEn : textTh)}
         </p>
-        {((uiLang === "en" && textTh) || (uiLang === "th" && textEn)) && (
-          <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11.5px", color: "#9A8B73", lineHeight: 1.5, margin: "3px 0 0" }}>
-            {uiLang === "en" ? textTh : textEn}
-          </p>
-        )}
       </div>
       <style>{`
         @keyframes catBreath { 0%,100% { transform:scale(1); } 50% { transform:scale(1.02); } }

@@ -33,15 +33,7 @@ import {
   shouldIgnoreClientEpoch,
 } from "@/lib/live/session-continuity";
 import { resolveKickoffAudience, type MemberContextBundle } from "@/lib/live/member-context";
-import {
-  detectLanguage,
-  detectPracticeAttempt,
-  normalizeLearningTarget,
-  resolveLiveSessionLanguages,
-  resolveProfileUiAnchor,
-  resolveTargetLanguage,
-  resolveUiLanguage,
-} from "@/lib/brain/language";
+import { resolveLiveSessionLanguages } from "@/lib/brain/language";
 import {
   newGeminiTranscriptItem,
   routeGeminiTranscriptChunk,
@@ -116,22 +108,6 @@ function sessionIntroducedWords(items: CanvasItem[]): string[] {
   return items
     .filter((item): item is Extract<CanvasItem, { kind: "word_card" }> => item.kind === "word_card")
     .map((item) => item.word.word_en);
-}
-
-function canvasToMemory(
-  items: CanvasItem[],
-): Array<{ role: "user" | "miomi"; content: string }> {
-  const memory: Array<{ role: "user" | "miomi"; content: string }> = [];
-  for (const item of items) {
-    if (item.kind === "user_said") {
-      memory.push({ role: "user", content: item.text });
-      continue;
-    }
-    if (item.kind === "word_card") continue;
-    const content = [item.textEn, item.textTh].filter(Boolean).join(" ");
-    if (content) memory.push({ role: "miomi", content });
-  }
-  return memory;
 }
 
 function makeOpenerItem(uiLang: "th" | "en"): CanvasItem {
@@ -227,7 +203,6 @@ export default function TalkPage() {
       profileTarget: profile?.learning_target_language ?? null,
       sessionUiLang: sessionUiLangRef.current,
       browserUiLang: browserUiLangRef.current,
-      sessionTargetLang: sessionTargetLangRef.current,
       teachLearningTarget: config.teach.learning,
     });
     sessionUiLangRef.current = uiLanguage;
@@ -548,58 +523,6 @@ export default function TalkPage() {
     itemsRef.current = items;
   }, [items]);
 
-  const maybeAdaptSessionLanguages = useCallback(
-    (userInput: string) => {
-      const trimmed = userInput.trim();
-      if (!trimmed) return;
-
-      const memory = canvasToMemory(itemsRef.current);
-      const sessionUi = sessionUiLangRef.current;
-      const targetLang = sessionTargetLangRef.current;
-      const profileUiAnchor = resolveProfileUiAnchor({
-        profileUiLang: profile?.ui_language ?? null,
-        sessionUiLang: sessionUi,
-      });
-      const profileTarget = normalizeLearningTarget(profile?.learning_target_language ?? null);
-
-      const isPracticeAttempt = detectPracticeAttempt({
-        userInput: trimmed,
-        nowLanguage: detectLanguage(trimmed, sessionUi),
-        learningTargetLanguage: targetLang,
-        uiLanguage: sessionUi,
-        memory,
-        introducedWords: sessionIntroducedWords(itemsRef.current),
-      });
-      if (isPracticeAttempt) return;
-
-      const resolvedUi = resolveUiLanguage({
-        profileUiLang: profileUiAnchor,
-        userInput: trimmed,
-        memory,
-        learningTargetLanguage: targetLang,
-      });
-      const resolvedTarget = resolveTargetLanguage({
-        userInput: trimmed,
-        memory,
-        profileTarget: profileTarget ?? normalizeLearningTarget(config.teach.learning),
-        uiLanguage: resolvedUi,
-      });
-
-      const uiChanged = resolvedUi !== sessionUi;
-      const targetChanged = resolvedTarget !== targetLang;
-      if (!uiChanged && !targetChanged) return;
-
-      sessionUiLangRef.current = resolvedUi;
-      sessionTargetLangRef.current = resolvedTarget;
-      conversationLangRef.current = resolvedUi;
-      setConversationLang(resolvedUi);
-      setUiLang(resolvedUi);
-      clientRef.current?.sendLanguageContext(resolvedUi, resolvedTarget);
-      syncTeachWordContext();
-    },
-    [profile?.ui_language, profile?.learning_target_language, config.teach.learning, syncTeachWordContext],
-  );
-
   const honorContentIntent = useCallback(
     async (userText: string) => {
       const intent = detectLessonContentIntent(userText);
@@ -695,12 +618,11 @@ export default function TalkPage() {
     userInputFinalizedRef.current = true;
     const finalUserText = commitUserTranscript();
     if (finalUserText) {
-      maybeAdaptSessionLanguages(finalUserText);
       void honorContentIntent(finalUserText);
       void honorExplicitLessonRequest(finalUserText);
     }
     return finalUserText;
-  }, [commitUserTranscript, honorContentIntent, honorExplicitLessonRequest, maybeAdaptSessionLanguages]);
+  }, [commitUserTranscript, honorContentIntent, honorExplicitLessonRequest]);
 
   const appendTranscript = useCallback((role: "user" | "gemini", chunk: string) => {
     if (role === "user") {
@@ -723,21 +645,20 @@ export default function TalkPage() {
       return;
     }
 
-    const uiField = sessionUiLangRef.current;
     if (currentGeminiItemIdRef.current) {
       setItems((prev) =>
         prev.map((item) => {
           if (item.id !== currentGeminiItemIdRef.current || item.kind !== "mini_cat") return item;
           return {
             ...item,
-            ...routeGeminiTranscriptChunk(uiField, item, chunk),
+            ...routeGeminiTranscriptChunk(item, chunk),
           };
         }),
       );
     } else {
       const id = crypto.randomUUID();
       currentGeminiItemIdRef.current = id;
-      const routed = newGeminiTranscriptItem(uiField, chunk);
+      const routed = newGeminiTranscriptItem(chunk);
       setItems((prev) => [
         ...prev,
         {
@@ -1024,7 +945,6 @@ export default function TalkPage() {
         profileTarget: profile?.learning_target_language ?? null,
         sessionUiLang: sessionUiLangRef.current,
         browserUiLang: browserUiLangRef.current,
-        sessionTargetLang: sessionTargetLangRef.current,
         teachLearningTarget: config.teach.learning,
       });
       sessionUiLangRef.current = uiLanguage;
@@ -1170,7 +1090,6 @@ export default function TalkPage() {
         profileTarget: profile?.learning_target_language ?? null,
         sessionUiLang: sessionUiLangRef.current,
         browserUiLang: browserUiLangRef.current,
-        sessionTargetLang: sessionTargetLangRef.current,
         teachLearningTarget: c.teach.learning,
       });
       sessionUiLangRef.current = uiLanguage;
@@ -1178,7 +1097,6 @@ export default function TalkPage() {
       conversationLangRef.current = uiLanguage;
       setConversationLang(uiLanguage);
       setUiLang(uiLanguage);
-      clientRef.current?.sendLanguageContext(uiLanguage, targetLanguage);
       syncTeachWordContext();
       setAdjustOpen(false);
     },
@@ -1338,7 +1256,6 @@ export default function TalkPage() {
     itemsRef.current = [...itemsRef.current, newItem];
     setItems((prev) => [...prev, newItem]);
     setTextInput("");
-    maybeAdaptSessionLanguages(cleaned);
     void honorContentIntent(cleaned);
     void honorExplicitLessonRequest(cleaned);
     if (!ensureTurnRuntime().state.sessionActive) {
@@ -1358,7 +1275,6 @@ export default function TalkPage() {
     dispatchTurn,
     ensureTurnRuntime,
     startLiveSession,
-    maybeAdaptSessionLanguages,
     honorContentIntent,
     honorExplicitLessonRequest,
     openGuestSignupSheet,

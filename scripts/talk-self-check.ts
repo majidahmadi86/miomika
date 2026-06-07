@@ -7,7 +7,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GUEST_EXCHANGE_LIMIT } from "../lib/ai/limits";
 import {
-  detectExplicitUiLanguageRequest,
   detectUnsupportedTeachingRequest,
   buildContentHonestyContract,
   normalizeLearningTarget,
@@ -191,29 +190,30 @@ const memberEnEn = resolveSessionLanguages({
 });
 assert(memberEnEn.targetLanguage === "th", "member UI=en + profile target=en → teaches th (never own language)");
 
-const teachThai = resolveTargetLanguage({
-  userInput: "teach me Thai please",
-  memory: [],
-  profileTarget: "en",
+const stableTargetEnUi = resolveTargetLanguage({
+  profileTarget: "th",
   uiLanguage: "en",
 });
-assert(teachThai === "th", '"teach me Thai" → target=th');
+assert(stableTargetEnUi === "th", "stable target=th from profile when UI=en");
 
-const teachEnglish = resolveTargetLanguage({
-  userInput: "I want to learn English",
-  memory: [],
-  profileTarget: "th",
-  uiLanguage: "th",
-});
-assert(teachEnglish === "en", '"learn English" with UI=th → target=en');
-
-const helpEnglish = resolveTargetLanguage({
-  userInput: "help my English",
-  memory: [],
+const stableTargetThUi = resolveTargetLanguage({
   profileTarget: null,
   uiLanguage: "th",
 });
-assert(helpEnglish === "en", '"help my English" with UI=th → target=en');
+assert(stableTargetThUi === "en", "stable target defaults to opposite when profile unset");
+
+const teachPhraseInputs = [
+  "let's talk about Thai language",
+  "how can I learn Thai",
+  "teach me Thai",
+  "สอนภาษาไทยหน่อยค่ะ teach me Thai words",
+];
+for (const phrase of teachPhraseInputs) {
+  const uiAfter = resolveUiLanguage({ profileUiLang: "en" });
+  const targetAfter = resolveTargetLanguage({ profileTarget: "th", uiLanguage: uiAfter });
+  assert(uiAfter === "en", `"${phrase}" → UI unchanged (en)`);
+  assert(targetAfter === "th", `"${phrase}" → target unchanged (th)`);
+}
 
 assert(
   sanitizeTargetLanguage("en", "en") === "th",
@@ -224,52 +224,32 @@ assert(
   "sanitize defaults to opposite when target unset",
 );
 
-const uiFromEnglish = resolveUiLanguage({
-  profileUiLang: "en",
-  userInput: "Hello, how are you doing today?",
-  memory: [],
-});
-assert(uiFromEnglish === "en", "UI stays anchored to profile on English input");
+assert(
+  resolveUiLanguage({ profileUiLang: "en" }) === "en",
+  "UI stays anchored to profile regardless of utterance",
+);
+assert(
+  resolveUiLanguage({ profileUiLang: "th" }) === "th",
+  "Thai profile UI stays th",
+);
+assert(
+  resolveUiLanguage({ profileUiLang: "en" }) === "en",
+  "speak-to-me-in-Thai request does not flip client UI (model-owned)",
+);
 
-const uiTargetPractice = resolveUiLanguage({
-  profileUiLang: "en",
-  userInput: "ตู้เย็น",
-  memory: [],
-  learningTargetLanguage: "th",
-});
-assert(uiTargetPractice === "en", "target-language practice does not flip UI");
-
-const uiExplicitThai = resolveUiLanguage({
-  profileUiLang: "en",
-  userInput: "Please speak to me in Thai from now on",
-  memory: [],
-  learningTargetLanguage: "th",
-});
-assert(uiExplicitThai === "th", "explicit UI switch request is honored");
-
+const connectInstruction = buildSystemInstruction("en", "th");
 assert(
-  detectExplicitUiLanguageRequest("speak to me in Thai") === "th",
-  "detectExplicitUiLanguageRequest: speak to me in Thai",
+  connectInstruction.includes("The user's language is English") &&
+    connectInstruction.includes("Converse naturally in English") &&
+    connectInstruction.includes("You teach Thai") &&
+    connectInstruction.includes("Do NOT switch the WHOLE conversation into Thai") &&
+    connectInstruction.includes("Never change the app interface language"),
+  "connect-time instruction anchors user lang + target + no whole-medium flip + no UI change",
 );
 assert(
-  detectExplicitUiLanguageRequest("reply in Thai") === "th",
-  "detectExplicitUiLanguageRequest: reply in Thai",
-);
-assert(
-  detectExplicitUiLanguageRequest("switch to Thai") === "th",
-  "detectExplicitUiLanguageRequest: switch to Thai",
-);
-assert(
-  detectExplicitUiLanguageRequest("explain the Thai word for cat") === null,
-  "detectExplicitUiLanguageRequest rejects Thai word-for query",
-);
-assert(
-  detectExplicitUiLanguageRequest("how do you say dog in Thai") === null,
-  "detectExplicitUiLanguageRequest rejects how-do-you-say query",
-);
-assert(
-  detectExplicitUiLanguageRequest("what's water in Thai") === null,
-  "detectExplicitUiLanguageRequest rejects what's-X-in-Thai query",
+  !connectInstruction.includes("Mirror the user") &&
+    !connectInstruction.includes("becomes UI_LANGUAGE"),
+  "connect instruction removed per-utterance UI mirroring",
 );
 
 assert(
@@ -304,9 +284,8 @@ assert(
     profileTarget: null,
     sessionUiLang: "th",
     browserUiLang: "th",
-    sessionTargetLang: "en",
   }).targetLanguage === "en",
-  "guest live session intent target reaches lesson direction",
+  "guest browser th → stable target en (no mid-session intent override)",
 );
 
 // --- B. Guest 5-turn flow (turn controller) -------------------------------
@@ -758,18 +737,17 @@ assert(
 
 section("Voice/text transcript routing");
 
-const enRouted = newGeminiTranscriptItem("en", "Hi there~");
-assert(enRouted.textEn === "Hi there~" && enRouted.textTh === "", "English UI → textEn only");
+const enRouted = newGeminiTranscriptItem("Hi there~");
+assert(enRouted.textEn === "Hi there~" && enRouted.textTh === "", "English speech → textEn");
 
-const thRouted = newGeminiTranscriptItem("th", "สวัสดีค่า~");
-assert(thRouted.textTh === "สวัสดีค่า~" && thRouted.textEn === "", "Thai UI → textTh only");
+const thRouted = newGeminiTranscriptItem("สวัสดีค่า~");
+assert(thRouted.textTh === "สวัสดีค่า~" && thRouted.textEn === "", "Thai speech → textTh");
 
 const appended = routeGeminiTranscriptChunk(
-  "en",
   { textTh: "", textEn: "Hello " },
   "friend~",
 );
-assert(appended.textEn === "Hello friend~" && appended.textTh === "", "chunks append to UI field only");
+assert(appended.textEn === "Hello friend~" && appended.textTh === "", "chunks append by spoken script");
 
 const ordered = sortTranscriptItems([
   { id: "g1", turnSeq: 1, roleOrder: TRANSCRIPT_GEMINI_ORDER },
@@ -887,8 +865,16 @@ assert(
 );
 
 const sysEnTh = buildSystemInstruction("en", "th");
-assert(sysEnTh.includes("UI_LANGUAGE = English"), "system instruction UI=en");
-assert(sysEnTh.includes("TARGET_LANGUAGE = Thai"), "system instruction TARGET=th");
+assert(
+  sysEnTh.includes("The user's language is English") &&
+    sysEnTh.includes("Converse naturally in English"),
+  "system instruction anchors UI=en at connect",
+);
+assert(
+  sysEnTh.includes("You teach Thai") &&
+    sysEnTh.includes("Do NOT switch the WHOLE conversation into Thai"),
+  "system instruction anchors TARGET=th at connect",
+);
 assert(sysEnTh.includes("TEACHING MODE v1"), "system instruction includes teaching mode contract");
 assert(sysEnTh.includes("get_word_to_review"), "system instruction names Tool 3");
 assert(
@@ -1237,9 +1223,14 @@ assert(
   "talk page wires Tool 3 + teaching mode state",
 );
 assert(
-  talkPageSrc.includes("maybeAdaptSessionLanguages") &&
-    !/if \(isGuestRef\.current\) return/.test(talkPageSrc),
-  "guest + member in-conversation intent adaptation enabled",
+  !talkPageSrc.includes("maybeAdaptSessionLanguages") &&
+    !talkPageSrc.includes("sendLanguageContext"),
+  "per-utterance language flip + mid-session language_update nudges removed",
+);
+assert(
+  !miomiClientSrc.includes("sendLanguageContext") &&
+    !miomiClientSrc.includes("[language_update]"),
+  "live client has no mid-session language reconfig",
 );
 assert(
   !talkPageSrc.includes("GuestPracticePick") &&
@@ -1254,8 +1245,8 @@ assert(
 assert(
   talkPageSrc.includes("sessionTargetLangRef") &&
     talkPageSrc.includes("syncTeachWordContext") &&
-    talkPageSrc.includes("sessionTargetLang: sessionTargetLangRef.current"),
-  "resolved target wired end-to-end to teach-word context",
+    talkPageSrc.includes("cardDirectionForTarget(sessionTargetLangRef.current)"),
+  "stable connect-time target wired end-to-end to teach-word context",
 );
 assert(
   talkPageSrc.includes("teachLearningTarget: config.teach.learning") ||
@@ -1413,8 +1404,9 @@ assert(
 );
 assert(
   talkPageSrc.includes("resolveLiveSessionLanguages") &&
-    talkPageSrc.includes("resolveProfileUiAnchor"),
-  "talk page uses anchored session language helpers",
+    !talkPageSrc.includes("resolveUiLanguage") &&
+    !talkPageSrc.includes("resolveTargetLanguage"),
+  "talk page uses connect-time session language resolution only",
 );
 const teachWordRoute = readFileSync(join(ROOT, "app/api/teach-word/route.ts"), "utf8");
 assert(

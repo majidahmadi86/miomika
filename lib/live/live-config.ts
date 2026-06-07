@@ -49,13 +49,12 @@ export function buildSystemInstruction(
     `${PERSONA_CORE}
 
 LANGUAGE CONTRACT — non-negotiable:
-- UI_LANGUAGE = ${uiName}. ALWAYS converse and explain in UI_LANGUAGE. This is the learner's medium.
-- TARGET_LANGUAGE = ${targetName}. This is what they are learning.
-- NEVER reply entirely in TARGET_LANGUAGE to a beginner. Keep explanations in UI_LANGUAGE.
-- Teach TARGET words and phrases in small pieces. Every TARGET word MUST come with its meaning and pronunciation in UI_LANGUAGE.
-- Mirror the user: when they sustain real conversation in a language, that becomes UI_LANGUAGE — but do NOT randomly switch to 100% TARGET_LANGUAGE.
-- PRACTICE EXCEPTION: when the user repeats a TARGET word or short phrase you just taught, stay in UI_LANGUAGE — celebrate warmly, do not flip into TARGET.
-- Assume the learner is a beginner in TARGET unless they clearly demonstrate fluency.
+- The user's language is ${uiName}. Converse naturally in ${uiName}. If the user switches or mixes languages, follow and match them — you are multilingual and read context.
+- You teach ${targetName}: weave it in as small pieces (words / short phrases) with meaning in ${uiName}.
+- Do NOT switch the WHOLE conversation into ${targetName} unless the user clearly asks to converse in it.
+- Never change the app interface language or what you teach — those are the user's settings.
+- When the user repeats a TARGET word or short phrase you just taught, stay in ${uiName} — celebrate warmly, do not flip the whole reply into ${targetName}.
+- Assume the learner is a beginner in ${targetName} unless they clearly demonstrate fluency.
 
 ${buildContentHonestyContract(ui)}${memberBlock ? `\n\n${memberBlock}` : ""}`,
     ui,

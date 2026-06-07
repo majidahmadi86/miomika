@@ -2,9 +2,6 @@
 
 export type DetectedLang = "th" | "en" | "mixed";
 
-const LEARN_INTENT_RE =
-  /(?:teach me|i want to learn|help(?:\s+me)?(?:\s+with)?\s+my|สอน|เรียน)\s*(?:thai|english|ไทย|อังกฤษ|ภาษาไทย|ภาษาอังกฤษ)/i;
-
 /** Languages we have curated teaching content for today. */
 export const SUPPORTED_TEACHING_LANGS = ["th", "en"] as const;
 
@@ -52,76 +49,17 @@ export function normalizeLearningTarget(raw: string | null): "th" | "en" | null 
   return null;
 }
 
-function detectTargetLanguageFromIntent(text: string): "th" | "en" | null {
-  const m = text.match(LEARN_INTENT_RE);
-  if (!m) return null;
-  const fragment = m[0].toLowerCase();
-  if (/thai|ไทย|ภาษาไทย/.test(fragment)) return "th";
-  if (/english|อังกฤษ|ภาษาอังกฤษ/.test(fragment)) return "en";
-  return null;
+/** Session UI chrome — stable profile/browser setting; never derived per utterance. */
+export function resolveUiLanguage(args: { profileUiLang: "th" | "en" }): "th" | "en" {
+  return args.profileUiLang;
 }
 
-export function resolveUiLanguage(args: {
-  profileUiLang: "th" | "en";
-  userInput: string;
-  memory: Array<{ role: "user" | "miomi"; content: string }>;
-  /** When set, dominant target-language input (practice) does not flip UI. */
-  learningTargetLanguage?: "th" | "en" | null;
-}): "th" | "en" {
-  const { profileUiLang, userInput, memory, learningTargetLanguage } = args;
-
-  const explicitNow = detectExplicitUiLanguageRequest(userInput);
-  if (explicitNow) return explicitNow;
-
-  // Scan recent user turns for an explicit switch request only — never mirror script.
-  for (let i = memory.length - 1; i >= 0; i--) {
-    const m = memory[i];
-    if (m.role !== "user") continue;
-    const explicit = detectExplicitUiLanguageRequest(m.content);
-    if (explicit) return explicit;
-    if (memory.length - i > 6) break;
-  }
-
-  const dominant = messageDominantLang(userInput);
-  if (
-    learningTargetLanguage &&
-    dominant === learningTargetLanguage &&
-    dominant !== profileUiLang
-  ) {
-    return profileUiLang;
-  }
-
-  return profileUiLang;
-}
-
+/** Learning target — stable profile setting; never keyword-detected mid-session. */
 export function resolveTargetLanguage(args: {
-  userInput: string;
-  memory: Array<{ role: "user" | "miomi"; content: string }>;
   profileTarget: "th" | "en" | null;
-  uiLanguage?: "th" | "en";
+  uiLanguage: "th" | "en";
 }): "th" | "en" {
-  const fromInput = detectTargetLanguageFromIntent(args.userInput);
-  if (fromInput) {
-    return args.uiLanguage
-      ? sanitizeTargetLanguage(args.uiLanguage, fromInput)
-      : fromInput;
-  }
-
-  const recentUserMsgs = args.memory.filter((m) => m.role === "user").slice(-5);
-  for (let i = recentUserMsgs.length - 1; i >= 0; i--) {
-    const fromHistory = detectTargetLanguageFromIntent(recentUserMsgs[i].content);
-    if (fromHistory) {
-      return args.uiLanguage
-        ? sanitizeTargetLanguage(args.uiLanguage, fromHistory)
-        : fromHistory;
-    }
-  }
-
-  const fallback = args.profileTarget ?? null;
-  if (args.uiLanguage) {
-    return sanitizeTargetLanguage(args.uiLanguage, fallback);
-  }
-  return fallback ?? "th";
+  return sanitizeTargetLanguage(args.uiLanguage, args.profileTarget);
 }
 
 export function messageDominantLang(text: string): "th" | "en" | null {
@@ -247,8 +185,6 @@ export function resolveSessionLanguages(args: {
   profileTarget: string | null;
   /** Browser ui-language cookie / Accept-Language seed. */
   browserUiLang: "th" | "en";
-  /** Live session target after in-conversation intent (guest + member). */
-  sessionTargetLang?: "th" | "en" | null;
   /** TalkConfig.teach.learning — member fallback when profile target unset. */
   teachLearningTarget?: "th" | "en" | null;
 }): { uiLanguage: "th" | "en"; targetLanguage: "th" | "en" } {
@@ -259,10 +195,9 @@ export function resolveSessionLanguages(args: {
   const profileTarget =
     normalizeLearningTarget(args.profileTarget) ??
     normalizeLearningTarget(args.teachLearningTarget ?? null);
-  const sessionTarget = normalizeLearningTarget(args.sessionTargetLang ?? null);
   return {
     uiLanguage,
-    targetLanguage: sanitizeTargetLanguage(uiLanguage, sessionTarget ?? profileTarget),
+    targetLanguage: sanitizeTargetLanguage(uiLanguage, profileTarget),
   };
 }
 
@@ -284,7 +219,6 @@ export function resolveLiveSessionLanguages(args: {
   profileTarget: string | null;
   sessionUiLang: "th" | "en";
   browserUiLang: "th" | "en";
-  sessionTargetLang?: "th" | "en" | null;
   teachLearningTarget?: "th" | "en" | null;
 }): { uiLanguage: "th" | "en"; targetLanguage: "th" | "en" } {
   const uiLanguage =
@@ -294,9 +228,8 @@ export function resolveLiveSessionLanguages(args: {
   const profileTarget =
     normalizeLearningTarget(args.profileTarget) ??
     normalizeLearningTarget(args.teachLearningTarget ?? null);
-  const sessionTarget = normalizeLearningTarget(args.sessionTargetLang ?? null);
   return {
     uiLanguage,
-    targetLanguage: sanitizeTargetLanguage(uiLanguage, sessionTarget ?? profileTarget),
+    targetLanguage: sanitizeTargetLanguage(uiLanguage, profileTarget),
   };
 }

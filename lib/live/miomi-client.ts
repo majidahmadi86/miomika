@@ -444,20 +444,6 @@ export class MiomiLiveClient {
     });
   }
 
-  /** Remind the model when UI/TARGET language adapts mid-session. */
-  sendLanguageContext(ui: "th" | "en", target: "th" | "en"): void {
-    this.teachWordContext = {
-      ...this.teachWordContext,
-      learningTarget: target,
-    };
-    const uiName = ui === "en" ? "English" : "Thai";
-    const targetName =
-      target === "en" ? "English" : target === "th" ? "Thai" : "none";
-    this.sendHiddenContext(
-      `[language_update] UI_LANGUAGE is now ${uiName}. TARGET_LANGUAGE is ${targetName}. ALWAYS explain and converse in ${uiName}. Teach ${targetName} in small pieces with meaning and pronunciation in ${uiName}. Do NOT reply entirely in ${targetName} to a beginner.`,
-    );
-  }
-
   /** Inject guest handoff context mid-session — invisible to the transcript UI. */
   sendHiddenContext(text: string): void {
     if (!this.session || !this.connected) return;
