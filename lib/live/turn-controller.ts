@@ -4,7 +4,7 @@
  */
 
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
-import { GUEST_INVITATION_CUE, LAST_TURN_HANDOFF } from "@/lib/live/live-config";
+import { GUEST_INVITATION_CUE } from "@/lib/live/live-config";
 import {
   advanceAfterTurn,
   buildPhaseNudge,
@@ -223,10 +223,13 @@ function beginUserExchange(
       handoffReplyStarted: false,
       phase: "guest_count",
     };
-    if (next.sessionActive) {
-      effects.push({ type: "send_hidden_context", text: LAST_TURN_HANDOFF });
-      next = markTiming(next, "handoff_context_sent", effects);
-    } else {
+    // Do NOT inject LAST_TURN_HANDOFF into the live turn: a turnComplete:false
+    // "user" turn sent as the 5th reply begins makes Gemini interrupt its own
+    // output and truncate the reply (e.g. "Okay, I"). Arm the handoff only; the
+    // state machine rides the model's natural reply, then GUEST_INVITATION_CUE
+    // performs the handoff. pendingHandoffContext is kept solely to re-arm on a
+    // mid-handoff reconnect — still without injection.
+    if (!next.sessionActive) {
       next = { ...next, pendingHandoffContext: true };
     }
   }
@@ -329,9 +332,10 @@ export function reduceTurn(
       };
       next = markTiming(next, "session_connect_end", effects);
       if (next.pendingHandoffContext) {
-        effects.push({ type: "send_hidden_context", text: LAST_TURN_HANDOFF });
+        // Re-arm the handoff after a mid-handoff reconnect — but do NOT inject
+        // LAST_TURN_HANDOFF (see beginUserExchange): the injection truncates the
+        // 5th reply. The scripted invitation still performs the handoff.
         next = { ...next, pendingHandoffContext: false, handoffArmed: true, phase: "handoff" };
-        next = markTiming(next, "handoff_context_sent", effects);
         effects.push({ type: "start_continuous_mic" });
       } else if (event.skipKickoff) {
         effects.push({ type: "start_continuous_mic" });
