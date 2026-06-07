@@ -93,6 +93,7 @@ export class TurnRuntime {
           this.deps.onAwaitingMic(effect.value);
           break;
         case "send_kickoff":
+          logEvent({ kind: "state", level: "info", message: "greeting kickoff emit", data: { lang: effect.lang } });
           this.deps.onKickoffCanvas();
           client?.sendKickoff(effect.lang, this.deps.getKickoffAudience?.() ?? "first_time");
           break;
@@ -103,6 +104,12 @@ export class TurnRuntime {
           client?.sendHiddenTurn(effect.text);
           break;
         case "send_speak_exact":
+          logEvent({
+            kind: "state",
+            level: "info",
+            message: "handoff/invitation CTA speak_exact fire",
+            data: { text: effect.text.slice(0, 120) },
+          });
           client?.sendSpeakExact(effect.text);
           break;
         case "start_continuous_mic":

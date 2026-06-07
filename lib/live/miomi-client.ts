@@ -9,6 +9,7 @@ import {
   buildResumePrompt,
 } from "@/lib/live/live-config";
 import { type MemberContextBundle } from "@/lib/live/member-context";
+import { logEvent } from "@/lib/debug/event-bus";
 import { createLiveClientEpoch } from "@/lib/live/session-continuity";
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -285,7 +286,14 @@ export class MiomiLiveClient {
       }
     }
     if (sc?.outputTranscription?.text) {
-      this.callbacks.onMessage?.({ type: "gemini", text: sc.outputTranscription.text });
+      const rawText = sc.outputTranscription.text;
+      logEvent({
+        kind: "engine",
+        level: "info",
+        message: "gemini transcript chunk (raw)",
+        data: { text: rawText },
+      });
+      this.callbacks.onMessage?.({ type: "gemini", text: rawText });
     }
     if (sc?.turnComplete) {
       this.callbacks.onMessage?.({ type: "turn_complete" });

@@ -1,3 +1,4 @@
+import { logEvent } from "@/lib/debug/event-bus";
 import {
   newGeminiTranscriptItem,
   routeGeminiTranscriptChunk,
@@ -55,6 +56,12 @@ export function appendGeminiTranscriptChunk(
   turnSeq: number,
 ): { items: SessionMiniCatItem[]; currentGeminiItemId: string } {
   const cleaned = sanitizeModelTranscript(chunk);
+  logEvent({
+    kind: "engine",
+    level: "info",
+    message: "appendGeminiTranscriptChunk post-sanitize",
+    data: { raw: chunk, cleaned },
+  });
   if (!cleaned) {
     return {
       items,

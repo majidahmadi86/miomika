@@ -1,6 +1,8 @@
 /**
  * PCM capture @ 16 kHz, playback @ 24 kHz ? ported from spike-live/media-handler.js.
  */
+import { logEvent } from "@/lib/debug/event-bus";
+
 const PLAYBACK_RATE = 24000;
 const SCHEDULE_AHEAD_S = 0.04;
 const CHUNK_FADE_SAMPLES = 64;
@@ -18,7 +20,36 @@ export class MediaHandler {
   private turnCompleteReceived = false;
   private pendingAfterDrain: Array<() => void> = [];
   private micSendSuspended = false;
+  private lastMicForward: boolean | null = null;
   isRecording = false;
+
+  private logMicForwardFlip(): void {
+    const forward = this.shouldForwardMicToGemini();
+    if (forward === this.lastMicForward) return;
+    this.lastMicForward = forward;
+    logEvent({
+      kind: "mic",
+      level: "info",
+      message: `shouldForwardMicToGemini=${forward}`,
+      data: {
+        isRecording: this.isRecording,
+        modelTurnActive: this.modelTurnActive,
+        micSendSuspended: this.micSendSuspended,
+      },
+    });
+  }
+
+  private setModelTurnActive(active: boolean, reason: string): void {
+    if (this.modelTurnActive === active) return;
+    this.modelTurnActive = active;
+    logEvent({
+      kind: "state",
+      level: "info",
+      message: `modelTurnActive=${active}`,
+      data: { reason },
+    });
+    this.logMicForwardFlip();
+  }
 
   /** True when mic PCM may be forwarded to Gemini (harness + replay guard). */
   shouldForwardMicToGemini(): boolean {
@@ -101,6 +132,7 @@ export class MediaHandler {
     muteGain.connect(this.audioContext.destination);
 
     this.isRecording = true;
+    this.logMicForwardFlip();
   }
 
   stopAudio(): void {
@@ -117,6 +149,7 @@ export class MediaHandler {
       this.inputGain.disconnect();
       this.inputGain = null;
     }
+    this.logMicForwardFlip();
   }
 
   private applyChunkFade(samples: Float32Array): void {
@@ -149,7 +182,7 @@ export class MediaHandler {
     if (!this.modelTurnActive) {
       this.turnCompleteReceived = false;
     }
-    this.modelTurnActive = true;
+    this.setModelTurnActive(true, "playAudio pcm chunk");
 
     const pcmData = new Int16Array(arrayBuffer);
     const float32Data = new Float32Array(pcmData.length);
@@ -189,7 +222,7 @@ export class MediaHandler {
     });
     this.scheduledSources = [];
     this.playbackActive = false;
-    this.modelTurnActive = false;
+    this.setModelTurnActive(false, "stopAudioPlayback");
     this.turnCompleteReceived = false;
     if (this.audioContext) {
       this.nextStartTime = this.audioContext.currentTime;
@@ -206,7 +239,7 @@ export class MediaHandler {
   async endModelTurnWhenDrained(maxWaitForStartMs = 3000): Promise<void> {
     if (!this.turnCompleteReceived && !this.modelTurnActive) return;
     await this.waitForTurnAudioThenIdle(maxWaitForStartMs);
-    this.modelTurnActive = false;
+    this.setModelTurnActive(false, "endModelTurnWhenDrained");
     this.turnCompleteReceived = false;
     this.flushDeferredAfterDrain();
   }
@@ -259,7 +292,7 @@ export class MediaHandler {
       )
       .then(() => {
         if (this.turnCompleteReceived || this.modelTurnActive) {
-          this.modelTurnActive = false;
+          this.setModelTurnActive(false, "waitForHandoffReplyDrain");
           this.turnCompleteReceived = false;
           this.flushDeferredAfterDrain();
         }
@@ -294,6 +327,7 @@ export class MediaHandler {
     if (this.inputGain) {
       this.inputGain.gain.value = suspended ? 0 : 1;
     }
+    this.logMicForwardFlip();
   }
 
   /** @deprecated use suspendMicSend ? kept for callers that only duck gain */

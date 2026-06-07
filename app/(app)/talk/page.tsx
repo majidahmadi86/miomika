@@ -231,6 +231,15 @@ export default function TalkPage() {
         },
       ];
       itemsRef.current = next;
+      const cardCountThisTurn = next.filter(
+        (i) => i.kind === "word_card" && i.turnSeq === turnSeq,
+      ).length;
+      logEvent({
+        kind: "state",
+        level: "info",
+        message: "pushWordCard",
+        data: { word_en: entry.word_en, cardCountThisTurn, turnSeq },
+      });
       return next;
     });
     syncTeachWordContext();
@@ -685,6 +694,12 @@ export default function TalkPage() {
     }
     if (msg.type === "audio") {
       if (suspended) return;
+      logEvent({
+        kind: "tts",
+        level: "info",
+        message: "model first-audio emit",
+        data: { bytes: msg.data.byteLength, modelTurnActive: mediaRef.current?.isModelTurnActive() },
+      });
       dispatchTurn({ type: "model_audio" });
       mediaRef.current?.playAudio(msg.data);
       return;
