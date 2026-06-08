@@ -469,6 +469,7 @@ export function reduceTurn(
           handoffReplyStarted: false,
           phase: "invitation",
         };
+        effects.push({ type: "reset_transcript_ids" });
         effects.push({ type: "wait_handoff_drain" });
         break;
       }
