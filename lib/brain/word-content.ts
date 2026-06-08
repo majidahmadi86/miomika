@@ -187,30 +187,50 @@ function persistGeneratedWord(card: ResolvedWord): void {
   })();
 }
 
+type CardCheck = { headwordOk: boolean; exampleOk: boolean };
+
 function buildVerifySystem(): string {
-  return `You are a strict bilingual Thai-English checker. You are given a Thai word or phrase and a CLAIMED English meaning. Reply with STRICT JSON ONLY — no prose, no markdown fences — {"back_translation": string, "real_thai": boolean, "meaning_matches": boolean}.
-- back_translation: translate the Thai into English yourself, from scratch, IGNORING the claimed meaning.
-- real_thai: true ONLY if the Thai is a real, natural word or phrase that a Thai speaker actually uses. Set it FALSE if the Thai is gibberish, a word-salad, or a phonetic transliteration of English sounds spelled in Thai letters (syllables that do not form a real Thai meaning).
-- meaning_matches: true ONLY if your back_translation means essentially the same thing as the claimed English meaning.
+  return `You are a strict bilingual Thai-English checker. You are given a Thai word or phrase with a CLAIMED English meaning, plus an example sentence pair. Reply with STRICT JSON ONLY — no prose, no markdown fences — {"headword_real": boolean, "headword_matches": boolean, "example_real": boolean, "example_uses_word": boolean, "example_matches": boolean}.
+- headword_real: true ONLY if the Thai word/phrase is real, natural Thai a speaker actually uses. FALSE if it is gibberish, a word-salad, or a phonetic transliteration of English sounds spelled in Thai letters.
+- headword_matches: true ONLY if the Thai word/phrase actually means the claimed English meaning.
+- example_real: true ONLY if the Thai example is a real, grammatical, natural Thai sentence containing NO non-words or gibberish tokens.
+- example_uses_word: true ONLY if the Thai example actually contains and uses the Thai word/phrase.
+- example_matches: true ONLY if the Thai example and the English example mean the same thing.
 Be strict: when in doubt, set the boolean to false.`;
 }
 
-// Independent semantic check: a generated card is only trusted if a second, blind
-// pass confirms the Thai is REAL and actually means the claimed English. This is
-// what stops hallucinated / transliterated content from ever reaching the learner.
-async function verifyCard(word_en: string, word_th: string): Promise<boolean> {
+// Independent, blind verification. The HEADWORD must check out or the card is never
+// shown (we withhold rather than teach something wrong). The EXAMPLE is verified
+// separately — if it has any flaw it is dropped, so a bad example can never reach
+// the learner while a correct word still can.
+async function verifyCard(args: {
+  word_en: string;
+  word_th: string;
+  example_th: string | null;
+  example_en: string | null;
+}): Promise<CardCheck> {
   const system = buildVerifySystem();
-  const user = `Thai: ${word_th}\nClaimed English meaning: ${word_en}`;
+  const user = `Thai word/phrase: ${args.word_th}\nClaimed English meaning: ${args.word_en}\nThai example: ${args.example_th ?? "(none)"}\nEnglish example: ${args.example_en ?? "(none)"}`;
   const raw = (await callGeminiJson(system, user)) ?? (await callGroqJson(system, user));
-  if (!raw) return false; // cannot verify -> never show unverified content
+  if (!raw) return { headwordOk: false, exampleOk: false };
   try {
     const v = JSON.parse(raw.replace(/```json|```/g, "").trim()) as {
-      real_thai?: boolean;
-      meaning_matches?: boolean;
+      headword_real?: boolean;
+      headword_matches?: boolean;
+      example_real?: boolean;
+      example_uses_word?: boolean;
+      example_matches?: boolean;
     };
-    return v.real_thai === true && v.meaning_matches === true;
+    const headwordOk = v.headword_real === true && v.headword_matches === true;
+    const hasExample = Boolean(args.example_th && args.example_en);
+    const exampleOk =
+      hasExample &&
+      v.example_real === true &&
+      v.example_uses_word === true &&
+      v.example_matches === true;
+    return { headwordOk, exampleOk };
   } catch {
-    return false;
+    return { headwordOk: false, exampleOk: false };
   }
 }
 
@@ -221,22 +241,25 @@ async function generateWordCard(
 ): Promise<ResolvedWord | null> {
   const system = buildGenSystem(target, cefr);
   const user = `Word, short phrase, or meaning to teach: ${word}`;
-  // Two independent generation attempts (Groq, then Gemini). Each candidate must
-  // pass structural validation AND independent meaning verification before it is
-  // ever returned. An unverifiable item yields null -> the model offers a real
-  // alternative instead of teaching something wrong.
+  // Two independent attempts (Groq, then Gemini). The headword must verify or we
+  // skip the candidate (and ultimately withhold). Prefer a candidate whose example
+  // also verifies; otherwise keep a headword-only card with the example dropped.
+  let fallback: ResolvedWord | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = attempt === 0 ? await callGroqJson(system, user) : await callGeminiJson(system, user);
     const parsed = parseCard(raw);
     if (!isValidCard(parsed)) continue;
     const word_en = (parsed.word_en ?? "").trim();
     const word_th = (parsed.word_th ?? "").trim();
-    if (!(await verifyCard(word_en, word_th))) continue;
-    return {
+    const example_en = (parsed.example_en ?? "").trim() || null;
+    const example_th = (parsed.example_th ?? "").trim() || null;
+    const check = await verifyCard({ word_en, word_th, example_th, example_en });
+    if (!check.headwordOk) continue;
+    const card: ResolvedWord = {
       word_en,
       word_th,
-      example_en: (parsed.example_en ?? "").trim() || null,
-      example_th: (parsed.example_th ?? "").trim() || null,
+      example_en: check.exampleOk ? example_en : null,
+      example_th: check.exampleOk ? example_th : null,
       topic: (parsed.topic ?? "").trim() || null,
       register: (parsed.register ?? "").trim() || null,
       cefr_level: cefr,
@@ -245,8 +268,10 @@ async function generateWordCard(
       en_ipa: null,
       source: "generated",
     };
+    if (check.exampleOk) return card;
+    if (!fallback) fallback = card;
   }
-  return null;
+  return fallback;
 }
 
 /**
