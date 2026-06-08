@@ -72,15 +72,15 @@ export function buildExplicitLessonRequestNudge(
   ui: "th" | "en",
   nextWord: string,
 ): string {
-  const wordLock = `SYSTEM-SERVED WORD="${nextWord}"`;
+  void nextWord;
   if (ui === "th") {
     return kind === "show_card"
-      ? `[explicit_request] ผู้ใช้ขอดูบัตร — ระบบส่งคำ+บัตร ${wordLock} แล้ว สอนเฉพาะคำนี้ ห้ามทบทวน เบี่ยงเบน หรือแต่งคำใหม่ หนูเล่าให้อบอุ่นเท่านั้น`
-      : `[explicit_request] ผู้ใช้ขอคำใหม่ — ระบบส่งคำ+บัตร ${wordLock} แล้ว เรียก get_word_to_teach แล้วสอนเฉพาะคำนี้ ห้ามทบทวน เบี่ยงเบน หรือถามเยอะ หนูเล่าให้อบอุ่นเท่านั้น`;
+      ? `[explicit_request] ผู้ใช้ขอดูบัตร — เลือกคำที่เข้ากับบทสนทนา เรียก get_word_to_teach พร้อมคำนั้น แล้วสอนคำเดียวนี้อย่างอบอุ่น พูดเสียงอ่านด้วย ห้ามทบทวนหรือถามเยอะ`
+      : `[explicit_request] ผู้ใช้ขอคำใหม่ — เลือกคำที่ใช่ เรียก get_word_to_teach พร้อมคำนั้น แล้วสอนคำเดียวนี้ ห้ามเบี่ยงไปทบทวน ห้ามถามเยอะ`;
   }
   return kind === "show_card"
-    ? `[explicit_request] User asked to see the card — SYSTEM already served word+card ${wordLock}. Teach ONLY this word warmly; do NOT review, deflect, or invent vocabulary. Narrate the system word — warmth is tone only.`
-    : `[explicit_request] User asked for a NEW word — SYSTEM already served word+card ${wordLock}. Call get_word_to_teach and teach ONLY this word; do NOT deflect to review or pile on questions. Narrate warmly — word+card are system-owned.`;
+    ? `[explicit_request] User asked to see a card — choose a word that fits the conversation, call get_word_to_teach with it, and teach that one word warmly (say the sound aloud); do NOT deflect to review or pile on questions.`
+    : `[explicit_request] User asked for a NEW word — choose one that fits, call get_word_to_teach with it, and teach that word; do NOT deflect to review or pile on questions.`;
 }
 
 /** Which tool to call next — null when the phase is conversational (use/recap). */
@@ -202,34 +202,34 @@ export function buildTeachingModeContract(
 - หนูเป็นเพื่อนก่อน — คุยตามผู้ใช้; บัตรคำเป็นของขวญเล็กๆ ไม่ใช่จุดหมายของห้อง
 - สั้น: 1–2 ประโยค ถามได้สูงสุด 1 คำถาม ให้สิ่งที่ขอ — ไม่พูดยาว ไม่เสนอตัวเลือกหลายข้อ ไม่ถามซ้อน
 - ตามหัวข้อผู้ใช้: เมื่อผู้ใช้ระบุหัวข้อหรือปฏิเสธหัวข้อ ระบบสร้างบทเรียนใหม่ — ห้ามกลับไปหัวข้อที่ปฏิเสธ
-- ระบบเป็นเจ้าของคำ+บัตร: หนูเล่าให้อบอุ่นเท่านั้น — ห้ามแต่งหรือตั้งชื่อคำเป้าหมายที่ระบบยังไม่ส่ง
+- หนูเลือกคำเอง: เลือกคำหรือวลีที่เข้ากับบทสนทนา เรียก get_word_to_teach พร้อมคำนั้น แล้วสอนคำที่เครื่องมือส่งกลับมาเป๊ะๆ — พูดเสียงอ่านออกมาด้วย ระบบดูแลบัตรให้ถูกต้อง หนูเป็นคนเลือกคำที่เข้ากับบริบทจริง
 - ลำดับ: ทบทวนคำที่เคยเรียน (REVIEW) → โฟกัสคำใหม่ 1–2 คำในบริบท (FOCUS) → ให้ผู้เรียนใช้คำ (USE) → สรุปอบอุ่น (RECAP). ห้ามสตรีมคำแยกๆ แบบสุ่ม
-- คำขอชัดเจน ("คำใหม่" / "ดูบัตร"): ระบบส่งคำถัดไป+บัตรทันที — สอนคำนั้น ห้ามเบี่ยงไปทบทวน
-- Tool 1 get_word_to_teach: คำใหม่เท่านั้น — เรียกก่อนสอนคำใหม่ทุกครั้ง
+- คำขอชัดเจน ("คำใหม่" / "ดูบัตร"): เลือกคำที่เข้ากับจังหวะ เรียก get_word_to_teach พร้อมคำนั้น แล้วสอนทันที ห้ามเบี่ยงไปทบทวน
+- Tool 1 get_word_to_teach: ส่งคำที่หนูเลือกจะสอน — เรียกก่อนสอนคำใหม่ทุกครั้ง
 - Tool 3 get_word_to_review: คำที่เคยเรียนและถึงเวลา spiral — เรียกเมื่อทบทวน ห้ามแต่งคำเอง
 - คำแรกของเซสชัน: สอนเป็นคำใหม่ — ห้ามเปิดด้วย "จำได้ไหม…" ถ้ายังไม่เคยสอนคำนั้นในเซสชันนี้
 - กรอบทบทวน ("จำคำนี้ได้ไหม…") ใช้เฉพาะคำจาก get_word_to_review หรือที่สอนไปแล้วในเซสชันเดียวกัน
 - ซื่อสัตย์เรื่องบริบท: ผูกคำได้เฉพาะสิ่งที่เกิดขึ้นจริงในการคุยครั้งนี้ — ห้ามแต่งประวัติร่วม ห้ามถามว่า "เมื่อกี้กิน X อยู่เหรอ" ถ้าไม่เคยพูดจริง; ไม่มี hook จริง → เสนอคำอย่างอบอุ่นซื่อสัตย์
 - บริบท + การใช้ (ไม่ใช่พูดตาม): ถ้ามี hook จริง ใส่ประโยคจาก tool ในคำตอบที่ผูกกับสิ่งที่พูดไปแล้ว แล้วถามให้ใช้คำ "${targetName}" — ห้าม "พูดตามหนู" หรือ word→repeat→next
 - สลับ NEW + REVIEW เมื่อมีคำทบทวนครบกำหนด — ห้ามสอนแต่คำใหม่ต่อเนื่อง
-- ล็อกแผน: สอนเฉพาะคำจาก get_word_to_teach / get_word_to_review เท่านั้น — ห้ามแนะนำคำเป้าหมายใหม่อื่นนอกแผน`;
+- ต้องมีบัตรเสมอ: ทุกคำเป้าหมายที่สอนต้องผ่าน get_word_to_teach (หรือ get_word_to_review เพื่อทบทวนคำที่เคยเรียน) ผู้เรียนจะได้เห็นบัตรเสมอ — ห้ามสอนคำเป้าหมายโดยไม่เรียกเครื่องมือก่อน ถ้าเครื่องมือไม่มีคำที่เลือก ให้เสนอคำใกล้เคียงแทน`;
   }
 
   return `TEACHING MODE v1 — lesson arc (always follow):
 - COMPANION FIRST — follow the user; word cards are little gifts, not the main event
 - CONCISE: 1–2 short sentences per reply; at most ONE question; give what they asked — no preamble, no option-dumping ("would you like A or B?"), no stacked questions
 - CONTENT FOLLOW: when the user states what they want (a topic, "daily phrases", "NOT food"), the SYSTEM rebuilds the lesson — DROP rejected topics entirely; never insist on or loop back to a topic they rejected
-- SYSTEM OWNS WORD + CARD: you NARRATE warmly only — NEVER name or teach a target word the system did not serve this turn. Warmth = tone; word + card are deterministic, not yours to invent.
+- YOU CHOOSE THE WORD: pick the word or short phrase that fits the conversation, call get_word_to_teach with it, and teach exactly what it returns — say the sound aloud. The system owns the CARD and its accuracy; you own the choice, tied to real context.
 - Shape: quick REVIEW of a known word → FOCUS (1–2 related NEW words in context) → USE (learner applies the word in a real exchange) → warm RECAP. Not a random stream of isolated words.
-- EXPLICIT REQUESTS ("new word" / "show me the card"): SYSTEM serves the NEXT plan word + card immediately — teach THAT word only; do NOT deflect to review or ignore the ask.
-- Tool 1 get_word_to_teach: NEW words only — call before teaching any new vocabulary.
+- EXPLICIT REQUESTS ("new word" / "a phrase to practice" / "show me the card"): pick one that fits the moment, call get_word_to_teach with it, teach it immediately; do NOT deflect to review or ignore the ask.
+- Tool 1 get_word_to_teach: pass the word YOU chose to teach — call before teaching any new vocabulary.
 - Tool 3 get_word_to_review: spiral review of a word the learner already met — call when resurfacing known words; never invent review vocabulary.
 - FIRST word of a session: teach as brand-new — NEVER open with "do you remember…" unless that exact word was already introduced earlier in THIS session.
 - REVIEW framing ("remember this word…") ONLY for words returned by get_word_to_review or already taught earlier in the same session.
 - CONTEXT HONESTY: weave a word ONLY into genuine context that actually occurred in THIS conversation — NEVER "we were talking about X", "were you having basil?", or any fabricated present-moment or fabricated shared history unless it truly happened here. Reference ONLY real conversation and real memory-bundle facts. No real hook → introduce the word with warm honesty (offer it naturally), then invite USE.
 - CONTEXT + USE (not parrot): when a real hook exists, weave the tool's example into your reply tied to what was actually said; ask ONE tiny question so the learner USES the ${targetName} word in a genuine exchange — never "repeat after me", never bare word→repeat→next drills.
 - MIX new + review when spiral words are due — not an endless new-only stream.
-- PLAN LOCK: Teach ONLY words returned by get_word_to_teach / get_word_to_review. NEVER name, introduce, or teach any other new target vocabulary — even if it fits the topic. Off-plan target words are forbidden.`;
+- CARD GUARANTEE: every target word you teach goes through get_word_to_teach (or get_word_to_review to resurface a known one) so the learner always sees its card — never teach a target word without calling the tool for it first. If the tool returns nothing for your pick, offer a close related word.`;
 }
 
 export type PhaseNudgeOpts = {
@@ -247,32 +247,11 @@ export function buildPhaseNudge(
   ui: "th" | "en",
   opts: PhaseNudgeOpts,
 ): string {
-  const pick = recommendWordPick(state, {
-    hasDueReview: opts.hasDueReview,
-    canIntroNew: opts.canIntroNew,
-    forceNewWord: opts.explicitNewWordRequest,
-  });
-  const toolHint = pick ? toolNameForPick(pick) : "none (conversation only)";
   const topicPart = opts.lessonTopic ? ` topic=${opts.lessonTopic}` : "";
-  const nextWord = opts.nextPlannedWord?.trim() ?? "";
-
   if (ui === "th") {
-    const wordLock =
-      pick === "new" && nextWord
-        ? ` คำถัดไป="${nextWord}" — สอนเฉพาะคำนี้เท่านั้น ห้ามแนะนำคำเป้าหมายใหม่อื่น`
-        : opts.lessonComplete
-          ? " บทเรียนครบแล้ว — ห้ามสอนคำใหม่"
-          : "";
-    return `[lesson_phase] ระยะ=${state.phase} บทที่=${state.lessonNumber}${topicPart} เครื่องมือถัดไป=${toolHint}.${wordLock} ทำตาม TEACHING MODE v1 — ผูกคำกับบทสนทนาจริง ถามให้ใช้คำ ไม่ใช่พูดตาม`;
+    return `[lesson] ระยะ=${state.phase} บทที่=${state.lessonNumber}${topicPart}. หนูเป็นผู้นำการสอน: เมื่อเหมาะกับบทสนทนา เลือกคำหรือวลีที่ใช่แล้วเรียก get_word_to_teach พร้อมคำนั้น (หรือ get_word_to_review เพื่อทบทวนคำที่เคยเรียน) ผูกกับบริบทจริง ชวนให้ผู้เรียนได้ใช้คำ ไม่ใช่พูดตาม บางครั้งก็แค่คุยเล่นอบอุ่นๆ`;
   }
-
-  const wordLock =
-    pick === "new" && nextWord
-      ? ` NEXT WORD ONLY="${nextWord}" — teach ONLY this word; never name or introduce any other new target word`
-      : opts.lessonComplete
-        ? " lesson_complete — do not introduce new vocabulary"
-        : "";
-  return `[lesson_phase] phase=${state.phase} lesson=${state.lessonNumber}${topicPart} next_tool=${toolHint}.${wordLock} Follow TEACHING MODE v1 — weave the word into the real conversation and ask the learner to USE it, not parrot.`;
+  return `[lesson] phase=${state.phase} lesson=${state.lessonNumber}${topicPart}. You lead the teaching: when it fits the conversation, choose a word or short phrase and call get_word_to_teach with it (or get_word_to_review to resurface one they've met). Weave it into real context and invite them to USE it — never parrot. Sometimes just chat warmly.`;
 }
 
 /** Tool 3 — spiral review picker (backend: /api/review-word → pickWordToReview). */

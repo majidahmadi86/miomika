@@ -82,11 +82,11 @@ export function buildContentIntentNudge(
   newTopic: string | null,
   nextWord: string | null,
 ): string {
+  void nextWord;
   const excluded = intent.excludeTopics.length ? intent.excludeTopics.join(", ") : "none";
   const topic = newTopic ?? intent.topicHint ?? "auto";
-  const wordLock = nextWord ? ` NEXT WORD ONLY="${nextWord}"` : "";
   if (ui === "th") {
-    return `[content_intent] ผู้ใช้ระบุหัวข้อ — ระบบสร้างบทเรียนใหม่ topic=${topic} ห้ามใช้=${excluded}.${wordLock ? ` คำถัดไป="${nextWord}"` : ""} สอนเฉพาะหัวข้อใหม่ ห้ามกลับไปหัวข้อที่ปฏิเสธ ตอบสั้น 1–2 ประโยค ให้สิ่งที่ขอ`;
+    return `[content_intent] ผู้ใช้ระบุหัวข้อ — สร้างบทเรียนใหม่ topic=${topic} ห้ามใช้=${excluded}. เลือกคำที่เข้ากับหัวข้อใหม่แล้วเรียก get_word_to_teach ห้ามกลับไปหัวข้อที่ปฏิเสธ ตอบสั้น 1–2 ประโยค ให้สิ่งที่ขอ`;
   }
-  return `[content_intent] User stated content intent — SYSTEM rebuilt lesson topic=${topic} excluded=${excluded}.${wordLock} Teach ONLY the new topic; NEVER loop back to rejected topics. Reply in 1–2 sentences; give what they asked — no preamble, no option menus.`;
+  return `[content_intent] User stated content intent — rebuilt lesson topic=${topic} excluded=${excluded}. Choose a word that fits the new topic and call get_word_to_teach with it; NEVER loop back to rejected topics. Reply in 1–2 sentences; give what they asked — no preamble, no option menus.`;
 }

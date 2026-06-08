@@ -852,12 +852,12 @@ const wordLockNudge = buildPhaseNudge(createTeachingModeState({ phase: "focus" }
   lessonTopic: "food",
 });
 assert(
-  wordLockNudge.includes('NEXT WORD ONLY="water"'),
-  "phase nudge names exact next planned word",
+  wordLockNudge.includes("get_word_to_teach") && wordLockNudge.includes("choose"),
+  "phase nudge invites the model to choose a fitting word",
 );
 assert(
-  buildTeachingModeContract("en", "th").includes("PLAN LOCK"),
-  "teaching contract forbids off-plan target words",
+  buildTeachingModeContract("en", "th").includes("CARD GUARANTEE"),
+  "teaching contract guarantees every taught word is carded via the tool",
 );
 
 const kickoffEnFirst = buildKickoffPrompt("en", "first_time");
@@ -1546,18 +1546,18 @@ assert(
 );
 const explicitNudge = buildExplicitLessonRequestNudge("new_word", "en", "water");
 assert(
-  explicitNudge.includes('SYSTEM-SERVED WORD="water"') &&
+  explicitNudge.includes("get_word_to_teach") &&
     explicitNudge.includes("do NOT deflect to review"),
-  "explicit request nudge locks system-served word and forbids review deflection",
+  "explicit request nudge: model chooses the word, no review deflection",
 );
 assert(
-  liveConfigSrc.includes("SYSTEM OWNS WORD + CARD") &&
-    liveConfigSrc.includes("Warmth = tone only"),
-  "persona declares system-owned word+card; warmth is tone only",
+  liveConfigSrc.includes("YOU CHOOSE WHAT TO TEACH") &&
+    liveConfigSrc.includes("say its pronunciation ALOUD"),
+  "persona: model owns word choice and says pronunciation aloud",
 );
 assert(
-  buildTeachingModeContract("en", "th").includes("SYSTEM OWNS WORD + CARD"),
-  "teaching contract declares system-owned word+card",
+  buildTeachingModeContract("en", "th").includes("YOU CHOOSE THE WORD"),
+  "teaching contract: model chooses the word",
 );
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||

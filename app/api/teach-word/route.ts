@@ -16,6 +16,7 @@ import {
   buildLessonPlan,
   resolveTeachServe,
 } from "@/lib/talk/lesson-plan";
+import { resolveOrGenerateWord } from "@/lib/brain/word-content";
 import type { Tier } from "@/lib/auth/get-server-profile";
 import { loadCefrLevel, loadVocabLists } from "@/lib/vocab/user-state-read";
 
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
   let sessionIntroduced: string[] = [];
   let clientLessonPlan: string[] = [];
   let clientIntroducedIdx: number | null = null;
+  let chosenWord = "";
   try {
     const body = (await req.json()) as {
       topic_hint?: string;
@@ -97,7 +99,9 @@ export async function POST(req: NextRequest) {
       session_introduced?: string[];
       lesson_plan?: string[];
       introduced_idx?: number;
+      word?: string;
     };
+    chosenWord = String(body?.word ?? "").trim();
     topicHint = String(body?.topic_hint ?? body?.topicHint ?? "").trim();
     const rawExclude = body?.exclude_topics ?? body?.excludeTopics;
     if (Array.isArray(rawExclude)) {
@@ -152,6 +156,58 @@ export async function POST(req: NextRequest) {
     );
     const requestTarget = normalizeLearningTarget(bodyLearningTarget);
     learningTarget = sanitizeTargetLanguage(browserUi, requestTarget);
+  }
+
+  if (chosenWord) {
+    const resolved = await resolveOrGenerateWord({
+      word: chosenWord,
+      learningTarget,
+      cefrLevel: isGuest ? "A1" : cefrLevel,
+    });
+    if (!resolved) {
+      log("teach-word", "get_word_to_teach", {
+        userId: userId ?? "guest",
+        topicHint: chosenWord,
+        picked: null,
+        mode: "unavailable",
+      });
+      return NextResponse.json({ ok: true, word: null, mode: "none" });
+    }
+    const word = rowToIntroducedWord(resolved, learningTarget);
+    if (!word) {
+      return NextResponse.json({ ok: true, word: null, mode: "none" });
+    }
+    if (userId) {
+      await introduceWord({ userId, word });
+    }
+    const phonetics = await resolvePhonetics({
+      word_th: word.word_th,
+      word_en: word.word_en,
+      learningTarget,
+      bankRomanization: resolved.th_romanization,
+      bankIpa: resolved.en_ipa,
+    });
+    log("teach-word", "get_word_to_teach", {
+      userId: userId ?? "guest",
+      topicHint: chosenWord,
+      picked: word.word_en,
+      mode: "introduce",
+      source: resolved.source,
+    });
+    return NextResponse.json({
+      ok: true,
+      mode: "introduce",
+      word_en: word.word_en,
+      word_th: word.word_th,
+      emoji: word.emoji,
+      cefr_level: word.cefr_level,
+      phonetics: phonetics.phonetics,
+      phonetics_source: phonetics.phonetics_source,
+      ...(phonetics.th_romanization ? { th_romanization: phonetics.th_romanization } : {}),
+      ...(phonetics.en_ipa ? { en_ipa: phonetics.en_ipa } : {}),
+      ...(resolved.example_th ? { example_th: resolved.example_th } : {}),
+      ...(resolved.example_en ? { example_en: resolved.example_en } : {}),
+    });
   }
 
   let lessonPlan = rebuildPlan ? [] : clientLessonPlan;

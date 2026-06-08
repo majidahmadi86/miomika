@@ -320,11 +320,15 @@ export class MiomiLiveClient {
             fc.args?.topicHint ??
             this.teachWordContext.topicHint ??
             "") as string;
+          const chosenWord = (fc.args?.word ?? fc.args?.word_en ?? "") as string;
           const body: Record<string, unknown> = {
             topic_hint: topicHint || undefined,
             learning_target: this.teachWordContext.learningTarget,
             session_introduced: this.teachWordContext.sessionIntroduced,
           };
+          if (chosenWord.trim()) {
+            body.word = chosenWord.trim();
+          }
           if (this.teachWordContext.excludeTopics.length > 0) {
             body.exclude_topics = this.teachWordContext.excludeTopics;
           }
