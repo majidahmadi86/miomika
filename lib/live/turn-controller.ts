@@ -470,6 +470,7 @@ export function reduceTurn(
           phase: "invitation",
         };
         effects.push({ type: "reset_transcript_ids" });
+        effects.push({ type: "stop_continuous_mic" });
         effects.push({ type: "wait_handoff_drain" });
         break;
       }
