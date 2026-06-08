@@ -22,6 +22,7 @@ export type ResolvedWord = {
   topic: string | null;
   register: string | null;
   source: ResolvedWordSource;
+  verified_at?: string | null;
 };
 
 type GeneratedCard = {
@@ -128,7 +129,7 @@ async function lookupBankWord(word: string): Promise<ResolvedWord | null> {
     const { data, error } = await supabase
       .from("vocabulary_bank")
       .select(
-        "word_en, word_th, cefr_level, emoji, example_th, example_en, th_romanization, en_ipa, topic, register",
+        "word_en, word_th, cefr_level, emoji, example_th, example_en, th_romanization, en_ipa, topic, register, verified_at",
       )
       .ilike(column, trimmed)
       .limit(1)
@@ -148,6 +149,7 @@ async function lookupBankWord(word: string): Promise<ResolvedWord | null> {
       en_ipa: (data.en_ipa as string | null) ?? null,
       topic: (data.topic as string | null) ?? null,
       register: (data.register as string | null) ?? null,
+      verified_at: (data.verified_at as string | null) ?? null,
       source: "bank",
     };
   } catch (err) {
@@ -156,6 +158,28 @@ async function lookupBankWord(word: string): Promise<ResolvedWord | null> {
   }
 }
 
+/** Fire-and-forget: stamp a bank row verified (and drop a flawed example) so future serves skip the verify LLM call. */
+function markBankVerified(card: ResolvedWord, exampleOk: boolean): void {
+  void (async () => {
+    try {
+      const supabase = await createServiceClient();
+      const patch: Record<string, unknown> = { verified_at: new Date().toISOString() };
+      if (!exampleOk) {
+        patch.example_th = null;
+        patch.example_en = null;
+      }
+      const { error } = await supabase
+        .from("vocabulary_bank")
+        .update(patch)
+        .eq("word_en", card.word_en);
+      if (error) {
+        console.error("[word-content.markBankVerified] update failed:", error.message);
+      }
+    } catch (err) {
+      console.error("[word-content.markBankVerified] failed:", err);
+    }
+  })();
+}
 function persistGeneratedWord(card: ResolvedWord): void {
   void (async () => {
     try {
@@ -174,6 +198,7 @@ function persistGeneratedWord(card: ResolvedWord): void {
           teach_english_to_thai: true,
           frequency_score: 0,
           difficulty_score: 0,
+          verified_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
         },
         { onConflict: "word_en", ignoreDuplicates: true },
@@ -292,6 +317,8 @@ export async function resolveOrGenerateWord(args: {
   // and generate a verified replacement rather than serve something wrong.
   const hit = await lookupBankWord(word);
   if (hit) {
+    // Verified once already — trust it, skip the LLM round-trip (instant serve).
+    if (hit.verified_at) return hit;
     const check = await verifyCard({
       word_en: hit.word_en,
       word_th: hit.word_th,
@@ -299,7 +326,10 @@ export async function resolveOrGenerateWord(args: {
       example_en: hit.example_en,
     });
     if (check.headwordOk) {
-      return check.exampleOk ? hit : { ...hit, example_th: null, example_en: null };
+      const clean = check.exampleOk ? hit : { ...hit, example_th: null, example_en: null };
+      // Stamp verified (and drop a flawed example for good) so the next serve is instant.
+      markBankVerified(clean, check.exampleOk);
+      return clean;
     }
   }
   const generated = await generateWordCard(word, args.learningTarget, cefr);
