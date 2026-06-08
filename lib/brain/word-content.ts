@@ -116,7 +116,7 @@ function isValidCard(c: GeneratedCard | null): c is GeneratedCard {
 
 function buildGenSystem(target: "th" | "en", cefr: string): string {
   const targetName = target === "en" ? "English" : "Thai";
-  return `You are a bilingual Thai–English lexicographer building ONE vocabulary card for a ${cefr} learner whose target language is ${targetName}. Given a word or short phrase, reply with STRICT JSON ONLY — no prose, no markdown fences — with keys: word_en (the English form), word_th (the Thai form, in Thai script), example_en (one short, natural English sentence that uses the English form), example_th (the Thai translation of that sentence, in Thai script, using the Thai form), topic (one lowercase English word, e.g. food, feelings, travel), register (exactly one of: neutral, formal, casual, slang). ONE COHERENT SENSE: word_en, word_th, and both examples must all be the same word/phrase and the same meaning — example_th must contain word_th verbatim and example_en must contain word_en. Never substitute a related-but-different word (e.g. if the input is ขอ "to request / may I have", do NOT drift to ขอโทษ "sorry"). If the input is ambiguous, pick the most common everyday sense and keep every field consistent with it. Keep it natural and appropriate for a ${cefr} learner. JSON only.`;
+  return `You are a bilingual Thai–English lexicographer building ONE vocabulary card for a ${cefr} learner whose target language is ${targetName}. Given a word, short phrase, or meaning, reply with STRICT JSON ONLY — no prose, no markdown fences — with keys: word_en (the English form), word_th (the Thai form, in Thai script), example_en (one short, natural English sentence that uses the English form), example_th (the Thai translation of that sentence, in Thai script, using the Thai form), topic (one lowercase English word, e.g. food, feelings, travel), register (exactly one of: neutral, formal, casual, slang). REAL CONTENT ONLY: the input may be an English meaning, Thai script, or an approximate romanization — TRANSLATE IT BY MEANING into the Thai a real Thai speaker actually uses. NEVER spell English sounds out in Thai letters (no phonetic transliteration) and never invent a word that does not exist; if you cannot give a real, correct Thai form for the meaning, return word_th as an empty string "". ONE COHERENT SENSE: word_en, word_th, and both examples must all be the same word/phrase and the same meaning — example_th must contain word_th verbatim and example_en must contain word_en. Never substitute a related-but-different word (e.g. if the input is ขอ "to request / may I have", do NOT drift to ขอโทษ "sorry"). If the input is ambiguous, pick the most common everyday sense and keep every field consistent with it. Keep it natural and appropriate for a ${cefr} learner. JSON only.`;
 }
 
 async function lookupBankWord(word: string): Promise<ResolvedWord | null> {
@@ -187,33 +187,66 @@ function persistGeneratedWord(card: ResolvedWord): void {
   })();
 }
 
+function buildVerifySystem(): string {
+  return `You are a strict bilingual Thai-English checker. You are given a Thai word or phrase and a CLAIMED English meaning. Reply with STRICT JSON ONLY — no prose, no markdown fences — {"back_translation": string, "real_thai": boolean, "meaning_matches": boolean}.
+- back_translation: translate the Thai into English yourself, from scratch, IGNORING the claimed meaning.
+- real_thai: true ONLY if the Thai is a real, natural word or phrase that a Thai speaker actually uses. Set it FALSE if the Thai is gibberish, a word-salad, or a phonetic transliteration of English sounds spelled in Thai letters (syllables that do not form a real Thai meaning).
+- meaning_matches: true ONLY if your back_translation means essentially the same thing as the claimed English meaning.
+Be strict: when in doubt, set the boolean to false.`;
+}
+
+// Independent semantic check: a generated card is only trusted if a second, blind
+// pass confirms the Thai is REAL and actually means the claimed English. This is
+// what stops hallucinated / transliterated content from ever reaching the learner.
+async function verifyCard(word_en: string, word_th: string): Promise<boolean> {
+  const system = buildVerifySystem();
+  const user = `Thai: ${word_th}\nClaimed English meaning: ${word_en}`;
+  const raw = (await callGeminiJson(system, user)) ?? (await callGroqJson(system, user));
+  if (!raw) return false; // cannot verify -> never show unverified content
+  try {
+    const v = JSON.parse(raw.replace(/```json|```/g, "").trim()) as {
+      real_thai?: boolean;
+      meaning_matches?: boolean;
+    };
+    return v.real_thai === true && v.meaning_matches === true;
+  } catch {
+    return false;
+  }
+}
+
 async function generateWordCard(
   word: string,
   target: "th" | "en",
   cefr: string,
 ): Promise<ResolvedWord | null> {
   const system = buildGenSystem(target, cefr);
-  const user = `Word or short phrase to teach: ${word}`;
-  let parsed = parseCard(await callGroqJson(system, user));
-  if (!isValidCard(parsed)) {
-    parsed = parseCard(await callGeminiJson(system, user));
+  const user = `Word, short phrase, or meaning to teach: ${word}`;
+  // Two independent generation attempts (Groq, then Gemini). Each candidate must
+  // pass structural validation AND independent meaning verification before it is
+  // ever returned. An unverifiable item yields null -> the model offers a real
+  // alternative instead of teaching something wrong.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = attempt === 0 ? await callGroqJson(system, user) : await callGeminiJson(system, user);
+    const parsed = parseCard(raw);
+    if (!isValidCard(parsed)) continue;
+    const word_en = (parsed.word_en ?? "").trim();
+    const word_th = (parsed.word_th ?? "").trim();
+    if (!(await verifyCard(word_en, word_th))) continue;
+    return {
+      word_en,
+      word_th,
+      example_en: (parsed.example_en ?? "").trim() || null,
+      example_th: (parsed.example_th ?? "").trim() || null,
+      topic: (parsed.topic ?? "").trim() || null,
+      register: (parsed.register ?? "").trim() || null,
+      cefr_level: cefr,
+      emoji: null,
+      th_romanization: null,
+      en_ipa: null,
+      source: "generated",
+    };
   }
-  if (!isValidCard(parsed)) return null;
-  const word_en = (parsed.word_en ?? "").trim();
-  const word_th = (parsed.word_th ?? "").trim();
-  return {
-    word_en,
-    word_th,
-    example_en: (parsed.example_en ?? "").trim() || null,
-    example_th: (parsed.example_th ?? "").trim() || null,
-    topic: (parsed.topic ?? "").trim() || null,
-    register: (parsed.register ?? "").trim() || null,
-    cefr_level: cefr,
-    emoji: null,
-    th_romanization: null,
-    en_ipa: null,
-    source: "generated",
-  };
+  return null;
 }
 
 /**
