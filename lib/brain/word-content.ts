@@ -193,7 +193,7 @@ function buildVerifySystem(): string {
   return `You are a strict bilingual Thai-English checker. You are given a Thai word or phrase with a CLAIMED English meaning, plus an example sentence pair. Reply with STRICT JSON ONLY — no prose, no markdown fences — {"headword_real": boolean, "headword_matches": boolean, "example_real": boolean, "example_uses_word": boolean, "example_matches": boolean}.
 - headword_real: true ONLY if the Thai word/phrase is real, natural Thai a speaker actually uses. FALSE if it is gibberish, a word-salad, or a phonetic transliteration of English sounds spelled in Thai letters.
 - headword_matches: true ONLY if the Thai word/phrase actually means the claimed English meaning.
-- example_real: true ONLY if the Thai example is a real, grammatical, natural Thai sentence containing NO non-words or gibberish tokens.
+- example_real: read EVERY word in the Thai example individually; true ONLY if every single word is a real Thai word AND the whole sentence is grammatical and natural. Set it FALSE if ANY token is a non-word, typo, fragment, or corrupted spelling.
 - example_uses_word: true ONLY if the Thai example actually contains and uses the Thai word/phrase.
 - example_matches: true ONLY if the Thai example and the English example mean the same thing.
 Be strict: when in doubt, set the boolean to false.`;
@@ -286,9 +286,22 @@ export async function resolveOrGenerateWord(args: {
 }): Promise<ResolvedWord | null> {
   const word = args.word.trim();
   if (!word) return null;
-  const hit = await lookupBankWord(word);
-  if (hit) return hit;
   const cefr = args.cefrLevel?.trim() || "A1";
+  // Bank hit: even curated rows are verified before serving (the bank is NOT assumed
+  // clean). Drop a flawed example; if the curated headword itself fails, fall through
+  // and generate a verified replacement rather than serve something wrong.
+  const hit = await lookupBankWord(word);
+  if (hit) {
+    const check = await verifyCard({
+      word_en: hit.word_en,
+      word_th: hit.word_th,
+      example_th: hit.example_th,
+      example_en: hit.example_en,
+    });
+    if (check.headwordOk) {
+      return check.exampleOk ? hit : { ...hit, example_th: null, example_en: null };
+    }
+  }
   const generated = await generateWordCard(word, args.learningTarget, cefr);
   if (!generated) return null;
   persistGeneratedWord(generated);
