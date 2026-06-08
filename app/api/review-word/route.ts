@@ -10,51 +10,12 @@ import {
 import { UI_LANGUAGE_COOKIE } from "@/lib/i18n/server";
 import { resolvePhonetics } from "@/lib/brain/phonetics";
 import { rowToIntroducedWord } from "@/lib/brain/teaching";
-import { createServiceClient } from "@/lib/supabase/service";
+import { resolveOrGenerateWord } from "@/lib/brain/word-content";
 import { log } from "@/lib/debug/log";
 import {
   buildExcludeSet,
   pickPlanReviewWord,
 } from "@/lib/talk/lesson-plan";
-
-async function loadWordFromBank(wordEn: string): Promise<{
-  word_en: string;
-  word_th: string;
-  emoji: string | null;
-  cefr_level: string | null;
-  example_th: string | null;
-  example_en: string | null;
-  th_romanization: string | null;
-  en_ipa: string | null;
-} | null> {
-  try {
-    const supabase = await createServiceClient();
-    const { data, error } = await supabase
-      .from("vocabulary_bank")
-      .select(
-        "word_en, word_th, emoji, cefr_level, example_th, example_en, th_romanization, en_ipa",
-      )
-      .eq("word_en", wordEn)
-      .maybeSingle();
-    if (error || !data) return null;
-    const word_en = (data.word_en as string | null)?.trim() ?? "";
-    const word_th = (data.word_th as string | null)?.trim() ?? "";
-    if (!word_en || !word_th) return null;
-    return {
-      word_en,
-      word_th,
-      emoji: (data.emoji as string | null) ?? null,
-      cefr_level: (data.cefr_level as string | null) ?? null,
-      example_th: (data.example_th as string | null) ?? null,
-      example_en: (data.example_en as string | null) ?? null,
-      th_romanization: (data.th_romanization as string | null) ?? null,
-      en_ipa: (data.en_ipa as string | null) ?? null,
-    };
-  } catch (err) {
-    console.error("[review-word] loadWordFromBank failed:", err);
-    return null;
-  }
-}
 
 function parseLessonPlan(body: unknown): string[] {
   if (!Array.isArray(body)) return [];
@@ -142,8 +103,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, word: null, mode: "none" });
   }
 
-  const bankRow = await loadWordFromBank(pickEn);
-  const word = bankRow ? rowToIntroducedWord(bankRow, learningTarget) : null;
+  const resolved = await resolveOrGenerateWord({
+    word: pickEn,
+    learningTarget,
+    cefrLevel: isGuest ? "A1" : null,
+  });
+  const word = resolved ? rowToIntroducedWord(resolved, learningTarget) : null;
   if (!word) {
     return NextResponse.json({ ok: true, word: null, mode: "none" });
   }
@@ -152,8 +117,8 @@ export async function POST(req: NextRequest) {
     word_th: word.word_th,
     word_en: word.word_en,
     learningTarget,
-    bankRomanization: bankRow?.th_romanization ?? null,
-    bankIpa: bankRow?.en_ipa ?? null,
+    bankRomanization: resolved?.th_romanization ?? null,
+    bankIpa: resolved?.en_ipa ?? null,
   });
 
   return NextResponse.json({
@@ -167,7 +132,7 @@ export async function POST(req: NextRequest) {
     phonetics_source: phonetics.phonetics_source,
     ...(phonetics.th_romanization ? { th_romanization: phonetics.th_romanization } : {}),
     ...(phonetics.en_ipa ? { en_ipa: phonetics.en_ipa } : {}),
-    ...(bankRow?.example_th ? { example_th: bankRow.example_th } : {}),
-    ...(bankRow?.example_en ? { example_en: bankRow.example_en } : {}),
+    ...(resolved?.example_th ? { example_th: resolved.example_th } : {}),
+    ...(resolved?.example_en ? { example_en: resolved.example_en } : {}),
   });
 }
