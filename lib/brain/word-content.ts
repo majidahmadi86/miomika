@@ -109,12 +109,14 @@ function isValidCard(c: GeneratedCard | null): c is GeneratedCard {
   if (!word_en || !word_th) return false;
   if (!hasThaiScript(word_th)) return false;
   if (isVocabularySlug(word_en)) return false;
+  const example_th = (c.example_th ?? "").trim();
+  if (example_th && !example_th.includes(word_th)) return false;
   return true;
 }
 
 function buildGenSystem(target: "th" | "en", cefr: string): string {
   const targetName = target === "en" ? "English" : "Thai";
-  return `You are a bilingual Thai–English lexicographer building ONE vocabulary card for a ${cefr} learner whose target language is ${targetName}. Given a word or short phrase, reply with STRICT JSON ONLY — no prose, no markdown fences — with keys: word_en (the English form), word_th (the Thai form, in Thai script), example_en (one short, natural English sentence that uses the English form), example_th (the Thai translation of that sentence, in Thai script, using the Thai form), topic (one lowercase English word, e.g. food, feelings, travel), register (exactly one of: neutral, formal, casual, slang). Keep it natural and appropriate for a ${cefr} learner. JSON only.`;
+  return `You are a bilingual Thai–English lexicographer building ONE vocabulary card for a ${cefr} learner whose target language is ${targetName}. Given a word or short phrase, reply with STRICT JSON ONLY — no prose, no markdown fences — with keys: word_en (the English form), word_th (the Thai form, in Thai script), example_en (one short, natural English sentence that uses the English form), example_th (the Thai translation of that sentence, in Thai script, using the Thai form), topic (one lowercase English word, e.g. food, feelings, travel), register (exactly one of: neutral, formal, casual, slang). ONE COHERENT SENSE: word_en, word_th, and both examples must all be the same word/phrase and the same meaning — example_th must contain word_th verbatim and example_en must contain word_en. Never substitute a related-but-different word (e.g. if the input is ขอ "to request / may I have", do NOT drift to ขอโทษ "sorry"). If the input is ambiguous, pick the most common everyday sense and keep every field consistent with it. Keep it natural and appropriate for a ${cefr} learner. JSON only.`;
 }
 
 async function lookupBankWord(word: string): Promise<ResolvedWord | null> {
