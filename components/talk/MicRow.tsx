@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wand2, GraduationCap, Sparkles, Languages, Heart, Mic, AudioWaveform, type LucideIcon } from "lucide-react";
+import { GraduationCap, Languages, Heart, Mic, AudioWaveform, type LucideIcon } from "lucide-react";
 import type { TalkMode } from "@/lib/talk/modes";
 import type { OrbState } from "@/components/talk/VoiceOrb";
 
@@ -18,11 +18,9 @@ interface MicRowProps {
 }
 
 const MODES: { key: TalkMode; Icon: LucideIcon; labelTh: string; labelEn: string }[] = [
-  { key: "auto", Icon: Wand2, labelTh: "อัตโนมัติ", labelEn: "Auto" },
-  { key: "teach", Icon: GraduationCap, labelTh: "สอน", labelEn: "Teach" },
-  { key: "social", Icon: Sparkles, labelTh: "โซเชียล", labelEn: "Social" },
-  { key: "translate", Icon: Languages, labelTh: "แปล", labelEn: "Translate" },
   { key: "chat", Icon: Heart, labelTh: "คุย", labelEn: "Chat" },
+  { key: "teach", Icon: GraduationCap, labelTh: "สอน", labelEn: "Teach" },
+  { key: "translate", Icon: Languages, labelTh: "แปล", labelEn: "Translate" },
 ];
 
 // Miomi's head reacts to live state. No dedicated "listening" art yet —
@@ -38,10 +36,10 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
   const activeMode = MODES[activeIdx];
 
   const ring = MODES.filter((_, i) => i !== activeIdx);
-  const leftSlots = ring.slice(0, 2);
-  const rightSlots = ring.slice(2, 4);
-  while (leftSlots.length < 2) leftSlots.push(null as never);
-  while (rightSlots.length < 2) rightSlots.push(null as never);
+  const leftSlots = ring.slice(0, 1);
+  const rightSlots = ring.slice(1, 2);
+  while (leftSlots.length < 1) leftSlots.push(null as never);
+  while (rightSlots.length < 1) rightSlots.push(null as never);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef<number | null>(null);
@@ -117,9 +115,7 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
   const OrbIcon =
     orbState === "listening" || orbState === "thinking" || orbState === "speaking"
       ? AudioWaveform
-      : showModes
-        ? activeMode.Icon
-        : Mic;
+      : Mic;
   const isHead = Boolean(HEAD_SRC[orbState]);
 
   return (

@@ -274,6 +274,13 @@ assert(
     chatInstruction.includes("Converse naturally and warmly"),
   "chat-mode instruction is the warm companion persona",
 );
+const translateInstruction = buildSystemInstruction("en", "th", null, "translate");
+assert(
+  translateInstruction.includes("live interpreter") &&
+    !translateInstruction.includes("TEACHING MODE v1") &&
+    !translateInstruction.includes("get_word_to_review"),
+  "translate-mode instruction is the interpreter persona with no teaching",
+);
 
 assert(
   resolveProfileUiAnchor({
@@ -1011,6 +1018,11 @@ assert(
   liveConfigSrc.includes("PERSONA_CHAT") &&
     liveConfigSrc.includes("you have no teaching tools here"),
   "chat persona exists and is tool-free",
+);
+assert(
+  liveConfigSrc.includes("PERSONA_TRANSLATE") &&
+    liveConfigSrc.includes('mode === "translate"'),
+  "translate mode is wired as its own persona branch",
 );
 assert(
   buildTeachingModeContract("en", "th").includes("weave") &&

@@ -1599,6 +1599,7 @@ export default function TalkPage() {
           current={config.mode}
           orbState={orbState}
           uiLang={uiLang}
+          showModes
           onModeChange={(m) => {
             const next = { ...config, mode: m };
             setConfig(next);
