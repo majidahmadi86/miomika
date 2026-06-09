@@ -348,7 +348,7 @@ function AppLayoutInner({
         <SwipeNavigator pathname={pathname}>
           {children}
         </SwipeNavigator>
-        <BottomNav />
+        {pathname !== "/talk" && <BottomNav />}
         {pathname !== "/talk" && <InstallPrompt />}
         <AmbientCompanion />
         <GuidanceHost />

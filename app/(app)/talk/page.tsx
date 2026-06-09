@@ -1493,12 +1493,14 @@ export default function TalkPage() {
         </button>
       </div>
 
-      <PersistentMiomi
-        mood={miomiMood}
-        uiLang={uiLang}
-        subtitleTh={items.length <= 1 ? "หนูพร้อมแล้วค่า~" : undefined}
-        subtitleEn={items.length <= 1 ? "I'm ready~" : undefined}
-      />
+      {items.length <= 1 && (
+        <PersistentMiomi
+          mood={miomiMood}
+          uiLang={uiLang}
+          subtitleTh={items.length <= 1 ? "หนูพร้อมแล้วค่า~" : undefined}
+          subtitleEn={items.length <= 1 ? "I'm ready~" : undefined}
+        />
+      )}
 
       <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <Toolbox

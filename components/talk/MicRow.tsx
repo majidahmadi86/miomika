@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wand2, GraduationCap, Sparkles, Languages, Heart, AudioWaveform, type LucideIcon } from "lucide-react";
+import { Wand2, GraduationCap, Sparkles, Languages, Heart, Mic, AudioWaveform, type LucideIcon } from "lucide-react";
 import type { TalkMode } from "@/lib/talk/modes";
 import type { OrbState } from "@/components/talk/VoiceOrb";
 
@@ -110,7 +110,7 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
       ? AudioWaveform
       : showModes
         ? activeMode.Icon
-        : Heart;
+        : Mic;
 
   return (
     <div
@@ -147,10 +147,17 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
               <PulseRing delay={1.1} />
             </>
           )}
+          {orbState === "listening" && (
+            <>
+              <PulseRing delay={0} listening />
+              <PulseRing delay={0.5} listening />
+              <PulseRing delay={1.0} listening />
+            </>
+          )}
           <motion.div
-            animate={orbState === "listening" ? { scale: [1, 1.04, 1] } : { scale: 1 }}
-            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-            style={{ width: "68px", height: "68px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 22px rgba(201,169,110,0.45), 0 0 0 1px rgba(255,255,255,0.5)", position: "relative", zIndex: 2 }}
+            animate={orbState === "listening" ? { scale: [1, 1.07, 1] } : { scale: 1 }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            style={{ width: "68px", height: "68px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: orbState === "listening" ? "0 8px 30px rgba(201,169,110,0.8), 0 0 0 5px rgba(201,169,110,0.14)" : "0 8px 22px rgba(201,169,110,0.45), 0 0 0 1px rgba(255,255,255,0.5)", position: "relative", zIndex: 2 }}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -181,12 +188,12 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
   );
 }
 
-function PulseRing({ delay }: { delay: number }) {
+function PulseRing({ delay, listening = false }: { delay: number; listening?: boolean }) {
   return (
     <motion.span
-      animate={{ scale: [1, 2], opacity: [0.7, 0] }}
-      transition={{ duration: 2.2, repeat: Infinity, delay, ease: "easeOut" }}
-      style={{ position: "absolute", top: "50%", left: "50%", width: "66px", height: "66px", marginTop: "-33px", marginLeft: "-33px", borderRadius: "50%", border: "2px solid rgba(232,199,122,0.55)", pointerEvents: "none" }}
+      animate={{ scale: listening ? [1, 1.7] : [1, 2], opacity: [listening ? 0.85 : 0.7, 0] }}
+      transition={{ duration: listening ? 1.3 : 2.2, repeat: Infinity, delay, ease: "easeOut" }}
+      style={{ position: "absolute", top: "50%", left: "50%", width: "66px", height: "66px", marginTop: "-33px", marginLeft: "-33px", borderRadius: "50%", border: listening ? "2.5px solid rgba(201,169,110,0.7)" : "2px solid rgba(232,199,122,0.55)", pointerEvents: "none" }}
     />
   );
 }
