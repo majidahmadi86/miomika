@@ -1513,6 +1513,8 @@ export default function TalkPage() {
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
             padding: "8px 14px 0",
             paddingRight: "52px",
           }}
@@ -1525,6 +1527,7 @@ export default function TalkPage() {
               alignItems: "stretch",
               gap: "12px",
               minHeight: "min-content",
+              marginTop: "auto",
             }}
           >
           {sortedCanvasItems.map((item) => {
