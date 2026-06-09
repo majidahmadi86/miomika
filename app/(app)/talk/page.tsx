@@ -11,7 +11,6 @@ import { FuelPill } from "@/components/talk/FuelPill";
 import { type OrbState } from "@/components/talk/VoiceOrb";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
 import { MicRow } from "@/components/talk/MicRow";
-import { Toolbox, type ResponseLength } from "@/components/talk/Toolbox";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
 import { WordCardV3 } from "@/components/talk/WordCardV3";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
@@ -129,7 +128,6 @@ export default function TalkPage() {
   const [uiLang, setUiLang] = useState<"th" | "en">("th");
   const [items, setItems] = useState<CanvasItem[]>([]);
   const [textInput, setTextInput] = useState("");
-  const [respLength, setRespLength] = useState<ResponseLength>("normal");
   const [conversationLang, setConversationLang] = useState<"th" | "en">("th");
   const [showGuestSheet, setShowGuestSheet] = useState(false);
   const [guestSheetReason, setGuestSheetReason] = useState<"talk" | "save">("talk");
@@ -1515,11 +1513,6 @@ export default function TalkPage() {
       )}
 
       <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        <Toolbox
-          length={respLength}
-          uiLang={uiLang}
-          onCycleLength={() => setRespLength((p) => (p === "short" ? "normal" : p === "normal" ? "detailed" : "short"))}
-        />
         <div
           ref={canvasRef}
           style={{
@@ -1530,7 +1523,6 @@ export default function TalkPage() {
             display: "flex",
             flexDirection: "column-reverse",
             padding: "8px 14px 0",
-            paddingRight: "52px",
             paddingBottom: "150px",
           }}
         >
