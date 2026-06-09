@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wand2, GraduationCap, Sparkles, Languages, Heart, Mic, AudioWaveform, type LucideIcon } from "lucide-react";
@@ -23,6 +24,14 @@ const MODES: { key: TalkMode; Icon: LucideIcon; labelTh: string; labelEn: string
   { key: "translate", Icon: Languages, labelTh: "แปล", labelEn: "Translate" },
   { key: "chat", Icon: Heart, labelTh: "คุย", labelEn: "Chat" },
 ];
+
+// Miomi's head reacts to live state. No dedicated "listening" art yet —
+// using the happy/engaged head while she's listening.
+const HEAD_SRC: Partial<Record<OrbState, string>> = {
+  listening: "/miomi/head-happy.png",
+  thinking: "/miomi/head-thinking.png",
+  speaking: "/miomi/head-speaking.png",
+};
 
 export function MicRow({ current, orbState, uiLang, showModes = false, onModeChange, onOrbTap, orbAriaLabel }: MicRowProps) {
   const activeIdx = Math.max(0, MODES.findIndex((m) => m.key === current));
@@ -161,14 +170,24 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
           >
             <AnimatePresence mode="wait">
               <motion.div
-                key={(showModes ? activeMode.key : "companion") + (orbState === "listening" || orbState === "thinking" || orbState === "speaking" ? "-active" : "-idle")}
+                key={(showModes ? activeMode.key : "companion") + "-" + orbState}
                 initial={{ opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.85 }}
                 transition={{ duration: 0.2 }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
               >
-                <OrbIcon size={26} color="#FFFFFF" strokeWidth={2} />
+                {HEAD_SRC[orbState] ? (
+                  <Image
+                    src={HEAD_SRC[orbState]!}
+                    alt="Miomi"
+                    width={54}
+                    height={54}
+                    style={{ borderRadius: "50%", objectFit: "contain" }}
+                  />
+                ) : (
+                  <OrbIcon size={26} color="#FFFFFF" strokeWidth={2} />
+                )}
               </motion.div>
             </AnimatePresence>
           </motion.div>
