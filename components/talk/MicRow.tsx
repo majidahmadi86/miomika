@@ -120,6 +120,7 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
       : showModes
         ? activeMode.Icon
         : Mic;
+  const isHead = Boolean(HEAD_SRC[orbState]);
 
   return (
     <div
@@ -150,23 +151,11 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
           aria-label={orbAriaLabel}
           style={{ width: "88px", height: "88px", borderRadius: "50%", border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", padding: 0 }}
         >
-          {orbState === "idle" && (
-            <>
-              <PulseRing delay={0} />
-              <PulseRing delay={1.1} />
-            </>
-          )}
-          {orbState === "listening" && (
-            <>
-              <PulseRing delay={0} listening />
-              <PulseRing delay={0.5} listening />
-              <PulseRing delay={1.0} listening />
-            </>
-          )}
+          {orbState === "idle" && <PulseRing delay={0} />}
           <motion.div
-            animate={orbState === "listening" ? { scale: [1, 1.07, 1] } : { scale: 1 }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-            style={{ width: "68px", height: "68px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: orbState === "listening" ? "0 8px 30px rgba(201,169,110,0.8), 0 0 0 5px rgba(201,169,110,0.14)" : "0 8px 22px rgba(201,169,110,0.45), 0 0 0 1px rgba(255,255,255,0.5)", position: "relative", zIndex: 2 }}
+            animate={orbState === "listening" ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+            style={{ width: isHead ? "84px" : "68px", height: isHead ? "84px" : "68px", borderRadius: "50%", background: isHead ? "transparent" : "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: isHead ? (orbState === "listening" ? "0 4px 18px rgba(201,169,110,0.30)" : "none") : (orbState === "listening" ? "0 8px 30px rgba(201,169,110,0.8), 0 0 0 5px rgba(201,169,110,0.14)" : "0 8px 22px rgba(201,169,110,0.45), 0 0 0 1px rgba(255,255,255,0.5)"), position: "relative", zIndex: 2 }}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -181,9 +170,9 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
                   <Image
                     src={HEAD_SRC[orbState]!}
                     alt="Miomi"
-                    width={54}
-                    height={54}
-                    style={{ borderRadius: "50%", objectFit: "contain" }}
+                    width={84}
+                    height={84}
+                    style={{ objectFit: "contain" }}
                   />
                 ) : (
                   <OrbIcon size={26} color="#FFFFFF" strokeWidth={2} />
