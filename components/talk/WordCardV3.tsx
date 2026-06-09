@@ -1,9 +1,5 @@
 "use client";
 
-/* TODO(phase-3): refactor IconComponent lookup to a static map so the
- * react-hooks/static-components rule passes naturally. The category mapping
- * is fixed at module load — there's no semantic need to recompute per render.
- */
 /* eslint-disable react-hooks/static-components */
 
 import { useState } from "react";
@@ -40,12 +36,17 @@ interface WordCardV3Props {
   word: VocabularyEntry;
   direction: "th_to_en" | "en_to_th";
   onPronunciationCheck?: (word: VocabularyEntry) => void;
-  /** When set, replay uses this instead of browser TTS (e.g. /api/talk/speak). */
   onReplayAudio?: () => void | Promise<void>;
-  /** Member: confirmed saved state. Guest: signup conversion hook. */
   saveState?: WordCardSaveState;
   onSaveTap?: () => void;
 }
+
+const FONT_LATIN = "'Quicksand', sans-serif";
+const FONT_THAI = "'Sarabun', sans-serif";
+const INK = "#1A1A18";
+const MUTE = "#9A8B73";
+const GOLD = "#C9A96E";
+const LINE = "#E8E5DF";
 
 export function WordCardV3({
   word,
@@ -65,13 +66,15 @@ export function WordCardV3({
   const audioLang = isThaiLearner ? "en-US" : "th-TH";
   const audioKey = isThaiLearner ? word.audio_key_en : word.audio_key_th;
 
-  // TODO(phase-3): move IconComponent lookup to a static map / hoisted helper.
+  const primaryFont = isThaiLearner ? FONT_LATIN : FONT_THAI;
+  const meaningFont = isThaiLearner ? FONT_THAI : FONT_LATIN;
+  const uiFont = isThaiLearner ? FONT_THAI : FONT_LATIN;
+
   const IconComponent = getIconForCategory(word.image_category);
   const glyphText =
     /[\u0E00-\u0E7F]/.test(primaryWord) && primaryWord.length <= 4
       ? primaryWord
       : primaryWord.charAt(0).toUpperCase();
-  const glyphFont = isThaiLearner ? "'Quicksand', sans-serif" : "'Sarabun', sans-serif";
 
   const handleAudio = async () => {
     if (audioPlaying) return;
@@ -84,341 +87,169 @@ export function WordCardV3({
     setAudioPlaying(false);
   };
 
+  const hasNote = !!(word.miomi_note_th || word.miomi_note_en);
+  const hasExample = !!(word.example_en || word.example_th);
+  const hasExtras = hasNote || hasExample || !!word.use_when || !!word.cultural_warning || !!word.example_context;
+
   return (
     <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: "auto" }}
-      transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
       style={{
         width: "100%",
         background: "#FFFFFF",
-        border: "1px solid #E8E5DF",
-        borderRadius: "16px",
-        boxShadow: "0 2px 8px rgba(26,26,24,0.05)",
-        position: "relative",
+        border: `1px solid ${LINE}`,
+        borderLeft: `3px solid ${GOLD}`,
+        borderRadius: "14px",
+        boxShadow: "0 1px 6px rgba(26,26,24,0.05)",
         overflow: "hidden",
         marginBottom: "8px",
       }}
     >
-      {/* Gold left bar */}
-      <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: "4px" }}
-        transition={{ duration: 0.24, delay: 0.20 }}
-        style={{
-          position: "absolute",
-          left: 0, top: 0, bottom: 0,
-          background: "#C9A96E",
-          borderRadius: "4px 0 0 4px",
-        }}
-      />
-
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.28, delay: 0.08 }}
-        style={{ padding: "20px 20px 20px 24px" }}
-      >
-        {/* Header row */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+      <div style={{ padding: "12px 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px", minHeight: "18px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             {word.cefr_level && (
-              <span style={{
-                fontFamily: "'Quicksand', sans-serif",
-                fontSize: "10px", fontWeight: 700,
-                letterSpacing: "0.08em", textTransform: "uppercase",
-                color: "#C9A96E",
-              }}>
+              <span style={{ fontFamily: FONT_LATIN, fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: GOLD }}>
                 {word.cefr_level}
               </span>
             )}
             {word.register && (
-              <span style={{
-                fontFamily: "'Quicksand', sans-serif",
-                fontSize: "10px", color: "#9A8B73",
-              }}>
-                · {word.register}
-              </span>
+              <span style={{ fontFamily: FONT_LATIN, fontSize: "10px", color: MUTE }}>· {word.register}</span>
             )}
           </div>
           <motion.button
             type="button"
             onClick={handleAudio}
             whileTap={{ scale: 0.9 }}
-            animate={audioPlaying ? { scale: [1, 1.15, 1] } : {}}
+            animate={audioPlaying ? { scale: [1, 1.12, 1] } : {}}
             transition={{ duration: 0.24 }}
-            style={{
-              background: "none", border: "none",
-              cursor: "pointer", padding: "4px",
-              display: "flex", alignItems: "center",
-            }}
+            aria-label="Play audio"
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
           >
-            <Volume2
-              style={{ width: "20px", height: "20px", color: audioPlaying ? "#C9A96E" : "#C4BDB5" }}
-              strokeWidth={1.75}
-            />
+            <Volume2 style={{ width: "18px", height: "18px", color: audioPlaying ? GOLD : "#C4BDB5" }} strokeWidth={1.75} />
           </motion.button>
         </div>
 
-        {/* Image + word row */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", marginBottom: "14px" }}>
-          {/* Image area */}
-          <div style={{
-            width: "80px", height: "80px", flexShrink: 0,
-            background: "#FAFAF6", border: "1px solid #E8E5DF",
-            borderRadius: "12px", display: "flex",
-            alignItems: "center", justifyContent: "center",
-          }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ width: "52px", height: "52px", flexShrink: 0, background: "#FAFAF6", border: `1px solid ${LINE}`, borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {IconComponent ? (
-              <IconComponent style={{ width: "40px", height: "40px", color: "#9A8B73" }} strokeWidth={1.5} />
+              <IconComponent style={{ width: "26px", height: "26px", color: MUTE }} strokeWidth={1.5} />
             ) : (
-              <span
-                style={{
-                  fontFamily: glyphFont,
-                  fontSize: glyphText.length > 1 ? "26px" : "32px",
-                  fontWeight: 600,
-                  color: "#9A8B73",
-                  lineHeight: 1,
-                }}
-              >
+              <span style={{ fontFamily: primaryFont, fontSize: glyphText.length > 1 ? "20px" : "26px", fontWeight: 600, color: MUTE, lineHeight: 1 }}>
                 {glyphText}
               </span>
             )}
           </div>
-
-          {/* Word + pronunciation */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <motion.p
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.24, delay: 0.48 }}
-              style={{
-                fontFamily: isThaiLearner ? "'Quicksand', sans-serif" : "'Sarabun', sans-serif",
-                fontSize: "clamp(20px, 6vw, 28px)",
-                fontWeight: 600,
-                color: "#1A1A18",
-                lineHeight: 1.1,
-                margin: "0 0 4px",
-              }}
-            >
+            <p style={{ fontFamily: primaryFont, fontSize: "22px", fontWeight: 600, color: INK, lineHeight: 1.15, margin: 0 }}>
               {primaryWord}
-            </motion.p>
+            </p>
             {pronunciation && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.20, delay: 0.56 }}
-                style={{
-                  fontFamily: isThaiLearner ? "monospace" : "'Sarabun', sans-serif",
-                  fontSize: "13px",
-                  fontStyle: "italic",
-                  color: "#9A8B73",
-                  margin: 0,
-                }}
-              >
+              <p style={{ fontFamily: FONT_LATIN, fontSize: "12.5px", color: MUTE, margin: "1px 0 0" }}>
                 {pronunciation}
-              </motion.p>
+              </p>
+            )}
+            {meaningWord && (
+              <p style={{ fontFamily: meaningFont, fontSize: "14px", fontWeight: 500, color: INK, margin: "3px 0 0" }}>
+                {meaningWord}
+              </p>
             )}
           </div>
         </div>
 
-        {/* Meaning */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.20, delay: 0.56 }}
-          style={{
-            fontFamily: isThaiLearner ? "'Sarabun', sans-serif" : "'Quicksand', sans-serif",
-            fontSize: "16px", fontWeight: 500,
-            color: "#1A1A18", margin: "0 0 14px",
-          }}
-        >
-          {meaningWord}
-        </motion.p>
-
-        {/* Divider */}
-        <div style={{ height: "1px", background: "#E8E5DF", margin: "0 0 14px" }} />
-
-        {/* Miomi note */}
-        {(word.miomi_note_th || word.miomi_note_en) && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.20, delay: 0.64 }}
-            style={{ marginBottom: "14px" }}
-          >
-            {word.miomi_note_th && (
-              <p style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18", lineHeight: 1.5, margin: "0 0 4px" }}>
-                {word.miomi_note_th}
-              </p>
+        {hasExtras && (
+          <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${LINE}`, display: "flex", flexDirection: "column", gap: "8px" }}>
+            {hasNote && (
+              <div>
+                {word.miomi_note_th && (
+                  <p style={{ fontFamily: FONT_THAI, fontSize: "13px", fontWeight: 500, color: INK, lineHeight: 1.45, margin: 0 }}>{word.miomi_note_th}</p>
+                )}
+                {word.miomi_note_en && (
+                  <p style={{ fontFamily: FONT_LATIN, fontSize: "12px", color: MUTE, margin: "2px 0 0" }}>{word.miomi_note_en}</p>
+                )}
+              </div>
             )}
-            {word.miomi_note_en && (
-              <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "12px", fontStyle: "italic", color: "#9A8B73", margin: 0 }}>
-                {word.miomi_note_en}
-              </p>
+            {hasExample && (
+              <div>
+                {word.example_en && (
+                  <p style={{ fontFamily: FONT_LATIN, fontSize: "13px", fontStyle: "italic", color: INK, margin: 0 }}>&ldquo;{word.example_en}&rdquo;</p>
+                )}
+                {word.example_th && (
+                  <p style={{ fontFamily: FONT_THAI, fontSize: "13px", color: MUTE, margin: "2px 0 0" }}>&ldquo;{word.example_th}&rdquo;</p>
+                )}
+              </div>
             )}
-          </motion.div>
-        )}
-
-        {/* Divider */}
-        <div style={{ height: "1px", background: "#E8E5DF", margin: "0 0 14px" }} />
-
-        {/* Examples */}
-        {(word.example_en || word.example_th) && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.20, delay: 0.72 }}
-            style={{ marginBottom: "14px" }}
-          >
-            {word.example_en && (
-              <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", fontStyle: "italic", color: "#1A1A18", margin: "0 0 4px" }}>
-                &ldquo;{word.example_en}&rdquo;
-              </p>
+            {word.use_when && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                <Lightbulb style={{ width: "13px", height: "13px", color: GOLD, flexShrink: 0, marginTop: "2px" }} strokeWidth={1.75} />
+                <p style={{ fontFamily: uiFont, fontSize: "12px", color: MUTE, margin: 0 }}>{word.use_when}</p>
+              </div>
             )}
-            {word.example_th && (
-              <p style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "13px", fontStyle: "italic", color: "#9A8B73", margin: 0 }}>
-                &ldquo;{word.example_th}&rdquo;
-              </p>
+            {word.cultural_warning && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                <AlertCircle style={{ width: "13px", height: "13px", color: "#FF8A80", flexShrink: 0, marginTop: "2px" }} strokeWidth={1.75} />
+                <p style={{ fontFamily: uiFont, fontSize: "12px", color: INK, margin: 0 }}>{word.cultural_warning}</p>
+              </div>
             )}
-          </motion.div>
-        )}
-
-        {/* Use when */}
-        {word.use_when && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.20, delay: 0.72 }}
-            style={{ display: "flex", alignItems: "flex-start", gap: "6px", marginBottom: "10px" }}
-          >
-            <Lightbulb style={{ width: "14px", height: "14px", color: "#C9A96E", flexShrink: 0, marginTop: "2px" }} strokeWidth={1.75} />
-            <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", fontStyle: "italic", color: "#9A8B73", margin: 0 }}>
-              {word.use_when}
-            </p>
-          </motion.div>
-        )}
-
-        {/* Cultural warning */}
-        {word.cultural_warning && (
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "6px", marginBottom: "10px" }}>
-            <AlertCircle style={{ width: "14px", height: "14px", color: "#FF8A80", flexShrink: 0, marginTop: "2px" }} strokeWidth={1.75} />
-            <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#1A1A18", margin: 0 }}>
-              {word.cultural_warning}
-            </p>
+            {word.example_context && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setExpanded((v) => !v)}
+                  style={{ display: "flex", alignItems: "center", gap: "4px", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: uiFont, fontSize: "12px", fontWeight: 500, color: GOLD }}
+                >
+                  {expanded ? (
+                    <>
+                      <ChevronUp style={{ width: "14px", height: "14px" }} strokeWidth={2} />
+                      {isThaiLearner ? "ซ่อน" : "Less"}
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown style={{ width: "14px", height: "14px" }} strokeWidth={2} />
+                      {isThaiLearner ? "ตัวอย่างเพิ่ม" : "More"}
+                    </>
+                  )}
+                </button>
+                {expanded && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ fontFamily: uiFont, fontSize: "12px", color: MUTE, margin: "6px 0 0" }}
+                  >
+                    {word.example_context}
+                  </motion.p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Expand toggle */}
-        {word.example_context && (
-          <button
-            type="button"
-            onClick={() => setExpanded(v => !v)}
-            style={{
-              display: "flex", alignItems: "center", gap: "4px",
-              background: "none", border: "none", cursor: "pointer",
-              padding: "0 0 10px",
-              fontFamily: "'Kanit', sans-serif",
-              fontSize: "12px", fontWeight: 500, color: "#C9A96E",
-            }}
-          >
-            {expanded
-              ? <><ChevronUp style={{ width: "14px", height: "14px" }} />▼ ซ่อน</>
-              : <><ChevronDown style={{ width: "14px", height: "14px" }} />▶ ตัวอย่างเพิ่ม</>
-            }
-          </button>
-        )}
-
-        {expanded && word.example_context && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            transition={{ duration: 0.24 }}
-            style={{ marginBottom: "10px" }}
-          >
-            <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#9A8B73", margin: 0 }}>
-              {word.example_context}
-            </p>
-          </motion.div>
-        )}
-
-        {saveState && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.20, delay: 0.76 }}
-            style={{ marginBottom: onPronunciationCheck ? "10px" : 0 }}
-          >
-            {saveState === "saved" ? (
-              <div
-                style={{
-                  width: "100%",
-                  height: "44px",
-                  borderRadius: "12px",
-                  background: "rgba(201,169,110,0.08)",
-                  border: "1px solid rgba(201,169,110,0.35)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                }}
-              >
-                <BookmarkCheck style={{ width: "16px", height: "16px", color: "#C9A96E" }} strokeWidth={2} />
-                <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#C9A96E" }}>
-                  {isThaiLearner ? "บันทึกแล้วค่า~" : "Saved~"}
-                </span>
-              </div>
-            ) : (
-              <motion.button
-                type="button"
-                onClick={onSaveTap}
-                whileTap={{ scale: 0.98 }}
-                style={{
-                  width: "100%",
-                  height: "44px",
-                  borderRadius: "12px",
-                  background: "#FFFFFF",
-                  border: "1.5px solid #C9A96E",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                }}
-              >
-                <BookmarkCheck style={{ width: "16px", height: "16px", color: "#C9A96E" }} strokeWidth={2} />
-                <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#C9A96E" }}>
-                  {isThaiLearner ? "สมัครเพื่อบันทึกคำศัพท์" : "Sign up to save your words"}
-                </span>
+        {(saveState || onPronunciationCheck) && (
+          <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            {saveState &&
+              (saveState === "saved" ? (
+                <div style={{ width: "100%", height: "42px", borderRadius: "11px", background: "rgba(201,169,110,0.08)", border: "1px solid rgba(201,169,110,0.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                  <BookmarkCheck style={{ width: "16px", height: "16px", color: GOLD }} strokeWidth={2} />
+                  <span style={{ fontFamily: uiFont, fontSize: "14px", fontWeight: 500, color: GOLD }}>{isThaiLearner ? "บันทึกแล้วค่า~" : "Saved~"}</span>
+                </div>
+              ) : (
+                <motion.button type="button" onClick={onSaveTap} whileTap={{ scale: 0.98 }} style={{ width: "100%", height: "42px", borderRadius: "11px", background: "#FFFFFF", border: `1.5px solid ${GOLD}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                  <BookmarkCheck style={{ width: "16px", height: "16px", color: GOLD }} strokeWidth={2} />
+                  <span style={{ fontFamily: uiFont, fontSize: "14px", fontWeight: 500, color: GOLD }}>{isThaiLearner ? "สมัครเพื่อบันทึกคำศัพท์" : "Sign up to save your words"}</span>
+                </motion.button>
+              ))}
+            {onPronunciationCheck && (
+              <motion.button type="button" onClick={() => onPronunciationCheck(word)} whileTap={{ scale: 0.98 }} style={{ width: "100%", height: "42px", borderRadius: "11px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                <Mic style={{ width: "16px", height: "16px", color: "#FFFFFF" }} strokeWidth={2} />
+                <span style={{ fontFamily: uiFont, fontSize: "14px", fontWeight: 500, color: "#FFFFFF" }}>{isThaiLearner ? "ลองพูดดูค่า~" : "Try saying this~"}</span>
               </motion.button>
             )}
-          </motion.div>
+          </div>
         )}
-
-        {/* Pronunciation check button */}
-        {onPronunciationCheck && (
-          <motion.button
-            type="button"
-            onClick={() => onPronunciationCheck(word)}
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.20, delay: 0.80 }}
-            style={{
-              width: "100%", height: "44px",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
-              border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center",
-              justifyContent: "center", gap: "8px",
-            }}
-          >
-            <Mic style={{ width: "16px", height: "16px", color: "#FFFFFF" }} strokeWidth={2} />
-            <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#FFFFFF" }}>
-              {isThaiLearner ? "ลองพูดดูค่า~" : "Try saying this~"}
-            </span>
-          </motion.button>
-        )}
-      </motion.div>
+      </div>
     </motion.div>
   );
 }
