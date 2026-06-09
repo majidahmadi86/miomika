@@ -1246,6 +1246,18 @@ export default function TalkPage() {
         dispatchTurn({ type: "orb_mic_start" });
         return;
       }
+      const interruptState = runtime.state;
+      if (
+        interruptState.handoffArmed ||
+        interruptState.invitationPending ||
+        interruptState.phase === "handoff" ||
+        interruptState.phase === "voiced_reply" ||
+        interruptState.phase === "invitation"
+      ) {
+        return;
+      }
+      mediaRef.current?.stopAudioPlayback();
+      dispatchTurn({ type: "interrupted" });
       return;
     }
     void (async () => {
@@ -1299,6 +1311,7 @@ export default function TalkPage() {
         clientRef.current?.sendText(trimmed);
       })();
     } else {
+      mediaRef.current?.stopAudioPlayback();
       clientRef.current?.sendText(trimmed);
     }
   }, [
