@@ -1529,7 +1529,6 @@ export default function TalkPage() {
             overflowY: "auto",
             padding: "8px 14px 0",
             paddingRight: "52px",
-            paddingBottom: "184px",
           }}
         >
           <div
@@ -1584,7 +1583,6 @@ export default function TalkPage() {
         </div>
       </div>
 
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 5, display: "flex", flexDirection: "column" }}>
       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
         {!audioUnlocked && items.length <= 1 && (
           <p
@@ -1656,7 +1654,6 @@ export default function TalkPage() {
             </button>
           )}
         </div>
-      </div>
       </div>
 
       {items.length > 1 && (
