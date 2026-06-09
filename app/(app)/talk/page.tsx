@@ -468,6 +468,7 @@ export default function TalkPage() {
           },
           onStopMic: stopContinuousMic,
           getLessonNudgeHints,
+          getMode: () => loadTalkConfig().mode,
         },
         guestExchangesRef.current,
         isGuestRef.current,
@@ -818,7 +819,7 @@ export default function TalkPage() {
       try {
         const uiLanguage = sessionUiLangRef.current;
         const targetLanguage = sessionTargetLangRef.current;
-        await client.connect({ uiLanguage, targetLanguage, resume: true });
+        await client.connect({ uiLanguage, targetLanguage, resume: true, mode: config.mode });
         memberContextRef.current = client.getMemberContext();
         syncTeachWordContext();
         lessonHadStartedRef.current = true;
@@ -866,6 +867,7 @@ export default function TalkPage() {
       syncTeachWordContext,
       dispatchTurn,
       stopContinuousMic,
+      config.mode,
     ],
   );
 
@@ -974,7 +976,7 @@ export default function TalkPage() {
       setConversationLang(uiLanguage);
       setUiLang(uiLanguage);
 
-      await clientRef.current!.connect({ uiLanguage, targetLanguage, resume: false });
+      await clientRef.current!.connect({ uiLanguage, targetLanguage, resume: false, mode: config.mode });
       memberContextRef.current = clientRef.current!.getMemberContext();
       syncTeachWordContext();
       lessonHadStartedRef.current = true;
@@ -1005,6 +1007,7 @@ export default function TalkPage() {
     teardownSessionIntentional,
     profile,
     config.teach.learning,
+    config.mode,
     syncTeachWordContext,
   ]);
 

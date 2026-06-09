@@ -262,6 +262,18 @@ assert(
     !connectInstruction.includes("becomes UI_LANGUAGE"),
   "connect instruction removed per-utterance UI mirroring",
 );
+const chatInstruction = buildSystemInstruction("en", "th", null, "chat");
+assert(
+  !chatInstruction.includes("TEACHING MODE v1") &&
+    !chatInstruction.includes("YOU CHOOSE WHAT TO TEACH") &&
+    !chatInstruction.includes("get_word_to_review"),
+  "chat-mode instruction carries NO teaching contract",
+);
+assert(
+  chatInstruction.includes("you have no teaching tools here") &&
+    chatInstruction.includes("Converse naturally and warmly"),
+  "chat-mode instruction is the warm companion persona",
+);
 
 assert(
   resolveProfileUiAnchor({
@@ -989,6 +1001,16 @@ assert(
   liveConfigSrc.includes("COMPANION FIRST") &&
     liveConfigSrc.includes('NEVER "repeat after me"'),
   "persona core is companion-first and forbids repeat-after-me drills",
+);
+assert(
+  liveConfigSrc.includes('mode === "teach"') &&
+    liveConfigSrc.includes("tools: isTeach"),
+  "live config gates teaching tools to teach mode",
+);
+assert(
+  liveConfigSrc.includes("PERSONA_CHAT") &&
+    liveConfigSrc.includes("you have no teaching tools here"),
+  "chat persona exists and is tool-free",
 );
 assert(
   buildTeachingModeContract("en", "th").includes("weave") &&

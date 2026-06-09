@@ -9,6 +9,7 @@ import {
   buildResumePrompt,
 } from "@/lib/live/live-config";
 import { type MemberContextBundle } from "@/lib/live/member-context";
+import type { TalkMode } from "@/lib/talk/modes";
 import { logEvent } from "@/lib/debug/event-bus";
 import { createLiveClientEpoch } from "@/lib/live/session-continuity";
 
@@ -156,11 +157,13 @@ export class MiomiLiveClient {
     uiLanguage: "th" | "en";
     targetLanguage: "th" | "en";
     resume?: boolean;
+    mode?: TalkMode;
   }): Promise<void> {
     const voice = opts.voice ?? LIVE_VOICE;
     const uiLanguage = opts.uiLanguage ?? "en";
     const targetLanguage = opts.targetLanguage ?? "th";
     const resume = opts.resume ?? false;
+    const mode = opts.mode ?? "teach";
 
     if (resume) {
       this.teachWordContext = {
@@ -211,7 +214,7 @@ export class MiomiLiveClient {
 
     this.session = (await ai.live.connect({
       model: LIVE_MODEL,
-      config: buildLiveConfig(voice, uiLanguage, targetLanguage, this.memberContext),
+      config: buildLiveConfig(voice, uiLanguage, targetLanguage, this.memberContext, mode),
       callbacks: {
         onopen: () => {
           this.connected = true;

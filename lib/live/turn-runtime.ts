@@ -15,6 +15,7 @@ import {
   type TurnEvent,
   type TurnSideEffect,
 } from "@/lib/live/turn-controller";
+import type { TalkMode } from "@/lib/talk/modes";
 
 export type TurnRuntimeCallbacks = {
   onLiveUi: (ui: LiveUiPhase) => void;
@@ -38,6 +39,7 @@ export type TurnRuntimeDeps = TurnRuntimeCallbacks & {
     TurnContext,
     "nextPlannedWord" | "lessonTopic" | "lessonComplete"
   >;
+  getMode?: () => TalkMode;
   isGuest: () => boolean;
 };
 
@@ -61,6 +63,7 @@ export class TurnRuntime {
     return {
       uiLang: this.deps.getUiLang(),
       isGuest: this.deps.isGuest(),
+      mode: this.deps.getMode?.() ?? "teach",
       ...lessonHints,
     };
   }

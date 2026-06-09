@@ -11,6 +11,7 @@ import {
   createTeachingModeState,
   type TeachingModeState,
 } from "@/lib/talk/teaching-mode";
+import type { TalkMode } from "@/lib/talk/modes";
 
 /** Explicit phases — guest tail is a sub-chain, not parallel timers. */
 export type TurnPhase =
@@ -284,11 +285,13 @@ function finishNormalTurn(
     currentTurnStart: null,
   };
   next = markTiming(next, "turn_complete", effects);
-  next = maybeSendPhaseNudge(next, uiLang, isGuest, effects, {
-    nextPlannedWord: ctx.nextPlannedWord,
-    lessonTopic: ctx.lessonTopic,
-    lessonComplete: ctx.lessonComplete,
-  });
+  if ((ctx.mode ?? "teach") === "teach") {
+    next = maybeSendPhaseNudge(next, uiLang, isGuest, effects, {
+      nextPlannedWord: ctx.nextPlannedWord,
+      lessonTopic: ctx.lessonTopic,
+      lessonComplete: ctx.lessonComplete,
+    });
+  }
   effects.push({ type: "reset_transcript_ids" });
   effects.push({ type: "clear_user_exchange_counted" });
   next = clearExchangeCounted(next);
@@ -299,6 +302,7 @@ function finishNormalTurn(
 export type TurnContext = {
   uiLang: "th" | "en";
   isGuest: boolean;
+  mode?: TalkMode;
   nextPlannedWord?: string | null;
   lessonTopic?: string | null;
   lessonComplete?: boolean;

@@ -48,7 +48,7 @@ export interface TalkConfig {
 }
 
 export const DEFAULT_TALK_CONFIG: TalkConfig = {
-  mode: "auto",
+  mode: "chat",
   tone: "warm",
   depth: 60,
   memory: { progress: true, personal: true, topics: false },
