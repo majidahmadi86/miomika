@@ -1525,6 +1525,7 @@ export default function TalkPage() {
           style={{
             flex: 1,
             minHeight: 0,
+            height: "100%",
             overflowY: "auto",
             padding: "8px 14px 0",
             paddingRight: "52px",
