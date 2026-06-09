@@ -1531,6 +1531,7 @@ export default function TalkPage() {
             flexDirection: "column-reverse",
             padding: "8px 14px 0",
             paddingRight: "52px",
+            paddingBottom: "150px",
           }}
         >
           <div
@@ -1583,7 +1584,7 @@ export default function TalkPage() {
         </div>
       </div>
 
-      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: "72px", zIndex: 6, display: "flex", flexDirection: "column", alignItems: "center", pointerEvents: "none" }}>
         {!audioUnlocked && items.length <= 1 && (
           <p
             style={{
@@ -1598,6 +1599,7 @@ export default function TalkPage() {
             {uiLang === "th" ? "แตะที่ไหนก็ได้เพื่อเริ่มค่า~" : "tap anywhere to begin~"}
           </p>
         )}
+        <div style={{ pointerEvents: "auto" }}>
         <MicRow
           current={config.mode}
           orbState={orbState}
@@ -1620,6 +1622,7 @@ export default function TalkPage() {
                   : uiLang === "en" ? "Tap to talk with Miomi" : "แตะเพื่อพูดกับหนู"
           }
         />
+        </div>
         {stateLabel ? (
           <p
             style={{
