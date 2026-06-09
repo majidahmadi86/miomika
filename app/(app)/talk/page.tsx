@@ -1433,7 +1433,7 @@ export default function TalkPage() {
         maxHeight: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "linear-gradient(180deg, #FEFCF7 0%, #FDFAF2 100%)",
+        background: "#FEFCF7",
         width: "100%",
         overflow: "hidden",
       }}
