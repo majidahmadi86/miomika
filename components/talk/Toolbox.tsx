@@ -2,16 +2,14 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Type, Keyboard } from "lucide-react";
+import { Type } from "lucide-react";
 
 export type ResponseLength = "short" | "normal" | "detailed";
 
 interface ToolboxProps {
   length: ResponseLength;
-  keyboardMode: boolean;
   uiLang: "th" | "en";
   onCycleLength: () => void;
-  onToggleKeyboard: () => void;
 }
 
 const iconVariants = {
@@ -21,10 +19,8 @@ const iconVariants = {
 
 export function Toolbox({
   length,
-  keyboardMode,
   uiLang,
   onCycleLength,
-  onToggleKeyboard,
 }: ToolboxProps) {
   const [lastPressedId, setLastPressedId] = useState<string | null>(null);
 
@@ -48,15 +44,6 @@ export function Toolbox({
         pointerEvents: "auto",
       }}
     >
-      <ToolBtn
-        id="keyboard"
-        Icon={Keyboard}
-        active={keyboardMode}
-        isPressed={lastPressedId === "keyboard"}
-        label=""
-        title={uiLang === "en" ? "Keyboard" : "แป้นพิมพ์"}
-        onClick={() => { markPressed("keyboard"); onToggleKeyboard(); }}
-      />
       <ToolBtn
         id="length"
         Icon={Type}

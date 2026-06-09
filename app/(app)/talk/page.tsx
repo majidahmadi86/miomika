@@ -129,7 +129,6 @@ export default function TalkPage() {
   const [uiLang, setUiLang] = useState<"th" | "en">("th");
   const [items, setItems] = useState<CanvasItem[]>([]);
   const [textInput, setTextInput] = useState("");
-  const [keyboardMode, setKeyboardMode] = useState(false);
   const [respLength, setRespLength] = useState<ResponseLength>("normal");
   const [conversationLang, setConversationLang] = useState<"th" | "en">("th");
   const [showGuestSheet, setShowGuestSheet] = useState(false);
@@ -1505,10 +1504,8 @@ export default function TalkPage() {
       <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <Toolbox
           length={respLength}
-          keyboardMode={keyboardMode}
           uiLang={uiLang}
           onCycleLength={() => setRespLength((p) => (p === "short" ? "normal" : p === "normal" ? "detailed" : "short"))}
-          onToggleKeyboard={() => setKeyboardMode((p) => !p)}
         />
         <div
           ref={canvasRef}
@@ -1572,30 +1569,6 @@ export default function TalkPage() {
         </div>
       </div>
 
-      {keyboardMode && (
-        <div style={{ flexShrink: 0, padding: "6px 12px 4px", background: "transparent" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#FFFFFF", border: "0.5px solid #EDE8E0", borderRadius: "26px", padding: "5px 5px 5px 16px", boxShadow: "0 2px 10px rgba(26,26,24,0.04)" }}>
-            <input
-              type="text"
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && textInput.trim()) handleSendText();
-              }}
-              placeholder={uiLang === "en" ? "Message Miomi~" : "พิมพ์ถึงหนู~"}
-              style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "'Kanit', sans-serif", fontSize: "13.5px", color: "#1A1A18", padding: "8px 0" }}
-            />
-            {textInput.trim() && (
-              <button type="button" onClick={handleSendText} aria-label="Send" style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
         {!audioUnlocked && items.length <= 1 && (
           <p
@@ -1646,6 +1619,27 @@ export default function TalkPage() {
             {stateLabel}
           </p>
         ) : null}
+      </div>
+      <div style={{ flexShrink: 0, padding: "4px 12px 8px", background: "transparent" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#FFFFFF", border: "0.5px solid #EDE8E0", borderRadius: "26px", padding: "5px 5px 5px 16px", boxShadow: "0 2px 10px rgba(26,26,24,0.04)" }}>
+          <input
+            type="text"
+            value={textInput}
+            onChange={(e) => setTextInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && textInput.trim()) handleSendText();
+            }}
+            placeholder={uiLang === "en" ? "Message Miomi~" : "พิมพ์ถึงหนู~"}
+            style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "'Kanit', sans-serif", fontSize: "13.5px", color: "#1A1A18", padding: "8px 0" }}
+          />
+          {textInput.trim() && (
+            <button type="button" onClick={handleSendText} aria-label="Send" style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {items.length > 1 && (
