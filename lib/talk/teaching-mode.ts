@@ -28,7 +28,7 @@ export function buildLearnerLevelBlock(level: CefrLevel, targetName: string): st
 }
 
 /** English-only, appended to both contract branches — Gemini reads it regardless of UI language. */
-const SENTENCE_TEACHING_RULE = `FULL-SENTENCE REQUESTS: when they ask how to say a whole sentence or expression ("how do I say…", "what's … in Thai / in English"), give the COMPLETE natural rendering of THEIR sentence in the target language and say it aloud, slowly, once — never shrink their sentence to a single different word. Then call get_word_to_teach with the most useful word or short phrase INSIDE that sentence so its card appears, and connect the card back to the full sentence they wanted to say.`;
+const SENTENCE_TEACHING_RULE = `FULL-SENTENCE REQUESTS: when they ask how to say a whole sentence or expression ("how do I say…", "what's … in Thai / in English"), give the COMPLETE natural rendering of THEIR sentence in the target language and say it aloud, slowly, once — never shrink their sentence to a single different word. Then call get_word_to_teach with the most useful word or short phrase INSIDE that sentence so its card appears, and connect the card back to the full sentence they wanted to say. Do this on their FIRST ask — never answer a sentence request with just one word from it and wait to be corrected.`;
 
 const EXPLICIT_NEW_WORD_RE =
   /(?:new\s+word|another\s+word|next\s+word|teach\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?word|give\s+me\s+(?:a\s+)?(?:new\s+)?word|learn\s+(?:a\s+)?new\s+word|คำใหม่|สอนคำใหม่|เรียนคำใหม่|เอาคำใหม่|ขอคำใหม่)/i;

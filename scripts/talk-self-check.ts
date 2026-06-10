@@ -1670,6 +1670,14 @@ assert(
   "guest sheet opens together with the CTA voice",
 );
 assert(
+  buildSystemInstruction("en", "th", null, "chat").includes("switch to Teach mode"),
+  "chat persona routes card requests to Teach mode instead of a dead end",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("Do this on their FIRST ask"),
+  "sentence rule applies on the first ask, not after correction",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",
