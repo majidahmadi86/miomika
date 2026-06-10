@@ -1641,6 +1641,11 @@ assert(
   "sentence rule forbids flattening the user's sentence to a single word",
 );
 assert(
+  buildTeachingModeContract("en", "th").includes("USER OVERRIDE") &&
+    buildTeachingModeContract("en", "th").includes("build a foundation first"),
+  "level block lets the user override difficulty — no foundation gatekeeping",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",

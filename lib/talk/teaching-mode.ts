@@ -23,7 +23,8 @@ const LEVEL_GUIDANCE: Record<CefrLevel, string> = {
 export function buildLearnerLevelBlock(level: CefrLevel, targetName: string): string {
   return `LEARNER LEVEL: ${level} (CEFR) in ${targetName} — calibrate every word choice, example sentence and question to this level: one small step beyond it, never far above or below.
 - ${LEVEL_GUIDANCE[level]}
-- If what they actually say clearly shows a different level, adapt to the level they actually show — meet the real person, not the setting.`;
+- If what they actually say clearly shows a different level, adapt to the level they actually show — meet the real person, not the setting.
+- USER OVERRIDE: if they ask for harder, more advanced, or easier content, give it on the very NEXT word — pick from a clearly higher (or lower) CEFR band immediately and stay there for the rest of the session. NEVER refuse, NEVER tell them they must build a foundation first, and NEVER re-serve a basic word they just rejected.`;
 }
 
 /** English-only, appended to both contract branches — Gemini reads it regardless of UI language. */
