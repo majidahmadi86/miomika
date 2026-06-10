@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
@@ -106,6 +106,7 @@ export default function LessonsPage() {
   const [planTarget, setPlanTarget] = useState<string>("auto");
   const [generating, setGenerating] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
+  const planRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -167,7 +168,7 @@ export default function LessonsPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h1 style={{ ...font, fontSize: 23, fontWeight: 700, color: INK_STRONG, margin: 0 }}>Lessons</h1>
           {authReady && !isGuest ? (
-            <button onClick={() => setAskOpen(true)} style={{
+            <button onClick={() => { setAskOpen(true); setTimeout(() => planRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60); }} style={{
               ...font, fontSize: 12.5, fontWeight: 700, padding: "9px 16px", borderRadius: 99,
               border: "none", cursor: "pointer", background: CTA, color: "#fff", boxShadow: CTA_SHADOW,
             }}>+ Plan a lesson</button>
@@ -279,7 +280,7 @@ export default function LessonsPage() {
               );
             })}
 
-            <div style={{
+            <div ref={planRef} style={{
               border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: 16, textAlign: "center",
               background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)", marginTop: lessons.length ? 6 : 0,
             }}>

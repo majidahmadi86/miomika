@@ -1782,6 +1782,19 @@ assert(
   "games auto-advance and checkpoint options have identity badges",
 );
 assert(
+  lessonBuilderSrc.includes("buildExtraWords") && lessonBuilderSrc.includes("ALREADY KNOWS"),
+  "generation avoids known words and lessons can extend",
+);
+const extendRouteSrc = readFileSync(join(ROOT, "app/api/lessons/[id]/extend/route.ts"), "utf8");
+assert(
+  extendRouteSrc.includes("buildExtraWords") && extendRouteSrc.includes('.eq("user_id", profile.id)'),
+  "extend endpoint enforces ownership and uses the verified pipeline",
+);
+assert(
+  lessonsPageSrc.includes("scrollIntoView"),
+  "pinned plan button opens and reveals the plan panel",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",

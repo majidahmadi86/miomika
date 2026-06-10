@@ -103,11 +103,29 @@ export async function POST(req: NextRequest) {
     );
     const dbLevel = await loadCefrLevel(profile.id);
     const level = levelAsk ?? levelFromCookie(req) ?? dbLevel ?? "A1";
+    let knownWords: string[] = [];
+    try {
+      const supabase = await createServiceClient();
+      const { data: prior } = await supabase
+        .from("lessons")
+        .select("content")
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(12);
+      for (const row of prior ?? []) {
+        const ws = (row.content as { words?: Array<{ word_en?: string }> })?.words ?? [];
+        for (const w of ws) if (w?.word_en) knownWords.push(w.word_en);
+      }
+      knownWords = [...new Set(knownWords)];
+    } catch {
+      knownWords = [];
+    }
     const result = await buildLesson({
       userId: profile.id,
       topicAsk,
       cefrLevel: level,
       learningTarget: targetAsk ?? learningTarget,
+      knownWords,
     });
     return NextResponse.json(result, { status: 200 });
   } catch (err) {

@@ -155,6 +155,16 @@ export default function LessonPlayerPage() {
     }).catch(() => {});
   }, [id]);
 
+  const extend = useCallback(async (): Promise<number> => {
+    if (!id) return 0;
+    try {
+      const r = await fetch(`/api/lessons/${id}/extend`, { method: "POST" });
+      const j = (await r.json()) as { ok?: boolean; added?: number };
+      if (j.ok && (j.added ?? 0) > 0) { await load(); return j.added ?? 0; }
+      return 0;
+    } catch { return 0; }
+  }, [id, load]);
+
   const go = useCallback((n: number) => {
     setStep(n);
     setMaxVisited((m) => {
@@ -245,7 +255,7 @@ export default function LessonPlayerPage() {
         ) : <span style={{ display: "block", height: 12 }} />}
 
         {step === 0 ? <IntroStep lesson={lesson} review={lesson.status === "completed"} onNext={() => go(1)} /> : null}
-        {step === 1 ? <WordsStep words={words} target={target} soft={tcol.soft} say={say} onNext={() => go(2)} /> : null}
+        {step === 1 ? <WordsStep words={words} target={target} soft={tcol.soft} say={say} onExtend={extend} onNext={() => go(2)} /> : null}
         {step === 2 ? <PhrasesStep phrases={phrases} target={target} say={say} onNext={() => go(3)} /> : null}
         {step === 3 ? (
           <GamesStep
@@ -338,8 +348,9 @@ function IntroStep({ lesson, review, onNext }: { lesson: Lesson; review: boolean
   );
 }
 
-function WordsStep({ words, target, soft, say, onNext }: { words: WordItem[]; target: string; soft: string; say: (t: string) => void; onNext: () => void }) {
+function WordsStep({ words, target, soft, say, onExtend, onNext }: { words: WordItem[]; target: string; soft: string; say: (t: string) => void; onExtend: () => Promise<number>; onNext: () => void }) {
   const [open, setOpen] = useState<number | null>(null);
+  const [extState, setExtState] = useState<"idle" | "busy" | "done" | "none">("idle");
   return (
     <div>
       <h3 style={{ ...font, fontSize: 19, fontWeight: 700, color: INK_STRONG, margin: "0 0 4px" }}>{words.length} words to know</h3>
@@ -395,6 +406,21 @@ function WordsStep({ words, target, soft, say, onNext }: { words: WordItem[]; ta
           ) : null}
         </div>
       ))}
+      {extState !== "done" ? (
+        <button
+          onClick={async () => {
+            if (extState === "busy") return;
+            setExtState("busy");
+            const added = await onExtend().catch(() => 0);
+            setExtState(added > 0 ? "done" : "none");
+          }}
+          style={{ ...font, width: "100%", fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1.5px dashed #CBE5D9", borderRadius: 14, background: "#EBFBF4", color: "#3E7A66", padding: 12, margin: "4px 0 14px" }}
+        >
+          {extState === "busy" ? "Miomi is choosing more — every word gets checked…" : extState === "none" ? "Miomi could not verify more right now — try again later" : "Need more? Miomi adds words for this topic"}
+        </button>
+      ) : (
+        <p style={{ ...font, fontSize: 12, fontWeight: 700, color: "#3E7A66", textAlign: "center", margin: "4px 0 14px" }}>Added — chosen for this topic, verified before shown.</p>
+      )}
       <PrimaryBtn label="Got them — phrases next" onClick={onNext} />
     </div>
   );

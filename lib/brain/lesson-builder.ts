@@ -56,8 +56,11 @@ type LessonPlan = {
   candos?: Array<{ label?: string; skill?: string }>;
 };
 
-function buildPlanSystem(level: string, targetName: string): string {
-  return `You are a CEFR-expert lesson planner for learners of ${targetName} at level ${level}. Reply STRICT JSON ONLY — no prose, no markdown fences — with keys: title_en (short inviting lesson title, e.g. "Ordering food"), topic (ONE lowercase English word, e.g. food, travel, social, shopping, work, feelings, general), words (EXACTLY 5 strings — each the plain ENGLISH MEANING of one useful ${targetName} word for this situation at ${level}; single concepts, no romanization, no duplicates), phrases (EXACTLY 5 strings — each the plain ENGLISH MEANING of one complete, short, polite, practical sentence the learner will actually say in this situation at ${level}), candos (EXACTLY 3 objects {"label": a CEFR-style can-do statement starting with "Can", "skill": one of "spoken interaction", "spoken production", "listening"}). The words and phrases together must genuinely cover the situation end to end — the lesson must deliver its promise. JSON only.`;
+function buildPlanSystem(level: string, targetName: string, avoid: string[]): string {
+  const avoidBlock = avoid.length
+    ? ` The learner ALREADY KNOWS these words — do NOT reuse any of them; choose the NEXT most useful ones and make this lesson one step deeper. Give the title a distinct angle (a sub-situation, or a "II"): ${avoid.join(", ")}.`
+    : "";
+  return `You are a CEFR-expert lesson planner for learners of ${targetName} at level ${level}. Reply STRICT JSON ONLY — no prose, no markdown fences — with keys: title_en (short inviting lesson title, e.g. "Ordering food"), topic (ONE lowercase English word, e.g. food, travel, social, shopping, work, feelings, general), words (EXACTLY 5 strings — each the plain ENGLISH MEANING of one useful ${targetName} word for this situation at ${level}; single concepts, no romanization, no duplicates), phrases (EXACTLY 5 strings — each the plain ENGLISH MEANING of one complete, short, polite, practical sentence the learner will actually say in this situation at ${level}), candos (EXACTLY 3 objects {"label": a CEFR-style can-do statement starting with "Can", "skill": one of "spoken interaction", "spoken production", "listening"}). The words and phrases together must genuinely cover the situation end to end — the lesson must deliver its promise.${avoidBlock} JSON only.`;
 }
 
 function buildPhraseSystem(level: string): string {
@@ -73,8 +76,8 @@ function parseJson<T>(raw: string | null): T | null {
   }
 }
 
-async function callPlan(level: string, targetName: string, topicAsk: string | null): Promise<LessonPlan | null> {
-  const system = buildPlanSystem(level, targetName);
+async function callPlan(level: string, targetName: string, topicAsk: string | null, avoid: string[]): Promise<LessonPlan | null> {
+  const system = buildPlanSystem(level, targetName, avoid);
   const user = topicAsk
     ? `Plan the lesson about: ${topicAsk}`
     : "Choose the most useful next everyday topic and plan the lesson.";
@@ -188,11 +191,36 @@ async function buildPhraseItem(
   return null; // withhold over lie
 }
 
+export async function buildExtraWords(args: {
+  topic: string;
+  cefrLevel: string;
+  learningTarget: "th" | "en";
+  exclude: string[];
+  count?: number;
+}): Promise<LessonWordItem[]> {
+  const n = Math.min(Math.max(args.count ?? 3, 1), 4);
+  const level = args.cefrLevel.trim() || "A1";
+  const targetName = args.learningTarget === "en" ? "English" : "Thai";
+  const avoid = args.exclude.slice(0, 60).join(", ");
+  const system = `You are a CEFR-expert vocabulary planner for learners of ${targetName} at level ${level}. Reply STRICT JSON ONLY — no prose, no markdown fences — {"words": array of EXACTLY ${n} strings, each the plain ENGLISH MEANING of one more useful ${targetName} word for the situation "${args.topic}" at ${level}; single concepts, no romanization, no duplicates${avoid ? `; the learner ALREADY KNOWS and you must NOT reuse: ${avoid}` : ""}}. JSON only.`;
+  const user = "Choose the next most useful words.";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = attempt === 0 ? await callGroqJson(system, user) : await callGeminiJson(system, user);
+    const parsed = parseJson<{ words?: string[] }>(raw);
+    const meanings = (parsed?.words ?? []).map((w) => String(w).trim()).filter(Boolean).slice(0, n);
+    if (!meanings.length) continue;
+    const items = await mapChunked(meanings, 3, (m) => buildWordItem(m, args.learningTarget, level));
+    if (items.length) return items;
+  }
+  return []; // withhold over lie
+}
+
 export type BuildLessonArgs = {
   userId: string;
   topicAsk?: string | null;
   cefrLevel: string;
   learningTarget: "th" | "en";
+  knownWords?: string[];
 };
 
 export type BuildLessonResult =
@@ -202,7 +230,7 @@ export type BuildLessonResult =
 export async function buildLesson(args: BuildLessonArgs): Promise<BuildLessonResult> {
   const level = args.cefrLevel.trim() || "A1";
   const targetName = args.learningTarget === "en" ? "English" : "Thai";
-  const plan = await callPlan(level, targetName, args.topicAsk?.trim() || null);
+  const plan = await callPlan(level, targetName, args.topicAsk?.trim() || null, (args.knownWords ?? []).slice(0, 60));
   if (!plan) return { ok: false, reason: "plan_failed" };
 
   const wordMeanings = (plan.words ?? []).map((w) => String(w).trim()).filter(Boolean).slice(0, 5);
