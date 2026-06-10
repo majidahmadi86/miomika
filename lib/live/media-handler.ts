@@ -322,7 +322,34 @@ export class MediaHandler {
    * invitation sendSpeakExact cannot interrupt voiced handoff audio.
    */
   waitForHandoffReplyDrain(maxWaitForStartMs = 2500, settleMs = 120): Promise<void> {
-    return this.waitForTurnAudioThenIdle(maxWaitForStartMs)
+    const start = Date.now();
+    let idleSince: number | null = null;
+    const waitSmart = new Promise<void>((resolve) => {
+      const poll = () => {
+        if (this.isPlaybackActive()) {
+          idleSince = null;
+          void this.waitForPlaybackIdle().then(resolve);
+          return;
+        }
+        // Turn audio already played AND drained (modelTurnActive only goes true on a
+        // played pcm chunk) — resolve after a short idle confirm instead of burning
+        // the full wait-for-start timeout. Fixes the ~2.5s late guest CTA.
+        if (this.modelTurnActive) {
+          if (idleSince === null) idleSince = Date.now();
+          if (Date.now() - idleSince >= 250) {
+            resolve();
+            return;
+          }
+        }
+        if (Date.now() - start >= maxWaitForStartMs) {
+          resolve();
+          return;
+        }
+        requestAnimationFrame(poll);
+      };
+      poll();
+    });
+    return waitSmart
       .then(
         () =>
           new Promise<void>((resolve) => {

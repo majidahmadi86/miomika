@@ -1659,6 +1659,16 @@ assert(
   modesSrc.includes("miomika.teach_level"),
   "saveTalkConfig persists the level cookie for the server brain",
 );
+const mediaSrc = readFileSync(join(ROOT, "lib/live/media-handler.ts"), "utf8");
+assert(
+  mediaSrc.includes("already played AND drained"),
+  "handoff drain short-circuits when turn audio already finished (fast CTA)",
+);
+const turnControllerSheetSrc = readFileSync(join(ROOT, "lib/live/turn-controller.ts"), "utf8");
+assert(
+  turnControllerSheetSrc.includes("Open the signup sheet WITH the CTA voice"),
+  "guest sheet opens together with the CTA voice",
+);
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),

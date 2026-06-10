@@ -489,6 +489,8 @@ export function reduceTurn(
       if (event.context === "handoff" && next.phase === "invitation") {
         const lang = uiLang;
         effects.push({ type: "send_speak_exact", text: GUEST_INVITATION_CUE[lang] });
+        // Open the signup sheet WITH the CTA voice (was: only after CTA audio drained).
+        effects.push({ type: "open_guest_sheet", reason: "talk" });
         next = {
           ...next,
           invitationPending: true,
@@ -504,7 +506,7 @@ export function reduceTurn(
           invitationVoiceSent: false,
         };
         effects.push({ type: "teardown_session" });
-        effects.push({ type: "open_guest_sheet", reason: "talk" });
+        // Sheet already opened with the CTA voice (invitation_sent branch) — open exactly once.
         next = markTiming(next, "sheet_open", effects);
       }
       break;
