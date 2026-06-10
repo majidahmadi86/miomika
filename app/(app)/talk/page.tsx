@@ -871,6 +871,61 @@ export default function TalkPage() {
     ],
   );
 
+  /** Mid-session mode flick: snapshot → soft reconnect with the new brain. */
+  const switchLiveMode = useCallback(
+    async (nextMode: TalkConfig["mode"]) => {
+      const runtime = turnRuntimeRef.current;
+      if (!runtime || !runtime.state.sessionActive) return;
+      if (!clientRef.current || reconnectInFlightRef.current) return;
+      reconnectInFlightRef.current = true;
+      const wasListening = runtime.state.phase === "listening";
+      setLiveUiState("connecting");
+      const snapshot = clientRef.current.getSessionSnapshot();
+      try {
+        mediaRef.current?.stopAudioPlayback();
+        clientRef.current.disconnectIntentionally();
+        clientRef.current = null;
+        liveClientEpochRef.current = null;
+        const client = createLiveClient();
+        client.restoreSessionSnapshot(snapshot);
+        wireLiveClient(client);
+        await client.connect({
+          uiLanguage: sessionUiLangRef.current,
+          targetLanguage: sessionTargetLangRef.current,
+          resume: true,
+          mode: nextMode,
+        });
+        memberContextRef.current = client.getMemberContext();
+        syncTeachWordContext();
+        dispatchTurn({
+          type: "session_connected",
+          isGuest: isGuestRef.current,
+          guestExchanges: guestExchangesRef.current,
+          skipKickoff: true,
+        });
+        if (wasListening) {
+          await startContinuousMic();
+          setLiveUiState("listening");
+        } else {
+          stopContinuousMic();
+          setLiveUiState("idle");
+        }
+        logEvent({ kind: "state", level: "info", message: "live mode switched", data: { mode: nextMode } });
+      } catch (err) {
+        logEvent({
+          kind: "state",
+          level: "error",
+          message: "live mode switch failed",
+          data: { error: String(err) },
+        });
+        teardownSessionIntentional();
+      } finally {
+        reconnectInFlightRef.current = false;
+      }
+    },
+    [createLiveClient, wireLiveClient, syncTeachWordContext, dispatchTurn, startContinuousMic, stopContinuousMic, teardownSessionIntentional],
+  );
+
   const handleClientClose = useCallback(
     async (detail: LiveClientCloseDetail) => {
       if (shouldIgnoreClientEpoch(detail.epochId, liveClientEpochRef.current)) {
@@ -1604,6 +1659,7 @@ export default function TalkPage() {
             const next = { ...config, mode: m };
             setConfig(next);
             saveTalkConfig(next);
+            void switchLiveMode(m);
           }}
           onOrbTap={handleOrbTap}
           orbAriaLabel={

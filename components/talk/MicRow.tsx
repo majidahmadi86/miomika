@@ -135,10 +135,12 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
         userSelect: "none",
       }}
     >
-      {showModes &&
-        leftSlots.map((m, i) => (
-          <ModePill key={`l-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
-        ))}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {showModes &&
+          leftSlots.map((m, i) => (
+            <ModePill key={`l-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
+          ))}
+      </AnimatePresence>
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, margin: showModes ? "0 4px" : 0 }}>
         <button
@@ -178,16 +180,27 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
           </motion.div>
         </button>
         {showModes && (
-          <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 600, color: "#B8985C", letterSpacing: "0.03em", marginTop: "4px" }}>
-            {uiLang === "en" ? activeMode.labelEn : activeMode.labelTh}
-          </span>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={activeMode.key}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ type: "spring", stiffness: 300, damping: 26 }}
+              style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 600, color: "#B8985C", letterSpacing: "0.03em", marginTop: "4px" }}
+            >
+              {uiLang === "en" ? activeMode.labelEn : activeMode.labelTh}
+            </motion.span>
+          </AnimatePresence>
         )}
       </div>
 
-      {showModes &&
-        rightSlots.map((m, i) => (
-          <ModePill key={`r-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
-        ))}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {showModes &&
+          rightSlots.map((m, i) => (
+            <ModePill key={`r-${i}-${m?.key ?? "empty"}`} mode={m} uiLang={uiLang} onClick={m ? () => onModeChange(m.key) : undefined} />
+          ))}
+      </AnimatePresence>
     </div>
   );
 }
@@ -212,9 +225,12 @@ function ModePill({ mode, uiLang, onClick }: { mode: { key: TalkMode; Icon: Luci
       type="button"
       onClick={onClick}
       aria-label={`Mode: ${labelEn}`}
-      whileTap={{ scale: 0.92 }}
+      whileTap={{ scale: 0.9 }}
       layout
-      transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+      initial={{ opacity: 0, scale: 0.6, y: 6 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.6, y: 6 }}
+      transition={{ type: "spring", stiffness: 320, damping: 24 }}
       style={{ width: "50px", minHeight: "60px", background: "transparent", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer", padding: 0, flexShrink: 0 }}
     >
       <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#FFFFFF", border: "0.5px solid rgba(237,232,224,0.7)", boxShadow: "0 4px 12px rgba(26,26,24,0.07), 0 1px 3px rgba(26,26,24,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
