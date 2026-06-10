@@ -1645,6 +1645,20 @@ assert(
     buildTeachingModeContract("en", "th").includes("build a foundation first"),
   "level block lets the user override difficulty — no foundation gatekeeping",
 );
+const teachWordSrc = readFileSync(join(ROOT, "app/api/teach-word/route.ts"), "utf8");
+assert(
+  teachWordSrc.includes("miomika.teach_level") && teachWordSrc.includes("effectiveLevel"),
+  "teach-word route reads the user's teaching level from the cookie",
+);
+assert(
+  !teachWordSrc.includes("cefrLevel: isGuest"),
+  "no call site bypasses effectiveLevel in teach-word",
+);
+const modesSrc = readFileSync(join(ROOT, "lib/talk/modes.ts"), "utf8");
+assert(
+  modesSrc.includes("miomika.teach_level"),
+  "saveTalkConfig persists the level cookie for the server brain",
+);
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),

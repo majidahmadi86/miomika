@@ -73,6 +73,8 @@ export function loadTalkConfig(): TalkConfig {
 export function saveTalkConfig(config: TalkConfig): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  // Server-side brain (/api/teach-word) reads the teaching level from this cookie.
+  document.cookie = `miomika.teach_level=${config.teach.level}; path=/; max-age=31536000; SameSite=Lax`;
 }
 
 export const GAME_LABELS: Record<GameType, { th: string; en: string; desc: string }> = {

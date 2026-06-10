@@ -28,6 +28,12 @@ function parseIntroducedIdx(body: unknown): number | null {
   if (typeof body !== "number" || !Number.isInteger(body) || body < 0) return null;
   return body;
 }
+const LEVEL_COOKIE = "miomika.teach_level";
+const VALID_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
+function levelFromCookie(req: NextRequest): string | null {
+  const v = req.cookies.get(LEVEL_COOKIE)?.value ?? "";
+  return VALID_LEVELS.includes(v) ? v : null;
+}
 
 /**
  * POST /api/teach-word
@@ -117,12 +123,14 @@ export async function POST(req: NextRequest) {
     const requestTarget = normalizeLearningTarget(bodyLearningTarget);
     learningTarget = sanitizeTargetLanguage(browserUi, requestTarget);
   }
+  // User's explicit teaching level (Adjust sheet → saveTalkConfig cookie) wins over DB value / guest default.
+  const effectiveLevel = levelFromCookie(req) ?? (isGuest ? "A1" : cefrLevel);
 
   if (chosenWord) {
     const resolved = await resolveOrGenerateWord({
       word: chosenWord,
       learningTarget,
-      cefrLevel: isGuest ? "A1" : cefrLevel,
+      cefrLevel: effectiveLevel,
     });
     if (!resolved) {
       log("teach-word", "get_word_to_teach", {
@@ -177,7 +185,7 @@ export async function POST(req: NextRequest) {
   if (lessonPlan.length === 0) {
     const built = await buildLessonPlan({
       tier,
-      cefrLevel: isGuest ? "A1" : cefrLevel,
+      cefrLevel: effectiveLevel,
       learningTarget,
       alreadyIntroducedWords: introduced,
       alreadyMasteredWords: mastered,
@@ -224,7 +232,7 @@ export async function POST(req: NextRequest) {
   const resolvedServe = await resolveOrGenerateWord({
     word: serve.wordId,
     learningTarget,
-    cefrLevel: isGuest ? "A1" : cefrLevel,
+    cefrLevel: effectiveLevel,
   });
   const word = resolvedServe
     ? rowToIntroducedWord(resolvedServe, learningTarget)
