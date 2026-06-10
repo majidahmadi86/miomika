@@ -1766,6 +1766,14 @@ assert(
   "lessons list greets with real Miomi art",
 );
 assert(
+  lessonsRouteSrc.includes("levelAsk") && lessonsRouteSrc.includes("targetAsk"),
+  "plan API accepts level and direction adjustments",
+);
+assert(
+  lessonsPageSrc.includes("My level") && lessonsPageSrc.includes("Ordering food"),
+  "plan panel has adjustments and one-tap starters",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",

@@ -100,6 +100,8 @@ export default function LessonsPage() {
   const [loaded, setLoaded] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [topic, setTopic] = useState("");
+  const [planLevel, setPlanLevel] = useState<string>("auto");
+  const [planTarget, setPlanTarget] = useState<string>("auto");
   const [generating, setGenerating] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
 
@@ -121,7 +123,7 @@ export default function LessonsPage() {
     void refresh();
   }, [authReady, isGuest, refresh]);
 
-  const generate = useCallback(async () => {
+  const generate = useCallback(async (topicOverride?: string) => {
     if (generating) return;
     setGenerating(true);
     setGenMsg("Miomi is planning your lesson — every word gets checked, give her a moment…");
@@ -129,7 +131,11 @@ export default function LessonsPage() {
       const r = await fetch("/api/lessons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: topic.trim() || undefined }),
+        body: JSON.stringify({
+          topic: (topicOverride ?? topic).trim() || undefined,
+          level: planLevel === "auto" ? undefined : planLevel,
+          target: planTarget === "auto" ? undefined : planTarget,
+        }),
       });
       const j = (await r.json()) as { ok?: boolean; reason?: string };
       if (j.ok) {
@@ -145,7 +151,7 @@ export default function LessonsPage() {
     } finally {
       setGenerating(false);
     }
-  }, [generating, topic, refresh]);
+  }, [generating, topic, planLevel, planTarget, refresh]);
 
   const font = { fontFamily: "'Quicksand', sans-serif" } as const;
 
@@ -154,8 +160,14 @@ export default function LessonsPage() {
       <AmbientBackground mode="ambient" />
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
 
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h1 style={{ ...font, fontSize: 23, fontWeight: 700, color: INK_STRONG, margin: 0 }}>Lessons</h1>
+          {authReady && !isGuest ? (
+            <button onClick={() => setAskOpen(true)} style={{
+              ...font, fontSize: 12.5, fontWeight: 700, padding: "9px 16px", borderRadius: 99,
+              border: "none", cursor: "pointer", background: CTA, color: "#fff", boxShadow: CTA_SHADOW,
+            }}>+ Plan a lesson</button>
+          ) : null}
         </div>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "10px 0 18px" }}>
           <span style={{ width: 38, height: 38, borderRadius: "50%", background: "#FDEAF4", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 38px", overflow: "hidden" }}>
@@ -255,6 +267,16 @@ export default function LessonsPage() {
               </p>
               {askOpen || !lessons.length ? (
                 <div style={{ marginTop: 12 }}>
+                  {!lessons.length ? (
+                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginBottom: 10 }}>
+                      {["Greetings", "Ordering food", "Taxis & directions", "Numbers & prices"].map((s) => (
+                        <button key={s} onClick={() => { setTopic(s); void generate(s); }} disabled={generating} style={{
+                          ...font, fontSize: 11.5, fontWeight: 700, padding: "7px 13px", borderRadius: 99, cursor: "pointer",
+                          border: "1px solid #F9A8D4", background: "#FDEAF4", color: "#C2497E",
+                        }}>{s}</button>
+                      ))}
+                    </div>
+                  ) : null}
                   <input
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
@@ -266,6 +288,30 @@ export default function LessonsPage() {
                       background: "#FFFFFF", outline: "none", boxSizing: "border-box",
                     }}
                   />
+                  <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 10 }}>
+                    {["auto", "A1", "A2", "B1", "B2", "C1"].map((lv) => (
+                      <button key={lv} onClick={() => setPlanLevel(lv)} disabled={generating} style={{
+                        ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer",
+                        border: `1px solid ${planLevel === lv ? "#C4B5FD" : BORDER}`,
+                        background: planLevel === lv ? "#F1EEFE" : "#FFFFFF",
+                        color: planLevel === lv ? "#6D5BBF" : MUTED,
+                      }}>{lv === "auto" ? "My level" : lv}</button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 8 }}>
+                    {[
+                      { v: "auto", t: "My language" },
+                      { v: "th", t: "Thai" },
+                      { v: "en", t: "English" },
+                    ].map((o) => (
+                      <button key={o.v} onClick={() => setPlanTarget(o.v)} disabled={generating} style={{
+                        ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer",
+                        border: `1px solid ${planTarget === o.v ? "#7DD3C0" : BORDER}`,
+                        background: planTarget === o.v ? "#E9F8F4" : "#FFFFFF",
+                        color: planTarget === o.v ? "#3E9C82" : MUTED,
+                      }}>{o.t}</button>
+                    ))}
+                  </div>
                   <button
                     onClick={() => void generate()}
                     disabled={generating}

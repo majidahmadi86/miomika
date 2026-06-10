@@ -83,9 +83,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "signin_required" }, { status: 401 });
   }
   let topicAsk: string | null = null;
+  let levelAsk: string | null = null;
+  let targetAsk: "th" | "en" | null = null;
   try {
-    const body = (await req.json().catch(() => ({}))) as { topic?: string };
+    const body = (await req.json().catch(() => ({}))) as { topic?: string; level?: string; target?: string };
     topicAsk = String(body?.topic ?? "").trim() || null;
+    const lv = String(body?.level ?? "").trim().toUpperCase();
+    levelAsk = VALID_LEVELS.includes(lv) ? lv : null;
+    const tg = String(body?.target ?? "").trim().toLowerCase();
+    targetAsk = tg === "th" || tg === "en" ? (tg as "th" | "en") : null;
   } catch {
     topicAsk = null;
   }
@@ -96,12 +102,12 @@ export async function POST(req: NextRequest) {
       normalizeLearningTarget(profile.learning_target_language),
     );
     const dbLevel = await loadCefrLevel(profile.id);
-    const level = levelFromCookie(req) ?? dbLevel ?? "A1";
+    const level = levelAsk ?? levelFromCookie(req) ?? dbLevel ?? "A1";
     const result = await buildLesson({
       userId: profile.id,
       topicAsk,
       cefrLevel: level,
-      learningTarget,
+      learningTarget: targetAsk ?? learningTarget,
     });
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
