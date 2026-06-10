@@ -70,6 +70,12 @@ function targetText(it: { word_th: string; word_en: string }, target: string): s
   return target === "en" ? it.word_en : it.word_th;
 }
 const HAS_DIGIT = /[0-9\u0E50-\u0E59]/;
+/* Checkpoint option identity — Thai letter badges in rotating PAL colors. */
+const OPT_MARKS = [
+  { t: "ก", bg: "#FDEAF4", fg: "#C2497E" },
+  { t: "ข", bg: "#F1EEFE", fg: "#6D5BBF" },
+  { t: "ค", bg: "#EBFBF4", fg: "#3E7A66" },
+];
 
 /* DESIGN POLICY: every sound button is top-right of its block, same glyph, soft circle. */
 function SoundBtn({ onClick, bg, color, size = 32 }: { onClick: () => void; bg: string; color: string; size?: number }) {
@@ -431,6 +437,11 @@ function GamesStep(props: {
   }, [words, phrases]);
   const [tab, setTab] = useState(available[0] ?? "say");
   const allDone = available.every((k) => games[k]);
+  const handleDone = (key: string) => {
+    onGameDone(key);
+    const rest = available.filter((k) => k !== key && !games[k]);
+    if (rest.length) setTimeout(() => setTab(rest[0]!), 900);
+  };
   const META: Record<string, { label: string; edge: string; soft: string; deep: string }> = {
     say: { label: "Say it", edge: PINK, soft: PINK_SOFT, deep: PINK_DEEP },
     match: { label: "Match", edge: LAV, soft: LAV_SOFT, deep: LAV_DEEP },
@@ -456,10 +467,10 @@ function GamesStep(props: {
           );
         })}
       </div>
-      {tab === "say" ? <SayGame phrase={phrases[0]!} target={target} say={say} done={!!games.say} onDone={() => onGameDone("say")} /> : null}
-      {tab === "match" ? <MatchGame words={words} target={target} done={!!games.match} onDone={() => onGameDone("match")} /> : null}
-      {tab === "listen" ? <ListenGame words={words} target={target} soft={MINT_SOFT} say={say} done={!!games.listen} onDone={() => onGameDone("listen")} /> : null}
-      {tab === "fill" ? <FillGame words={words} done={!!games.fill} onDone={() => onGameDone("fill")} /> : null}
+      {tab === "say" ? <SayGame phrase={phrases[0]!} target={target} say={say} done={!!games.say} onDone={() => handleDone("say")} /> : null}
+      {tab === "match" ? <MatchGame words={words} target={target} done={!!games.match} onDone={() => handleDone("match")} /> : null}
+      {tab === "listen" ? <ListenGame words={words} target={target} soft={MINT_SOFT} say={say} done={!!games.listen} onDone={() => handleDone("listen")} /> : null}
+      {tab === "fill" ? <FillGame words={words} done={!!games.fill} onDone={() => handleDone("fill")} /> : null}
       {allDone ? <div style={{ marginTop: 14 }}><PrimaryBtn label="All done — checkpoint" onClick={onNext} /></div> : null}
     </div>
   );
@@ -749,9 +760,10 @@ function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: Phra
           How do you say: “{q.q}”
         </p>
       </div>
-      {q.options.map((opt) => {
+      {q.options.map((opt, oi) => {
         const isRight = picked && opt === q.right;
         const isWrong = picked === opt && opt !== q.right;
+        const mark = OPT_MARKS[oi % OPT_MARKS.length]!;
         return (
           <div
             key={opt}
@@ -760,13 +772,14 @@ function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: Phra
             onClick={() => answer(opt)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") answer(opt); }}
             style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+              display: "flex", alignItems: "center", gap: 10,
               cursor: picked ? "default" : "pointer", background: isRight ? TEAL_SOFT : isWrong ? CORAL_SOFT : "#fff",
               border: `1px solid ${isRight ? TEAL : isWrong ? CORAL : BORDER}`, borderRadius: 14,
-              padding: "12px 12px 12px 15px", marginBottom: 9, boxShadow: CARD_SHADOW,
+              padding: "12px 12px 12px 12px", marginBottom: 9, boxShadow: CARD_SHADOW,
               transition: "all .15s ease",
             }}
           >
+            <span style={{ ...thai, width: 26, height: 26, borderRadius: "50%", background: mark.bg, color: mark.fg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flex: "0 0 26px" }}>{mark.t}</span>
             <span style={{ ...thai, fontSize: 15, fontWeight: 600, color: INK_STRONG, flex: 1, textAlign: "left" }}>{opt}</span>
             <SoundBtn onClick={() => say(opt)} bg={PINK_SOFT} color={PINK_DEEP} size={28} />
           </div>

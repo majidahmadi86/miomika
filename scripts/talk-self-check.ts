@@ -1774,6 +1774,14 @@ assert(
   "plan panel has adjustments and one-tap starters",
 );
 assert(
+  lessonsPageSrc.includes("Day streak") && lessonsPageSrc.includes("useProfile"),
+  "lessons hero card shows the learner's stats",
+);
+assert(
+  playerPageSrc.includes("handleDone") && playerPageSrc.includes("OPT_MARKS"),
+  "games auto-advance and checkpoint options have identity badges",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",

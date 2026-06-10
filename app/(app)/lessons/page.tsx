@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
+import { useProfile } from "@/lib/auth/use-profile";
 
 const AmbientBackground = dynamic(
   () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
@@ -96,6 +97,7 @@ function GoldStar() {
 
 export default function LessonsPage() {
   const { isGuest, authReady } = useGuestExploration();
+  const { profile } = useProfile();
   const [lessons, setLessons] = useState<LessonListItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
@@ -153,6 +155,8 @@ export default function LessonsPage() {
     }
   }, [generating, topic, planLevel, planTarget, refresh]);
 
+  const doneCount = lessons.filter((l) => l.status === "completed").length;
+  const learningCount = lessons.filter((l) => l.status === "in_progress").length;
   const font = { fontFamily: "'Quicksand', sans-serif" } as const;
 
   return (
@@ -169,13 +173,33 @@ export default function LessonsPage() {
             }}>+ Plan a lesson</button>
           ) : null}
         </div>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "10px 0 18px" }}>
-          <span style={{ width: 38, height: 38, borderRadius: "50%", background: "#FDEAF4", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 38px", overflow: "hidden" }}>
-            <Image src="/miomi/head-idle.png" alt="Miomi" width={34} height={34} style={{ objectFit: "contain" }} />
-          </span>
-          <p style={{ ...font, fontSize: 13, lineHeight: 1.5, color: INK, background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: "4px 16px 16px 16px", padding: "9px 13px", boxShadow: CARD_SHADOW, margin: 0 }}>
-            I planned these start to finish — pick one and I will walk it with you~
-          </p>
+        <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "14px 15px", margin: "10px 0 18px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 42, height: 42, borderRadius: "50%", background: "#FDEAF4", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 42px", overflow: "hidden" }}>
+              <Image src="/miomi/head-idle.png" alt="Miomi" width={38} height={38} style={{ objectFit: "contain" }} />
+            </span>
+            <p style={{ ...font, flex: 1, fontSize: 13.5, fontWeight: 700, color: INK_STRONG, margin: 0, lineHeight: 1.4 }}>
+              {profile?.display_name ? `Hi ${profile.display_name}~` : "Hi~"} pick a lesson — I will walk it with you.
+            </p>
+            {profile?.level ? (
+              <span style={{ ...font, fontSize: 10.5, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: "#F1EEFE", color: "#6D5BBF", flex: "0 0 auto" }}>Lv.{profile.level}</span>
+            ) : null}
+          </div>
+          {authReady && !isGuest ? (
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              {[
+                { n: String(profile?.streak ?? 0), l: "Day streak", bg: "#FEEFEF", fg: "#C56A5E" },
+                { n: String(profile?.miomi_stars ?? 0), l: "Miomi stars", bg: "#F7F0E2", fg: "#A8853F" },
+                { n: String(doneCount), l: "Completed", bg: "#E9F8F4", fg: "#3E9C82" },
+                { n: String(learningCount), l: "Learning", bg: "#F1EEFE", fg: "#6D5BBF" },
+              ].map((s) => (
+                <div key={s.l} style={{ flex: 1, background: s.bg, borderRadius: 12, padding: "9px 4px", textAlign: "center" }}>
+                  <b style={{ ...font, fontSize: 16, display: "block", color: s.fg }}>{s.n}</b>
+                  <span style={{ ...font, fontSize: 9, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: s.fg, opacity: 0.75 }}>{s.l}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {!authReady || (!isGuest && !loaded) ? (
