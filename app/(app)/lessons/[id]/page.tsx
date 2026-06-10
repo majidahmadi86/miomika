@@ -3,7 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { detectLang, speak } from "@/lib/voice/tts";
+
+const AmbientBackground = dynamic(
+  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
+  { ssr: false },
+);
 
 type WordItem = {
   word_en: string; word_th: string;
@@ -179,6 +185,7 @@ export default function LessonPlayerPage() {
 
   return (
     <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "#FAFAF6" }}>
+      <AmbientBackground mode="ambient" />
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -339,15 +346,17 @@ function WordsStep({ words, target, soft, say, onNext }: { words: WordItem[]; ta
           <div style={{ display: "flex", gap: 12, alignItems: "center", paddingRight: 40 }}>
             <WordTile w={w} target={target} soft={soft} />
             <div>
-              <div style={{ ...thai, fontSize: 20, fontWeight: 600, color: INK_STRONG }}>{targetText(w, target)}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 4, flexWrap: "wrap" }}>
+              <div style={{ ...thai, fontSize: 20, fontWeight: 600, color: INK_STRONG, lineHeight: 1.25 }}>{targetText(w, target)}</div>
+              <div style={{ ...(target === "en" ? thai : font), fontSize: 14, fontWeight: 700, color: INK, marginTop: 3 }}>
+                {target === "en" ? w.word_th : w.word_en}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6, flexWrap: "wrap" }}>
                 {w.cefr_level ? <span style={{ ...font, fontSize: 10.5, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: LAV_SOFT, color: LAV_DEEP }}>{w.cefr_level}</span> : null}
                 {(target === "en" ? w.ipa : w.romanization) ? (
-                  <span style={{ ...font, fontSize: 11.5, fontWeight: 700, background: "#FAFAF6", border: `1px solid ${BORDER}`, borderRadius: 99, padding: "2px 8px", color: MUTED }}>
+                  <span style={{ ...font, fontSize: 11.5, fontWeight: 700, background: PEACH_SOFT, borderRadius: 99, padding: "3px 9px", color: PEACH_DEEP }}>
                     {target === "en" ? w.ipa : w.romanization}
                   </span>
                 ) : null}
-                <span style={{ ...font, fontSize: 12.5, color: MUTED, fontWeight: 600 }}>{target === "en" ? w.word_th : w.word_en}</span>
               </div>
             </div>
           </div>

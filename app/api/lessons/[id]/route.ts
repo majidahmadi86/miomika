@@ -99,10 +99,19 @@ export async function PATCH(
       ...((prev.games as Record<string, unknown>) ?? {}),
       ...(incoming.games ?? {}),
     };
+    // EARNED GOLD ONLY: completed requires a passed checkpoint (>= 2/3).
+    const cp = merged.checkpoint as { score?: number; total?: number } | undefined;
+    const passed =
+      !!cp && typeof cp.score === "number" && typeof cp.total === "number" &&
+      cp.total > 0 && cp.score / cp.total >= 2 / 3;
     let status = (existing.status as string) ?? "planned";
-    if (merged.completed_at) status = "completed";
-    else if ((typeof merged.step === "number" && merged.step > 0) || status === "in_progress") {
-      status = "in_progress";
+    if (merged.completed_at && passed) {
+      status = "completed";
+    } else {
+      if (merged.completed_at && !passed) delete merged.completed_at;
+      if ((typeof merged.step === "number" && merged.step > 0) || status === "in_progress" || status === "completed") {
+        status = "in_progress";
+      }
     }
     const { error: updErr } = await supabase
       .from("lessons")

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 
@@ -32,6 +33,10 @@ const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
   mint: { edge: "#A7F3D0", soft: "#EBFBF4" },
   teal: { edge: "#7DD3C0", soft: "#E9F8F4" },
   coral: { edge: "#FCA5A5", soft: "#FEEFEF" },
+};
+const TOPIC_DEEP: Record<string, string> = {
+  peach: "#B06A28", pink: "#C2497E", lavender: "#6D5BBF",
+  mint: "#3E7A66", teal: "#3E9C82", coral: "#C56A5E",
 };
 const INK = "#4A4136";
 const INK_STRONG = "#3C352B";
@@ -152,9 +157,14 @@ export default function LessonsPage() {
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
           <h1 style={{ ...font, fontSize: 23, fontWeight: 700, color: INK_STRONG, margin: 0 }}>Lessons</h1>
         </div>
-        <p style={{ ...font, fontSize: 13, color: MUTED, margin: "6px 0 18px" }}>
-          Planned for you by Miomi — each one start to finish.
-        </p>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "10px 0 18px" }}>
+          <span style={{ width: 38, height: 38, borderRadius: "50%", background: "#FDEAF4", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 38px", overflow: "hidden" }}>
+            <Image src="/miomi/head-idle.png" alt="Miomi" width={34} height={34} style={{ objectFit: "contain" }} />
+          </span>
+          <p style={{ ...font, fontSize: 13, lineHeight: 1.5, color: INK, background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: "4px 16px 16px 16px", padding: "9px 13px", boxShadow: CARD_SHADOW, margin: 0 }}>
+            I planned these start to finish — pick one and I will walk it with you~
+          </p>
+        </div>
 
         {!authReady || (!isGuest && !loaded) ? (
           <p style={{ ...font, fontSize: 13, color: MUTED }}>Loading…</p>
@@ -200,18 +210,19 @@ export default function LessonsPage() {
                     <YarnRing pct={pct} edge={tc.edge} done={done} />
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-                    {[
-                      l.learning_target === "en" ? "English" : "Thai",
-                      l.topic,
-                      `${l.words_count} words`,
-                      `${l.phrases_count} phrases`,
-                      ...(l.has_checkpoint ? ["Checkpoint"] : []),
-                      l.cefr_level,
-                    ].map((chip) => (
-                      <span key={chip} style={{
-                        ...font, fontSize: 11, fontWeight: 600, padding: "4px 10px",
-                        borderRadius: 99, background: "#FFFFFF", border: `1px solid ${BORDER}`, color: MUTED,
-                      }}>{chip}</span>
+                    {([
+                      { t: l.learning_target === "en" ? "English" : "Thai", bg: "#E9F8F4", fg: "#3E9C82" },
+                      { t: l.topic, bg: tc.soft, fg: TOPIC_DEEP[l.color] ?? TOPIC_DEEP.peach },
+                      { t: `${l.words_count} words`, bg: "#FFFFFF", fg: MUTED, bd: BORDER },
+                      { t: `${l.phrases_count} phrases`, bg: "#FFFFFF", fg: MUTED, bd: BORDER },
+                      ...(l.has_checkpoint ? [{ t: "Checkpoint", bg: "#FDEAF4", fg: "#C2497E" }] : []),
+                      { t: l.cefr_level, bg: "#F1EEFE", fg: "#6D5BBF" },
+                    ] as Array<{ t: string; bg: string; fg: string; bd?: string }>).map((chip) => (
+                      <span key={chip.t} style={{
+                        ...font, fontSize: 11, fontWeight: 700, padding: "4px 10px",
+                        borderRadius: 99, background: chip.bg, color: chip.fg,
+                        border: chip.bd ? `1px solid ${chip.bd}` : "none",
+                      }}>{chip.t}</span>
                     ))}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>

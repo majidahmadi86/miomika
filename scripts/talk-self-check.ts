@@ -1758,6 +1758,14 @@ assert(
   "phrase romanization must be syllable-segmented",
 );
 assert(
+  lessonIdRouteSrc.includes("EARNED GOLD ONLY"),
+  "server enforces: completed status requires a passed checkpoint",
+);
+assert(
+  lessonsPageSrc.includes("head-idle.png"),
+  "lessons list greets with real Miomi art",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",
