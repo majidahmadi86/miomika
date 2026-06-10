@@ -1617,6 +1617,15 @@ assert(
   buildTeachingModeContract("en", "th", "C1").includes("adapt to the level they actually show"),
   "level block keeps the adapt-to-real-ability rule",
 );
+const wordContentSrc = readFileSync(join(ROOT, "lib/brain/word-content.ts"), "utf8");
+assert(
+  wordContentSrc.includes("thinkingBudget: 0"),
+  "card generation disables Gemini thinking so JSON output is never starved",
+);
+assert(
+  wordContentSrc.includes("attempt < 3"),
+  "card generation gets three attempts before withholding",
+);
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),

@@ -60,7 +60,7 @@ async function callGroqJson(system: string, user: string): Promise<string | null
   try {
     const r = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      max_tokens: 300,
+      max_tokens: 600,
       temperature: 0.3,
       response_format: { type: "json_object" },
       messages: [
@@ -82,7 +82,10 @@ async function callGeminiJson(system: string, user: string): Promise<string | nu
       model: "gemini-2.5-flash",
       config: {
         systemInstruction: system,
-        maxOutputTokens: 300,
+        // gemini-2.5-flash thinks by default; without thinkingBudget: 0 the thinking
+        // silently eats maxOutputTokens and r.text returns empty → "bank drew a blank".
+        thinkingConfig: { thinkingBudget: 0 },
+        maxOutputTokens: 800,
         temperature: 0.3,
         responseMimeType: "application/json",
       },
@@ -270,7 +273,8 @@ async function generateWordCard(
   // skip the candidate (and ultimately withhold). Prefer a candidate whose example
   // also verifies; otherwise keep a headword-only card with the example dropped.
   let fallback: ResolvedWord | null = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // 3 attempts: Groq once, then Gemini twice — survives a missing GROQ_API_KEY or one flaky call.
+  for (let attempt = 0; attempt < 3; attempt++) {
     const raw = attempt === 0 ? await callGroqJson(system, user) : await callGeminiJson(system, user);
     const parsed = parseCard(raw);
     if (!isValidCard(parsed)) continue;
