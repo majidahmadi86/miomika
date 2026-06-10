@@ -1,11 +1,13 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { detectLang, speak } from "@/lib/voice/tts";
 
 type WordItem = {
   word_en: string; word_th: string;
+  emoji?: string | null;
   romanization: string | null; ipa: string | null;
   cefr_level: string | null;
   example_en: string | null; example_th: string | null;
@@ -21,6 +23,12 @@ type Lesson = {
   progress: { step?: number; games?: Record<string, boolean>; checkpoint?: { score: number; total: number }; completed_at?: string | null };
 };
 
+/* Real Miomi only — never drawn stand-ins. */
+const HEAD_IDLE = "/miomi/head-idle.png";
+const HEAD_HAPPY = "/miomi/head-happy.png";
+const HEAD_THINKING = "/miomi/head-thinking.png";
+const CELEBRATION = "/characters/miomi/companion/companion-celebration.png";
+
 const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
   peach: { edge: "#FDBA74", soft: "#FEF1E3" },
   pink: { edge: "#F9A8D4", soft: "#FDEAF4" },
@@ -32,6 +40,7 @@ const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
 const INK = "#4A4136", INK_STRONG = "#3C352B", MUTED = "#9A8B73",
   BORDER = "#EDE8E0", TEAL = "#7DD3C0", TEAL_DEEP = "#3E9C82",
   TEAL_SOFT = "#E9F8F4", CORAL_SOFT = "#FEEFEF", CORAL = "#FCA5A5",
+  CORAL_DEEP = "#C56A5E",
   LAV = "#C4B5FD", LAV_SOFT = "#F1EEFE", LAV_DEEP = "#6D5BBF",
   PEACH = "#FDBA74", PEACH_SOFT = "#FEF1E3", PEACH_DEEP = "#B06A28",
   PINK = "#F9A8D4", PINK_SOFT = "#FDEAF4", PINK_DEEP = "#C2497E",
@@ -41,6 +50,7 @@ const CTA_SHADOW = "0 4px 16px -4px rgba(52,169,143,0.40)";
 const CARD_SHADOW = "0 1px 2px rgba(74,65,54,.05), 0 8px 22px rgba(74,65,54,.06)";
 const font = { fontFamily: "'Quicksand', sans-serif" } as const;
 const thai = { fontFamily: "'Sarabun', sans-serif" } as const;
+const PASS_RATIO = 2 / 3;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -55,34 +65,17 @@ function targetText(it: { word_th: string; word_en: string }, target: string): s
 }
 const HAS_DIGIT = /[0-9\u0E50-\u0E59]/;
 
-/* Decorative doodle tiles — playful art until the illustration pipeline lands. */
-const DOODLES: string[] = [
-  '<path d="M12 4l2 4.4 4.8.5-3.6 3.2 1 4.7L12 14.4 7.8 16.8l1-4.7L5.2 8.9l4.8-.5z"/>',
-  '<path d="M12 19s-6-3.8-6-8a3.4 3.4 0 0 1 6-2.2A3.4 3.4 0 0 1 18 11c0 4.2-6 8-6 8z"/>',
-  '<path d="M6 16c0-6 5-10 12-10-1 7-5 11-10 11-1 0-2-.4-2-1z"/><path d="M6 16c2-3 5-5 8-6"/>',
-  '<path d="M12 5l1.2 3.3L16.5 9.5l-3.3 1.2L12 14l-1.2-3.3L7.5 9.5l3.3-1.2z"/><path d="M17.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
-  '<path d="M7 17a3.5 3.5 0 0 1 .6-7A4.6 4.6 0 0 1 16.5 9 3.2 3.2 0 0 1 17 17z"/>',
-  '<path d="M9 17.5V7l8-1.6V15"/><circle cx="7" cy="17.5" r="2"/><circle cx="15" cy="15.5" r="2"/>',
-];
-function Doodle({ i, color, soft }: { i: number; color: string; soft: string }) {
-  return (
-    <span style={{
-      width: 44, height: 44, borderRadius: 12, background: soft, flex: "0 0 44px",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke={color} strokeWidth="1.7"
-        strokeLinecap="round" strokeLinejoin="round"
-        dangerouslySetInnerHTML={{ __html: DOODLES[i % DOODLES.length]! }} />
-    </span>
-  );
-}
-
+/* DESIGN POLICY: every sound button is top-right of its block, same glyph, soft circle. */
 function SoundBtn({ onClick, bg, color, size = 32 }: { onClick: () => void; bg: string; color: string; size?: number }) {
   return (
-    <button onClick={onClick} aria-label="Play sound" style={{
-      width: size, height: size, borderRadius: "50%", border: "none", background: bg,
-      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flex: `0 0 ${size}px`,
-    }}>
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      aria-label="Play sound"
+      style={{
+        width: size, height: size, borderRadius: "50%", border: "none", background: bg,
+        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flex: `0 0 ${size}px`,
+      }}
+    >
       <svg viewBox="0 0 24 24" width={size * 0.5} height={size * 0.5} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M11 5 6.5 8.5H4v7h2.5L11 19z" fill={color} stroke="none" />
         <path d="M14.5 9.2a4 4 0 0 1 0 5.6" />
@@ -92,15 +85,21 @@ function SoundBtn({ onClick, bg, color, size = 32 }: { onClick: () => void; bg: 
   );
 }
 
-function MiomiHead({ size = 54, stroke = "#D4699B" }: { size?: number; stroke?: string }) {
+/* SEMANTIC OR ABSENT: the word's own emoji from the verified bank, else the word itself. */
+function WordTile({ w, target, soft }: { w: WordItem; target: string; soft: string }) {
+  const t = targetText(w, target);
+  const glyph = /[\u0E00-\u0E7F]/.test(t) && t.length <= 4 ? t : t.charAt(0).toUpperCase();
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 9 L5.5 4 L9.5 6.8" /><path d="M20 9 L18.5 4 L14.5 6.8" />
-      <circle cx="12" cy="13" r="7.4" />
-      <circle cx="9.4" cy="12" r="0.7" fill={stroke} /><circle cx="14.6" cy="12" r="0.7" fill={stroke} />
-      <path d="M10.4 15.4 Q12 17 13.6 15.4" />
-      <path d="M3.5 13.5 H6" /><path d="M18 13.5 H20.5" />
-    </svg>
+    <span style={{
+      width: 50, height: 50, borderRadius: 12, background: soft, flex: "0 0 50px",
+      display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+    }}>
+      {w.emoji ? (
+        <span style={{ fontSize: 27, lineHeight: 1 }}>{w.emoji}</span>
+      ) : (
+        <span style={{ ...(glyph.length > 1 ? thai : font), fontSize: glyph.length > 1 ? 17 : 22, fontWeight: 700, color: INK }}>{glyph}</span>
+      )}
+    </span>
   );
 }
 
@@ -112,6 +111,8 @@ export default function LessonPlayerPage() {
   const [step, setStep] = useState(0);
   const [maxVisited, setMaxVisited] = useState(0);
   const [games, setGames] = useState<Record<string, boolean>>({});
+  const [result, setResult] = useState<{ kind: "gold" | "almost"; score: number; total: number } | null>(null);
+  const [attempt, setAttempt] = useState(1);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -146,7 +147,7 @@ export default function LessonPlayerPage() {
     setStep(n);
     setMaxVisited((m) => {
       const mv = Math.max(m, Math.min(n, 4));
-      patch({ step: Math.max(Math.min(n, 5), mv) });
+      patch({ step: mv });
       return mv;
     });
   }, [patch]);
@@ -231,7 +232,7 @@ export default function LessonPlayerPage() {
         ) : <span style={{ display: "block", height: 12 }} />}
 
         {step === 0 ? <IntroStep lesson={lesson} review={lesson.status === "completed"} onNext={() => go(1)} /> : null}
-        {step === 1 ? <WordsStep words={words} target={target} say={say} onNext={() => go(2)} /> : null}
+        {step === 1 ? <WordsStep words={words} target={target} soft={tcol.soft} say={say} onNext={() => go(2)} /> : null}
         {step === 2 ? <PhrasesStep phrases={phrases} target={target} say={say} onNext={() => go(3)} /> : null}
         {step === 3 ? (
           <GamesStep
@@ -249,14 +250,33 @@ export default function LessonPlayerPage() {
         ) : null}
         {step === 4 ? (
           <CheckpointStep
-            phrases={phrases} candos={candos} level={lesson.cefr_level}
+            key={attempt}
+            phrases={phrases} candos={candos} level={lesson.cefr_level} say={say}
             onDone={(score, total) => {
-              patch({ checkpoint: { score, total }, completed_at: new Date().toISOString(), step: 5 });
+              const passed = total > 0 && score / total >= PASS_RATIO;
+              if (passed) {
+                patch({ checkpoint: { score, total }, completed_at: new Date().toISOString(), step: 5 });
+                setResult({ kind: "gold", score, total });
+              } else {
+                patch({ checkpoint: { score, total } });
+                setResult({ kind: "almost", score, total });
+              }
               setStep(5);
             }}
           />
         ) : null}
-        {step === 5 ? <RecapStep lesson={lesson} words={words} phrases={phrases} candos={candos} onReview={() => { setStep(0); setMaxVisited(4); }} /> : null}
+        {step === 5 ? (
+          result?.kind === "almost" ? (
+            <AlmostStep
+              score={result.score} total={result.total}
+              onReviewWords={() => go(1)}
+              onReviewPhrases={() => go(2)}
+              onRetry={() => { setAttempt((a) => a + 1); setResult(null); setStep(4); }}
+            />
+          ) : (
+            <RecapStep lesson={lesson} words={words} phrases={phrases} candos={candos} result={result} onReview={() => { setResult(null); setStep(0); setMaxVisited(4); }} />
+          )
+        ) : null}
       </div>
     </div>
   );
@@ -272,21 +292,30 @@ function PrimaryBtn({ label, onClick, disabled }: { label: string; onClick: () =
   );
 }
 
+function MiomiBubble({ head, text }: { head: string; text: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16 }}>
+      <span style={{ width: 38, height: 38, borderRadius: "50%", background: PINK_SOFT, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 38px", overflow: "hidden" }}>
+        <Image src={head} alt="Miomi" width={34} height={34} style={{ objectFit: "contain" }} />
+      </span>
+      <p style={{ ...font, fontSize: 13.5, lineHeight: 1.5, color: INK, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: "4px 16px 16px 16px", padding: "10px 13px", boxShadow: CARD_SHADOW, margin: 0 }}>
+        {text}
+      </p>
+    </div>
+  );
+}
+
 function IntroStep({ lesson, review, onNext }: { lesson: Lesson; review: boolean; onNext: () => void }) {
   const w = lesson.content?.words?.length ?? 0;
   const p = lesson.content?.phrases?.length ?? 0;
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16 }}>
-        <span style={{ width: 36, height: 36, borderRadius: "50%", background: PINK_SOFT, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 36px" }}>
-          <MiomiHead size={24} />
-        </span>
-        <p style={{ ...font, fontSize: 13.5, lineHeight: 1.5, color: INK, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: "4px 16px 16px 16px", padding: "10px 13px", boxShadow: CARD_SHADOW, margin: 0 }}>
-          {review
-            ? "Welcome back — wander anywhere on the trail. Reviewing is how it sticks~"
-            : `${w} words, ${p} phrases, games for your voice, ears and hands — and a ${lesson.cefr_level} checkpoint at the end. เมี้ยว~`}
-        </p>
-      </div>
+      <MiomiBubble
+        head={HEAD_HAPPY}
+        text={review
+          ? "Welcome back — wander anywhere on the trail. Reviewing is how it sticks~"
+          : `${w} words, ${p} phrases, games for your voice, ears and hands — then show me at the ${lesson.cefr_level} checkpoint. เมี้ยว~`}
+      />
       <h3 style={{ ...font, fontSize: 19, fontWeight: 700, color: INK_STRONG, margin: "0 0 4px" }}>What this lesson covers</h3>
       <p style={{ ...font, fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: "0 0 16px" }}>
         Words you will actually say, phrases that do the talking, and proof of what you can do by the end.
@@ -296,19 +325,19 @@ function IntroStep({ lesson, review, onNext }: { lesson: Lesson; review: boolean
   );
 }
 
-function WordsStep({ words, target, say, onNext }: { words: WordItem[]; target: string; say: (t: string) => void; onNext: () => void }) {
+function WordsStep({ words, target, soft, say, onNext }: { words: WordItem[]; target: string; soft: string; say: (t: string) => void; onNext: () => void }) {
   const [open, setOpen] = useState<number | null>(null);
   return (
     <div>
       <h3 style={{ ...font, fontSize: 19, fontWeight: 700, color: INK_STRONG, margin: "0 0 4px" }}>{words.length} words to know</h3>
-      <p style={{ ...font, fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: "0 0 16px" }}>Tap any sound — hear it, then say it.</p>
+      <p style={{ ...font, fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: "0 0 16px" }}>Tap any sound — hear Miomi, then say it.</p>
       {words.map((w, i) => (
         <div key={i} style={{ position: "relative", background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${PEACH}`, borderRadius: 14, boxShadow: CARD_SHADOW, padding: "12px 13px", marginBottom: 10 }}>
           <span style={{ position: "absolute", top: 10, right: 10 }}>
             <SoundBtn onClick={() => say(targetText(w, target))} bg={PEACH_SOFT} color={PEACH_DEEP} />
           </span>
           <div style={{ display: "flex", gap: 12, alignItems: "center", paddingRight: 40 }}>
-            <Doodle i={i} color={PEACH_DEEP} soft={PEACH_SOFT} />
+            <WordTile w={w} target={target} soft={soft} />
             <div>
               <div style={{ ...thai, fontSize: 20, fontWeight: 600, color: INK_STRONG }}>{targetText(w, target)}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 4, flexWrap: "wrap" }}>
@@ -324,11 +353,11 @@ function WordsStep({ words, target, say, onNext }: { words: WordItem[]; target: 
           </div>
           {w.example_th && w.example_en ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAF6", borderRadius: 10, padding: "9px 11px", marginTop: 11 }}>
-              <SoundBtn onClick={() => say(target === "en" ? w.example_en! : w.example_th!)} bg="#fff" color={PEACH_DEEP} size={28} />
-              <span style={{ fontSize: 12.5, lineHeight: 1.5, color: INK }}>
+              <span style={{ flex: 1, fontSize: 12.5, lineHeight: 1.5, color: INK }}>
                 <span style={font}>“{w.example_en}”</span><br />
                 <span style={{ ...thai, color: MUTED }}>“{w.example_th}”</span>
               </span>
+              <SoundBtn onClick={() => say(target === "en" ? w.example_en! : w.example_th!)} bg="#fff" color={PEACH_DEEP} size={28} />
             </div>
           ) : null}
           {w.meanings?.length ? (
@@ -367,7 +396,7 @@ function PhrasesStep({ phrases, target, say, onNext }: { phrases: PhraseItem[]; 
             <SoundBtn onClick={() => say(target === "en" ? p.en : p.th)} bg={PINK_SOFT} color={PINK_DEEP} />
           </span>
           <div style={{ ...thai, fontSize: 17.5, fontWeight: 600, color: INK_STRONG, lineHeight: 1.5, paddingRight: 40 }}>{target === "en" ? p.en : p.th}</div>
-          {p.romanization && target !== "en" ? <div style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED, marginTop: 5 }}>{p.romanization}</div> : null}
+          {p.romanization && target !== "en" ? <div style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED, marginTop: 5, letterSpacing: ".02em" }}>{p.romanization}</div> : null}
           <div style={{ ...font, fontSize: 12.5, color: MUTED, marginTop: 5 }}>{target === "en" ? p.th : p.en}</div>
         </div>
       ))}
@@ -420,7 +449,7 @@ function GamesStep(props: {
       </div>
       {tab === "say" ? <SayGame phrase={phrases[0]!} target={target} say={say} done={!!games.say} onDone={() => onGameDone("say")} /> : null}
       {tab === "match" ? <MatchGame words={words} target={target} done={!!games.match} onDone={() => onGameDone("match")} /> : null}
-      {tab === "listen" ? <ListenGame words={words} target={target} say={say} done={!!games.listen} onDone={() => onGameDone("listen")} /> : null}
+      {tab === "listen" ? <ListenGame words={words} target={target} soft={MINT_SOFT} say={say} done={!!games.listen} onDone={() => onGameDone("listen")} /> : null}
       {tab === "fill" ? <FillGame words={words} done={!!games.fill} onDone={() => onGameDone("fill")} /> : null}
       {allDone ? <div style={{ marginTop: 14 }}><PrimaryBtn label="All done — checkpoint" onClick={onNext} /></div> : null}
     </div>
@@ -469,27 +498,27 @@ function SayGame({ phrase, target, say, done, onDone }: { phrase: PhraseItem; ta
 
   return (
     <div style={{ textAlign: "center" }}>
-      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${PINK}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: 18, marginBottom: 14 }}>
-        <div style={{ ...thai, fontSize: 20, fontWeight: 600, color: INK_STRONG }}>{text}</div>
-        {phrase.romanization && target !== "en" ? <div style={{ ...font, fontSize: 12.5, fontWeight: 700, color: MUTED, marginTop: 7 }}>{phrase.romanization}</div> : null}
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
-          <SoundBtn onClick={() => say(text)} bg={PINK_SOFT} color={PINK_DEEP} size={40} />
-        </div>
+      <div style={{ position: "relative", background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${PINK}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: 18, marginBottom: 14 }}>
+        <span style={{ position: "absolute", top: 10, right: 10 }}>
+          <SoundBtn onClick={() => say(text)} bg={PINK_SOFT} color={PINK_DEEP} />
+        </span>
+        <div style={{ ...thai, fontSize: 20, fontWeight: 600, color: INK_STRONG, paddingRight: 36 }}>{text}</div>
+        {phrase.romanization && target !== "en" ? <div style={{ ...font, fontSize: 12.5, fontWeight: 700, color: MUTED, marginTop: 7, letterSpacing: ".02em" }}>{phrase.romanization}</div> : null}
       </div>
 
       <button
         onClick={recState === "recording" ? stopRec : () => void startRec()}
         aria-label={recState === "recording" ? "Stop recording" : "Record your voice"}
         style={{
-          width: 84, height: 84, borderRadius: "50%", cursor: "pointer",
+          width: 88, height: 88, borderRadius: "50%", cursor: "pointer",
           border: `1px solid ${recState === "recording" ? PINK : BORDER}`,
           margin: "0 auto 10px", display: "flex", alignItems: "center", justifyContent: "center",
           background: "#fff", boxShadow: recState === "recording" ? `0 0 0 6px ${PINK_SOFT}` : CARD_SHADOW,
-          transition: "box-shadow .2s ease",
+          transition: "box-shadow .2s ease", overflow: "hidden",
         }}
       >
         {recState === "recording" ? (
-          <MiomiHead size={54} />
+          <Image src={HEAD_HAPPY} alt="Miomi is listening" width={80} height={80} style={{ objectFit: "contain" }} />
         ) : (
           <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" />
@@ -578,7 +607,7 @@ function MatchGame({ words, target, done, onDone }: { words: WordItem[]; target:
   );
 }
 
-function ListenGame({ words, target, say, done, onDone }: { words: WordItem[]; target: string; say: (t: string) => void; done: boolean; onDone: () => void }) {
+function ListenGame({ words, target, soft, say, done, onDone }: { words: WordItem[]; target: string; soft: string; say: (t: string) => void; done: boolean; onDone: () => void }) {
   const pool = useMemo(() => shuffle(words).slice(0, 3), [words]);
   const answer = pool[0]!;
   const options = useMemo(() => shuffle(pool), [pool]);
@@ -607,7 +636,7 @@ function ListenGame({ words, target, say, done, onDone }: { words: WordItem[]; t
             borderRadius: 14, boxShadow: CARD_SHADOW, color: INK_STRONG,
             display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
           }}>
-            <Doodle i={i + 1} color={MINT_DEEP} soft={MINT_SOFT} />
+            <WordTile w={w} target={target} soft={soft} />
             {target === "en" ? w.word_th : w.word_en}
           </button>
         ))}
@@ -657,10 +686,9 @@ function FillGame({ words, done, onDone }: { words: WordItem[]; done: boolean; o
   );
 }
 
-function CheckpointStep({ phrases, candos, level, onDone }: { phrases: PhraseItem[]; candos: Cando[]; level: string; onDone: (score: number, total: number) => void }) {
+function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: PhraseItem[]; candos: Cando[]; level: string; say: (t: string) => void; onDone: (score: number, total: number) => void }) {
   const questions = useMemo(() => {
     const pool = phrases.slice(0, 5);
-    // Digits give answers away — prefer number-free phrases when enough exist.
     const numberFree = pool.filter((p) => !HAS_DIGIT.test(p.en) && !HAS_DIGIT.test(p.th));
     const qPool = numberFree.length >= 3 ? numberFree : pool;
     return shuffle(qPool).slice(0, Math.min(3, qPool.length)).map((p, i) => {
@@ -692,14 +720,14 @@ function CheckpointStep({ phrases, candos, level, onDone }: { phrases: PhraseIte
             {questions.map((_, i) => (
               <span key={i} style={{
                 width: 8, height: 8, borderRadius: "50%",
-                background: i < idx ? TEAL : i === idx ? LAV_DEEP : "#fff",
-                border: `1.5px solid ${i < idx ? TEAL : i === idx ? LAV_DEEP : "#D8D0F2"}`,
+                background: i < idx ? LAV_DEEP : i === idx ? PINK_DEEP : "#fff",
+                border: `1.5px solid ${i < idx ? LAV_DEEP : i === idx ? PINK_DEEP : "#D8D0F2"}`,
               }} />
             ))}
           </span>
         </div>
         <p style={{ ...font, fontSize: 12.5, color: "#7E6FA8", margin: "5px 0 0", lineHeight: 1.45 }}>
-          Not a grade — proof of what you can now do.
+          Listen to each answer before you choose — your ears know.
         </p>
       </div>
       {q.cando ? (
@@ -707,7 +735,7 @@ function CheckpointStep({ phrases, candos, level, onDone }: { phrases: PhraseIte
           {level} · {q.cando}
         </span>
       ) : null}
-      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 16, boxShadow: CARD_SHADOW, padding: "15px 16px", marginBottom: 12 }}>
+      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${LAV}`, borderRadius: 16, boxShadow: CARD_SHADOW, padding: "15px 16px", marginBottom: 12 }}>
         <p style={{ ...font, fontSize: 16, fontWeight: 700, color: INK_STRONG, margin: 0, lineHeight: 1.45 }}>
           How do you say: “{q.q}”
         </p>
@@ -716,34 +744,73 @@ function CheckpointStep({ phrases, candos, level, onDone }: { phrases: PhraseIte
         const isRight = picked && opt === q.right;
         const isWrong = picked === opt && opt !== q.right;
         return (
-          <button key={opt} onClick={() => answer(opt)} disabled={!!picked} style={{
-            ...thai, width: "100%", textAlign: "left", fontSize: 15, fontWeight: 600,
-            cursor: picked ? "default" : "pointer", background: isRight ? TEAL_SOFT : isWrong ? CORAL_SOFT : "#fff",
-            border: `1px solid ${isRight ? TEAL : isWrong ? CORAL : BORDER}`, borderRadius: 14,
-            padding: "13px 15px", marginBottom: 9, boxShadow: CARD_SHADOW, color: INK_STRONG,
-            transition: "all .15s ease",
-          }}>{opt}</button>
+          <div
+            key={opt}
+            role="button"
+            tabIndex={0}
+            onClick={() => answer(opt)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") answer(opt); }}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+              cursor: picked ? "default" : "pointer", background: isRight ? TEAL_SOFT : isWrong ? CORAL_SOFT : "#fff",
+              border: `1px solid ${isRight ? TEAL : isWrong ? CORAL : BORDER}`, borderRadius: 14,
+              padding: "12px 12px 12px 15px", marginBottom: 9, boxShadow: CARD_SHADOW,
+              transition: "all .15s ease",
+            }}
+          >
+            <span style={{ ...thai, fontSize: 15, fontWeight: 600, color: INK_STRONG, flex: 1, textAlign: "left" }}>{opt}</span>
+            <SoundBtn onClick={() => say(opt)} bg={PINK_SOFT} color={PINK_DEEP} size={28} />
+          </div>
         );
       })}
     </div>
   );
 }
 
-function RecapStep({ lesson, words, phrases, candos, onReview }: { lesson: Lesson; words: WordItem[]; phrases: PhraseItem[]; candos: Cando[]; onReview: () => void }) {
-  const cp = lesson.progress?.checkpoint;
+function AlmostStep({ score, total, onReviewWords, onReviewPhrases, onRetry }: { score: number; total: number; onReviewWords: () => void; onReviewPhrases: () => void; onRetry: () => void }) {
   return (
     <div>
-      <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
-        <div style={{
-          width: 74, height: 74, borderRadius: "50%", margin: "0 auto 12px",
-          background: "linear-gradient(135deg,#E8C77A,#C9A96E)",
-          boxShadow: "0 6px 24px rgba(201,169,110,.5), 0 0 0 8px rgba(232,199,122,.18)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <svg viewBox="0 0 24 24" width="34" height="34" fill="#fff" stroke="#fff" strokeWidth="1" strokeLinejoin="round"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.1 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.3l6.1-.7L12 3z" /></svg>
+      <div style={{ textAlign: "center", padding: "8px 0 14px" }}>
+        <span style={{ display: "inline-flex", width: 84, height: 84, borderRadius: "50%", background: PEACH_SOFT, alignItems: "center", justifyContent: "center", overflow: "hidden", marginBottom: 10 }}>
+          <Image src={HEAD_THINKING} alt="Miomi" width={74} height={74} style={{ objectFit: "contain" }} />
+        </span>
+        <h3 style={{ ...font, fontSize: 20, color: INK_STRONG, margin: 0 }}>Almost there</h3>
+        <p style={{ ...font, fontSize: 13, color: MUTED, margin: "6px 0 0", lineHeight: 1.5 }}>
+          {score} of {total} this time — no gold yet, and that is honest. One more look and it is yours.
+        </p>
+      </div>
+      <div style={{ background: CORAL_SOFT, border: `1px solid ${CORAL}`, borderRadius: 16, padding: "13px 15px", marginBottom: 14 }}>
+        <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: CORAL_DEEP, margin: 0, lineHeight: 1.5 }}>
+          Miomi’s tip: replay the phrase sounds before retrying — your ears will recognize the right answer before your eyes do.
+        </p>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button onClick={onReviewWords} style={{ ...font, flex: 1, fontSize: 12.5, fontWeight: 700, padding: "11px 8px", borderRadius: 99, border: `1px solid ${BORDER}`, background: "#fff", color: MUTED, cursor: "pointer" }}>Review words</button>
+        <button onClick={onReviewPhrases} style={{ ...font, flex: 1, fontSize: 12.5, fontWeight: 700, padding: "11px 8px", borderRadius: 99, border: `1px solid ${BORDER}`, background: "#fff", color: MUTED, cursor: "pointer" }}>Review phrases</button>
+      </div>
+      <PrimaryBtn label="Try the checkpoint again" onClick={onRetry} />
+    </div>
+  );
+}
+
+function RecapStep({ lesson, words, phrases, candos, result, onReview }: { lesson: Lesson; words: WordItem[]; phrases: PhraseItem[]; candos: Cando[]; result: { score: number; total: number } | null; onReview: () => void }) {
+  const cp = result ?? lesson.progress?.checkpoint ?? null;
+  return (
+    <div>
+      <div style={{ textAlign: "center", padding: "4px 0 14px" }}>
+        <div style={{ position: "relative", display: "inline-block", marginBottom: 8 }}>
+          <Image src={CELEBRATION} alt="Miomi celebrating" width={132} height={132} style={{ objectFit: "contain" }} />
+          <span style={{
+            position: "absolute", right: -4, bottom: 6, width: 34, height: 34, borderRadius: "50%",
+            background: "linear-gradient(135deg,#E8C77A,#C9A96E)",
+            boxShadow: "0 4px 14px rgba(201,169,110,.5), 0 0 0 5px rgba(232,199,122,.18)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff" stroke="#fff" strokeWidth="1" strokeLinejoin="round"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.1 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.3l6.1-.7L12 3z" /></svg>
+          </span>
         </div>
         <h3 style={{ ...font, fontSize: 20, color: INK_STRONG, margin: 0 }}>A <span style={{ color: "#A8853F", fontWeight: 700 }}>golden</span> moment</h3>
-        <p style={{ ...font, fontSize: 13, color: MUTED, margin: "6px 0 0", lineHeight: 1.5 }}>Lesson complete — these are things you can now do.</p>
+        <p style={{ ...font, fontSize: 13, color: MUTED, margin: "6px 0 0", lineHeight: 1.5 }}>Earned, not given — these are things you can now do.</p>
       </div>
       {candos.map((c, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 13, padding: "11px 13px", marginBottom: 8, boxShadow: CARD_SHADOW }}>

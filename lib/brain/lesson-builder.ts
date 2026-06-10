@@ -16,6 +16,7 @@ export type LessonCando = { label: string; cefr: string; skill: string };
 export type LessonWordItem = {
   word_en: string;
   word_th: string;
+  emoji: string | null;
   romanization: string | null;
   ipa: string | null;
   cefr_level: string | null;
@@ -60,7 +61,7 @@ function buildPlanSystem(level: string, targetName: string): string {
 }
 
 function buildPhraseSystem(level: string): string {
-  return `You are a bilingual Thai-English phrasebook author writing for a ${level} learner. Given the English meaning of something to say, reply STRICT JSON ONLY — no prose, no markdown fences — {"en": the natural short English sentence, "th": the natural, polite Thai sentence a real Thai speaker actually says (Thai script; polite particle where natural)}. REAL Thai only: never spell English sounds in Thai letters, never mix non-Thai words unless they are genuine everyday loanwords. Keep both short and everyday for ${level}. JSON only.`;
+  return `You are a bilingual Thai-English phrasebook author writing for a ${level} learner. Given the English meaning of something to say, reply STRICT JSON ONLY — no prose, no markdown fences — {"en": the natural short English sentence, "th": the natural, polite Thai sentence a real Thai speaker actually says (Thai script; polite particle where natural), "rom": romanization of the Thai with a space between every syllable (lowercase Latin letters, hyphens and spaces only)}. REAL Thai only: never spell English sounds in Thai letters, never mix non-Thai words unless they are genuine everyday loanwords. Keep both short and everyday for ${level}. JSON only.`;
 }
 
 function parseJson<T>(raw: string | null): T | null {
@@ -142,6 +143,7 @@ async function buildWordItem(
   return {
     word_en: resolved.word_en,
     word_th: resolved.word_th,
+    emoji: resolved.emoji ?? null,
     romanization: phonetics.th_romanization ?? resolved.th_romanization ?? null,
     ipa: phonetics.en_ipa ?? resolved.en_ipa ?? null,
     cefr_level: resolved.cefr_level ?? cefrLevel,
@@ -159,9 +161,10 @@ async function buildPhraseItem(
   const user = `Meaning to say: ${meaning}`;
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = attempt === 0 ? await callGroqJson(system, user) : await callGeminiJson(system, user);
-    const parsed = parseJson<{ en?: string; th?: string }>(raw);
+    const parsed = parseJson<{ en?: string; th?: string; rom?: string }>(raw);
     const en = (parsed?.en ?? "").trim();
     const th = (parsed?.th ?? "").trim();
+    const promptRom = (parsed?.rom ?? "").trim().toLowerCase();
     if (!en || !th || !isPureThai(th) || FOREIGN_SCRIPT.test(en)) continue;
     // ACCURACY GATE: blind verification — the Thai must be real and must match.
     const check = await verifyCard({ word_en: en, word_th: th, example_th: null, example_en: null });
@@ -173,7 +176,14 @@ async function buildPhraseItem(
       bankRomanization: null,
       bankIpa: null,
     });
-    return { en, th, romanization: phonetics.th_romanization ?? null };
+    // PHONETICS ARE FIRST-CLASS: phrase romanization must be syllable-spaced.
+    const segmented = (txt: string) => txt.includes(" ") || txt.includes("-");
+    const resolvedRom = (phonetics.th_romanization ?? "").trim();
+    const cleanPromptRom =
+      promptRom && /^[a-z' \-]+$/.test(promptRom) && segmented(promptRom) ? promptRom : null;
+    const romanization =
+      resolvedRom && segmented(resolvedRom) ? resolvedRom : cleanPromptRom ?? (resolvedRom || null);
+    return { en, th, romanization };
   }
   return null; // withhold over lie
 }

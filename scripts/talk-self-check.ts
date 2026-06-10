@@ -1746,6 +1746,18 @@ assert(
   "player has a real mic recorder and navigable trail",
 );
 assert(
+  playerPageSrc.includes("/miomi/head-happy.png") && playerPageSrc.includes("companion-celebration.png"),
+  "player uses real Miomi art, never drawn stand-ins",
+);
+assert(
+  playerPageSrc.includes("AlmostStep") && playerPageSrc.includes("PASS_RATIO"),
+  "gold is earned: failed checkpoints get the honest Almost-there path",
+);
+assert(
+  lessonBuilderSrc.includes("PHONETICS ARE FIRST-CLASS"),
+  "phrase romanization must be syllable-segmented",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",
