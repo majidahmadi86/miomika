@@ -1703,6 +1703,21 @@ assert(
   lessonBuilderSrc.includes("title_th: null"),
   "lesson builder never stores unverified Thai titles",
 );
+const lessonsRouteSrc = readFileSync(join(ROOT, "app/api/lessons/route.ts"), "utf8");
+assert(
+  lessonsRouteSrc.includes("buildLesson") && lessonsRouteSrc.includes("signin_required"),
+  "lessons API generates via the builder and gates guests",
+);
+assert(
+  lessonsRouteSrc.includes("levelFromCookie"),
+  "lesson generation honors the user's level cookie",
+);
+const lessonIdRouteSrc = readFileSync(join(ROOT, "app/api/lessons/[id]/route.ts"), "utf8");
+assert(
+  lessonIdRouteSrc.includes("sanitizeProgress") &&
+    lessonIdRouteSrc.includes('.eq("user_id", profile.id)'),
+  "lesson detail route sanitizes progress and enforces ownership",
+);
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
