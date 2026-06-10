@@ -1700,6 +1700,10 @@ assert(
   "lesson phrases are blind-verified before storing",
 );
 assert(
+  lessonBuilderSrc.includes("isPureThai") && lessonBuilderSrc.includes("FOREIGN_SCRIPT"),
+  "script purity gate: no foreign characters can enter lesson content",
+);
+assert(
   lessonBuilderSrc.includes("title_th: null"),
   "lesson builder never stores unverified Thai titles",
 );

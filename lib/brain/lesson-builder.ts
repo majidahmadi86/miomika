@@ -108,6 +108,15 @@ async function mapChunked<T, R>(
   return out;
 }
 
+/** ACCURACY GATE: script purity. Thai fields must be pure Thai script (plus
+ *  digits/spaces/basic punctuation); no field may carry CJK/kana/hangul/cyrillic. */
+const THAI_PURE = /^[\u0E00-\u0E7F0-9\s.,!?'"()\u2018\u2019\u201C\u201D\-\u2013\u2014:;%฿\u2026]+$/;
+const FOREIGN_SCRIPT = /[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF\u0400-\u04FF]/;
+function isPureThai(text: string): boolean {
+  const t = text.trim();
+  return THAI_PURE.test(t) && /[\u0E00-\u0E7F]/.test(t);
+}
+
 async function buildWordItem(
   meaning: string,
   learningTarget: "th" | "en",
@@ -119,6 +128,10 @@ async function buildWordItem(
     cefrLevel,
   });
   if (!resolved) return null; // ACCURACY GATE: withhold over lie
+  if (!isPureThai(resolved.word_th)) return null;
+  if (resolved.example_th && !isPureThai(resolved.example_th)) return null;
+  if (FOREIGN_SCRIPT.test(resolved.word_en)) return null;
+  if (resolved.example_en && FOREIGN_SCRIPT.test(resolved.example_en)) return null;
   const phonetics = await resolvePhonetics({
     word_th: resolved.word_th,
     word_en: resolved.word_en,
@@ -149,7 +162,7 @@ async function buildPhraseItem(
     const parsed = parseJson<{ en?: string; th?: string }>(raw);
     const en = (parsed?.en ?? "").trim();
     const th = (parsed?.th ?? "").trim();
-    if (!en || !th || !/[\u0E00-\u0E7F]/.test(th)) continue;
+    if (!en || !th || !isPureThai(th) || FOREIGN_SCRIPT.test(en)) continue;
     // ACCURACY GATE: blind verification — the Thai must be real and must match.
     const check = await verifyCard({ word_en: en, word_th: th, example_th: null, example_en: null });
     if (!check.headwordOk) continue;
