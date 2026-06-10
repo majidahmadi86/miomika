@@ -26,6 +26,9 @@ export function buildLearnerLevelBlock(level: CefrLevel, targetName: string): st
 - If what they actually say clearly shows a different level, adapt to the level they actually show — meet the real person, not the setting.`;
 }
 
+/** English-only, appended to both contract branches — Gemini reads it regardless of UI language. */
+const SENTENCE_TEACHING_RULE = `FULL-SENTENCE REQUESTS: when they ask how to say a whole sentence or expression ("how do I say…", "what's … in Thai / in English"), give the COMPLETE natural rendering of THEIR sentence in the target language and say it aloud, slowly, once — never shrink their sentence to a single different word. Then call get_word_to_teach with the most useful word or short phrase INSIDE that sentence so its card appears, and connect the card back to the full sentence they wanted to say.`;
+
 const EXPLICIT_NEW_WORD_RE =
   /(?:new\s+word|another\s+word|next\s+word|teach\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?word|give\s+me\s+(?:a\s+)?(?:new\s+)?word|learn\s+(?:a\s+)?new\s+word|คำใหม่|สอนคำใหม่|เรียนคำใหม่|เอาคำใหม่|ขอคำใหม่)/i;
 
@@ -232,7 +235,8 @@ export function buildTeachingModeContract(
 - บริบท + การใช้ (ไม่ใช่พูดตาม): ถ้ามี hook จริง ใส่ประโยคจาก tool ในคำตอบที่ผูกกับสิ่งที่พูดไปแล้ว แล้วถามให้ใช้คำ "${targetName}" — ห้าม "พูดตามหนู" หรือ word→repeat→next
 - สลับ NEW + REVIEW เมื่อมีคำทบทวนครบกำหนด — ห้ามสอนแต่คำใหม่ต่อเนื่อง
 - ต้องมีบัตรเสมอ: ทุกคำหรือวลีเป้าหมายที่สอนต้องผ่าน get_word_to_teach (หรือ get_word_to_review เพื่อทบทวนคำที่เคยเรียน) ผู้เรียนจะได้เห็นบัตรเสมอ — ห้ามสอนคำหรือวลีเป้าหมายโดยไม่เรียกเครื่องมือก่อน ถ้าเครื่องมือไม่มีที่เลือก ให้เสนอที่ใกล้เคียงแทน
-${buildLearnerLevelBlock(level, targetName)}`;
+${buildLearnerLevelBlock(level, targetName)}
+${SENTENCE_TEACHING_RULE}`;
   }
 
   return `TEACHING MODE v1 — lesson arc (always follow):
@@ -250,7 +254,8 @@ ${buildLearnerLevelBlock(level, targetName)}`;
 - CONTEXT + USE (not parrot): when a real hook exists, weave the tool's example into your reply tied to what was actually said; ask ONE tiny question so the learner USES the ${targetName} word in a genuine exchange — never "repeat after me", never bare word→repeat→next drills.
 - MIX new + review when spiral words are due — not an endless new-only stream.
 - CARD GUARANTEE: every target word OR PHRASE you teach goes through get_word_to_teach (or get_word_to_review to resurface a known one) so the learner always sees its card — never teach a target word or phrase without calling the tool for it first. If the tool returns nothing for your pick, offer a close related one.
-${buildLearnerLevelBlock(level, targetName)}`;
+${buildLearnerLevelBlock(level, targetName)}
+${SENTENCE_TEACHING_RULE}`;
 }
 
 export type PhaseNudgeOpts = {

@@ -1632,6 +1632,15 @@ assert(
   "teach and chat personas carry the smiling delivery cue",
 );
 assert(
+  buildTeachingModeContract("en", "th").includes("FULL-SENTENCE REQUESTS") &&
+    buildTeachingModeContract("th", "en").includes("FULL-SENTENCE REQUESTS"),
+  "teaching contract teaches whole sentences in both UI directions",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("never shrink their sentence"),
+  "sentence rule forbids flattening the user's sentence to a single word",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",
