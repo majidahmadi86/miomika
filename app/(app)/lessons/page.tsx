@@ -16,6 +16,7 @@ type LessonListItem = {
   topic: string;
   color: string;
   cefr_level: string;
+  learning_target: string;
   status: string;
   position: number;
   words_count: number;
@@ -200,6 +201,7 @@ export default function LessonsPage() {
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
                     {[
+                      l.learning_target === "en" ? "English" : "Thai",
                       l.topic,
                       `${l.words_count} words`,
                       `${l.phrases_count} phrases`,
@@ -216,12 +218,15 @@ export default function LessonsPage() {
                     <span style={{ ...font, display: "inline-flex", alignItems: "center", fontSize: 10.5, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: done ? "#3E9C82" : MUTED }}>
                       {done ? (<><GoldStar />Completed</>) : inProgress ? "In progress" : "Up next"}
                     </span>
-                    <span style={{
+                    <Link href={`/lessons/${l.id}`} style={{
                       ...font, fontSize: 12.5, fontWeight: 700, padding: "9px 18px",
-                      borderRadius: 99, border: `1px solid ${BORDER}`, color: MUTED, background: "transparent",
+                      borderRadius: 99, textDecoration: "none",
+                      ...(done
+                        ? { border: `1px solid ${BORDER}`, color: MUTED, background: "transparent" }
+                        : { border: "none", color: "#fff", background: CTA, boxShadow: CTA_SHADOW }),
                     }}>
-                      {done ? "Review · soon" : "Play · next update"}
-                    </span>
+                      {done ? "Review" : inProgress ? "Continue" : "Start"}
+                    </Link>
                   </div>
                 </div>
               );

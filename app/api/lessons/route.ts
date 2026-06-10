@@ -26,6 +26,7 @@ export type LessonListItem = {
   topic: string;
   color: string;
   cefr_level: string;
+  learning_target: string;
   status: string;
   position: number;
   words_count: number;
@@ -42,7 +43,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("lessons")
       .select(
-        "id, title_en, title_th, topic, color, cefr_level, status, position, content, progress",
+        "id, title_en, title_th, topic, color, cefr_level, learning_target, status, position, content, progress",
       )
       .eq("user_id", profile.id)
       .order("position", { ascending: true });
@@ -60,6 +61,7 @@ export async function GET() {
         topic: (row.topic as string) ?? "general",
         color: (row.color as string) ?? "peach",
         cefr_level: (row.cefr_level as string) ?? "A1",
+        learning_target: (row.learning_target as string) ?? "th",
         status: (row.status as string) ?? "planned",
         position: (row.position as number) ?? 0,
         words_count: Array.isArray(content.words) ? content.words.length : 0,

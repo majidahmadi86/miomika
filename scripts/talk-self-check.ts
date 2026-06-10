@@ -1728,6 +1728,15 @@ assert(
   lessonsPageSrc.includes('fetch("/api/lessons")') && lessonsPageSrc.includes("AmbientBackground"),
   "lessons page lists from the API under the real ambient background",
 );
+const playerPageSrc = readFileSync(join(ROOT, "app/(app)/lessons/[id]/page.tsx"), "utf8");
+assert(
+  playerPageSrc.includes("CheckpointStep") && playerPageSrc.includes("opt === q.right"),
+  "checkpoint questions are built from the lesson's own verified phrases",
+);
+assert(
+  playerPageSrc.includes("grading your sound in a coming update"),
+  "Say-it game is honest about what it can do today",
+);
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
