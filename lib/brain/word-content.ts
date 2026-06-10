@@ -54,7 +54,7 @@ function getGemini(): GoogleGenAI | null {
   return _gemini;
 }
 
-async function callGroqJson(system: string, user: string): Promise<string | null> {
+export async function callGroqJson(system: string, user: string): Promise<string | null> {
   const groq = getGroq();
   if (!groq) return null;
   try {
@@ -74,7 +74,7 @@ async function callGroqJson(system: string, user: string): Promise<string | null
   }
 }
 
-async function callGeminiJson(system: string, user: string): Promise<string | null> {
+export async function callGeminiJson(system: string, user: string): Promise<string | null> {
   const gemini = getGemini();
   if (!gemini) return null;
   try {
@@ -231,7 +231,7 @@ Be strict: when in doubt, set the boolean to false.`;
 // shown (we withhold rather than teach something wrong). The EXAMPLE is verified
 // separately — if it has any flaw it is dropped, so a bad example can never reach
 // the learner while a correct word still can.
-async function verifyCard(args: {
+export async function verifyCard(args: {
   word_en: string;
   word_th: string;
   example_th: string | null;

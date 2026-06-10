@@ -1690,6 +1690,19 @@ assert(
     buildTeachingModeContract("th", "en").includes("CAPABILITY HONESTY"),
   "capability honesty rule present in both UI directions",
 );
+const lessonBuilderSrc = readFileSync(join(ROOT, "lib/brain/lesson-builder.ts"), "utf8");
+assert(
+  lessonBuilderSrc.includes("resolveOrGenerateWord"),
+  "lesson words go through the verified card pipeline",
+);
+assert(
+  lessonBuilderSrc.includes("verifyCard") && lessonBuilderSrc.includes("ACCURACY GATE"),
+  "lesson phrases are blind-verified before storing",
+);
+assert(
+  lessonBuilderSrc.includes("title_th: null"),
+  "lesson builder never stores unverified Thai titles",
+);
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
