@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, TrendingUp, Sparkles, Gift, User } from "lucide-react";
+import { Home, TrendingUp, Sparkles, BookOpen, User } from "lucide-react";
 import { useUILanguage } from "@/lib/i18n/client";
 
 const tabs = [
   { href: "/home",      labelTh: "หน้าหลัก",  labelEn: "Home",   icon: Home     },
+  { href: "/lessons",   labelTh: "เรียน",      labelEn: "Learn",  icon: BookOpen },
+  { href: "/talk",      labelTh: "คุย",        labelEn: "Talk",   icon: Sparkles },
   { href: "/dashboard", labelTh: "แดชบอร์ด",  labelEn: "Growth", icon: TrendingUp },
-  { href: "/talk",      labelTh: "เรียน",      labelEn: "Learn",  icon: Sparkles },
-  { href: "/invite",    labelTh: "ชวนเพื่อน",  labelEn: "Invite", icon: Gift     },
   { href: "/me",        labelTh: "ฉัน",        labelEn: "Me",     icon: User     },
 ] as const;
 

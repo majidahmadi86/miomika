@@ -1,0 +1,286 @@
+"use client";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
+
+const AmbientBackground = dynamic(
+  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
+  { ssr: false },
+);
+
+type LessonListItem = {
+  id: string;
+  title_en: string;
+  title_th: string | null;
+  topic: string;
+  color: string;
+  cefr_level: string;
+  status: string;
+  position: number;
+  words_count: number;
+  phrases_count: number;
+  has_checkpoint: boolean;
+  progress: { step?: number; completed_at?: string | null };
+};
+
+const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
+  peach: { edge: "#FDBA74", soft: "#FEF1E3" },
+  pink: { edge: "#F9A8D4", soft: "#FDEAF4" },
+  lavender: { edge: "#C4B5FD", soft: "#F1EEFE" },
+  mint: { edge: "#A7F3D0", soft: "#EBFBF4" },
+  teal: { edge: "#7DD3C0", soft: "#E9F8F4" },
+  coral: { edge: "#FCA5A5", soft: "#FEEFEF" },
+};
+const INK = "#4A4136";
+const INK_STRONG = "#3C352B";
+const MUTED = "#9A8B73";
+const BORDER = "#EDE8E0";
+const CTA = "linear-gradient(135deg,#6ECDB8 0%,#34A98F 100%)";
+const CTA_SHADOW = "0 4px 16px -4px rgba(52,169,143,0.40)";
+const CARD_SHADOW = "0 1px 2px rgba(74,65,54,.05), 0 8px 22px rgba(74,65,54,.06)";
+
+function pctFor(l: LessonListItem): number {
+  if (l.status === "completed") return 100;
+  const step = typeof l.progress?.step === "number" ? l.progress.step : 0;
+  return Math.min(95, Math.round((step / 5) * 100));
+}
+
+function YarnRing({ pct, edge, done }: { pct: number; edge: string; done: boolean }) {
+  const dash = 113;
+  const offset = dash - (dash * pct) / 100;
+  return (
+    <div style={{ position: "relative", width: 46, height: 46, flex: "0 0 46px" }}>
+      <svg viewBox="0 0 46 46" style={{ width: 46, height: 46, transform: "rotate(-90deg)" }}>
+        <circle cx="23" cy="23" r="18" fill="none" stroke={BORDER} strokeWidth="4" />
+        <circle
+          cx="23" cy="23" r="18" fill="none"
+          stroke={done ? "#7DD3C0" : edge}
+          strokeWidth="4" strokeLinecap="round"
+          strokeDasharray={dash} strokeDashoffset={offset}
+        />
+      </svg>
+      <span style={{
+        position: "absolute", inset: 0, display: "flex", alignItems: "center",
+        justifyContent: "center", fontSize: 10, fontWeight: 700, color: MUTED,
+        fontFamily: "'Quicksand', sans-serif",
+      }}>
+        {done ? (
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#3E9C82" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4 10-10" /></svg>
+        ) : (
+          `${pct}%`
+        )}
+      </span>
+    </div>
+  );
+}
+
+function GoldStar() {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      width: 18, height: 18, borderRadius: "50%",
+      background: "linear-gradient(135deg,#E8C77A,#C9A96E)",
+      boxShadow: "0 2px 6px rgba(201,169,110,.4)", marginRight: 6,
+    }}>
+      <svg viewBox="0 0 24 24" width="10" height="10" fill="#fff"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.1 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.3l6.1-.7L12 3z" /></svg>
+    </span>
+  );
+}
+
+export default function LessonsPage() {
+  const { isGuest, authReady } = useGuestExploration();
+  const [lessons, setLessons] = useState<LessonListItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const [topic, setTopic] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genMsg, setGenMsg] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch("/api/lessons");
+      const j = (await r.json()) as { lessons?: LessonListItem[] };
+      setLessons(Array.isArray(j.lessons) ? j.lessons : []);
+    } catch {
+      setLessons([]);
+    } finally {
+      setLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authReady || isGuest) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; state is set only after await, matching the app's existing pattern
+    void refresh();
+  }, [authReady, isGuest, refresh]);
+
+  const generate = useCallback(async () => {
+    if (generating) return;
+    setGenerating(true);
+    setGenMsg("Miomi is planning your lesson — every word gets checked, give her a moment…");
+    try {
+      const r = await fetch("/api/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: topic.trim() || undefined }),
+      });
+      const j = (await r.json()) as { ok?: boolean; reason?: string };
+      if (j.ok) {
+        setGenMsg(null);
+        setTopic("");
+        setAskOpen(false);
+        await refresh();
+      } else {
+        setGenMsg("Miomi couldn't finish planning that one — try once more, or a different topic.");
+      }
+    } catch {
+      setGenMsg("Something slipped — try once more.");
+    } finally {
+      setGenerating(false);
+    }
+  }, [generating, topic, refresh]);
+
+  const font = { fontFamily: "'Quicksand', sans-serif" } as const;
+
+  return (
+    <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "#FAFAF6" }}>
+      <AmbientBackground mode="ambient" />
+      <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
+
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+          <h1 style={{ ...font, fontSize: 23, fontWeight: 700, color: INK_STRONG, margin: 0 }}>Lessons</h1>
+        </div>
+        <p style={{ ...font, fontSize: 13, color: MUTED, margin: "6px 0 18px" }}>
+          Planned for you by Miomi — each one start to finish.
+        </p>
+
+        {!authReady || (!isGuest && !loaded) ? (
+          <p style={{ ...font, fontSize: 13, color: MUTED }}>Loading…</p>
+        ) : isGuest ? (
+          <div style={{
+            background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18,
+            boxShadow: CARD_SHADOW, padding: 22, textAlign: "center",
+          }}>
+            <p style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>
+              Lessons live in your Miomika account
+            </p>
+            <p style={{ ...font, fontSize: 12.5, color: MUTED, margin: "8px 0 16px", lineHeight: 1.5 }}>
+              Sign up free and Miomi plans real lessons for you — saved, tracked, yours.
+            </p>
+            <Link href="/signup" style={{
+              ...font, display: "inline-block", fontSize: 14, fontWeight: 700,
+              padding: "12px 26px", borderRadius: 99, background: CTA, color: "#fff",
+              textDecoration: "none", boxShadow: CTA_SHADOW,
+            }}>
+              Sign up free
+            </Link>
+          </div>
+        ) : (
+          <>
+            {lessons.map((l) => {
+              const tc = TOPIC_HEX[l.color] ?? TOPIC_HEX.peach;
+              const done = l.status === "completed";
+              const inProgress = l.status === "in_progress";
+              const pct = pctFor(l);
+              return (
+                <div key={l.id} style={{
+                  position: "relative", background: "#FFFFFF", border: `1px solid ${BORDER}`,
+                  borderRadius: 18, boxShadow: CARD_SHADOW, padding: 16, marginBottom: 12, overflow: "hidden",
+                }}>
+                  <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5, background: tc.edge }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                    <div>
+                      <div style={{ ...font, fontSize: 15.5, fontWeight: 700, color: INK_STRONG }}>{l.title_en}</div>
+                      {l.title_th ? (
+                        <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: 13.5, color: MUTED, marginTop: 2 }}>{l.title_th}</div>
+                      ) : null}
+                    </div>
+                    <YarnRing pct={pct} edge={tc.edge} done={done} />
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                    {[
+                      l.topic,
+                      `${l.words_count} words`,
+                      `${l.phrases_count} phrases`,
+                      ...(l.has_checkpoint ? ["Checkpoint"] : []),
+                      l.cefr_level,
+                    ].map((chip) => (
+                      <span key={chip} style={{
+                        ...font, fontSize: 11, fontWeight: 600, padding: "4px 10px",
+                        borderRadius: 99, background: "#FFFFFF", border: `1px solid ${BORDER}`, color: MUTED,
+                      }}>{chip}</span>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+                    <span style={{ ...font, display: "inline-flex", alignItems: "center", fontSize: 10.5, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: done ? "#3E9C82" : MUTED }}>
+                      {done ? (<><GoldStar />Completed</>) : inProgress ? "In progress" : "Up next"}
+                    </span>
+                    <span style={{
+                      ...font, fontSize: 12.5, fontWeight: 700, padding: "9px 18px",
+                      borderRadius: 99, border: `1px solid ${BORDER}`, color: MUTED, background: "transparent",
+                    }}>
+                      {done ? "Review · soon" : "Play · next update"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div style={{
+              border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: 16, textAlign: "center",
+              background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)", marginTop: lessons.length ? 6 : 0,
+            }}>
+              <p style={{ ...font, fontSize: 14, fontWeight: 700, color: INK_STRONG, margin: 0 }}>
+                {lessons.length ? "+ Ask Miomi for a lesson on anything" : "Ask Miomi to plan your first lesson"}
+              </p>
+              <p style={{ ...font, fontSize: 12, color: MUTED, margin: "4px 0 0", lineHeight: 1.5 }}>
+                A topic, a situation, even grammar — she plans it, you learn it.
+              </p>
+              {askOpen || !lessons.length ? (
+                <div style={{ marginTop: 12 }}>
+                  <input
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="Topic (optional) — e.g. taxis, feelings, past tense"
+                    disabled={generating}
+                    style={{
+                      ...font, width: "100%", fontSize: 13.5, padding: "11px 14px",
+                      borderRadius: 12, border: `1px solid ${BORDER}`, color: INK,
+                      background: "#FFFFFF", outline: "none", boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    onClick={() => void generate()}
+                    disabled={generating}
+                    style={{
+                      ...font, width: "100%", marginTop: 10, fontSize: 14, fontWeight: 700,
+                      padding: "13px 20px", borderRadius: 99, border: "none", cursor: generating ? "default" : "pointer",
+                      background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: generating ? 0.7 : 1,
+                    }}
+                  >
+                    {generating ? "Miomi is planning…" : "Plan my lesson"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAskOpen(true)}
+                  style={{
+                    ...font, marginTop: 12, fontSize: 13, fontWeight: 700, padding: "10px 22px",
+                    borderRadius: 99, border: "none", cursor: "pointer",
+                    background: CTA, color: "#fff", boxShadow: CTA_SHADOW,
+                  }}
+                >
+                  Plan a lesson
+                </button>
+              )}
+              {genMsg ? (
+                <p style={{ ...font, fontSize: 12, color: MUTED, margin: "10px 0 0", lineHeight: 1.5 }}>{genMsg}</p>
+              ) : null}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

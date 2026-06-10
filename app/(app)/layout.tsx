@@ -62,7 +62,7 @@ export default function AppLayout({
   );
 }
 
-const SCREENS = ["/home", "/dashboard", "/create", "/invite", "/me"];
+const SCREENS = ["/home", "/lessons", "/dashboard", "/create", "/me"];
 
 function SwipeNavigator({
   children,

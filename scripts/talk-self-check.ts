@@ -1718,6 +1718,16 @@ assert(
     lessonIdRouteSrc.includes('.eq("user_id", profile.id)'),
   "lesson detail route sanitizes progress and enforces ownership",
 );
+const bottomNavSrc = readFileSync(join(ROOT, "components/ui/BottomNav.tsx"), "utf8");
+assert(
+  bottomNavSrc.includes('"/lessons"') && bottomNavSrc.includes('labelEn: "Talk"') && !bottomNavSrc.includes('"/invite"'),
+  "nav: Lessons owns Learn, Talk relabeled, Invite removed",
+);
+const lessonsPageSrc = readFileSync(join(ROOT, "app/(app)/lessons/page.tsx"), "utf8");
+assert(
+  lessonsPageSrc.includes('fetch("/api/lessons")') && lessonsPageSrc.includes("AmbientBackground"),
+  "lessons page lists from the API under the real ambient background",
+);
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
