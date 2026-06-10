@@ -872,11 +872,17 @@ export default function TalkPage() {
   );
 
   /** Mid-session mode flick: snapshot → soft reconnect with the new brain. */
+  const pendingModeSwitchRef = useRef<TalkConfig["mode"] | null>(null);
+  const switchLiveModeRef = useRef<((m: TalkConfig["mode"]) => Promise<void>) | null>(null);
   const switchLiveMode = useCallback(
     async (nextMode: TalkConfig["mode"]) => {
       const runtime = turnRuntimeRef.current;
       if (!runtime || !runtime.state.sessionActive) return;
-      if (!clientRef.current || reconnectInFlightRef.current) return;
+      if (!clientRef.current) return;
+      if (reconnectInFlightRef.current) {
+        pendingModeSwitchRef.current = nextMode;
+        return;
+      }
       reconnectInFlightRef.current = true;
       const wasListening = runtime.state.phase === "listening";
       setLiveUiState("connecting");
@@ -921,10 +927,18 @@ export default function TalkPage() {
         teardownSessionIntentional();
       } finally {
         reconnectInFlightRef.current = false;
+        const pending = pendingModeSwitchRef.current;
+        pendingModeSwitchRef.current = null;
+        if (pending && pending !== nextMode) {
+          void switchLiveModeRef.current?.(pending);
+        }
       }
     },
     [createLiveClient, wireLiveClient, syncTeachWordContext, dispatchTurn, startContinuousMic, stopContinuousMic, teardownSessionIntentional],
   );
+  useEffect(() => {
+    switchLiveModeRef.current = switchLiveMode;
+  }, [switchLiveMode]);
 
   const handleClientClose = useCallback(
     async (detail: LiveClientCloseDetail) => {
