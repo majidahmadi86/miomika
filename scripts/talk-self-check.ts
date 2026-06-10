@@ -1627,6 +1627,11 @@ assert(
   "card generation gets three attempts before withholding",
 );
 assert(
+  buildSystemInstruction("en", "th").includes("as if smiling") &&
+    buildSystemInstruction("en", "th", null, "chat").includes("as if smiling"),
+  "teach and chat personas carry the smiling delivery cue",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",
