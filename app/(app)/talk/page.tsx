@@ -819,7 +819,7 @@ export default function TalkPage() {
       try {
         const uiLanguage = sessionUiLangRef.current;
         const targetLanguage = sessionTargetLangRef.current;
-        await client.connect({ uiLanguage, targetLanguage, resume: true, mode: config.mode });
+        await client.connect({ uiLanguage, targetLanguage, resume: true, mode: config.mode, level: config.teach.level });
         memberContextRef.current = client.getMemberContext();
         syncTeachWordContext();
         lessonHadStartedRef.current = true;
@@ -868,6 +868,7 @@ export default function TalkPage() {
       dispatchTurn,
       stopContinuousMic,
       config.mode,
+      config.teach.level,
     ],
   );
 
@@ -900,6 +901,7 @@ export default function TalkPage() {
           targetLanguage: sessionTargetLangRef.current,
           resume: true,
           mode: nextMode,
+          level: loadTalkConfig().teach.level,
         });
         memberContextRef.current = client.getMemberContext();
         syncTeachWordContext();
@@ -1045,7 +1047,7 @@ export default function TalkPage() {
       setConversationLang(uiLanguage);
       setUiLang(uiLanguage);
 
-      await clientRef.current!.connect({ uiLanguage, targetLanguage, resume: false, mode: config.mode });
+      await clientRef.current!.connect({ uiLanguage, targetLanguage, resume: false, mode: config.mode, level: config.teach.level });
       memberContextRef.current = clientRef.current!.getMemberContext();
       syncTeachWordContext();
       lessonHadStartedRef.current = true;
@@ -1076,6 +1078,7 @@ export default function TalkPage() {
     teardownSessionIntentional,
     profile,
     config.teach.learning,
+    config.teach.level,
     config.mode,
     syncTeachWordContext,
   ]);

@@ -1594,6 +1594,30 @@ assert(
   "teaching contract: model chooses the word",
 );
 assert(
+  buildTeachingModeContract("en", "th").includes("LEARNER LEVEL: A1"),
+  "teaching contract defaults to CEFR A1 level block",
+);
+assert(
+  buildTeachingModeContract("th", "en", "B1").includes("LEARNER LEVEL: B1"),
+  "Thai-UI teaching contract carries the CEFR level block too",
+);
+assert(
+  buildSystemInstruction("en", "th", null, "teach", "B2").includes("Upper-intermediate"),
+  "teach instruction carries the selected CEFR level guidance",
+);
+assert(
+  !buildSystemInstruction("en", "th", null, "chat", "B2").includes("LEARNER LEVEL"),
+  "chat-mode instruction ignores CEFR level",
+);
+assert(
+  !buildSystemInstruction("en", "th", null, "translate", "B2").includes("LEARNER LEVEL"),
+  "translate-mode instruction ignores CEFR level",
+);
+assert(
+  buildTeachingModeContract("en", "th", "C1").includes("adapt to the level they actually show"),
+  "level block keeps the adapt-to-real-ability rule",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",

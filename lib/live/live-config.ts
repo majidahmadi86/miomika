@@ -2,6 +2,7 @@ import { Modality, type LiveConnectConfig } from "@google/genai";
 import {
   buildTeachingModeContract,
   GET_WORD_TO_REVIEW_DECLARATION,
+  type CefrLevel,
 } from "@/lib/talk/teaching-mode";
 import { buildContentHonestyContract } from "@/lib/brain/language";
 import {
@@ -37,8 +38,9 @@ export function appendTeachingModeInstruction(
   base: string,
   ui: "th" | "en",
   target: "th" | "en" | null,
+  level: CefrLevel = "A1",
 ): string {
-  return `${base}\n\n${buildTeachingModeContract(ui, target)}`;
+  return `${base}\n\n${buildTeachingModeContract(ui, target, level)}`;
 }
 
 export function buildSystemInstruction(
@@ -46,6 +48,7 @@ export function buildSystemInstruction(
   target: "th" | "en" | null,
   memberContext?: MemberContextBundle | null,
   mode: TalkMode = "teach",
+  level: CefrLevel = "A1",
 ): string {
   const uiName = ui === "en" ? "English" : "Thai";
   const targetName =
@@ -77,11 +80,12 @@ LANGUAGE CONTRACT — non-negotiable:
 - Do NOT switch the WHOLE conversation into ${targetName} unless the user clearly asks to converse in it.
 - Never change the app interface language or what you teach — those are the user's settings.
 - When the user repeats a TARGET word or short phrase you just taught, stay in ${uiName} — celebrate warmly, do not flip the whole reply into ${targetName}.
-- Assume the learner is a beginner in ${targetName} unless they clearly demonstrate fluency.
+- The learner's ${targetName} is CEFR ${level} — follow the LEARNER LEVEL rules at the end of the teaching contract.
 
 ${buildContentHonestyContract(ui)}${memberBlock ? `\n\n${memberBlock}` : ""}`,
     ui,
     target,
+    level,
   );
 }
 
@@ -141,6 +145,7 @@ export function buildLiveConfig(
   targetLanguage: "th" | "en" | null = "th",
   memberContext?: MemberContextBundle | null,
   mode: TalkMode = "teach",
+  level: CefrLevel = "A1",
 ): LiveConnectConfig {
   const isTeach = mode === "teach";
   return {
@@ -153,7 +158,7 @@ export function buildLiveConfig(
         prebuiltVoiceConfig: { voiceName },
       },
     },
-    systemInstruction: buildSystemInstruction(uiLanguage, targetLanguage, memberContext, mode),
+    systemInstruction: buildSystemInstruction(uiLanguage, targetLanguage, memberContext, mode, level),
     tools: isTeach
       ? [
           {

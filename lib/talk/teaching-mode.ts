@@ -8,6 +8,24 @@ export type LessonPhase = "review" | "focus" | "use" | "recap";
 export type WordPickKind = "new" | "review";
 export type ExplicitLessonRequest = "new_word" | "show_card";
 
+/** CEFR level — mirrors TeachConfig["level"] in lib/talk/modes.ts. */
+export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1";
+
+/** English-only guidance: Gemini follows English instructions regardless of UI language — no new Thai strings. */
+const LEVEL_GUIDANCE: Record<CefrLevel, string> = {
+  A1: "Absolute beginner: teach only very common, concrete everyday words and short survival phrases. Always give the meaning in their own language, keep example sentences very short and simple, say target words slowly and clearly, and never assume they recognize related vocabulary.",
+  A2: "Elementary: teach high-frequency words and practical everyday phrases. Use simple full sentences as examples, connect new words to ones they have already met, and still give the meaning in their own language for every new item.",
+  B1: "Intermediate: teach useful mid-frequency vocabulary, common expressions, and important multiple meanings of words they already know. Use natural full-sentence examples, invite them to build their own sentence with the word, and gently correct their mistakes.",
+  B2: "Upper-intermediate: teach nuanced vocabulary, collocations, register differences and idiomatic phrases. Use richer natural examples, challenge them to paraphrase or contrast similar words, and hold longer exchanges in the target language when they engage.",
+  C1: "Advanced: teach precise, sophisticated vocabulary, subtle differences between near-synonyms, idioms and natural collocations. Converse mostly in the target language when they engage, and focus on nuance, naturalness and register.",
+};
+
+export function buildLearnerLevelBlock(level: CefrLevel, targetName: string): string {
+  return `LEARNER LEVEL: ${level} (CEFR) in ${targetName} — calibrate every word choice, example sentence and question to this level: one small step beyond it, never far above or below.
+- ${LEVEL_GUIDANCE[level]}
+- If what they actually say clearly shows a different level, adapt to the level they actually show — meet the real person, not the setting.`;
+}
+
 const EXPLICIT_NEW_WORD_RE =
   /(?:new\s+word|another\s+word|next\s+word|teach\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?word|give\s+me\s+(?:a\s+)?(?:new\s+)?word|learn\s+(?:a\s+)?new\s+word|คำใหม่|สอนคำใหม่|เรียนคำใหม่|เอาคำใหม่|ขอคำใหม่)/i;
 
@@ -193,6 +211,7 @@ export function cardContextForWord(
 export function buildTeachingModeContract(
   ui: "th" | "en",
   target: "th" | "en" | null,
+  level: CefrLevel = "A1",
 ): string {
   const targetName =
     target === "en" ? "English" : target === "th" ? "Thai" : "TARGET_LANGUAGE";
@@ -212,7 +231,8 @@ export function buildTeachingModeContract(
 - ซื่อสัตย์เรื่องบริบท: ผูกคำได้เฉพาะสิ่งที่เกิดขึ้นจริงในการคุยครั้งนี้ — ห้ามแต่งประวัติร่วม ห้ามถามว่า "เมื่อกี้กิน X อยู่เหรอ" ถ้าไม่เคยพูดจริง; ไม่มี hook จริง → เสนอคำอย่างอบอุ่นซื่อสัตย์
 - บริบท + การใช้ (ไม่ใช่พูดตาม): ถ้ามี hook จริง ใส่ประโยคจาก tool ในคำตอบที่ผูกกับสิ่งที่พูดไปแล้ว แล้วถามให้ใช้คำ "${targetName}" — ห้าม "พูดตามหนู" หรือ word→repeat→next
 - สลับ NEW + REVIEW เมื่อมีคำทบทวนครบกำหนด — ห้ามสอนแต่คำใหม่ต่อเนื่อง
-- ต้องมีบัตรเสมอ: ทุกคำหรือวลีเป้าหมายที่สอนต้องผ่าน get_word_to_teach (หรือ get_word_to_review เพื่อทบทวนคำที่เคยเรียน) ผู้เรียนจะได้เห็นบัตรเสมอ — ห้ามสอนคำหรือวลีเป้าหมายโดยไม่เรียกเครื่องมือก่อน ถ้าเครื่องมือไม่มีที่เลือก ให้เสนอที่ใกล้เคียงแทน`;
+- ต้องมีบัตรเสมอ: ทุกคำหรือวลีเป้าหมายที่สอนต้องผ่าน get_word_to_teach (หรือ get_word_to_review เพื่อทบทวนคำที่เคยเรียน) ผู้เรียนจะได้เห็นบัตรเสมอ — ห้ามสอนคำหรือวลีเป้าหมายโดยไม่เรียกเครื่องมือก่อน ถ้าเครื่องมือไม่มีที่เลือก ให้เสนอที่ใกล้เคียงแทน
+${buildLearnerLevelBlock(level, targetName)}`;
   }
 
   return `TEACHING MODE v1 — lesson arc (always follow):
@@ -229,7 +249,8 @@ export function buildTeachingModeContract(
 - CONTEXT HONESTY: weave a word ONLY into genuine context that actually occurred in THIS conversation — NEVER "we were talking about X", "were you having basil?", or any fabricated present-moment or fabricated shared history unless it truly happened here. Reference ONLY real conversation and real memory-bundle facts. No real hook → introduce the word with warm honesty (offer it naturally), then invite USE.
 - CONTEXT + USE (not parrot): when a real hook exists, weave the tool's example into your reply tied to what was actually said; ask ONE tiny question so the learner USES the ${targetName} word in a genuine exchange — never "repeat after me", never bare word→repeat→next drills.
 - MIX new + review when spiral words are due — not an endless new-only stream.
-- CARD GUARANTEE: every target word OR PHRASE you teach goes through get_word_to_teach (or get_word_to_review to resurface a known one) so the learner always sees its card — never teach a target word or phrase without calling the tool for it first. If the tool returns nothing for your pick, offer a close related one.`;
+- CARD GUARANTEE: every target word OR PHRASE you teach goes through get_word_to_teach (or get_word_to_review to resurface a known one) so the learner always sees its card — never teach a target word or phrase without calling the tool for it first. If the tool returns nothing for your pick, offer a close related one.
+${buildLearnerLevelBlock(level, targetName)}`;
 }
 
 export type PhaseNudgeOpts = {

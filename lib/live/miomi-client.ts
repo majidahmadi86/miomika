@@ -158,12 +158,15 @@ export class MiomiLiveClient {
     targetLanguage: "th" | "en";
     resume?: boolean;
     mode?: TalkMode;
+    /** CEFR teaching level — only used by teach mode. */
+    level?: "A1" | "A2" | "B1" | "B2" | "C1";
   }): Promise<void> {
     const voice = opts.voice ?? LIVE_VOICE;
     const uiLanguage = opts.uiLanguage ?? "en";
     const targetLanguage = opts.targetLanguage ?? "th";
     const resume = opts.resume ?? false;
     const mode = opts.mode ?? "teach";
+    const level = opts.level ?? "A1";
 
     if (resume) {
       this.teachWordContext = {
@@ -214,7 +217,7 @@ export class MiomiLiveClient {
 
     this.session = (await ai.live.connect({
       model: LIVE_MODEL,
-      config: buildLiveConfig(voice, uiLanguage, targetLanguage, this.memberContext, mode),
+      config: buildLiveConfig(voice, uiLanguage, targetLanguage, this.memberContext, mode, level),
       callbacks: {
         onopen: () => {
           this.connected = true;
