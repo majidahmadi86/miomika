@@ -30,6 +30,9 @@ export function buildLearnerLevelBlock(level: CefrLevel, targetName: string): st
 /** English-only, appended to both contract branches — Gemini reads it regardless of UI language. */
 const SENTENCE_TEACHING_RULE = `FULL-SENTENCE REQUESTS: when they ask how to say a whole sentence or expression ("how do I say…", "what's … in Thai / in English"), give the COMPLETE natural rendering of THEIR sentence in the target language and say it aloud, slowly, once — never shrink their sentence to a single different word. Then call get_word_to_teach with the most useful word or short phrase INSIDE that sentence so its card appears, and connect the card back to the full sentence they wanted to say. Do this on their FIRST ask — never answer a sentence request with just one word from it and wait to be corrected.`;
 
+/** English-only, appended to both contract branches. */
+const CAPABILITY_HONESTY_RULE = `CAPABILITY HONESTY: never promise features you cannot deliver in this chat (quizzes, reading activities, planned lesson lists, dashboards) — offer only what you can truly do right now. Every full sentence you speak in the target language must be REAL, natural target-language — never mix in words from the other language unless they are genuine loanwords.`;
+
 const EXPLICIT_NEW_WORD_RE =
   /(?:new\s+word|another\s+word|next\s+word|teach\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?word|give\s+me\s+(?:a\s+)?(?:new\s+)?word|learn\s+(?:a\s+)?new\s+word|คำใหม่|สอนคำใหม่|เรียนคำใหม่|เอาคำใหม่|ขอคำใหม่)/i;
 
@@ -237,7 +240,8 @@ export function buildTeachingModeContract(
 - สลับ NEW + REVIEW เมื่อมีคำทบทวนครบกำหนด — ห้ามสอนแต่คำใหม่ต่อเนื่อง
 - ต้องมีบัตรเสมอ: ทุกคำหรือวลีเป้าหมายที่สอนต้องผ่าน get_word_to_teach (หรือ get_word_to_review เพื่อทบทวนคำที่เคยเรียน) ผู้เรียนจะได้เห็นบัตรเสมอ — ห้ามสอนคำหรือวลีเป้าหมายโดยไม่เรียกเครื่องมือก่อน ถ้าเครื่องมือไม่มีที่เลือก ให้เสนอที่ใกล้เคียงแทน
 ${buildLearnerLevelBlock(level, targetName)}
-${SENTENCE_TEACHING_RULE}`;
+${SENTENCE_TEACHING_RULE}
+${CAPABILITY_HONESTY_RULE}`;
   }
 
   return `TEACHING MODE v1 — lesson arc (always follow):
@@ -256,7 +260,8 @@ ${SENTENCE_TEACHING_RULE}`;
 - MIX new + review when spiral words are due — not an endless new-only stream.
 - CARD GUARANTEE: every target word OR PHRASE you teach goes through get_word_to_teach (or get_word_to_review to resurface a known one) so the learner always sees its card — never teach a target word or phrase without calling the tool for it first. If the tool returns nothing for your pick, offer a close related one.
 ${buildLearnerLevelBlock(level, targetName)}
-${SENTENCE_TEACHING_RULE}`;
+${SENTENCE_TEACHING_RULE}
+${CAPABILITY_HONESTY_RULE}`;
 }
 
 export type PhaseNudgeOpts = {

@@ -1678,6 +1678,19 @@ assert(
   "sentence rule applies on the first ask, not after correction",
 );
 assert(
+  buildSystemInstruction("en", "th").includes("NEVER describe a card that isn't on screen"),
+  "persona forbids narrating phantom or invented card content",
+);
+assert(
+  buildSystemInstruction("en", "th").includes("change it in Adjust"),
+  "direction-change requests route to Adjust instead of a silent dead end",
+);
+assert(
+  buildTeachingModeContract("en", "th").includes("CAPABILITY HONESTY") &&
+    buildTeachingModeContract("th", "en").includes("CAPABILITY HONESTY"),
+  "capability honesty rule present in both UI directions",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",
