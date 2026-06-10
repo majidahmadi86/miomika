@@ -1742,6 +1742,10 @@ assert(
   "Say-it game is honest about what it can do today",
 );
 assert(
+  playerPageSrc.includes("MediaRecorder") && playerPageSrc.includes("maxVisited"),
+  "player has a real mic recorder and navigable trail",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",
