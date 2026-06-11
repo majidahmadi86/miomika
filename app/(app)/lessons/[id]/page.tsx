@@ -503,9 +503,9 @@ function GamesStep(props: {
         })}
       </div>
       {tab === "say" ? <SayGame phrase={sayPhrase} target={target} say={say} done={!!games.say} onDone={() => handleDone("say")} /> : null}
-      {tab === "match" ? <MatchGame words={words} target={target} done={!!games.match} onDone={() => handleDone("match")} /> : null}
+      {tab === "match" ? <MatchGame words={words} target={target} say={say} done={!!games.match} onDone={() => handleDone("match")} /> : null}
       {tab === "listen" ? <ListenGame words={words} target={target} soft={MINT_SOFT} say={say} done={!!games.listen} onDone={() => handleDone("listen")} /> : null}
-      {tab === "fill" ? <FillGame words={words} done={!!games.fill} onDone={() => handleDone("fill")} /> : null}
+      {tab === "fill" ? <FillGame words={words} say={say} done={!!games.fill} onDone={() => handleDone("fill")} /> : null}
       {allDone ? <div style={{ marginTop: 14 }}><PrimaryBtn label="All done — checkpoint" onClick={onNext} /></div> : null}
     </div>
   );
@@ -614,7 +614,7 @@ function SayGame({ phrase, target, say, done, onDone }: { phrase: PhraseItem; ta
   );
 }
 
-function MatchGame({ words, target, done, onDone }: { words: WordItem[]; target: string; done: boolean; onDone: () => void }) {
+function MatchGame({ words, target, say, done, onDone }: { words: WordItem[]; target: string; say: (t: string) => void; done: boolean; onDone: () => void }) {
   const pairs = useMemo(() => shuffle(words).slice(0, 4), [words]);
   const cells = useMemo(() => shuffle(pairs.flatMap((w, i) => [
     { t: targetText(w, target), k: i, isThai: target !== "en" },
@@ -645,13 +645,20 @@ function MatchGame({ words, target, done, onDone }: { words: WordItem[]; target:
         {cells.map((c, idx) => {
           const isPaired = paired.has(c.k) || done;
           return (
-            <button key={idx} onClick={() => !isPaired && pick(idx)} style={{
-              ...(c.isThai ? thai : font), fontSize: 14.5, fontWeight: 600, cursor: isPaired ? "default" : "pointer",
-              background: isPaired ? TEAL_SOFT : sel === idx ? LAV_SOFT : "#fff",
-              border: `1px solid ${isPaired ? TEAL : shakeIdx === idx ? CORAL : sel === idx ? LAV : BORDER}`,
-              borderRadius: 13, padding: "14px 8px", boxShadow: CARD_SHADOW,
-              color: isPaired ? TEAL_DEEP : INK_STRONG, textAlign: "center",
-            }}>{c.t}</button>
+            <div key={idx} role="button" tabIndex={0}
+              onClick={() => !isPaired && pick(idx)}
+              onKeyDown={(e) => { if (!isPaired && (e.key === "Enter" || e.key === " ")) pick(idx); }}
+              style={{
+                ...(c.isThai ? thai : font), fontSize: 14.5, fontWeight: 600, cursor: isPaired ? "default" : "pointer",
+                background: isPaired ? TEAL_SOFT : sel === idx ? LAV_SOFT : "#fff",
+                border: `1px solid ${isPaired ? TEAL : shakeIdx === idx ? CORAL : sel === idx ? LAV : BORDER}`,
+                borderRadius: 13, padding: "12px 8px", boxShadow: CARD_SHADOW,
+                color: isPaired ? TEAL_DEEP : INK_STRONG, textAlign: "center",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+              }}>
+              <span>{c.t}</span>
+              {c.isThai ? <SoundBtn onClick={() => say(c.t)} bg={LAV_SOFT} color={LAV_DEEP} size={24} /> : null}
+            </div>
           );
         })}
       </div>
@@ -671,12 +678,9 @@ function ListenGame({ words, target, soft, say, done, onDone }: { words: WordIte
   const [wrongIdx, setWrongIdx] = useState<number | null>(null);
   return (
     <div style={{ textAlign: "center" }}>
-      <button onClick={() => { say(targetText(answer, target)); setPlayed(true); setMsg("Which one did you hear?"); }} style={{
-        width: 64, height: 64, borderRadius: "50%", border: `1px solid ${MINT}`, cursor: "pointer",
-        margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center", background: MINT_SOFT,
-      }} aria-label="Play the word">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill={MINT_DEEP}><path d="M8 5v14l11-7z" /></svg>
-      </button>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+        <SoundBtn onClick={() => { say(targetText(answer, target)); setPlayed(true); setMsg("Which one did you hear?"); }} bg={MINT_SOFT} color={MINT_DEEP} size={64} />
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 9, marginBottom: 12 }}>
         {options.map((w, i) => (
           <button key={i} onClick={() => {
@@ -703,7 +707,7 @@ function ListenGame({ words, target, soft, say, done, onDone }: { words: WordIte
   );
 }
 
-function FillGame({ words, done, onDone }: { words: WordItem[]; done: boolean; onDone: () => void }) {
+function FillGame({ words, say, done, onDone }: { words: WordItem[]; say: (t: string) => void; done: boolean; onDone: () => void }) {
   const pick = useMemo(() => shuffle(words.filter((w) => w.example_th && w.example_en && w.example_th!.includes(w.word_th)))[0] ?? null, [words]);
   const options = useMemo(() => {
     if (!pick) return [];
@@ -716,22 +720,34 @@ function FillGame({ words, done, onDone }: { words: WordItem[]; done: boolean; o
   const blanked = pick.example_th!.replace(pick.word_th, " ____ ");
   return (
     <div style={{ textAlign: "center" }}>
-      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${PEACH}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: 18, marginBottom: 14, lineHeight: 1.7 }}>
+      <div style={{ position: "relative", background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${PEACH}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: 18, marginBottom: 14, lineHeight: 1.7 }}>
+        {done ? (
+          <span style={{ position: "absolute", top: 10, right: 10 }}>
+            <SoundBtn onClick={() => say(pick.example_th!)} bg={PEACH_SOFT} color={PEACH_DEEP} size={28} />
+          </span>
+        ) : null}
         <div style={{ ...font, fontSize: 13.5, color: MUTED }}>“{pick.example_en}”</div>
         <div style={{ ...thai, fontSize: 17, fontWeight: 600, color: INK_STRONG, marginTop: 8 }}>{done ? pick.example_th : blanked}</div>
       </div>
       <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 12 }}>
         {options.map((w) => (
-          <button key={w.word_en} onClick={() => {
-            if (done) return;
-            if (w.word_en === pick.word_en) { setMsg("Perfect fit."); onDone(); }
-            else { setWrong(w.word_en); setMsg("Real word — wrong slot."); setTimeout(() => setWrong(null), 600); }
-          }} style={{
-            ...thai, fontSize: 16, fontWeight: 600, cursor: "pointer", padding: "9px 16px",
-            background: done && w.word_en === pick.word_en ? TEAL_SOFT : wrong === w.word_en ? CORAL_SOFT : "#fff",
-            border: `1px solid ${done && w.word_en === pick.word_en ? TEAL : wrong === w.word_en ? CORAL : BORDER}`,
-            borderRadius: 12, boxShadow: CARD_SHADOW, color: INK_STRONG,
-          }}>{w.word_th}</button>
+          <div key={w.word_en} role="button" tabIndex={0}
+            onClick={() => {
+              if (done) return;
+              if (w.word_en === pick.word_en) { setMsg("Perfect fit."); onDone(); }
+              else { setWrong(w.word_en); setMsg("Real word — wrong slot."); setTimeout(() => setWrong(null), 600); }
+            }}
+            onKeyDown={(e) => { if (!done && (e.key === "Enter" || e.key === " ")) (e.target as HTMLElement).click(); }}
+            style={{
+              ...thai, fontSize: 16, fontWeight: 600, cursor: "pointer", padding: "9px 14px",
+              background: done && w.word_en === pick.word_en ? TEAL_SOFT : wrong === w.word_en ? CORAL_SOFT : "#fff",
+              border: `1px solid ${done && w.word_en === pick.word_en ? TEAL : wrong === w.word_en ? CORAL : BORDER}`,
+              borderRadius: 12, boxShadow: CARD_SHADOW, color: INK_STRONG,
+              display: "inline-flex", alignItems: "center", gap: 8,
+            }}>
+            <span>{w.word_th}</span>
+            <SoundBtn onClick={() => say(w.word_th)} bg={PEACH_SOFT} color={PEACH_DEEP} size={24} />
+          </div>
         ))}
       </div>
       <p style={{ ...font, fontSize: 12.5, fontWeight: 700, color: done ? TEAL_DEEP : MUTED, margin: 0, minHeight: 18 }}>

@@ -64,7 +64,7 @@ function buildPlanSystem(level: string, targetName: string, avoid: string[]): st
 }
 
 function buildPhraseSystem(level: string): string {
-  return `You are a bilingual Thai-English phrasebook author writing for a ${level} learner. Given the English meaning of something to say, reply STRICT JSON ONLY — no prose, no markdown fences — {"en": the natural short English sentence, "th": the natural, polite Thai sentence a real Thai speaker actually says (Thai script; polite particle where natural), "rom": romanization of the Thai with a space between every syllable (lowercase Latin letters, hyphens and spaces only)}. REAL Thai only: never spell English sounds in Thai letters, never mix non-Thai words unless they are genuine everyday loanwords. Keep both short and everyday for ${level}. JSON only.`;
+  return `You are a bilingual Thai-English phrasebook author writing for a ${level} learner. Given the English meaning of something to say, reply STRICT JSON ONLY — no prose, no markdown fences — {"en": the natural short English sentence, "th": the natural, polite Thai sentence a real Thai speaker actually says (Thai script; polite particle where natural), "rom": romanization of the Thai as real syllables separated by single spaces, like "khun chuay phom tham kan baan" — NEVER letter-by-letter, lowercase Latin letters only}. REAL Thai only: never spell English sounds in Thai letters, never mix non-Thai words unless they are genuine everyday loanwords. Keep both short and everyday for ${level}. JSON only.`;
 }
 
 function parseJson<T>(raw: string | null): T | null {
@@ -121,6 +121,22 @@ function isPureThai(text: string): boolean {
   return THAI_PURE.test(t) && /[\u0E00-\u0E7F]/.test(t);
 }
 
+/** Every word deserves an example: generate + blind-verify one when the bank has none. */
+async function makeExample(word_en: string, word_th: string, level: string): Promise<{ en: string; th: string } | null> {
+  const system = `You write one short example sentence pair for a ${level} learner. Reply STRICT JSON ONLY — no prose, no markdown fences — {"en": a natural short English sentence using "${word_en}", "th": the natural Thai sentence that says the same thing and CONTAINS the exact Thai word "${word_th}"}. REAL Thai only — never transliterate English sounds. JSON only.`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = attempt === 0 ? await callGroqJson(system, "Write the example now.") : await callGeminiJson(system, "Write the example now.");
+    const parsed = parseJson<{ en?: string; th?: string }>(raw);
+    const en = (parsed?.en ?? "").trim();
+    const th = (parsed?.th ?? "").trim();
+    if (!en || !th || !th.includes(word_th) || !isPureThai(th) || FOREIGN_SCRIPT.test(en)) continue;
+    const check = await verifyCard({ word_en: en, word_th: th, example_th: null, example_en: null });
+    if (!check.headwordOk) continue; // ACCURACY GATE
+    return { en, th };
+  }
+  return null; // withhold over lie
+}
+
 async function buildWordItem(
   meaning: string,
   learningTarget: "th" | "en",
@@ -143,6 +159,13 @@ async function buildWordItem(
     bankRomanization: resolved.th_romanization,
     bankIpa: resolved.en_ipa,
   });
+  let exampleEn = resolved.example_en;
+  let exampleTh = resolved.example_th;
+  if (!exampleEn || !exampleTh) {
+    const made = await makeExample(resolved.word_en, resolved.word_th, cefrLevel);
+    exampleEn = made?.en ?? null;
+    exampleTh = made?.th ?? null;
+  }
   return {
     word_en: resolved.word_en,
     word_th: resolved.word_th,
@@ -150,8 +173,8 @@ async function buildWordItem(
     romanization: phonetics.th_romanization ?? resolved.th_romanization ?? null,
     ipa: phonetics.en_ipa ?? resolved.en_ipa ?? null,
     cefr_level: resolved.cefr_level ?? cefrLevel,
-    example_en: resolved.example_en,
-    example_th: resolved.example_th,
+    example_en: exampleEn,
+    example_th: exampleTh,
   };
 }
 
@@ -179,13 +202,22 @@ async function buildPhraseItem(
       bankRomanization: null,
       bankIpa: null,
     });
-    // PHONETICS ARE FIRST-CLASS: phrase romanization must be syllable-spaced.
-    const segmented = (txt: string) => txt.includes(" ") || txt.includes("-");
-    const resolvedRom = (phonetics.th_romanization ?? "").trim();
-    const cleanPromptRom =
-      promptRom && /^[a-z' \-]+$/.test(promptRom) && segmented(promptRom) ? promptRom : null;
-    const romanization =
-      resolvedRom && segmented(resolvedRom) ? resolvedRom : cleanPromptRom ?? (resolvedRom || null);
+    // PHONETICS ARE FIRST-CLASS: real syllables ("khun chuay phom") or nothing —
+    // never letter-by-letter spacing, never one unbroken run. Withhold over garbage.
+    const looksSyllabic = (txt: string): boolean => {
+      const t = txt.trim();
+      if (!t || !/^[a-z' \-]+$/.test(t)) return false;
+      const tokens = t.split(/[\s\-]+/).filter(Boolean);
+      if (tokens.length < 2 || tokens.length > 16) return false;
+      const singles = tokens.filter((x) => x.length === 1).length;
+      return singles / tokens.length <= 0.34;
+    };
+    const resolvedRom = (phonetics.th_romanization ?? "").trim().toLowerCase();
+    const romanization = looksSyllabic(resolvedRom)
+      ? resolvedRom
+      : looksSyllabic(promptRom)
+        ? promptRom
+        : null;
     return { en, th, romanization };
   }
   return null; // withhold over lie

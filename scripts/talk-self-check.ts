@@ -1811,6 +1811,14 @@ assert(
   "lesson cards show step-by-step progress dots",
 );
 assert(
+  lessonBuilderSrc.includes("makeExample") && lessonBuilderSrc.includes("looksSyllabic"),
+  "every word gets a verified example and phonetics are syllabic or withheld",
+);
+assert(
+  playerPageSrc.includes("function MatchGame({ words, target, say") && playerPageSrc.includes("function FillGame({ words, say"),
+  "audio reaches every game per the sound-button standard",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",
