@@ -262,7 +262,7 @@ export default function LearnPage() {
                 Your {targetName} path
               </h1>
               <p style={{ ...font, fontSize: 12, fontWeight: 600, color: MUTED, margin: "2px 0 0" }}>
-                Planned by Miomi, walked together
+                Planned by Miomi — she walks every step with you~
               </p>
             </div>
           </div>
@@ -503,6 +503,38 @@ export default function LearnPage() {
                 );
               })}
             </div>
+            <Link href="/lessons" style={{
+              display: "flex", alignItems: "center", gap: 11, textDecoration: "none",
+              border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: "13px 14px", marginTop: 14,
+              background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)",
+            }}>
+              <span style={{
+                ...font, width: 34, height: 34, borderRadius: 11, background: CTA, color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 19, fontWeight: 700, flex: "0 0 34px", boxShadow: CTA_SHADOW,
+              }}>+</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Create your own lesson</span>
+                <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
+                  Any topic, your level — tell Miomi and she plans it just for you~
+                </span>
+              </span>
+            </Link>
+            <Link href="/talk" style={{
+              display: "flex", alignItems: "center", gap: 11, textDecoration: "none",
+              background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18,
+              boxShadow: CARD_SHADOW, padding: "13px 14px", marginTop: 10,
+            }}>
+              <span style={{ width: 34, height: 34, borderRadius: "50%", background: "#FDEAF4", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px", overflow: "hidden" }}>
+                <Image src="/miomi/head-idle.png" alt="Miomi" width={30} height={30} style={{ objectFit: "contain" }} />
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Say it out loud with Miomi</span>
+                <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
+                  Everything you learn here, you two can chat about~
+                </span>
+              </span>
+            </Link>
             {genMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "4px 0 0", textAlign: "center" }}>{genMsg}</p> : null}
           </>
         )}
