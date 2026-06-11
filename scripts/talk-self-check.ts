@@ -1795,6 +1795,14 @@ assert(
   "pinned plan button opens and reveals the plan panel",
 );
 assert(
+  lessonBuilderSrc.includes("buildExtraPhrases") && lessonBuilderSrc.includes("TYPICAL OF"),
+  "extension covers phrases and planning targets the chosen level",
+);
+assert(
+  playerPageSrc.includes("keepPosition") && extendRouteSrc.includes("buildExtraPhrases"),
+  "extension keeps the learner's place and grows phrases too",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",

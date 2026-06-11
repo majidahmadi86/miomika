@@ -4,7 +4,7 @@ export const maxDuration = 30;
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
-import { buildExtraWords, type LessonWordItem } from "@/lib/brain/lesson-builder";
+import { buildExtraPhrases, buildExtraWords, type LessonPhraseItem, type LessonWordItem } from "@/lib/brain/lesson-builder";
 
 export async function POST(
   _req: NextRequest,
@@ -23,10 +23,12 @@ export async function POST(
       .maybeSingle();
     if (error) throw error;
     if (!lesson) return NextResponse.json({ ok: false, reason: "not_found" }, { status: 404 });
-    const content = (lesson.content ?? {}) as { words?: LessonWordItem[]; phrases?: unknown[]; candos?: unknown[] };
+    const content = (lesson.content ?? {}) as { words?: LessonWordItem[]; phrases?: LessonPhraseItem[]; candos?: unknown[] };
     const words = Array.isArray(content.words) ? content.words : [];
-    if (words.length >= 12) return NextResponse.json({ ok: false, reason: "limit" });
+    const phrases = Array.isArray(content.phrases) ? content.phrases : [];
+    if (words.length >= 12 && phrases.length >= 8) return NextResponse.json({ ok: false, reason: "limit" });
     const exclude = words.map((w) => w.word_en).filter(Boolean);
+    const phraseExclude = phrases.map((p) => p.en).filter(Boolean);
     const target = lesson.learning_target === "en" ? "en" : "th";
     const extra = (
       await buildExtraWords({
@@ -37,15 +39,27 @@ export async function POST(
         count: 3,
       })
     ).filter((w) => !exclude.includes(w.word_en));
-    if (!extra.length) return NextResponse.json({ ok: false, reason: "content_incomplete" });
-    const newContent = { ...content, words: [...words, ...extra] };
+    const extraPhrases =
+      phrases.length < 8
+        ? (
+            await buildExtraPhrases({
+              topic: (lesson.title_en as string) || (lesson.topic as string) || "everyday life",
+              cefrLevel: (lesson.cefr_level as string) || "A1",
+              learningTarget: target,
+              exclude: phraseExclude,
+              count: 2,
+            })
+          ).filter((p) => !phraseExclude.includes(p.en))
+        : [];
+    if (!extra.length && !extraPhrases.length) return NextResponse.json({ ok: false, reason: "content_incomplete" });
+    const newContent = { ...content, words: [...words, ...extra], phrases: [...phrases, ...extraPhrases] };
     const { error: updErr } = await supabase
       .from("lessons")
       .update({ content: newContent, updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("user_id", profile.id);
     if (updErr) throw updErr;
-    return NextResponse.json({ ok: true, added: extra.length });
+    return NextResponse.json({ ok: true, added: extra.length, addedPhrases: extraPhrases.length });
   } catch (err) {
     console.error("[api/lessons/extend] failed:", err);
     return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });

@@ -126,13 +126,14 @@ export default function LessonPlayerPage() {
   const [result, setResult] = useState<{ kind: "gold" | "almost"; score: number; total: number } | null>(null);
   const [attempt, setAttempt] = useState(1);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (keepPosition = false) => {
     if (!id) return;
     try {
       const r = await fetch(`/api/lessons/${id}`);
       const j = (await r.json()) as { lesson?: Lesson | null };
       if (!j.lesson) { setMissing(true); return; }
       setLesson(j.lesson);
+      if (keepPosition) return; // content refresh only — keep the learner exactly where they are
       setGames(j.lesson.progress?.games ?? {});
       const done = j.lesson.status === "completed";
       const saved = Math.min(j.lesson.progress?.step ?? 0, 4);
@@ -159,8 +160,9 @@ export default function LessonPlayerPage() {
     if (!id) return 0;
     try {
       const r = await fetch(`/api/lessons/${id}/extend`, { method: "POST" });
-      const j = (await r.json()) as { ok?: boolean; added?: number };
-      if (j.ok && (j.added ?? 0) > 0) { await load(); return j.added ?? 0; }
+      const j = (await r.json()) as { ok?: boolean; added?: number; addedPhrases?: number };
+      const total = (j.added ?? 0) + (j.addedPhrases ?? 0);
+      if (j.ok && total > 0) { await load(true); return total; }
       return 0;
     } catch { return 0; }
   }, [id, load]);
@@ -463,6 +465,7 @@ function GamesStep(props: {
   }, [words, phrases]);
   const [tab, setTab] = useState(available[0] ?? "say");
   const allDone = available.every((k) => games[k]);
+  const sayPhrase = useMemo(() => shuffle(phrases)[0] ?? phrases[0]!, [phrases]);
   const handleDone = (key: string) => {
     onGameDone(key);
     const rest = available.filter((k) => k !== key && !games[k]);
@@ -493,7 +496,7 @@ function GamesStep(props: {
           );
         })}
       </div>
-      {tab === "say" ? <SayGame phrase={phrases[0]!} target={target} say={say} done={!!games.say} onDone={() => handleDone("say")} /> : null}
+      {tab === "say" ? <SayGame phrase={sayPhrase} target={target} say={say} done={!!games.say} onDone={() => handleDone("say")} /> : null}
       {tab === "match" ? <MatchGame words={words} target={target} done={!!games.match} onDone={() => handleDone("match")} /> : null}
       {tab === "listen" ? <ListenGame words={words} target={target} soft={MINT_SOFT} say={say} done={!!games.listen} onDone={() => handleDone("listen")} /> : null}
       {tab === "fill" ? <FillGame words={words} done={!!games.fill} onDone={() => handleDone("fill")} /> : null}
@@ -606,7 +609,7 @@ function SayGame({ phrase, target, say, done, onDone }: { phrase: PhraseItem; ta
 }
 
 function MatchGame({ words, target, done, onDone }: { words: WordItem[]; target: string; done: boolean; onDone: () => void }) {
-  const pairs = useMemo(() => words.slice(0, 4), [words]);
+  const pairs = useMemo(() => shuffle(words).slice(0, 4), [words]);
   const cells = useMemo(() => shuffle(pairs.flatMap((w, i) => [
     { t: targetText(w, target), k: i, isThai: target !== "en" },
     { t: target === "en" ? w.word_th : w.word_en, k: i, isThai: target === "en" },
@@ -695,7 +698,7 @@ function ListenGame({ words, target, soft, say, done, onDone }: { words: WordIte
 }
 
 function FillGame({ words, done, onDone }: { words: WordItem[]; done: boolean; onDone: () => void }) {
-  const pick = useMemo(() => words.find((w) => w.example_th && w.example_en && w.example_th.includes(w.word_th)) ?? null, [words]);
+  const pick = useMemo(() => shuffle(words.filter((w) => w.example_th && w.example_en && w.example_th!.includes(w.word_th)))[0] ?? null, [words]);
   const options = useMemo(() => {
     if (!pick) return [];
     const others = shuffle(words.filter((w) => w.word_en !== pick.word_en)).slice(0, 2);
@@ -734,7 +737,7 @@ function FillGame({ words, done, onDone }: { words: WordItem[]; done: boolean; o
 
 function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: PhraseItem[]; candos: Cando[]; level: string; say: (t: string) => void; onDone: (score: number, total: number) => void }) {
   const questions = useMemo(() => {
-    const pool = phrases.slice(0, 5);
+    const pool = phrases.slice(0, 8);
     const numberFree = pool.filter((p) => !HAS_DIGIT.test(p.en) && !HAS_DIGIT.test(p.th));
     const qPool = numberFree.length >= 3 ? numberFree : pool;
     return shuffle(qPool).slice(0, Math.min(3, qPool.length)).map((p, i) => {
