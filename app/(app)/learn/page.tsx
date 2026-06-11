@@ -1,9 +1,8 @@
 "use client";
 
-// /learn — the Learn surface (Curriculum milestone).
-// Course surface live: system-planned journey per level — units, lazy lesson
-// building, checkpoints on the spine. Speak/Tests/Reading/Fun wire next.
-// NOT nav-linked until the build is complete.
+// /learn — the Learn surface (Curriculum milestone). Nav-linked.
+// Live: Course (journey + in-page lesson creator + own lessons + talk bridge).
+// Speak/Tests/Reading/Fun appear in the surface bar as each one ships.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -49,6 +48,7 @@ type CurriculumRow = {
 
 const LADDER = ["A1", "A2", "B1", "B2", "C1"] as const;
 const SURFACES = ["Course", "Speak", "Tests", "Reading", "Fun"] as const;
+const BUILT_SURFACES: ReadonlyArray<(typeof SURFACES)[number]> = ["Course"];
 type Surface = (typeof SURFACES)[number];
 
 const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
@@ -63,6 +63,7 @@ const TOPIC_DEEP: Record<string, string> = {
   peach: "#B06A28", pink: "#C2497E", lavender: "#6D5BBF",
   mint: "#3E7A66", teal: "#3E9C82", coral: "#C56A5E",
 };
+const INK = "#4A4136";
 const INK_STRONG = "#3C352B";
 const MUTED = "#9A8B73";
 const BORDER = "#EDE8E0";
@@ -97,6 +98,7 @@ export default function LearnPage() {
   const [myLevel, setMyLevel] = useState<string>("A1");
   const [viewLevel, setViewLevel] = useState<string | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumRow | null>(null);
+  const [allLessons, setAllLessons] = useState<LessonLite[]>([]);
   const [lessonsById, setLessonsById] = useState<Map<string, LessonLite>>(new Map());
   const [goldCount, setGoldCount] = useState(0);
   const [silverCount, setSilverCount] = useState(0);
@@ -106,6 +108,13 @@ export default function LearnPage() {
   const [planning, setPlanning] = useState(false);
   const [building, setBuilding] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
+  // In-page lesson creator
+  const [askOpen, setAskOpen] = useState(false);
+  const [topic, setTopic] = useState("");
+  const [planLevel, setPlanLevel] = useState<string>("auto");
+  const [planTarget, setPlanTarget] = useState<string>("auto");
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async (levelAsk?: string) => {
     try {
@@ -127,6 +136,7 @@ export default function LearnPage() {
         if (cp && cp.score === cp.total) gold += 1;
         else silver += 1;
       }
+      setAllLessons(lessons);
       setLessonsById(map);
       setGoldCount(gold);
       setSilverCount(silver);
@@ -196,6 +206,36 @@ export default function LearnPage() {
     }
   }, [building, viewLevel, router]);
 
+  const createLesson = useCallback(async () => {
+    if (creating) return;
+    setCreating(true);
+    setCreateMsg("Miomi is planning your lesson — every word gets checked, give her a moment…");
+    try {
+      const r = await fetch("/api/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: topic.trim() || undefined,
+          level: planLevel === "auto" ? undefined : planLevel,
+          target: planTarget === "auto" ? undefined : planTarget,
+        }),
+      });
+      const j = (await r.json()) as { ok?: boolean };
+      if (j.ok) {
+        setCreateMsg(null);
+        setTopic("");
+        setAskOpen(false);
+        await refresh(viewLevel ?? undefined);
+      } else {
+        setCreateMsg("Miomi couldn't finish planning that one — try once more, or a different topic.");
+      }
+    } catch {
+      setCreateMsg("Something slipped — try once more.");
+    } finally {
+      setCreating(false);
+    }
+  }, [creating, topic, planLevel, planTarget, viewLevel, refresh]);
+
   const myRank = Math.max(0, (LADDER as readonly string[]).indexOf(myLevel));
   const targetName = profile?.learning_target_language === "en" ? "English" : "Thai";
   const units = Array.isArray(curriculum?.plan?.units) ? curriculum.plan.units : [];
@@ -216,6 +256,8 @@ export default function LearnPage() {
   [unitLessons]);
   const firstOpen = units.find((u) => !unitComplete(u))?.position ?? (units.length ? units.length + 1 : 0);
   const openUnit = expandedUnit ?? firstOpen;
+  const journeyIds = new Set(units.flatMap((u) => u.lesson_ids ?? []));
+  const ownLessons = allLessons.filter((l) => !journeyIds.has(l.id));
 
   const stats = [
     { n: myLevel, l: "Level", icon: ShieldCheck },
@@ -223,6 +265,8 @@ export default function LearnPage() {
     { n: String(goldCount), l: "Gold", icon: Medal },
     { n: String(silverCount), l: "Silver", icon: Medal },
   ];
+
+  const shownSurfaces = SURFACES.filter((s) => (BUILT_SURFACES as readonly string[]).includes(s));
 
   return (
     <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "#FAFAF6" }}>
@@ -285,18 +329,20 @@ export default function LearnPage() {
           ) : null}
         </div>
 
-        {/* Surfaces */}
-        <div style={{ display: "flex", background: "#F1ECE3", borderRadius: 14, padding: 4, gap: 4, marginBottom: 16 }}>
-          {SURFACES.map((s) => (
-            <button key={s} onClick={() => setSurface(s)} style={{
-              ...font, flex: 1, fontSize: 12, fontWeight: 700, padding: "8px 0",
-              borderRadius: 10, border: "none", cursor: "pointer",
-              background: surface === s ? "#FFFFFF" : "transparent",
-              color: surface === s ? INK_STRONG : MUTED,
-              boxShadow: surface === s ? "0 2px 6px rgba(74,65,54,.08)" : "none",
-            }}>{s}</button>
-          ))}
-        </div>
+        {/* Surface bar — appears once more than one surface is live. */}
+        {shownSurfaces.length > 1 ? (
+          <div style={{ display: "flex", background: "#F1ECE3", borderRadius: 14, padding: 4, gap: 4, marginBottom: 16 }}>
+            {shownSurfaces.map((s) => (
+              <button key={s} onClick={() => setSurface(s)} style={{
+                ...font, flex: 1, fontSize: 12, fontWeight: 700, padding: "8px 0",
+                borderRadius: 10, border: "none", cursor: "pointer",
+                background: surface === s ? "#FFFFFF" : "transparent",
+                color: surface === s ? INK_STRONG : MUTED,
+                boxShadow: surface === s ? "0 2px 6px rgba(74,65,54,.08)" : "none",
+              }}>{s}</button>
+            ))}
+          </div>
+        ) : null}
 
         {!authReady || (!isGuest && !loaded) ? (
           <p style={{ ...font, fontSize: 13, color: MUTED }}>Loading…</p>
@@ -316,214 +362,324 @@ export default function LearnPage() {
               Sign up free
             </Link>
           </div>
-        ) : surface !== "Course" ? (
-          <div style={{ background: "#FFFFFF", border: `1.5px dashed ${BORDER}`, borderRadius: 18, padding: 22, textAlign: "center" }}>
-            <p style={{ ...font, fontSize: 14, fontWeight: 700, color: INK_STRONG, margin: 0 }}>
-              {surface} is being built here
-            </p>
-            <p style={{ ...font, fontSize: 12, color: MUTED, margin: "6px 0 0", lineHeight: 1.5 }}>
-              Step by step — Miomi first, always.
-            </p>
-          </div>
-        ) : !curriculum || !units.length ? (
-          <div style={{
-            border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: 22, textAlign: "center",
-            background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)",
-          }}>
-            <p style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>
-              Miomi plans your whole {viewLevel ?? myLevel} {targetName} journey
-            </p>
-            <p style={{ ...font, fontSize: 12, color: MUTED, margin: "6px 0 14px", lineHeight: 1.5 }}>
-              8 units, 4 checkpoints — laid out around what you already know, built as you walk.
-            </p>
-            <button onClick={() => void planJourney()} disabled={planning} style={{
-              ...font, fontSize: 14, fontWeight: 700, padding: "13px 26px", borderRadius: 99,
-              border: "none", cursor: planning ? "default" : "pointer",
-              background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: planning ? 0.7 : 1,
-            }}>
-              {planning ? "Miomi is planning…" : "Plan my journey"}
-            </button>
-            {genMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "10px 0 0" }}>{genMsg}</p> : null}
-          </div>
         ) : (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "0 2px 10px" }}>
-              <h2 style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>
-                {targetName} · {curriculum.cefr_level} journey
-              </h2>
-              <span style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED }}>
-                {units.length} units · {checkpoints.length} checkpoints
-              </span>
-            </div>
-            <div style={{ borderLeft: `3px solid ${BORDER}`, marginLeft: 10, paddingLeft: 16 }}>
-              {units.map((u) => {
-                const tc = TOPIC_HEX[u.color] ?? TOPIC_HEX.peach;
-                const deep = TOPIC_DEEP[u.color] ?? TOPIC_DEEP.peach;
-                const built = unitLessons(u);
-                const done = unitComplete(u);
-                const allGold = done && unitAllGold(u);
-                const isCurrent = u.position === firstOpen;
-                const isFuture = u.position > firstOpen;
-                const isOpen = u.position === openUnit;
-                const cp = checkpoints.find((c) => c.after_unit === u.position);
-                const cpReached = cp ? firstOpen > cp.after_unit : false;
-                const firstNonGoldId = built.find((l) => {
-                  const v = l.progress?.checkpoint;
-                  return l.status === "completed" && !(v && v.score === v.total);
-                })?.id;
-                return (
-                  <div key={u.position}>
-                    <div style={{ position: "relative", marginBottom: 10 }}>
-                      <span style={{
-                        position: "absolute", left: -28.5, top: 14, width: 22, height: 22, borderRadius: "50%",
-                        background: done ? (allGold ? GOLD_GRAD : SILVER_GRAD) : isCurrent ? CTA : "#FFFFFF",
-                        border: done || isCurrent ? "2px solid transparent" : `2px solid ${BORDER}`,
-                        boxShadow: isCurrent ? "0 0 0 4px rgba(52,169,143,.18)" : "none",
-                        opacity: isFuture ? 0.6 : 1,
-                      }} />
-                      <div style={{
-                        background: "#FFFFFF", border: `1px solid ${isCurrent ? "#7DD3C0" : BORDER}`,
-                        borderRadius: 18, boxShadow: isCurrent ? "0 4px 14px rgba(52,169,143,.12)" : CARD_SHADOW,
-                        overflow: "hidden", position: "relative",
-                      }}>
-                        <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5, background: tc.edge }} />
-                        <button onClick={() => setExpandedUnit(isOpen ? -1 : u.position)} style={{
-                          display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 13px 12px 16px",
-                          background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
-                        }}>
-                          <span style={{
-                            ...font, width: 34, height: 34, borderRadius: 11, background: tc.soft, color: deep,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 13, fontWeight: 700, flex: "0 0 34px",
-                          }}>{u.position}</span>
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.title_en}</span>
-                            <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED }}>
-                              {u.topic} · {built.length}/4 lessons{isCurrent ? " · You are here" : ""}
-                            </span>
-                          </span>
-                          {done ? (
-                            <span style={{ ...font, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: allGold ? "#A8853F" : "#5F6B79", whiteSpace: "nowrap" }}>
-                              <MedalDot gold={allGold} />{allGold ? "Gold" : "Silver"} · Completed
-                            </span>
-                          ) : (
-                            <span style={{ ...font, fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: "nowrap" }}>
-                              {isCurrent ? "" : "Up next"}
-                            </span>
-                          )}
+            {/* Create your own lesson — functional, in place, on top. */}
+            <div style={{
+              border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: askOpen ? 16 : 0,
+              background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)", marginBottom: 14, overflow: "hidden",
+            }}>
+              {!askOpen ? (
+                <button onClick={() => setAskOpen(true)} style={{
+                  display: "flex", alignItems: "center", gap: 11, width: "100%", padding: "13px 14px",
+                  background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+                }}>
+                  <span style={{
+                    ...font, width: 34, height: 34, borderRadius: 11, background: CTA, color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 19, fontWeight: 700, flex: "0 0 34px", boxShadow: CTA_SHADOW,
+                  }}>+</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Create your own lesson</span>
+                    <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
+                      Any topic, your level — tell Miomi and she plans it just for you~
+                    </span>
+                  </span>
+                </button>
+              ) : (
+                <div>
+                  <p style={{ ...font, fontSize: 14, fontWeight: 700, color: INK_STRONG, margin: 0, textAlign: "center" }}>
+                    Ask Miomi for a lesson on anything
+                  </p>
+                  <input
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="Topic (optional) — e.g. taxis, feelings, past tense"
+                    disabled={creating}
+                    style={{
+                      ...font, width: "100%", fontSize: 13.5, padding: "11px 14px", marginTop: 12,
+                      borderRadius: 12, border: `1px solid ${BORDER}`, color: INK,
+                      background: "#FFFFFF", outline: "none", boxSizing: "border-box",
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 10 }}>
+                    {["auto", "A1", "A2", "B1", "B2", "C1"].map((lv) => {
+                      const locked = lv !== "auto" && (LADDER as readonly string[]).indexOf(lv) > Math.min(myRank + 1, LADDER.length - 1);
+                      return (
+                        <button key={lv} onClick={() => !locked && setPlanLevel(lv)} disabled={creating || locked}
+                          title={locked ? "Unlocks as your level grows" : undefined}
+                          style={{
+                            ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
+                            cursor: locked ? "default" : "pointer", opacity: locked ? 0.4 : 1,
+                            border: `1px solid ${planLevel === lv ? "#C4B5FD" : BORDER}`,
+                            background: planLevel === lv ? "#F1EEFE" : "#FFFFFF",
+                            color: planLevel === lv ? "#6D5BBF" : MUTED,
+                            display: "inline-flex", alignItems: "center", gap: 4,
+                          }}>
+                          {locked ? <Lock style={{ width: 10, height: 10 }} aria-hidden /> : null}
+                          {lv === "auto" ? "My level" : lv}
                         </button>
-                        {isOpen ? (
-                          <div style={{ borderTop: `1px solid ${BORDER}`, padding: "4px 13px 12px 16px" }}>
-                            {(u.lesson_titles ?? []).map((title, li) => {
-                              const lesson = built[li];
-                              if (lesson) {
-                                const v = lesson.progress?.checkpoint;
-                                const lGold = lesson.status === "completed" && !!v && v.score === v.total;
-                                const lDone = lesson.status === "completed";
-                                return (
-                                  <div key={li} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: li < 3 ? `1px solid ${BORDER}` : "none" }}>
-                                    {lDone ? <MedalDot gold={lGold} /> : (
-                                      <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid #7DD3C0", flex: "0 0 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#34A98F" }} />
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 8 }}>
+                    {[
+                      { v: "auto", t: "My language" },
+                      { v: "th", t: "Thai" },
+                      { v: "en", t: "English" },
+                    ].map((o) => (
+                      <button key={o.v} onClick={() => setPlanTarget(o.v)} disabled={creating} style={{
+                        ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer",
+                        border: `1px solid ${planTarget === o.v ? "#7DD3C0" : BORDER}`,
+                        background: planTarget === o.v ? "#E9F8F4" : "#FFFFFF",
+                        color: planTarget === o.v ? "#3E9C82" : MUTED,
+                      }}>{o.t}</button>
+                    ))}
+                  </div>
+                  <button onClick={() => void createLesson()} disabled={creating} style={{
+                    ...font, width: "100%", marginTop: 10, fontSize: 14, fontWeight: 700,
+                    padding: "13px 20px", borderRadius: 99, border: "none", cursor: creating ? "default" : "pointer",
+                    background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: creating ? 0.7 : 1,
+                  }}>
+                    {creating ? "Miomi is planning…" : "Plan my lesson"}
+                  </button>
+                  <button onClick={() => { if (!creating) { setAskOpen(false); setCreateMsg(null); } }} style={{
+                    ...font, width: "100%", marginTop: 6, fontSize: 12, fontWeight: 700, padding: "8px 0",
+                    borderRadius: 99, border: "none", cursor: "pointer", background: "transparent", color: MUTED,
+                  }}>
+                    Close
+                  </button>
+                  {createMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "8px 0 0", lineHeight: 1.5, textAlign: "center" }}>{createMsg}</p> : null}
+                </div>
+              )}
+            </div>
+
+            {!curriculum || !units.length ? (
+              <div style={{
+                background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18,
+                boxShadow: CARD_SHADOW, padding: 22, textAlign: "center",
+              }}>
+                <p style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>
+                  Miomi plans your whole {viewLevel ?? myLevel} {targetName} journey
+                </p>
+                <p style={{ ...font, fontSize: 12, color: MUTED, margin: "6px 0 14px", lineHeight: 1.5 }}>
+                  8 units, 4 checkpoints — laid out around what you already know, built as you walk.
+                </p>
+                <button onClick={() => void planJourney()} disabled={planning} style={{
+                  ...font, fontSize: 14, fontWeight: 700, padding: "13px 26px", borderRadius: 99,
+                  border: "none", cursor: planning ? "default" : "pointer",
+                  background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: planning ? 0.7 : 1,
+                }}>
+                  {planning ? "Miomi is planning…" : "Plan my journey"}
+                </button>
+                {genMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "10px 0 0" }}>{genMsg}</p> : null}
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "0 2px 10px" }}>
+                  <h2 style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>
+                    {targetName} · {curriculum.cefr_level} journey
+                  </h2>
+                  <span style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED }}>
+                    {units.length} units · {checkpoints.length} checkpoints
+                  </span>
+                </div>
+                <div style={{ borderLeft: `3px solid ${BORDER}`, marginLeft: 10, paddingLeft: 16 }}>
+                  {units.map((u) => {
+                    const tc = TOPIC_HEX[u.color] ?? TOPIC_HEX.peach;
+                    const deep = TOPIC_DEEP[u.color] ?? TOPIC_DEEP.peach;
+                    const built = unitLessons(u);
+                    const done = unitComplete(u);
+                    const allGold = done && unitAllGold(u);
+                    const isCurrent = u.position === firstOpen;
+                    const isFuture = u.position > firstOpen;
+                    const isOpen = u.position === openUnit;
+                    const cp = checkpoints.find((c) => c.after_unit === u.position);
+                    const cpReached = cp ? firstOpen > cp.after_unit : false;
+                    const firstNonGoldId = built.find((l) => {
+                      const v = l.progress?.checkpoint;
+                      return l.status === "completed" && !(v && v.score === v.total);
+                    })?.id;
+                    return (
+                      <div key={u.position}>
+                        <div style={{ position: "relative", marginBottom: 10 }}>
+                          <span style={{
+                            position: "absolute", left: -28.5, top: 14, width: 22, height: 22, borderRadius: "50%",
+                            background: done ? (allGold ? GOLD_GRAD : SILVER_GRAD) : isCurrent ? CTA : "#FFFFFF",
+                            border: done || isCurrent ? "2px solid transparent" : `2px solid ${BORDER}`,
+                            boxShadow: isCurrent ? "0 0 0 4px rgba(52,169,143,.18)" : "none",
+                            opacity: isFuture ? 0.6 : 1,
+                          }} />
+                          <div style={{
+                            background: "#FFFFFF", border: `1px solid ${isCurrent ? "#7DD3C0" : BORDER}`,
+                            borderRadius: 18, boxShadow: isCurrent ? "0 4px 14px rgba(52,169,143,.12)" : CARD_SHADOW,
+                            overflow: "hidden", position: "relative",
+                          }}>
+                            <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5, background: tc.edge }} />
+                            <button onClick={() => setExpandedUnit(isOpen ? -1 : u.position)} style={{
+                              display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 13px 12px 16px",
+                              background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+                            }}>
+                              <span style={{
+                                ...font, width: 34, height: 34, borderRadius: 11, background: tc.soft, color: deep,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: 13, fontWeight: 700, flex: "0 0 34px",
+                              }}>{u.position}</span>
+                              <span style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.title_en}</span>
+                                <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED }}>
+                                  {u.topic} · {built.length}/4 lessons{isCurrent ? " · You are here" : ""}
+                                </span>
+                              </span>
+                              {done ? (
+                                <span style={{ ...font, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: allGold ? "#A8853F" : "#5F6B79", whiteSpace: "nowrap" }}>
+                                  <MedalDot gold={allGold} />{allGold ? "Gold" : "Silver"} · Completed
+                                </span>
+                              ) : (
+                                <span style={{ ...font, fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: "nowrap" }}>
+                                  {isCurrent ? "" : "Up next"}
+                                </span>
+                              )}
+                            </button>
+                            {isOpen ? (
+                              <div style={{ borderTop: `1px solid ${BORDER}`, padding: "4px 13px 12px 16px" }}>
+                                {(u.lesson_titles ?? []).map((title, li) => {
+                                  const lesson = built[li];
+                                  if (lesson) {
+                                    const v = lesson.progress?.checkpoint;
+                                    const lGold = lesson.status === "completed" && !!v && v.score === v.total;
+                                    const lDone = lesson.status === "completed";
+                                    return (
+                                      <div key={li} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: li < 3 ? `1px solid ${BORDER}` : "none" }}>
+                                        {lDone ? <MedalDot gold={lGold} /> : (
+                                          <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid #7DD3C0", flex: "0 0 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#34A98F" }} />
+                                          </span>
+                                        )}
+                                        <span style={{ flex: 1, minWidth: 0 }}>
+                                          <span style={{ ...font, display: "block", fontSize: 12.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lesson.title_en}</span>
+                                          <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>
+                                            {lDone ? (lGold ? "Gold · Completed" : "Silver · Completed") : "In progress"}
+                                          </span>
+                                        </span>
+                                        <Link href={`/lessons/${lesson.id}`} style={{
+                                          ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99, textDecoration: "none",
+                                          ...(lDone
+                                            ? { border: `1px solid ${BORDER}`, color: MUTED, background: "transparent" }
+                                            : { border: "none", color: "#fff", background: CTA, boxShadow: CTA_SHADOW }),
+                                        }}>
+                                          {lDone ? "Review" : "Continue"}
+                                        </Link>
+                                      </div>
+                                    );
+                                  }
+                                  const isNext = li === built.length && isCurrent;
+                                  return (
+                                    <div key={li} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: li < 3 ? `1px solid ${BORDER}` : "none", opacity: isNext ? 1 : 0.5 }}>
+                                      <span style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isNext ? "#7DD3C0" : BORDER}`, flex: "0 0 18px" }} />
+                                      <span style={{ flex: 1, minWidth: 0 }}>
+                                        <span style={{ ...font, display: "block", fontSize: 12.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
+                                        <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>{isNext ? "Miomi builds it when you start" : "Up next"}</span>
                                       </span>
-                                    )}
-                                    <span style={{ flex: 1, minWidth: 0 }}>
-                                      <span style={{ ...font, display: "block", fontSize: 12.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lesson.title_en}</span>
-                                      <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>
-                                        {lDone ? (lGold ? "Gold · Completed" : "Silver · Completed") : "In progress"}
-                                      </span>
-                                    </span>
-                                    <Link href={`/lessons/${lesson.id}`} style={{
-                                      ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99, textDecoration: "none",
-                                      ...(lDone
-                                        ? { border: `1px solid ${BORDER}`, color: MUTED, background: "transparent" }
-                                        : { border: "none", color: "#fff", background: CTA, boxShadow: CTA_SHADOW }),
-                                    }}>
-                                      {lDone ? "Review" : "Continue"}
-                                    </Link>
-                                  </div>
-                                );
-                              }
-                              const isNext = li === built.length && isCurrent;
-                              return (
-                                <div key={li} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: li < 3 ? `1px solid ${BORDER}` : "none", opacity: isNext ? 1 : 0.5 }}>
-                                  <span style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isNext ? "#7DD3C0" : BORDER}`, flex: "0 0 18px" }} />
-                                  <span style={{ flex: 1, minWidth: 0 }}>
-                                    <span style={{ ...font, display: "block", fontSize: 12.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
-                                    <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>{isNext ? "Miomi builds it when you start" : "Up next"}</span>
-                                  </span>
-                                  {isNext ? (
-                                    <button onClick={() => void buildNextLesson(u.position)} disabled={building} style={{
-                                      ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
-                                      border: "none", cursor: building ? "default" : "pointer",
-                                      background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: building ? 0.7 : 1,
-                                    }}>
-                                      {building ? "Planning…" : "Start"}
-                                    </button>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                            {!allGold && done && firstNonGoldId ? (
-                              <Link href={`/lessons/${firstNonGoldId}`} style={{ ...font, display: "inline-block", fontSize: 11.5, fontWeight: 700, color: "#3E9C82", textDecoration: "none", marginTop: 8 }}>
-                                Retry for gold
-                              </Link>
+                                      {isNext ? (
+                                        <button onClick={() => void buildNextLesson(u.position)} disabled={building} style={{
+                                          ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
+                                          border: "none", cursor: building ? "default" : "pointer",
+                                          background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: building ? 0.7 : 1,
+                                        }}>
+                                          {building ? "Planning…" : "Start"}
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
+                                {!allGold && done && firstNonGoldId ? (
+                                  <Link href={`/lessons/${firstNonGoldId}`} style={{ ...font, display: "inline-block", fontSize: 11.5, fontWeight: 700, color: "#3E9C82", textDecoration: "none", marginTop: 8 }}>
+                                    Retry for gold
+                                  </Link>
+                                ) : null}
+                              </div>
                             ) : null}
+                          </div>
+                        </div>
+                        {cp ? (
+                          <div style={{ position: "relative", marginBottom: 10 }}>
+                            <span style={{
+                              position: "absolute", left: -28.5, top: 14, width: 22, height: 22, borderRadius: "50%",
+                              background: "#FFFFFF", border: `2px solid ${cpReached ? "#7DD3C0" : BORDER}`, opacity: cpReached ? 1 : 0.7,
+                            }} />
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF",
+                              border: `1.5px ${cpReached ? "solid #7DD3C0" : `dashed ${BORDER}`}`, borderRadius: 18, padding: "11px 13px",
+                            }}>
+                              <span style={{
+                                width: 34, height: 34, borderRadius: "50%", background: "#F1ECE3", color: MUTED,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontFamily: "'Sarabun', sans-serif", fontSize: 16, fontWeight: 700, flex: "0 0 34px",
+                              }}>{cp.badge}</span>
+                              <span style={{ flex: 1 }}>
+                                <span style={{ ...font, display: "block", fontSize: 13, fontWeight: 700, color: INK_STRONG }}>
+                                  {cp.kind === "level_test" ? `${curriculum.cefr_level} level test` : `Checkpoint ${cp.badge}`}
+                                </span>
+                                <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED }}>
+                                  {cpReached ? "Miomi is preparing this — coming in an update" : `After unit ${cp.after_unit}`}
+                                </span>
+                              </span>
+                            </div>
                           </div>
                         ) : null}
                       </div>
+                    );
+                  })}
+                </div>
+                {genMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "4px 0 0", textAlign: "center" }}>{genMsg}</p> : null}
+              </>
+            )}
+
+            {ownLessons.length ? (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "18px 2px 10px" }}>
+                  <h2 style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>Your own lessons</h2>
+                  <span style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED }}>{ownLessons.length}</span>
+                </div>
+                {ownLessons.map((l) => {
+                  const v = l.progress?.checkpoint;
+                  const lGold = l.status === "completed" && !!v && v.score === v.total;
+                  const lDone = l.status === "completed";
+                  const inProgress = l.status === "in_progress";
+                  return (
+                    <div key={l.id} style={{
+                      display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF",
+                      border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW,
+                      padding: "12px 14px", marginBottom: 10,
+                    }}>
+                      {lDone ? <MedalDot gold={lGold} /> : (
+                        <span style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${inProgress ? "#7DD3C0" : BORDER}`, flex: "0 0 18px" }} />
+                      )}
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.title_en}</span>
+                        <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>
+                          {lDone ? (lGold ? "Gold · Completed" : "Silver · Completed") : inProgress ? "In progress" : "Up next"}
+                        </span>
+                      </span>
+                      <Link href={`/lessons/${l.id}`} style={{
+                        ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99, textDecoration: "none",
+                        ...(lDone
+                          ? { border: `1px solid ${BORDER}`, color: MUTED, background: "transparent" }
+                          : { border: "none", color: "#fff", background: CTA, boxShadow: CTA_SHADOW }),
+                      }}>
+                        {lDone ? "Review" : inProgress ? "Continue" : "Start"}
+                      </Link>
                     </div>
-                    {cp ? (
-                      <div style={{ position: "relative", marginBottom: 10 }}>
-                        <span style={{
-                          position: "absolute", left: -28.5, top: 14, width: 22, height: 22, borderRadius: "50%",
-                          background: "#FFFFFF", border: `2px solid ${cpReached ? "#7DD3C0" : BORDER}`, opacity: cpReached ? 1 : 0.7,
-                        }} />
-                        <div style={{
-                          display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF",
-                          border: `1.5px ${cpReached ? "solid #7DD3C0" : `dashed ${BORDER}`}`, borderRadius: 18, padding: "11px 13px",
-                        }}>
-                          <span style={{
-                            width: 34, height: 34, borderRadius: "50%", background: "#F1ECE3", color: MUTED,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontFamily: "'Sarabun', sans-serif", fontSize: 16, fontWeight: 700, flex: "0 0 34px",
-                          }}>{cp.badge}</span>
-                          <span style={{ flex: 1 }}>
-                            <span style={{ ...font, display: "block", fontSize: 13, fontWeight: 700, color: INK_STRONG }}>
-                              {cp.kind === "level_test" ? `${curriculum.cefr_level} level test` : `Checkpoint ${cp.badge}`}
-                            </span>
-                            <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED }}>
-                              {cpReached ? "Miomi is preparing this — coming in an update" : `After unit ${cp.after_unit}`}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-            <Link href="/lessons" style={{
-              display: "flex", alignItems: "center", gap: 11, textDecoration: "none",
-              border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: "13px 14px", marginTop: 14,
-              background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)",
-            }}>
-              <span style={{
-                ...font, width: 34, height: 34, borderRadius: 11, background: CTA, color: "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 19, fontWeight: 700, flex: "0 0 34px", boxShadow: CTA_SHADOW,
-              }}>+</span>
-              <span style={{ minWidth: 0 }}>
-                <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Create your own lesson</span>
-                <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
-                  Any topic, your level — tell Miomi and she plans it just for you~
-                </span>
-              </span>
-            </Link>
+                  );
+                })}
+              </>
+            ) : null}
+
             <Link href="/talk" style={{
               display: "flex", alignItems: "center", gap: 11, textDecoration: "none",
               background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18,
-              boxShadow: CARD_SHADOW, padding: "13px 14px", marginTop: 10,
+              boxShadow: CARD_SHADOW, padding: "13px 14px", marginTop: 14,
             }}>
               <span style={{ width: 34, height: 34, borderRadius: "50%", background: "#FDEAF4", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px", overflow: "hidden" }}>
                 <Image src="/miomi/head-idle.png" alt="Miomi" width={30} height={30} style={{ objectFit: "contain" }} />
@@ -535,7 +691,6 @@ export default function LearnPage() {
                 </span>
               </span>
             </Link>
-            {genMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "4px 0 0", textAlign: "center" }}>{genMsg}</p> : null}
           </>
         )}
       </div>

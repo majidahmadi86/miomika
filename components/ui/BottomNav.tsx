@@ -7,7 +7,7 @@ import { useUILanguage } from "@/lib/i18n/client";
 
 const tabs = [
   { href: "/home",      labelTh: "หน้าหลัก",  labelEn: "Home",   icon: Home     },
-  { href: "/lessons",   labelTh: "เรียน",      labelEn: "Learn",  icon: BookOpen },
+  { href: "/learn",     labelTh: "เรียน",      labelEn: "Learn",  icon: BookOpen },
   { href: "/talk",      labelTh: "คุย",        labelEn: "Talk",   icon: Sparkles },
   { href: "/dashboard", labelTh: "แดชบอร์ด",  labelEn: "Growth", icon: TrendingUp },
   { href: "/me",        labelTh: "ฉัน",        labelEn: "Me",     icon: User     },

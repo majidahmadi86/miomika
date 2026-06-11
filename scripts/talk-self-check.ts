@@ -1724,8 +1724,8 @@ assert(
 );
 const bottomNavSrc = readFileSync(join(ROOT, "components/ui/BottomNav.tsx"), "utf8");
 assert(
-  bottomNavSrc.includes('"/lessons"') && bottomNavSrc.includes('labelEn: "Talk"') && !bottomNavSrc.includes('"/invite"'),
-  "nav: Lessons owns Learn, Talk relabeled, Invite removed",
+  bottomNavSrc.includes('"/learn"') && bottomNavSrc.includes('labelEn: "Talk"') && !bottomNavSrc.includes('"/invite"'),
+  "nav: Learn owns /learn, Talk relabeled, Invite removed",
 );
 const lessonsPageSrc = readFileSync(join(ROOT, "app/(app)/lessons/page.tsx"), "utf8");
 assert(
