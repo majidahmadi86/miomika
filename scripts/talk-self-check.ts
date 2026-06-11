@@ -1727,6 +1727,26 @@ assert(
   bottomNavSrc.includes('"/learn"') && bottomNavSrc.includes('labelEn: "Talk"') && !bottomNavSrc.includes('"/invite"'),
   "nav: Learn owns /learn, Talk relabeled, Invite removed",
 );
+const sessionLiveConfigSrc = readFileSync(join(ROOT, "lib/live/live-config.ts"), "utf8");
+assert(
+  sessionLiveConfigSrc.includes("buildSessionLiveConfig") &&
+    sessionLiveConfigSrc.includes("REPORT_STAGE_DECLARATION") &&
+    sessionLiveConfigSrc.includes("CONFIDENT SPEAKING SESSION CONTRACT"),
+  "speaking room: session brain + report_stage declared (additive)",
+);
+assert(
+  sessionLiveConfigSrc.includes('LIVE_VOICE = "Leda"') &&
+    sessionLiveConfigSrc.includes("PERSONA_SESSION") &&
+    sessionLiveConfigSrc.includes("NEVER claim a score"),
+  "speaking room: Leda lock intact + tutor persona + feedback honesty",
+);
+const sessionClientSrc = readFileSync(join(ROOT, "lib/live/miomi-client.ts"), "utf8");
+assert(
+  sessionClientSrc.includes('fc.name === "report_stage"') &&
+    sessionClientSrc.includes("opts.session") &&
+    sessionClientSrc.includes("buildSessionLiveConfig"),
+  "speaking room: client routes session config + relays report_stage",
+);
 const lessonsPageSrc = readFileSync(join(ROOT, "app/(app)/lessons/page.tsx"), "utf8");
 assert(
   lessonsPageSrc.includes('fetch("/api/lessons")') && lessonsPageSrc.includes("AmbientBackground"),

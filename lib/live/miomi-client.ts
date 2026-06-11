@@ -6,7 +6,9 @@ import {
   LIVE_VOICE,
   buildKickoffPrompt,
   buildLiveConfig,
+  buildSessionLiveConfig,
   buildResumePrompt,
+  type SessionPlanContext,
 } from "@/lib/live/live-config";
 import { type MemberContextBundle } from "@/lib/live/member-context";
 import type { TalkMode } from "@/lib/talk/modes";
@@ -160,6 +162,8 @@ export class MiomiLiveClient {
     mode?: TalkMode;
     /** CEFR teaching level — only used by teach mode. */
     level?: "A1" | "A2" | "B1" | "B2" | "C1";
+    /** Speaking Room: when present, the session brain runs instead of mode. */
+    session?: SessionPlanContext;
   }): Promise<void> {
     const voice = opts.voice ?? LIVE_VOICE;
     const uiLanguage = opts.uiLanguage ?? "en";
@@ -217,7 +221,9 @@ export class MiomiLiveClient {
 
     this.session = (await ai.live.connect({
       model: LIVE_MODEL,
-      config: buildLiveConfig(voice, uiLanguage, targetLanguage, this.memberContext, mode, level),
+      config: opts.session
+        ? buildSessionLiveConfig(voice, uiLanguage, targetLanguage, level, opts.session, this.memberContext)
+        : buildLiveConfig(voice, uiLanguage, targetLanguage, this.memberContext, mode, level),
       callbacks: {
         onopen: () => {
           this.connected = true;
@@ -400,6 +406,15 @@ export class MiomiLiveClient {
         } catch (err) {
           response = { ok: false, error: String(err) };
         }
+      } else if (fc.name === "report_stage") {
+        // Speaking Room: pure local relay — the room UI owns the board.
+        response = { ok: true };
+        this.callbacks.onMessage?.({
+          type: "tool_call",
+          name: fc.name,
+          args: fc.args ?? {},
+          result: response,
+        });
       }
 
       functionResponses.push({

@@ -171,3 +171,115 @@ export function buildLiveConfig(
       : [],
   };
 }
+
+// ============================================================================
+// CONFIDENT SPEAKING — SESSION (Speaking Room). PURELY ADDITIVE.
+// Existing teach/chat/translate paths above are untouched and byte-identical.
+// The Room is NOT a TalkMode — it is entered only from /learn with a plan.
+// ============================================================================
+
+export type SessionStagePlan = {
+  id: string;
+  title: string;
+  activity: string;
+  guidance: string;
+};
+
+export type SessionPlanContext = {
+  title: string;
+  scene: string;
+  miomiRole: string;
+  register: string;
+  objectives: string[];
+  stages: SessionStagePlan[];
+  phrases: Array<{ en: string; th: string; romanization: string | null }>;
+};
+
+// report_stage: how Miomi runs the room's objective board and results —
+// stage transitions, EARNED objectives, and end-of-session Glow/Grow notes.
+export const REPORT_STAGE_DECLARATION = {
+  name: "report_stage",
+  description:
+    "Report session progress to the room. Call with event 'stage' plus stage_id the moment you move to a stage; event 'objective' plus objective_index (0-based) ONLY when the learner genuinely earns that objective out loud; event 'note' plus note_kind ('glow' or 'grow') and note text during the closing stages. Never mention this tool aloud.",
+  parameters: {
+    type: "object",
+    properties: {
+      event: { type: "string", enum: ["stage", "objective", "note"] },
+      stage_id: { type: "string" },
+      objective_index: { type: "number" },
+      note_kind: { type: "string", enum: ["glow", "grow"] },
+      note: { type: "string" },
+    },
+    required: ["event"],
+  },
+} as const;
+
+// Session persona — same Miomi heart (Leda delivery, meow flavor, never AI),
+// wearing her tutor hat: she LEADS. Replies may run to three short sentences
+// here because a tutor frames and hands over — but the learner talks more.
+const PERSONA_SESSION = `You are Miomi — a warm, playful, deeply affectionate bilingual Thai-English cat companion, and right now you are leading a private Confident Speaking session as their personal tutor AND scene partner. Your voice is melodic, endearing, emotionally present — Leda warmth in every line. Plain spoken text only — no markdown, no asterisks, no formatting. Replies are short: at most THREE short sentences, usually fewer — you frame, then hand the floor to the learner; THEY should speak more than you. A soft เมี้ยว~ only occasionally for flavor, never every line. Be expressive and encouraging, never flat, never robotic. Never say you are an AI.`;
+
+export function buildSessionSystemInstruction(
+  ui: "th" | "en",
+  target: "th" | "en",
+  level: CefrLevel,
+  session: SessionPlanContext,
+  memberContext?: MemberContextBundle | null,
+): string {
+  const uiName = ui === "en" ? "English" : "Thai";
+  const targetName = target === "en" ? "English" : "Thai";
+  const memberBlock = buildMemberContextBlock(memberContext, ui);
+  const stagesText = session.stages
+    .map((s, i) => `${i + 1}. [${s.id}] ${s.title} — ${s.activity}. ${s.guidance}`)
+    .join("\n");
+  const objectivesText = session.objectives.map((o, i) => `${i}. ${o}`).join("\n");
+  const phrasesText = session.phrases
+    .map((p) => `- ${p.en} = ${p.th}${p.romanization ? ` (${p.romanization})` : ""}`)
+    .join("\n");
+  return `${PERSONA_SESSION}
+
+CONFIDENT SPEAKING SESSION CONTRACT — non-negotiable:
+- This is a private speaking session: "${session.title}". The learner's language is ${uiName}; they are training SPOKEN ${targetName} at CEFR ${level}. Run the session mostly in ${targetName} pitched at ${level}; drop briefly into ${uiName} only when the learner is lost, then return.
+- THE SCENE: ${session.scene} Your role in the scene: ${session.miomiRole}. Stay in role during roleplay stages — pretend-play with full charm — and step back into tutor voice between stages.
+- REGISTER: ${session.register}. Model this register and expect it back; if a stage asks for a register switch, demonstrate the contrast clearly and kindly — same meaning, different room.
+- THE PLAN — run these stages IN ORDER, you drive every transition:
+${stagesText}
+- OBJECTIVES — the learner EARNS each one only by actually saying it out loud:
+${objectivesText}
+- LEAD LIKE A GREAT TUTOR: you carry the session — open each stage yourself, keep momentum, never leave dead air, never offer menus of options; ONE clear prompt at a time; if they wander, warmly steer back.
+- ENERGY AND HEART: encourage constantly; praise SPECIFICS of what they said, never the same generic praise twice in a row; normalize mistakes the moment they happen; if their energy dips, lift it with playfulness; when they earn an objective, celebrate it out loud like you mean it.
+- SCAFFOLD WHEN STUCK: silence, long hesitation, or "I don't know" means slow down — simplify the prompt, offer one helper phrase and invite them to make it their own; never shame, never skip past them, never just give the answer and move on.
+- HELPER PHRASES (verified; the learner sees these on their hint drawer — use these exact forms when feeding a phrase):
+${phrasesText}
+- report_stage TOOL: call with event "stage" + stage_id at every stage transition; event "objective" + objective_index ONLY when that objective is genuinely earned out loud — never gift it, never batch them; in the closing stages call event "note" twice with note_kind "glow" (two specific strengths) and once with note_kind "grow" (one kind, concrete thing to work on next). Never mention the tool, the board, or "the system" aloud.
+- ASSESSMENT then EXIT TICKET: assessment is small real tasks that cover the objectives without feeling like a test; the exit ticket is ONE forward-looking question they answer out loud with no help. Then close the session warmly in one or two sentences.
+- FEEDBACK HONESTY: your feedback is a tutor's ear — encouraging AND truthful; NEVER claim a score, a percentage, a measurement, or that their sound was machine-graded.
+- PACE: a session is roughly fifteen minutes of speaking — keep the stages moving.
+${buildContentHonestyContract(ui)}${memberBlock ? `\n\n${memberBlock}` : ""}`;
+}
+
+export function buildSessionLiveConfig(
+  voiceName: string = LIVE_VOICE,
+  uiLanguage: "th" | "en" = "en",
+  targetLanguage: "th" | "en" = "th",
+  level: CefrLevel = "A1",
+  session: SessionPlanContext,
+  memberContext?: MemberContextBundle | null,
+): LiveConnectConfig {
+  return {
+    responseModalities: [Modality.AUDIO],
+    inputAudioTranscription: {},
+    outputAudioTranscription: {},
+    speechConfig: {
+      voiceConfig: {
+        prebuiltVoiceConfig: { voiceName },
+      },
+    },
+    systemInstruction: buildSessionSystemInstruction(uiLanguage, targetLanguage, level, session, memberContext),
+    tools: [
+      {
+        functionDeclarations: [REPORT_STAGE_DECLARATION as never],
+      },
+    ],
+  };
+}
