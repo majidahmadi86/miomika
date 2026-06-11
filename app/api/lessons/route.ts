@@ -70,7 +70,9 @@ export async function GET() {
         progress: (row.progress ?? {}) as Record<string, unknown>,
       };
     });
-    return NextResponse.json({ lessons });
+    let cefrLevel: string | null = null;
+    try { cefrLevel = await loadCefrLevel(profile.id); } catch { cefrLevel = null; }
+    return NextResponse.json({ lessons, cefrLevel });
   } catch (err) {
     console.error("[api/lessons] list failed:", err);
     return NextResponse.json({ lessons: [] });
@@ -102,7 +104,12 @@ export async function POST(req: NextRequest) {
       normalizeLearningTarget(profile.learning_target_language),
     );
     const dbLevel = await loadCefrLevel(profile.id);
-    const level = levelAsk ?? levelFromCookie(req) ?? dbLevel ?? "A1";
+    // LEVEL ACCESS: a learner may plan at most one level above their own.
+    const LADDER = ["A1", "A2", "B1", "B2", "C1"];
+    const userRank = Math.max(0, LADDER.indexOf((levelFromCookie(req) ?? dbLevel ?? "A1").toUpperCase()));
+    const askRank = levelAsk ? LADDER.indexOf(levelAsk) : -1;
+    const clampedAsk = askRank >= 0 ? LADDER[Math.min(askRank, Math.min(userRank + 1, LADDER.length - 1))]! : null;
+    const level = clampedAsk ?? levelFromCookie(req) ?? dbLevel ?? "A1";
     let knownWords: string[] = [];
     try {
       const supabase = await createServiceClient();

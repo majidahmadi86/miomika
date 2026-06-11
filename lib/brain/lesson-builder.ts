@@ -57,10 +57,15 @@ type LessonPlan = {
 };
 
 function buildPlanSystem(level: string, targetName: string, avoid: string[]): string {
+  const rank = Math.max(0, ["A1", "A2", "B1", "B2", "C1"].indexOf(level.toUpperCase()));
+  const rigorBlock =
+    rank >= 2
+      ? ` THIS IS A ${level} LESSON: at least 4 of the 5 words must be genuinely ${level}-level (abstract, precise, or situational vocabulary — not beginner words), and the phrases must use ${level}-appropriate structures (connectors, conditions, opinions), noticeably longer than beginner sentences.`
+      : "";
   const avoidBlock = avoid.length
     ? ` The learner ALREADY KNOWS these words — do NOT reuse any of them; choose the NEXT most useful ones and make this lesson one step deeper. Give the title a distinct angle (a sub-situation, or a "II"): ${avoid.join(", ")}.`
     : "";
-  return `You are a CEFR-expert lesson planner for learners of ${targetName} at level ${level}. Reply STRICT JSON ONLY — no prose, no markdown fences — with keys: title_en (short inviting lesson title, e.g. "Ordering food"), topic (ONE lowercase English word, e.g. food, travel, social, shopping, work, feelings, general), words (EXACTLY 5 strings — each the plain ENGLISH MEANING of one useful ${targetName} word for this situation at ${level}; choose vocabulary TYPICAL OF ${level} — only drop below ${level} when a word is truly essential to the situation; single concepts, no romanization, no duplicates), phrases (EXACTLY 5 strings — each the plain ENGLISH MEANING of one complete, short, polite, practical sentence the learner will actually say in this situation at ${level}), candos (EXACTLY 3 objects {"label": a CEFR-style can-do statement starting with "Can", "skill": one of "spoken interaction", "spoken production", "listening"}). The words and phrases together must genuinely cover the situation end to end — the lesson must deliver its promise.${avoidBlock} JSON only.`;
+  return `You are a CEFR-expert lesson planner for learners of ${targetName} at level ${level}. Reply STRICT JSON ONLY — no prose, no markdown fences — with keys: title_en (short inviting lesson title, e.g. "Ordering food"), topic (ONE lowercase English word, e.g. food, travel, social, shopping, work, feelings, general), words (EXACTLY 5 strings — each the plain ENGLISH MEANING of one useful ${targetName} word for this situation at ${level}; choose vocabulary TYPICAL OF ${level} — only drop below ${level} when a word is truly essential to the situation; single concepts, no romanization, no duplicates), phrases (EXACTLY 5 strings — each the plain ENGLISH MEANING of one complete, short, polite, practical sentence the learner will actually say in this situation at ${level}), candos (EXACTLY 3 objects {"label": a CEFR-style can-do statement starting with "Can", "skill": one of "spoken interaction", "spoken production", "listening"}). The words and phrases together must genuinely cover the situation end to end — the lesson must deliver its promise.${rigorBlock}${avoidBlock} JSON only.`;
 }
 
 function buildPhraseSystem(level: string): string {

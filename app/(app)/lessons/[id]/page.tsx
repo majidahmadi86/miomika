@@ -125,7 +125,7 @@ export default function LessonPlayerPage() {
   const [step, setStep] = useState(0);
   const [maxVisited, setMaxVisited] = useState(0);
   const [games, setGames] = useState<Record<string, boolean>>({});
-  const [result, setResult] = useState<{ kind: "gold" | "almost"; score: number; total: number } | null>(null);
+  const [result, setResult] = useState<{ kind: "gold" | "silver" | "almost"; score: number; total: number } | null>(null);
   const [attempt, setAttempt] = useState(1);
 
   const load = useCallback(async (keepPosition = false) => {
@@ -287,7 +287,7 @@ export default function LessonPlayerPage() {
               const passed = total > 0 && score / total >= PASS_RATIO;
               if (passed) {
                 patch({ checkpoint: { score, total }, completed_at: new Date().toISOString(), step: 5 });
-                setResult({ kind: "gold", score, total });
+                setResult({ kind: score === total ? "gold" : "silver", score, total });
               } else {
                 patch({ checkpoint: { score, total } });
                 setResult({ kind: "almost", score, total });
@@ -305,7 +305,7 @@ export default function LessonPlayerPage() {
               onRetry={() => { setAttempt((a) => a + 1); setResult(null); setStep(4); }}
             />
           ) : (
-            <RecapStep lesson={lesson} words={words} phrases={phrases} candos={candos} result={result} onReview={() => { setResult(null); setStep(0); setMaxVisited(4); }} />
+            <RecapStep lesson={lesson} words={words} phrases={phrases} candos={candos} result={result} say={say} onRetry={() => { setAttempt((a) => a + 1); setResult(null); setStep(4); }} onReview={() => { setResult(null); setStep(0); setMaxVisited(4); }} />
           )
         ) : null}
       </div>
@@ -881,8 +881,14 @@ function AlmostStep({ score, total, onReviewWords, onReviewPhrases, onRetry }: {
   );
 }
 
-function RecapStep({ lesson, words, phrases, candos, result, onReview }: { lesson: Lesson; words: WordItem[]; phrases: PhraseItem[]; candos: Cando[]; result: { score: number; total: number } | null; onReview: () => void }) {
+function RecapStep({ lesson, words, phrases, candos, result, say, onRetry, onReview }: { lesson: Lesson; words: WordItem[]; phrases: PhraseItem[]; candos: Cando[]; result: { kind?: "gold" | "silver" | "almost"; score: number; total: number } | null; say: (t: string) => void; onRetry: () => void; onReview: () => void }) {
   const cp = result ?? lesson.progress?.checkpoint ?? null;
+  const gold = cp ? cp.score === cp.total : true;
+  useEffect(() => {
+    // Miomi congratulates aloud — Thai hearts love a real celebration.
+    say(gold ? "Amazing! You did it — a golden moment!" : "You passed! One step from gold — so proud of you!");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div>
       <style>{`
@@ -892,30 +898,41 @@ function RecapStep({ lesson, words, phrases, candos, result, onReview }: { lesso
       `}</style>
       <div style={{ textAlign: "center", padding: "4px 0 14px" }}>
         <div className="lesson-pop" style={{ position: "relative", display: "inline-block", marginBottom: 8, animation: "lesson-pop .6s cubic-bezier(.34,1.56,.64,1)" }}>
-          {[
+          {(gold ? [
             { l: "6%", t: "12%", c: "#F9A8D4", d: "0s" },
             { l: "88%", t: "20%", c: "#C4B5FD", d: ".3s" },
             { l: "14%", t: "72%", c: "#E8C77A", d: ".6s" },
             { l: "80%", t: "66%", c: "#A7F3D0", d: ".9s" },
             { l: "50%", t: "2%", c: "#FCA5A5", d: "1.2s" },
             { l: "96%", t: "44%", c: "#FDBA74", d: "1.5s" },
-          ].map((p, i) => (
+            { l: "28%", t: "0%", c: "#E8C77A", d: ".4s" },
+            { l: "66%", t: "84%", c: "#F472B6", d: ".8s" },
+            { l: "2%", t: "48%", c: "#34D399", d: "1.3s" },
+          ] : [
+            { l: "10%", t: "16%", c: "#C4B5FD", d: "0s" },
+            { l: "84%", t: "24%", c: "#A7F3D0", d: ".5s" },
+            { l: "50%", t: "4%", c: "#FBCFD8", d: "1s" },
+          ]).map((p, i) => (
             <span key={i} className="lesson-confetti" style={{ position: "absolute", left: p.l, top: p.t, width: 7, height: 7, borderRadius: "50%", background: p.c, animation: "lesson-confetti 1.8s ease-out infinite", animationDelay: p.d }} />
           ))}
           <Image src={CELEBRATION} alt="Miomi celebrating" width={132} height={132} style={{ objectFit: "contain" }} />
           <span style={{
             position: "absolute", right: -4, bottom: 6, width: 34, height: 34, borderRadius: "50%",
-            background: "linear-gradient(135deg,#E8C77A,#C9A96E)",
-            boxShadow: "0 4px 14px rgba(201,169,110,.5), 0 0 0 5px rgba(232,199,122,.18)",
+            background: gold ? "linear-gradient(135deg,#E8C77A,#C9A96E)" : "linear-gradient(135deg,#E3E7ED,#AAB4C0)",
+            boxShadow: gold ? "0 4px 14px rgba(201,169,110,.5), 0 0 0 5px rgba(232,199,122,.18)" : "0 4px 14px rgba(150,160,175,.45), 0 0 0 5px rgba(190,200,212,.2)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
             <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff" stroke="#fff" strokeWidth="1" strokeLinejoin="round"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.1 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.3l6.1-.7L12 3z" /></svg>
           </span>
         </div>
-        <h3 style={{ ...font, fontSize: 20, color: INK_STRONG, margin: 0 }}>A <span style={{ color: "#A8853F", fontWeight: 700 }}>golden</span> moment</h3>
-        <p style={{ ...font, fontSize: 13, color: MUTED, margin: "6px 0 0", lineHeight: 1.5 }}>Earned, not given — these are things you can now do.</p>
+        <h3 style={{ ...font, fontSize: 20, color: INK_STRONG, margin: 0 }}>
+          A <span style={{ color: gold ? "#A8853F" : "#6E7B8A", fontWeight: 700 }}>{gold ? "golden" : "silver"}</span> moment
+        </h3>
+        <p style={{ ...font, fontSize: 13, color: MUTED, margin: "6px 0 0", lineHeight: 1.5 }}>
+          {gold ? "Perfect score — earned, not given." : "Passed with a slip — gold is one retry away."}
+        </p>
       </div>
-      <MiomiBubble head={HEAD_HAPPY} text="You did it — เมี้ยว~ Now go say these out in the real world." />
+      <MiomiBubble head={HEAD_HAPPY} text={gold ? "You did it — เมี้ยว~ Now go say these out in the real world." : "So close to gold — เมี้ยว~ One more run and it shines."} />
       {candos.map((c, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 13, padding: "11px 13px", marginBottom: 8, boxShadow: CARD_SHADOW }}>
           <span style={{ width: 24, height: 24, borderRadius: "50%", background: TEAL_SOFT, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 24px" }}>
@@ -939,6 +956,11 @@ function RecapStep({ lesson, words, phrases, candos, result, onReview }: { lesso
           </div>
         ))}
       </div>
+      {!gold ? (
+        <button onClick={onRetry} style={{ ...font, display: "block", width: "100%", textAlign: "center", fontSize: 13.5, fontWeight: 700, padding: "13px 22px", borderRadius: 99, background: "linear-gradient(135deg,#E8C77A,#C9A96E)", border: "none", color: "#fff", cursor: "pointer", marginBottom: 10, boxShadow: "0 4px 14px rgba(201,169,110,.4)" }}>
+          Retry for gold
+        </button>
+      ) : null}
       <button onClick={onReview} style={{ ...font, display: "block", width: "100%", textAlign: "center", fontSize: 13, fontWeight: 700, padding: "12px 22px", borderRadius: 99, background: "transparent", border: `1px solid ${BORDER}`, color: MUTED, cursor: "pointer", marginBottom: 10 }}>
         Review this lesson
       </button>

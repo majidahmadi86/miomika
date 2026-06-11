@@ -1819,6 +1819,14 @@ assert(
   "audio reaches every game per the sound-button standard",
 );
 assert(
+  lessonsRouteSrc.includes("LEVEL ACCESS") && lessonsPageSrc.includes("Unlocks as your level grows"),
+  "levels above the learner's reach are locked, client and server",
+);
+assert(
+  playerPageSrc.includes("Retry for gold") && lessonBuilderSrc.includes("THIS IS A"),
+  "gold is perfect, silver is passing, and upper levels feel like upper levels",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",

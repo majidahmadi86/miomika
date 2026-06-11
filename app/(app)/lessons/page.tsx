@@ -24,7 +24,7 @@ type LessonListItem = {
   words_count: number;
   phrases_count: number;
   has_checkpoint: boolean;
-  progress: { step?: number; completed_at?: string | null };
+  progress: { step?: number; completed_at?: string | null; checkpoint?: { score: number; total: number } };
 };
 
 const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
@@ -82,13 +82,13 @@ function YarnRing({ pct, edge, done }: { pct: number; edge: string; done: boolea
   );
 }
 
-function GoldStar() {
+function GoldStar({ silver = false }: { silver?: boolean }) {
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", justifyContent: "center",
       width: 18, height: 18, borderRadius: "50%",
-      background: "linear-gradient(135deg,#E8C77A,#C9A96E)",
-      boxShadow: "0 2px 6px rgba(201,169,110,.4)", marginRight: 6,
+      background: silver ? "linear-gradient(135deg,#E3E7ED,#AAB4C0)" : "linear-gradient(135deg,#E8C77A,#C9A96E)",
+      boxShadow: silver ? "0 2px 6px rgba(150,160,175,.4)" : "0 2px 6px rgba(201,169,110,.4)", marginRight: 6,
     }}>
       <svg viewBox="0 0 24 24" width="10" height="10" fill="#fff"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.1 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.3l6.1-.7L12 3z" /></svg>
     </span>
@@ -104,6 +104,7 @@ export default function LessonsPage() {
   const [topic, setTopic] = useState("");
   const [planLevel, setPlanLevel] = useState<string>("auto");
   const [planTarget, setPlanTarget] = useState<string>("auto");
+  const [myLevel, setMyLevel] = useState<string>("A1");
   const [generating, setGenerating] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
   const planRef = useRef<HTMLDivElement | null>(null);
@@ -111,8 +112,9 @@ export default function LessonsPage() {
   const refresh = useCallback(async () => {
     try {
       const r = await fetch("/api/lessons");
-      const j = (await r.json()) as { lessons?: LessonListItem[] };
+      const j = (await r.json()) as { lessons?: LessonListItem[]; cefrLevel?: string | null };
       setLessons(Array.isArray(j.lessons) ? j.lessons : []);
+      if (j.cefrLevel) setMyLevel(j.cefrLevel);
     } catch {
       setLessons([]);
     } finally {
@@ -232,6 +234,8 @@ export default function LessonsPage() {
               const inProgress = l.status === "in_progress";
               const pct = pctFor(l);
               const stepNow = done ? 5 : Math.min(typeof l.progress?.step === "number" ? l.progress.step : 0, 5);
+              const cpv = l.progress?.checkpoint;
+              const isPerfect = !!cpv && cpv.score === cpv.total;
               return (
                 <div key={l.id} style={{
                   position: "relative", background: "#FFFFFF", border: `1px solid ${BORDER}`,
@@ -266,7 +270,7 @@ export default function LessonsPage() {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <span style={{ ...font, display: "inline-flex", alignItems: "center", fontSize: 10.5, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: done ? "#3E9C82" : MUTED }}>
-                        {done ? (<><GoldStar />Completed</>) : inProgress ? "In progress" : "Up next"}
+                        {done ? (<><GoldStar silver={!isPerfect} />{isPerfect ? "Gold" : "Silver"} · Completed</>) : inProgress ? "In progress" : "Up next"}
                       </span>
                       <span style={{ display: "flex", gap: 4, alignItems: "center" }} aria-label={`Step ${Math.min(stepNow + 1, 5)} of 5`}>
                         {[0, 1, 2, 3, 4].map((i) => (
@@ -326,14 +330,28 @@ export default function LessonsPage() {
                     }}
                   />
                   <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 10 }}>
-                    {["auto", "A1", "A2", "B1", "B2", "C1"].map((lv) => (
-                      <button key={lv} onClick={() => setPlanLevel(lv)} disabled={generating} style={{
-                        ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer",
-                        border: `1px solid ${planLevel === lv ? "#C4B5FD" : BORDER}`,
-                        background: planLevel === lv ? "#F1EEFE" : "#FFFFFF",
-                        color: planLevel === lv ? "#6D5BBF" : MUTED,
-                      }}>{lv === "auto" ? "My level" : lv}</button>
-                    ))}
+                    {["auto", "A1", "A2", "B1", "B2", "C1"].map((lv) => {
+                      const LADDER = ["A1", "A2", "B1", "B2", "C1"];
+                      const myRank = Math.max(0, LADDER.indexOf(myLevel.toUpperCase()));
+                      const locked = lv !== "auto" && LADDER.indexOf(lv) > Math.min(myRank + 1, LADDER.length - 1);
+                      return (
+                        <button key={lv} onClick={() => !locked && setPlanLevel(lv)} disabled={generating || locked}
+                          title={locked ? "Unlocks as your level grows" : undefined}
+                          style={{
+                            ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
+                            cursor: locked ? "default" : "pointer", opacity: locked ? 0.4 : 1,
+                            border: `1px solid ${planLevel === lv ? "#C4B5FD" : BORDER}`,
+                            background: planLevel === lv ? "#F1EEFE" : "#FFFFFF",
+                            color: planLevel === lv ? "#6D5BBF" : MUTED,
+                            display: "inline-flex", alignItems: "center", gap: 4,
+                          }}>
+                          {locked ? (
+                            <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                          ) : null}
+                          {lv === "auto" ? "My level" : lv}
+                        </button>
+                      );
+                    })}
                   </div>
                   <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 8 }}>
                     {[
