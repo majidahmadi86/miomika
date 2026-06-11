@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { detectLang, speak } from "@/lib/voice/tts";
-import { sfxGold, sfxPop, sfxSilver, sfxSuccess, sfxWrong } from "@/lib/sound/sfx";
+import { sfxAlmost, sfxGold, sfxPop, sfxSilver, sfxSuccess, sfxWrong } from "@/lib/sound/sfx";
 
 const AmbientBackground = dynamic(
   () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
@@ -300,7 +300,7 @@ export default function LessonPlayerPage() {
         {step === 5 ? (
           result?.kind === "almost" ? (
             <AlmostStep
-              score={result.score} total={result.total}
+              score={result.score} total={result.total} say={say}
               onReviewWords={() => go(1)}
               onReviewPhrases={() => go(2)}
               onRetry={() => { setAttempt((a) => a + 1); setResult(null); setStep(4); }}
@@ -870,7 +870,15 @@ function CheckpointStep({ phrases, candos, level, target, say, onDone }: { phras
   );
 }
 
-function AlmostStep({ score, total, onReviewWords, onReviewPhrases, onRetry }: { score: number; total: number; onReviewWords: () => void; onReviewPhrases: () => void; onRetry: () => void }) {
+function AlmostStep({ score, total, say, onReviewWords, onReviewPhrases, onRetry }: { score: number; total: number; say: (t: string) => void; onReviewWords: () => void; onReviewPhrases: () => void; onRetry: () => void }) {
+  useEffect(() => {
+    sfxAlmost();
+    const t = window.setTimeout(() => {
+      say("Almost there! One more look and it is yours — I believe in you.");
+    }, 400);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div>
       <div style={{ textAlign: "center", padding: "8px 0 14px" }}>

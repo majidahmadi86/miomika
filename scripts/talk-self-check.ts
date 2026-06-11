@@ -1840,6 +1840,14 @@ assert(
   "checkpoint and fill-in derive fully from learning_target — both directions are first-class",
 );
 assert(
+  sfxSrc.includes("sfxAlmost") && playerPageSrc.includes("sfxAlmost"),
+  "the almost-there path is audible and encouraging",
+);
+assert(
+  lessonBuilderSrc.includes("NOT A1"),
+  "A2 plans carry a hard rigor quota of their own",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",

@@ -61,7 +61,9 @@ function buildPlanSystem(level: string, targetName: string, avoid: string[]): st
   const rigorBlock =
     rank >= 2
       ? ` THIS IS A ${level} LESSON: at least 4 of the 5 words must be genuinely ${level}-level (abstract, precise, or situational vocabulary — not beginner words), and the phrases must use ${level}-appropriate structures (connectors, conditions, opinions), noticeably longer than beginner sentences.`
-      : "";
+      : rank === 1
+        ? ` THIS IS AN A2 LESSON, NOT A1: at least 3 of the 5 words must be genuinely A2 (beyond survival basics), and the phrases must be full A2 sentences — longer and more specific than A1 one-liners.`
+        : "";
   const avoidBlock = avoid.length
     ? ` The learner ALREADY KNOWS these words — do NOT reuse any of them; choose the NEXT most useful ones and make this lesson one step deeper. Give the title a distinct angle (a sub-situation, or a "II"): ${avoid.join(", ")}.`
     : "";

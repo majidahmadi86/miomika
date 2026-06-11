@@ -84,6 +84,14 @@ export function sfxSilver(): void {
   ]);
 }
 
+/** Hopeful little lift — almost there, try again. */
+export function sfxAlmost(): void {
+  play([
+    { f: 392, t: 0, dur: 0.16, gain: 0.07 },
+    { f: 523.25, t: 0.12, dur: 0.22, gain: 0.08 },
+  ]);
+}
+
 /** Rising fanfare with a sparkle — the GOLDEN moment. */
 export function sfxGold(): void {
   play([
