@@ -283,7 +283,7 @@ export default function LessonPlayerPage() {
         {step === 4 ? (
           <CheckpointStep
             key={attempt}
-            phrases={phrases} candos={candos} level={lesson.cefr_level} say={say}
+            phrases={phrases} candos={candos} level={lesson.cefr_level} target={target} say={say}
             onDone={(score, total) => {
               const passed = total > 0 && score / total >= PASS_RATIO;
               if (passed) {
@@ -372,7 +372,7 @@ function WordsStep({ words, target, soft, say, onExtend, onNext }: { words: Word
           <div style={{ display: "flex", gap: 12, alignItems: "center", paddingRight: 40 }}>
             <WordTile w={w} target={target} soft={soft} />
             <div>
-              <div style={{ ...thai, fontSize: 20, fontWeight: 600, color: INK_STRONG, lineHeight: 1.25 }}>{targetText(w, target)}</div>
+              <div style={{ ...(target === "en" ? font : thai), fontSize: 20, fontWeight: 600, color: INK_STRONG, lineHeight: 1.25 }}>{targetText(w, target)}</div>
               <div style={{ ...(target === "en" ? thai : font), fontSize: 14, fontWeight: 700, color: INK, marginTop: 3 }}>
                 {target === "en" ? w.word_th : w.word_en}
               </div>
@@ -445,7 +445,7 @@ function PhrasesStep({ phrases, target, say, onNext }: { phrases: PhraseItem[]; 
           <span style={{ position: "absolute", top: 10, right: 10 }}>
             <SoundBtn onClick={() => say(target === "en" ? p.en : p.th)} bg={PINK_SOFT} color={PINK_DEEP} />
           </span>
-          <div style={{ ...thai, fontSize: 17.5, fontWeight: 600, color: INK_STRONG, lineHeight: 1.5, paddingRight: 40 }}>{target === "en" ? p.en : p.th}</div>
+          <div style={{ ...(target === "en" ? font : thai), fontSize: 17.5, fontWeight: 600, color: INK_STRONG, lineHeight: 1.5, paddingRight: 40 }}>{target === "en" ? p.en : p.th}</div>
           {p.romanization && target !== "en" ? <div style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED, marginTop: 5, letterSpacing: ".02em" }}>{p.romanization}</div> : null}
           <div style={{ ...font, fontSize: 12.5, color: MUTED, marginTop: 5 }}>{target === "en" ? p.th : p.en}</div>
         </div>
@@ -466,10 +466,11 @@ function GamesStep(props: {
     if (phrases.length > 0) a.push("say");
     if (words.length >= 3) a.push("match");
     if (words.length >= 3) a.push("listen");
-    const fillable = words.find((w) => w.example_th && w.example_en && w.example_th.includes(w.word_th));
+    // DIRECTION-TRUE: the blank lives in the language being learned.
+    const fillable = words.find((w) => w.example_th && w.example_en && (target === "en" ? w.example_en.includes(w.word_en) : w.example_th.includes(w.word_th)));
     if (fillable && words.length >= 3) a.push("fill");
     return a;
-  }, [words, phrases]);
+  }, [words, phrases, target]);
   const [tab, setTab] = useState(available[0] ?? "say");
   const allDone = available.every((k) => games[k]);
   const sayPhrase = useMemo(() => shuffle(phrases)[0] ?? phrases[0]!, [phrases]);
@@ -507,7 +508,7 @@ function GamesStep(props: {
       {tab === "say" ? <SayGame phrase={sayPhrase} target={target} say={say} done={!!games.say} onDone={() => handleDone("say")} /> : null}
       {tab === "match" ? <MatchGame words={words} target={target} say={say} done={!!games.match} onDone={() => handleDone("match")} /> : null}
       {tab === "listen" ? <ListenGame words={words} target={target} soft={MINT_SOFT} say={say} done={!!games.listen} onDone={() => handleDone("listen")} /> : null}
-      {tab === "fill" ? <FillGame words={words} say={say} done={!!games.fill} onDone={() => handleDone("fill")} /> : null}
+      {tab === "fill" ? <FillGame words={words} target={target} say={say} done={!!games.fill} onDone={() => handleDone("fill")} /> : null}
       {allDone ? <div style={{ marginTop: 14 }}><PrimaryBtn label="All done — checkpoint" onClick={onNext} /></div> : null}
     </div>
   );
@@ -619,8 +620,8 @@ function SayGame({ phrase, target, say, done, onDone }: { phrase: PhraseItem; ta
 function MatchGame({ words, target, say, done, onDone }: { words: WordItem[]; target: string; say: (t: string) => void; done: boolean; onDone: () => void }) {
   const pairs = useMemo(() => shuffle(words).slice(0, 4), [words]);
   const cells = useMemo(() => shuffle(pairs.flatMap((w, i) => [
-    { t: targetText(w, target), k: i, isThai: target !== "en" },
-    { t: target === "en" ? w.word_th : w.word_en, k: i, isThai: target === "en" },
+    { t: targetText(w, target), k: i, isThai: target !== "en", tgt: true },
+    { t: target === "en" ? w.word_th : w.word_en, k: i, isThai: target === "en", tgt: false },
   ])), [pairs, target]);
   const [sel, setSel] = useState<number | null>(null);
   const [paired, setPaired] = useState<Set<number>>(new Set());
@@ -661,7 +662,7 @@ function MatchGame({ words, target, say, done, onDone }: { words: WordItem[]; ta
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
               }}>
               <span>{c.t}</span>
-              {c.isThai ? <SoundBtn onClick={() => say(c.t)} bg={LAV_SOFT} color={LAV_DEEP} size={24} /> : null}
+              {c.tgt ? <SoundBtn onClick={() => say(c.t)} bg={LAV_SOFT} color={LAV_DEEP} size={24} /> : null}
             </div>
           );
         })}
@@ -693,7 +694,7 @@ function ListenGame({ words, target, soft, say, done, onDone }: { words: WordIte
             if (w.word_en === answer.word_en) { setMsg("Your ears caught it."); onDone(); }
             else { sfxWrong(); setWrongIdx(i); setMsg("Listen once more."); setTimeout(() => setWrongIdx(null), 600); }
           }} style={{
-            ...font, fontSize: 12.5, fontWeight: 700, cursor: "pointer", padding: "12px 6px",
+            ...(target === "en" ? thai : font), fontSize: 12.5, fontWeight: 700, cursor: "pointer", padding: "12px 6px",
             background: done && w.word_en === answer.word_en ? TEAL_SOFT : wrongIdx === i ? CORAL_SOFT : "#fff",
             border: `1px solid ${done && w.word_en === answer.word_en ? TEAL : wrongIdx === i ? CORAL : BORDER}`,
             borderRadius: 14, boxShadow: CARD_SHADOW, color: INK_STRONG,
@@ -711,8 +712,11 @@ function ListenGame({ words, target, soft, say, done, onDone }: { words: WordIte
   );
 }
 
-function FillGame({ words, say, done, onDone }: { words: WordItem[]; say: (t: string) => void; done: boolean; onDone: () => void }) {
-  const pick = useMemo(() => shuffle(words.filter((w) => w.example_th && w.example_en && w.example_th!.includes(w.word_th)))[0] ?? null, [words]);
+function FillGame({ words, target, say, done, onDone }: { words: WordItem[]; target: string; say: (t: string) => void; done: boolean; onDone: () => void }) {
+  const pick = useMemo(
+    () => shuffle(words.filter((w) => w.example_th && w.example_en && (target === "en" ? w.example_en!.includes(w.word_en) : w.example_th!.includes(w.word_th))))[0] ?? null,
+    [words, target],
+  );
   const options = useMemo(() => {
     if (!pick) return [];
     const others = shuffle(words.filter((w) => w.word_en !== pick.word_en)).slice(0, 2);
@@ -721,17 +725,19 @@ function FillGame({ words, say, done, onDone }: { words: WordItem[]; say: (t: st
   const [msg, setMsg] = useState<string | null>(null);
   const [wrong, setWrong] = useState<string | null>(null);
   if (!pick) return null;
-  const blanked = pick.example_th!.replace(pick.word_th, " ____ ");
+  const ex = (target === "en" ? pick.example_en : pick.example_th)!;
+  const hint = target === "en" ? pick.example_th : pick.example_en;
+  const blanked = ex.replace(target === "en" ? pick.word_en : pick.word_th, " ____ ");
   return (
     <div style={{ textAlign: "center" }}>
       <div style={{ position: "relative", background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${PEACH}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: 18, marginBottom: 14, lineHeight: 1.7 }}>
         {done ? (
           <span style={{ position: "absolute", top: 10, right: 10 }}>
-            <SoundBtn onClick={() => say(pick.example_th!)} bg={PEACH_SOFT} color={PEACH_DEEP} size={28} />
+            <SoundBtn onClick={() => say(ex)} bg={PEACH_SOFT} color={PEACH_DEEP} size={28} />
           </span>
         ) : null}
-        <div style={{ ...font, fontSize: 13.5, color: MUTED }}>“{pick.example_en}”</div>
-        <div style={{ ...thai, fontSize: 17, fontWeight: 600, color: INK_STRONG, marginTop: 8 }}>{done ? pick.example_th : blanked}</div>
+        <div style={{ ...(target === "en" ? thai : font), fontSize: 13.5, color: MUTED }}>“{hint}”</div>
+        <div style={{ ...(target === "en" ? font : thai), fontSize: 17, fontWeight: 600, color: INK_STRONG, marginTop: 8 }}>{done ? ex : blanked}</div>
       </div>
       <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 12 }}>
         {options.map((w) => (
@@ -743,14 +749,14 @@ function FillGame({ words, say, done, onDone }: { words: WordItem[]; say: (t: st
             }}
             onKeyDown={(e) => { if (!done && (e.key === "Enter" || e.key === " ")) (e.target as HTMLElement).click(); }}
             style={{
-              ...thai, fontSize: 16, fontWeight: 600, cursor: "pointer", padding: "9px 14px",
+              ...(target === "en" ? font : thai), fontSize: 16, fontWeight: 600, cursor: "pointer", padding: "9px 14px",
               background: done && w.word_en === pick.word_en ? TEAL_SOFT : wrong === w.word_en ? CORAL_SOFT : "#fff",
               border: `1px solid ${done && w.word_en === pick.word_en ? TEAL : wrong === w.word_en ? CORAL : BORDER}`,
               borderRadius: 12, boxShadow: CARD_SHADOW, color: INK_STRONG,
               display: "inline-flex", alignItems: "center", gap: 8,
             }}>
-            <span>{w.word_th}</span>
-            <SoundBtn onClick={() => say(w.word_th)} bg={PEACH_SOFT} color={PEACH_DEEP} size={24} />
+            <span>{target === "en" ? w.word_en : w.word_th}</span>
+            <SoundBtn onClick={() => say(target === "en" ? w.word_en : w.word_th)} bg={PEACH_SOFT} color={PEACH_DEEP} size={24} />
           </div>
         ))}
       </div>
@@ -761,25 +767,29 @@ function FillGame({ words, say, done, onDone }: { words: WordItem[]; say: (t: st
   );
 }
 
-function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: PhraseItem[]; candos: Cando[]; level: string; say: (t: string) => void; onDone: (score: number, total: number) => void }) {
+function CheckpointStep({ phrases, candos, level, target, say, onDone }: { phrases: PhraseItem[]; candos: Cando[]; level: string; target: string; say: (t: string) => void; onDone: (score: number, total: number) => void }) {
   const questions = useMemo(() => {
     const pool = phrases.slice(0, 8);
     const numberFree = pool.filter((p) => !HAS_DIGIT.test(p.en) && !HAS_DIGIT.test(p.th));
     const qPool = numberFree.length >= 3 ? numberFree : pool;
-    // LEVEL-SCALED: A1 = 3 questions x 3 options; A2 = 4 x 4; B1+ adds reversed-direction questions.
+    // LEVEL-SCALED + DIRECTION-TRUE: A1 = 3x3; A2 = 4x4; B1+ adds reversed questions —
+    // and the whole thing derives from learning_target, so Thai learners and English learners both get a true test.
     const rank = Math.max(0, ["A1", "A2", "B1", "B2", "C1"].indexOf(level.toUpperCase()));
     const qCount = Math.min(3 + Math.min(rank, 2), qPool.length);
     const optCount = Math.min(rank >= 1 ? 4 : 3, pool.length);
+    const tgt = (x: { en: string; th: string }) => (target === "en" ? x.en : x.th);
+    const sup = (x: { en: string; th: string }) => (target === "en" ? x.th : x.en);
     return shuffle(qPool).slice(0, qCount).map((p, i) => {
       const reversed = rank >= 2 && i % 2 === 1;
       const others = shuffle(pool.filter((x) => x.th !== p.th)).slice(0, Math.max(optCount - 1, 1));
       const cando = candos[i % Math.max(candos.length, 1)]?.label ?? null;
-      if (reversed) {
-        return { reversed, q: p.th, right: p.en, options: shuffle([p.en, ...others.map((x) => x.en)]), cando };
-      }
-      return { reversed, q: p.en, right: p.th, options: shuffle([p.th, ...others.map((x) => x.th)]), cando };
+      const right = reversed ? sup(p) : tgt(p);
+      const options = shuffle([right, ...others.map((x) => (reversed ? sup(x) : tgt(x)))]);
+      const qThai = reversed ? target === "th" : target === "en";
+      const optThai = reversed ? target === "en" : target === "th";
+      return { reversed, q: reversed ? tgt(p) : sup(p), right, options, cando, qThai, optThai };
     });
-  }, [phrases, candos, level]);
+  }, [phrases, candos, level, target]);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
@@ -827,7 +837,7 @@ function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: Phra
           </span>
         ) : null}
         <p style={{ ...font, fontSize: 12, fontWeight: 700, color: MUTED, margin: 0 }}>{q.reversed ? "What does this mean?" : "How do you say:"}</p>
-        <p style={{ ...(q.reversed ? thai : font), fontSize: q.reversed ? 17 : 16, fontWeight: q.reversed ? 600 : 700, color: INK_STRONG, margin: "5px 0 0", lineHeight: 1.5, paddingRight: q.reversed ? 36 : 0 }}>
+        <p style={{ ...(q.qThai ? thai : font), fontSize: q.qThai ? 17 : 16, fontWeight: q.qThai ? 600 : 700, color: INK_STRONG, margin: "5px 0 0", lineHeight: 1.5, paddingRight: q.reversed ? 36 : 0 }}>
           “{q.q}”
         </p>
       </div>
@@ -851,7 +861,7 @@ function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: Phra
             }}
           >
             <span style={{ ...thai, width: 26, height: 26, borderRadius: "50%", background: mark.bg, color: mark.fg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flex: "0 0 26px" }}>{mark.t}</span>
-            <span style={{ ...(q.reversed ? font : thai), fontSize: q.reversed ? 13.5 : 15, fontWeight: 600, color: INK_STRONG, flex: 1, textAlign: "left" }}>{opt}</span>
+            <span style={{ ...(q.optThai ? thai : font), fontSize: q.optThai ? 15 : 13.5, fontWeight: 600, color: INK_STRONG, flex: 1, textAlign: "left" }}>{opt}</span>
             {!q.reversed ? <SoundBtn onClick={() => say(opt)} bg={PINK_SOFT} color={PINK_DEEP} size={28} /> : null}
           </div>
         );

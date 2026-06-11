@@ -1815,7 +1815,7 @@ assert(
   "every word gets a verified example and phonetics are syllabic or withheld",
 );
 assert(
-  playerPageSrc.includes("function MatchGame({ words, target, say") && playerPageSrc.includes("function FillGame({ words, say"),
+  playerPageSrc.includes("function MatchGame({ words, target, say") && playerPageSrc.includes("function FillGame({ words, target, say"),
   "audio reaches every game per the sound-button standard",
 );
 assert(
@@ -1834,6 +1834,10 @@ assert(
 assert(
   playerPageSrc.includes("sfxGold") && playerPageSrc.includes("sfxWrong"),
   "celebrations and key actions are audible",
+);
+assert(
+  playerPageSrc.includes("DIRECTION-TRUE") && playerPageSrc.includes("optThai"),
+  "checkpoint and fill-in derive fully from learning_target — both directions are first-class",
 );
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
