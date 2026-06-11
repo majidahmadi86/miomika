@@ -175,3 +175,78 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
   }
 }
+
+// Goal self-check progress. Speaking medals wait for the pronunciation-grading
+// milestone — until then a finished scene is "Completed", never gold.
+export async function PATCH(req: NextRequest) {
+  const profile = await getServerProfile();
+  if (!profile) {
+    return NextResponse.json({ ok: false, reason: "signin_required" }, { status: 401 });
+  }
+  try {
+    const body = (await req.json().catch(() => ({}))) as {
+      level?: string;
+      course_position?: number;
+      scenario_position?: number;
+      goals_done?: number;
+    };
+    const coursePos = Number(body?.course_position ?? 0);
+    const scenarioPos = Number(body?.scenario_position ?? 0);
+    const goalsDone = Math.min(3, Math.max(0, Number(body?.goals_done ?? 0)));
+    const uiLanguage = normalizeUiLanguage(profile.ui_language ?? null);
+    const learningTarget = sanitizeTargetLanguage(
+      uiLanguage,
+      normalizeLearningTarget(profile.learning_target_language),
+    );
+    const dbLevel = await loadCefrLevel(profile.id);
+    const userRank = Math.max(0, VALID_LEVELS.indexOf((levelFromCookie(req) ?? dbLevel ?? "A1").toUpperCase()));
+    const lvAsk = String(body?.level ?? "").trim().toUpperCase();
+    const askRank = VALID_LEVELS.includes(lvAsk) ? VALID_LEVELS.indexOf(lvAsk) : -1;
+    const level =
+      askRank >= 0
+        ? VALID_LEVELS[Math.min(askRank, Math.min(userRank + 1, VALID_LEVELS.length - 1))]!
+        : VALID_LEVELS[userRank]!;
+
+    const supabase = await createServiceClient();
+    const { data: row, error: rowErr } = await supabase
+      .from("speaking_courses")
+      .select("id, plan, progress")
+      .eq("user_id", profile.id)
+      .eq("cefr_level", level)
+      .eq("learning_target", learningTarget)
+      .maybeSingle();
+    if (rowErr) throw rowErr;
+    if (!row) return NextResponse.json({ ok: false, reason: "no_plan" }, { status: 200 });
+
+    const plan = (row.plan ?? {}) as { courses?: Course[] };
+    const course = (plan.courses ?? []).find((c) => c.position === coursePos);
+    const scenario = course?.scenarios?.find((s) => s.position === scenarioPos);
+    if (!course || !scenario) return NextResponse.json({ ok: false, reason: "no_scenario" }, { status: 200 });
+
+    const progress = (row.progress ?? {}) as {
+      completed?: Record<string, { goals_done: number; completed_at?: string | null }>;
+      current_course?: number;
+    };
+    const key = `${coursePos}-${scenarioPos}`;
+    const prev = progress.completed?.[key];
+    progress.completed = {
+      ...(progress.completed ?? {}),
+      [key]: {
+        goals_done: goalsDone,
+        completed_at: goalsDone >= 3 ? (prev?.completed_at ?? new Date().toISOString()) : null,
+      },
+    };
+    const { error: upErr } = await supabase
+      .from("speaking_courses")
+      .update({ progress, updated_at: new Date().toISOString() })
+      .eq("id", row.id);
+    if (upErr) {
+      console.error("[api/speaking/scenario] progress update failed:", upErr.message);
+      return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
+    }
+    return NextResponse.json({ ok: true, completed: goalsDone >= 3 }, { status: 200 });
+  } catch (err) {
+    console.error("[api/speaking/scenario] progress failed:", err);
+    return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
+  }
+}

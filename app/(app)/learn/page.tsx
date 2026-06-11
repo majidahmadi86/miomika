@@ -1,17 +1,20 @@
 "use client";
 
 // /learn — the Learn surface (Curriculum milestone). Nav-linked.
-// Live: Course (journey + in-page lesson creator + own lessons + talk bridge).
-// Speak/Tests/Reading/Fun appear in the surface bar as each one ships.
+// Live: Course (journey + creator + own lessons) and SPEAK — Confident
+// Speaking, the flagship: hero card, courses, scenario view with goal
+// self-check and verified phrases. Tests/Reading/Fun ship next.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Flame, ShieldCheck, Lock, Medal } from "lucide-react";
+import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLeft } from "lucide-react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
+import { detectLang, speak } from "@/lib/voice/tts";
+import { sfxPop, sfxSuccess } from "@/lib/sound/sfx";
 
 const AmbientBackground = dynamic(
   () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
@@ -46,9 +49,36 @@ type CurriculumRow = {
   progress: Record<string, unknown>;
 };
 
+type SpeakingScenario = {
+  position: number;
+  title_en: string;
+  scene_en: string;
+  goals: string[];
+  phrases: Array<{ en: string; th: string; romanization: string | null }>;
+  status: string;
+};
+
+type SpeakingCourse = {
+  position: number;
+  title_en: string;
+  topic: string;
+  color: string;
+  scenario_titles: string[];
+  scenarios: SpeakingScenario[];
+};
+
+type SpeakingRow = {
+  id: string;
+  cefr_level: string;
+  learning_target: string;
+  status: string;
+  plan: { courses?: SpeakingCourse[] };
+  progress: { completed?: Record<string, { goals_done: number; completed_at?: string | null }>; current_course?: number };
+};
+
 const LADDER = ["A1", "A2", "B1", "B2", "C1"] as const;
 const SURFACES = ["Course", "Speak", "Tests", "Reading", "Fun"] as const;
-const BUILT_SURFACES: ReadonlyArray<(typeof SURFACES)[number]> = ["Course"];
+const BUILT_SURFACES: ReadonlyArray<(typeof SURFACES)[number]> = ["Course", "Speak"];
 type Surface = (typeof SURFACES)[number];
 
 const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
@@ -72,7 +102,9 @@ const CTA_SHADOW = "0 4px 16px -4px rgba(52,169,143,0.40)";
 const CARD_SHADOW = "0 1px 2px rgba(74,65,54,.05), 0 8px 22px rgba(74,65,54,.06)";
 const GOLD_GRAD = "linear-gradient(135deg,#E8C77A,#C9A96E)";
 const SILVER_GRAD = "linear-gradient(135deg,#E3E7ED,#AAB4C0)";
+const TEAL_DEEP = "#2C8576";
 const font = { fontFamily: "'Quicksand', sans-serif" } as const;
+const thaiFont = { fontFamily: "'Sarabun', sans-serif" } as const;
 
 const STAT_STYLES = [
   { bg: "#F1EEFE", fg: "#6D5BBF" },
@@ -91,6 +123,29 @@ function MedalDot({ gold }: { gold: boolean }) {
   );
 }
 
+function ProChip() {
+  return (
+    <span style={{
+      ...font, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700,
+      letterSpacing: ".05em", color: "#fff", background: CTA, borderRadius: 7, padding: "3px 8px",
+      boxShadow: CTA_SHADOW, flex: "0 0 auto",
+    }}>
+      <Crown style={{ width: 10, height: 10 }} strokeWidth={2.6} aria-hidden />PRO
+    </span>
+  );
+}
+
+function SoundBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={(e) => { e.stopPropagation(); onClick(); }} aria-label="Play sound" style={{
+      width: 28, height: 28, borderRadius: "50%", border: `1px solid ${BORDER}`, background: "#FFFFFF",
+      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flex: "0 0 28px",
+    }}>
+      <Volume2 style={{ width: 14, height: 14, color: "#3E9C82" }} strokeWidth={2.2} aria-hidden />
+    </button>
+  );
+}
+
 export default function LearnPage() {
   const router = useRouter();
   const { isGuest, authReady } = useGuestExploration();
@@ -98,6 +153,7 @@ export default function LearnPage() {
   const [myLevel, setMyLevel] = useState<string>("A1");
   const [viewLevel, setViewLevel] = useState<string | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumRow | null>(null);
+  const [speaking, setSpeaking] = useState<SpeakingRow | null>(null);
   const [allLessons, setAllLessons] = useState<LessonLite[]>([]);
   const [lessonsById, setLessonsById] = useState<Map<string, LessonLite>>(new Map());
   const [goldCount, setGoldCount] = useState(0);
@@ -105,10 +161,14 @@ export default function LearnPage() {
   const [loaded, setLoaded] = useState(false);
   const [surface, setSurface] = useState<Surface>("Course");
   const [expandedUnit, setExpandedUnit] = useState<number | null>(null);
+  const [expandedCourse, setExpandedCourse] = useState<number | null>(null);
+  const [activeScenario, setActiveScenario] = useState<{ c: number; s: number } | null>(null);
   const [planning, setPlanning] = useState(false);
   const [building, setBuilding] = useState(false);
+  const [speakPlanning, setSpeakPlanning] = useState(false);
+  const [scenarioBuilding, setScenarioBuilding] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
-  // In-page lesson creator
+  const [speakMsg, setSpeakMsg] = useState<string | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [topic, setTopic] = useState("");
   const [planLevel, setPlanLevel] = useState<string>("auto");
@@ -116,14 +176,20 @@ export default function LearnPage() {
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState<string | null>(null);
 
+  const say = useCallback((text: string) => {
+    try { void speak(text, detectLang(text)); } catch { /* audio is best-effort */ }
+  }, []);
+
   const refresh = useCallback(async (levelAsk?: string) => {
     try {
       const q = levelAsk ? `?level=${encodeURIComponent(levelAsk)}` : "";
-      const [curRes, lesRes] = await Promise.all([
+      const [curRes, spkRes, lesRes] = await Promise.all([
         fetch(`/api/curriculum${q}`),
+        fetch(`/api/speaking${q}`),
         fetch("/api/lessons"),
       ]);
       const curJson = (await curRes.json()) as { curriculum?: CurriculumRow | null; level?: string };
+      const spkJson = (await spkRes.json()) as { speaking?: SpeakingRow | null };
       const lesJson = (await lesRes.json()) as { lessons?: LessonLite[]; cefrLevel?: string | null };
       const lessons = Array.isArray(lesJson.lessons) ? lesJson.lessons : [];
       const map = new Map<string, LessonLite>();
@@ -144,6 +210,7 @@ export default function LearnPage() {
         setMyLevel(lesJson.cefrLevel.toUpperCase());
       }
       setCurriculum(curJson.curriculum ?? null);
+      setSpeaking(spkJson.speaking ?? null);
       if (curJson.level) setViewLevel(curJson.level);
     } catch {
       setCurriculum(null);
@@ -236,10 +303,93 @@ export default function LearnPage() {
     }
   }, [creating, topic, planLevel, planTarget, viewLevel, refresh]);
 
+  const planSpeaking = useCallback(async () => {
+    if (speakPlanning) return;
+    setSpeakPlanning(true);
+    setSpeakMsg("Miomi is planning your speaking path — give her a moment…");
+    try {
+      const r = await fetch("/api/speaking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level: viewLevel ?? undefined }),
+      });
+      const j = (await r.json()) as { ok?: boolean };
+      if (j.ok) {
+        setSpeakMsg(null);
+        await refresh(viewLevel ?? undefined);
+      } else {
+        setSpeakMsg("Miomi couldn't finish planning — try once more in a moment.");
+      }
+    } catch {
+      setSpeakMsg("Something slipped — try once more.");
+    } finally {
+      setSpeakPlanning(false);
+    }
+  }, [speakPlanning, viewLevel, refresh]);
+
+  const buildScenario = useCallback(async (coursePos: number, scenarioPos: number) => {
+    if (scenarioBuilding) return;
+    setScenarioBuilding(true);
+    setSpeakMsg("Miomi is setting the scene — every phrase gets checked, give her a moment…");
+    try {
+      const r = await fetch("/api/speaking/scenario", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level: viewLevel ?? undefined, course_position: coursePos, scenario_position: scenarioPos }),
+      });
+      const j = (await r.json()) as { ok?: boolean; reason?: string };
+      if (j.ok) {
+        setSpeakMsg(null);
+        await refresh(viewLevel ?? undefined);
+        setActiveScenario({ c: coursePos, s: scenarioPos });
+      } else if (j.reason === "pro_required") {
+        setSpeakMsg("This scene unlocks with Pro — the first scene of every course is yours free~");
+      } else {
+        setSpeakMsg("Miomi couldn't set that scene — try once more.");
+      }
+    } catch {
+      setSpeakMsg("Something slipped — try once more.");
+    } finally {
+      setScenarioBuilding(false);
+    }
+  }, [scenarioBuilding, viewLevel, refresh]);
+
+  const saveGoals = useCallback((coursePos: number, scenarioPos: number, goalsDone: number) => {
+    setSpeaking((prev) => {
+      if (!prev) return prev;
+      const key = `${coursePos}-${scenarioPos}`;
+      const prevEntry = prev.progress?.completed?.[key];
+      return {
+        ...prev,
+        progress: {
+          ...prev.progress,
+          completed: {
+            ...(prev.progress?.completed ?? {}),
+            [key]: {
+              goals_done: goalsDone,
+              completed_at: goalsDone >= 3 ? (prevEntry?.completed_at ?? new Date().toISOString()) : null,
+            },
+          },
+        },
+      };
+    });
+    void fetch("/api/speaking/scenario", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level: viewLevel ?? undefined, course_position: coursePos, scenario_position: scenarioPos, goals_done: goalsDone }),
+    }).catch(() => { /* progress save is best-effort; local state already holds it */ });
+  }, [viewLevel]);
+
   const myRank = Math.max(0, (LADDER as readonly string[]).indexOf(myLevel));
   const targetName = profile?.learning_target_language === "en" ? "English" : "Thai";
+  const targetIsEn = profile?.learning_target_language === "en";
+  const isPro = profile?.tier === "pro" || profile?.tier === "pro_max";
   const units = Array.isArray(curriculum?.plan?.units) ? curriculum.plan.units : [];
   const checkpoints = Array.isArray(curriculum?.plan?.checkpoints) ? curriculum.plan.checkpoints : [];
+  const courses = Array.isArray(speaking?.plan?.courses) ? speaking.plan.courses : [];
+  const completedMap = speaking?.progress?.completed ?? {};
+  const scenesDone = Object.values(completedMap).filter((c) => c?.completed_at).length;
+  const scenesTotal = courses.reduce((n, c) => n + (c.scenario_titles?.length ?? 0), 0);
 
   const unitLessons = useCallback((u: CurriculumUnit): LessonLite[] =>
     (u.lesson_ids ?? []).map((id) => lessonsById.get(id)).filter(Boolean) as LessonLite[],
@@ -268,19 +418,26 @@ export default function LearnPage() {
 
   const shownSurfaces = SURFACES.filter((s) => (BUILT_SURFACES as readonly string[]).includes(s));
 
+  const activeCourse = activeScenario ? courses.find((c) => c.position === activeScenario.c) ?? null : null;
+  const activeScene = activeCourse && activeScenario
+    ? activeCourse.scenarios?.find((s) => s.position === activeScenario.s) ?? null
+    : null;
+  const activeKey = activeScenario ? `${activeScenario.c}-${activeScenario.s}` : "";
+  const activeGoalsDone = activeScenario ? (completedMap[activeKey]?.goals_done ?? 0) : 0;
+
   return (
     <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "#FAFAF6" }}>
       <AmbientBackground mode="ambient" />
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
 
-        {/* Level rail — own level +1 is walkable; the rest waits. */}
+        {/* Level rail */}
         <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
           {LADDER.map((lv, i) => {
             const done = i < myRank;
             const isView = (viewLevel ?? myLevel) === lv;
             const open = i <= myRank + 1;
             return (
-              <button key={lv} onClick={() => { if (!open) return; setViewLevel(lv); setExpandedUnit(null); void refresh(lv); }} style={{
+              <button key={lv} onClick={() => { if (!open) return; setViewLevel(lv); setExpandedUnit(null); setExpandedCourse(null); setActiveScenario(null); void refresh(lv); }} style={{
                 ...font, display: "inline-flex", alignItems: "center", gap: 4,
                 fontSize: 12.5, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
                 border: isView ? "1px solid transparent" : `1px solid ${done ? "#E8C77A" : BORDER}`,
@@ -329,11 +486,39 @@ export default function LearnPage() {
           ) : null}
         </div>
 
-        {/* Surface bar — appears once more than one surface is live. */}
+        {/* CONFIDENT SPEAKING — the flagship, always present. */}
+        {authReady && !isGuest ? (
+          <button onClick={() => { setSurface("Speak"); setActiveScenario(null); }} style={{
+            display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
+            background: "linear-gradient(135deg,#34A98F 0%,#1F7A68 100%)", border: "none", borderRadius: 18,
+            padding: "14px 15px", marginBottom: 12, cursor: "pointer",
+            boxShadow: "0 8px 20px -6px rgba(31,122,104,0.45)",
+          }}>
+            <span style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,.16)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 40px" }}>
+              <Mic style={{ width: 19, height: 19, color: "#fff" }} strokeWidth={2.2} aria-hidden />
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ ...font, display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: ".09em", textTransform: "uppercase", color: "rgba(255,255,255,.92)" }}>
+                Confident Speaking
+                <span style={{ ...font, display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 700, color: "#fff", background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.35)", borderRadius: 6, padding: "2px 6px" }}>
+                  <Crown style={{ width: 9, height: 9 }} strokeWidth={2.6} aria-hidden />PRO
+                </span>
+              </span>
+              <span style={{ ...font, display: "block", fontSize: 14.5, fontWeight: 700, color: "#fff", marginTop: 2 }}>
+                {courses.length ? `${scenesDone} of ${scenesTotal} scenes spoken` : "Speak from day one — real scenes with Miomi"}
+              </span>
+              <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,.85)", marginTop: 1 }}>
+                The first scene of every course is free~
+              </span>
+            </span>
+          </button>
+        ) : null}
+
+        {/* Surface bar */}
         {shownSurfaces.length > 1 ? (
           <div style={{ display: "flex", background: "#F1ECE3", borderRadius: 14, padding: 4, gap: 4, marginBottom: 16 }}>
             {shownSurfaces.map((s) => (
-              <button key={s} onClick={() => setSurface(s)} style={{
+              <button key={s} onClick={() => { setSurface(s); setActiveScenario(null); }} style={{
                 ...font, flex: 1, fontSize: 12, fontWeight: 700, padding: "8px 0",
                 borderRadius: 10, border: "none", cursor: "pointer",
                 background: surface === s ? "#FFFFFF" : "transparent",
@@ -362,9 +547,208 @@ export default function LearnPage() {
               Sign up free
             </Link>
           </div>
+        ) : surface === "Speak" ? (
+          activeScene && activeCourse && activeScenario ? (
+            /* ---------- SCENARIO VIEW ---------- */
+            <>
+              <button onClick={() => setActiveScenario(null)} style={{
+                ...font, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700,
+                color: MUTED, background: "transparent", border: "none", cursor: "pointer", padding: 0, marginBottom: 10,
+              }}>
+                <ChevronLeft style={{ width: 14, height: 14 }} aria-hidden />{activeCourse.title_en}
+              </button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+                <h2 style={{ ...font, fontSize: 17, fontWeight: 700, color: INK_STRONG, margin: 0 }}>{activeScene.title_en}</h2>
+                {activeScenario.s === 1 ? (
+                  <span style={{ ...font, fontSize: 9.5, fontWeight: 700, letterSpacing: ".05em", color: "#3E7A66", background: "#EBFBF4", borderRadius: 7, padding: "3px 8px", flex: "0 0 auto" }}>FREE SCENE</span>
+                ) : <ProChip />}
+              </div>
+              <div style={{ background: "#FEF1E3", border: "1px solid #F4D9BC", borderRadius: 18, padding: "13px 14px", marginBottom: 12 }}>
+                <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: "#7A4F26", margin: 0, lineHeight: 1.55 }}>
+                  <b style={{ fontWeight: 700 }}>The scene:</b> {activeScene.scene_en}
+                </p>
+              </div>
+              <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 12 }}>
+                <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: MUTED, margin: "0 0 8px" }}>
+                  Your goals — tap each one you said out loud
+                </p>
+                {activeScene.goals.map((g, gi) => {
+                  const checked = gi < activeGoalsDone;
+                  return (
+                    <button key={gi} onClick={() => {
+                      const next = checked ? gi : gi + 1;
+                      if (!checked) {
+                        if (next >= 3) { try { sfxSuccess(); } catch { /* best-effort */ } }
+                        else { try { sfxPop(); } catch { /* best-effort */ } }
+                      }
+                      saveGoals(activeScenario.c, activeScenario.s, next);
+                    }} style={{
+                      display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 0",
+                      background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+                      borderBottom: gi < activeScene.goals.length - 1 ? `1px solid ${BORDER}` : "none",
+                    }}>
+                      <span style={{
+                        width: 20, height: 20, borderRadius: "50%", flex: "0 0 20px",
+                        border: checked ? "2px solid transparent" : `2px solid ${BORDER}`,
+                        background: checked ? CTA : "#FFFFFF",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {checked ? <Check style={{ width: 11, height: 11, color: "#fff" }} strokeWidth={3} aria-hidden /> : null}
+                      </span>
+                      <span style={{ ...font, fontSize: 13, fontWeight: 700, color: checked ? TEAL_DEEP : INK_STRONG }}>{g}</span>
+                    </button>
+                  );
+                })}
+                {activeGoalsDone >= 3 ? (
+                  <p style={{ ...font, fontSize: 12, fontWeight: 700, color: TEAL_DEEP, margin: "10px 0 0" }}>
+                    Scene completed — you said it all out loud~
+                  </p>
+                ) : null}
+              </div>
+              <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 18, padding: "13px 14px", marginBottom: 12 }}>
+                <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#6D5BBF", margin: "0 0 6px" }}>
+                  Phrases that help
+                </p>
+                {activeScene.phrases.map((p, pi) => (
+                  <div key={pi} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: pi < activeScene.phrases.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                    <SoundBtn onClick={() => say(targetIsEn ? p.en : p.th)} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ ...(targetIsEn ? font : thaiFont), display: "block", fontSize: 14, fontWeight: 700, color: INK_STRONG }}>
+                        {targetIsEn ? p.en : p.th}
+                      </span>
+                      {!targetIsEn && p.romanization ? (
+                        <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: "#6D5BBF", marginTop: 1 }}>{p.romanization}</span>
+                      ) : null}
+                      <span style={{ ...(targetIsEn ? thaiFont : font), display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginTop: 1 }}>
+                        {targetIsEn ? p.th : p.en}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Link href="/talk" style={{
+                ...font, display: "block", textAlign: "center", fontSize: 14, fontWeight: 700,
+                padding: "14px 20px", borderRadius: 99, background: CTA, color: "#fff",
+                textDecoration: "none", boxShadow: CTA_SHADOW,
+              }}>
+                Talk it through with Miomi
+              </Link>
+              <p style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 }}>
+                Miomi listens and plays her part live — sound grading is coming in an update~
+              </p>
+            </>
+          ) : !speaking || !courses.length ? (
+            /* ---------- SPEAK EMPTY STATE ---------- */
+            <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: 22, textAlign: "center" }}>
+              <p style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>
+                Speak {targetName} from day one
+              </p>
+              <p style={{ ...font, fontSize: 12, color: MUTED, margin: "6px 0 14px", lineHeight: 1.5 }}>
+                Real scenes, your voice, out loud — Miomi plays the other side. 4 courses, 16 scenes, planned for {viewLevel ?? myLevel}.
+              </p>
+              <button onClick={() => void planSpeaking()} disabled={speakPlanning} style={{
+                ...font, fontSize: 14, fontWeight: 700, padding: "13px 26px", borderRadius: 99,
+                border: "none", cursor: speakPlanning ? "default" : "pointer",
+                background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: speakPlanning ? 0.7 : 1,
+              }}>
+                {speakPlanning ? "Miomi is planning…" : "Plan my speaking path"}
+              </button>
+              {speakMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "10px 0 0" }}>{speakMsg}</p> : null}
+            </div>
+          ) : (
+            /* ---------- COURSE LIST ---------- */
+            <>
+              <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: MUTED, margin: "0 2px 12px", lineHeight: 1.55 }}>
+                <b style={{ color: INK_STRONG }}>Speak from day one.</b> Miomi plays the other side — the vendor, the receptionist, the friend. The first scene of every course is free~
+              </p>
+              {courses.map((c) => {
+                const tc = TOPIC_HEX[c.color] ?? TOPIC_HEX.peach;
+                const deep = TOPIC_DEEP[c.color] ?? TOPIC_DEEP.peach;
+                const isOpen = expandedCourse === c.position;
+                const courseDone = (c.scenario_titles ?? []).filter((_, si) => completedMap[`${c.position}-${si + 1}`]?.completed_at).length;
+                return (
+                  <div key={c.position} style={{
+                    background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18,
+                    boxShadow: CARD_SHADOW, overflow: "hidden", position: "relative", marginBottom: 10,
+                  }}>
+                    <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5, background: tc.edge }} />
+                    <button onClick={() => setExpandedCourse(isOpen ? null : c.position)} style={{
+                      display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 13px 12px 16px",
+                      background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+                    }}>
+                      <span style={{
+                        width: 34, height: 34, borderRadius: 11, background: tc.soft, color: deep,
+                        display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px",
+                      }}>
+                        <Mic style={{ width: 16, height: 16 }} strokeWidth={2.2} aria-hidden />
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.title_en}</span>
+                        <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED }}>
+                          {courseDone} of {c.scenario_titles?.length ?? 4} scenes spoken
+                        </span>
+                      </span>
+                      {!isPro ? <ProChip /> : null}
+                    </button>
+                    {isOpen ? (
+                      <div style={{ borderTop: `1px solid ${BORDER}`, padding: "4px 13px 12px 16px" }}>
+                        {(c.scenario_titles ?? []).map((title, si) => {
+                          const pos = si + 1;
+                          const built = (c.scenarios ?? []).find((s) => s.position === pos);
+                          const entry = completedMap[`${c.position}-${pos}`];
+                          const isDone = !!entry?.completed_at;
+                          const isNextBuild = !built && pos === (c.scenarios ?? []).length + 1;
+                          const needsPro = pos > 1 && !isPro;
+                          return (
+                            <div key={si} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: si < 3 ? `1px solid ${BORDER}` : "none", opacity: built || isNextBuild ? 1 : 0.5 }}>
+                              <span style={{
+                                width: 18, height: 18, borderRadius: "50%", flex: "0 0 18px",
+                                border: isDone ? "2px solid transparent" : `2px solid ${built || isNextBuild ? "#7DD3C0" : BORDER}`,
+                                background: isDone ? CTA : "#FFFFFF",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}>
+                                {isDone ? <Check style={{ width: 10, height: 10, color: "#fff" }} strokeWidth={3} aria-hidden /> : null}
+                              </span>
+                              <span style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ ...font, display: "block", fontSize: 12.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
+                                <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>
+                                  {isDone ? "Completed" : built ? "Ready" : pos === 1 ? "Free scene" : needsPro ? "Unlocks with Pro" : "Up next"}
+                                </span>
+                              </span>
+                              {built ? (
+                                <button onClick={() => setActiveScenario({ c: c.position, s: pos })} style={{
+                                  ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
+                                  border: isDone ? `1px solid ${BORDER}` : "none", cursor: "pointer",
+                                  color: isDone ? MUTED : "#fff", background: isDone ? "transparent" : CTA,
+                                  boxShadow: isDone ? "none" : CTA_SHADOW,
+                                }}>
+                                  {isDone ? "Replay" : "Open"}
+                                </button>
+                              ) : isNextBuild && !needsPro ? (
+                                <button onClick={() => void buildScenario(c.position, pos)} disabled={scenarioBuilding} style={{
+                                  ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
+                                  border: "none", cursor: scenarioBuilding ? "default" : "pointer",
+                                  background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: scenarioBuilding ? 0.7 : 1,
+                                }}>
+                                  {scenarioBuilding ? "Setting up…" : "Start"}
+                                </button>
+                              ) : needsPro ? (
+                                <Crown style={{ width: 15, height: 15, color: "#C9A96E", flex: "0 0 15px" }} strokeWidth={2.2} aria-hidden />
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {speakMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "4px 0 0", textAlign: "center" }}>{speakMsg}</p> : null}
+            </>
+          )
         ) : (
           <>
-            {/* Create your own lesson — functional, in place, on top. */}
+            {/* Create your own lesson */}
             <div style={{
               border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: askOpen ? 16 : 0,
               background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)", marginBottom: 14, overflow: "hidden",
@@ -613,9 +997,9 @@ export default function LearnPage() {
                               border: `1.5px ${cpReached ? "solid #7DD3C0" : `dashed ${BORDER}`}`, borderRadius: 18, padding: "11px 13px",
                             }}>
                               <span style={{
-                                width: 34, height: 34, borderRadius: "50%", background: "#F1ECE3", color: MUTED,
+                                ...thaiFont, width: 34, height: 34, borderRadius: "50%", background: "#F1ECE3", color: MUTED,
                                 display: "flex", alignItems: "center", justifyContent: "center",
-                                fontFamily: "'Sarabun', sans-serif", fontSize: 16, fontWeight: 700, flex: "0 0 34px",
+                                fontSize: 16, fontWeight: 700, flex: "0 0 34px",
                               }}>{cp.badge}</span>
                               <span style={{ flex: 1 }}>
                                 <span style={{ ...font, display: "block", fontSize: 13, fontWeight: 700, color: INK_STRONG }}>
@@ -657,7 +1041,7 @@ export default function LearnPage() {
                         <span style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${inProgress ? "#7DD3C0" : BORDER}`, flex: "0 0 18px" }} />
                       )}
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.title_en}</span>
+                        <span style={{ ...font, display: "block", fontSize: 13, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.title_en}</span>
                         <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>
                           {lDone ? (lGold ? "Gold · Completed" : "Silver · Completed") : inProgress ? "In progress" : "Up next"}
                         </span>
