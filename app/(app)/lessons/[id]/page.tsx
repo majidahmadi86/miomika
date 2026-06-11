@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { detectLang, speak } from "@/lib/voice/tts";
+import { sfxGold, sfxPop, sfxSilver, sfxSuccess, sfxWrong } from "@/lib/sound/sfx";
 
 const AmbientBackground = dynamic(
   () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
@@ -473,6 +474,7 @@ function GamesStep(props: {
   const allDone = available.every((k) => games[k]);
   const sayPhrase = useMemo(() => shuffle(phrases)[0] ?? phrases[0]!, [phrases]);
   const handleDone = (key: string) => {
+    sfxSuccess();
     onGameDone(key);
     const rest = available.filter((k) => k !== key && !games[k]);
     if (rest.length) setTimeout(() => setTab(rest[0]!), 900);
@@ -630,10 +632,12 @@ function MatchGame({ words, target, say, done, onDone }: { words: WordItem[]; ta
     if (sel === idx) { setSel(null); return; }
     const other = cells[sel]!;
     if (other.k === cell.k) {
+      sfxPop();
       const next = new Set(paired); next.add(cell.k);
       setPaired(next); setSel(null);
       if (next.size === pairs.length) onDone();
     } else {
+      sfxWrong();
       setShakeIdx(idx);
       setTimeout(() => setShakeIdx(null), 450);
       setSel(null);
@@ -687,7 +691,7 @@ function ListenGame({ words, target, soft, say, done, onDone }: { words: WordIte
             if (done) return;
             if (!played) { setMsg("Play it first — train those ears."); return; }
             if (w.word_en === answer.word_en) { setMsg("Your ears caught it."); onDone(); }
-            else { setWrongIdx(i); setMsg("Listen once more."); setTimeout(() => setWrongIdx(null), 600); }
+            else { sfxWrong(); setWrongIdx(i); setMsg("Listen once more."); setTimeout(() => setWrongIdx(null), 600); }
           }} style={{
             ...font, fontSize: 12.5, fontWeight: 700, cursor: "pointer", padding: "12px 6px",
             background: done && w.word_en === answer.word_en ? TEAL_SOFT : wrongIdx === i ? CORAL_SOFT : "#fff",
@@ -735,7 +739,7 @@ function FillGame({ words, say, done, onDone }: { words: WordItem[]; say: (t: st
             onClick={() => {
               if (done) return;
               if (w.word_en === pick.word_en) { setMsg("Perfect fit."); onDone(); }
-              else { setWrong(w.word_en); setMsg("Real word — wrong slot."); setTimeout(() => setWrong(null), 600); }
+              else { sfxWrong(); setWrong(w.word_en); setMsg("Real word — wrong slot."); setTimeout(() => setWrong(null), 600); }
             }}
             onKeyDown={(e) => { if (!done && (e.key === "Enter" || e.key === " ")) (e.target as HTMLElement).click(); }}
             style={{
@@ -785,6 +789,7 @@ function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: Phra
     if (picked) return;
     setPicked(opt);
     const right = opt === q.right;
+    if (right) sfxPop(); else sfxWrong();
     setTimeout(() => {
       const nextScore = score + (right ? 1 : 0);
       if (idx + 1 < questions.length) { setScore(nextScore); setIdx(idx + 1); setPicked(null); }
@@ -885,8 +890,12 @@ function RecapStep({ lesson, words, phrases, candos, result, say, onRetry, onRev
   const cp = result ?? lesson.progress?.checkpoint ?? null;
   const gold = cp ? cp.score === cp.total : true;
   useEffect(() => {
-    // Miomi congratulates aloud — Thai hearts love a real celebration.
-    say(gold ? "Amazing! You did it — a golden moment!" : "You passed! One step from gold — so proud of you!");
+    // Fanfare first, then Miomi's voice — a celebration you can hear.
+    if (gold) sfxGold(); else sfxSilver();
+    const t = window.setTimeout(() => {
+      say(gold ? "Amazing! You did it — a golden moment!" : "You passed! One step from gold — so proud of you!");
+    }, 450);
+    return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (

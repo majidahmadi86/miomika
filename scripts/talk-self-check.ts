@@ -1826,6 +1826,15 @@ assert(
   playerPageSrc.includes("Retry for gold") && lessonBuilderSrc.includes("THIS IS A"),
   "gold is perfect, silver is passing, and upper levels feel like upper levels",
 );
+const sfxSrc = readFileSync(join(ROOT, "lib/sound/sfx.ts"), "utf8");
+assert(
+  !sfxSrc.includes("import ") && sfxSrc.includes("AudioContext"),
+  "sfx is our own zero-dependency synthesized sound lib (house rule: own smart libs)",
+);
+assert(
+  playerPageSrc.includes("sfxGold") && playerPageSrc.includes("sfxWrong"),
+  "celebrations and key actions are audible",
+);
 assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
