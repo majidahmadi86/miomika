@@ -115,7 +115,14 @@ export async function GET(req: NextRequest) {
       normalizeLearningTarget(profile.learning_target_language),
     );
     const dbLevel = await loadCefrLevel(profile.id);
-    const level = (levelFromCookie(req) ?? dbLevel ?? "A1").toUpperCase();
+    // LEVEL ACCESS: viewing too is clamped to own level +1.
+    const userRank = Math.max(0, VALID_LEVELS.indexOf((levelFromCookie(req) ?? dbLevel ?? "A1").toUpperCase()));
+    const lvAsk = (req.nextUrl.searchParams.get("level") ?? "").trim().toUpperCase();
+    const askRank = VALID_LEVELS.includes(lvAsk) ? VALID_LEVELS.indexOf(lvAsk) : -1;
+    const level =
+      askRank >= 0
+        ? VALID_LEVELS[Math.min(askRank, Math.min(userRank + 1, VALID_LEVELS.length - 1))]!
+        : VALID_LEVELS[Math.max(0, userRank)]!;
     const supabase = await createServiceClient();
     const { data, error } = await supabase
       .from("curricula")
