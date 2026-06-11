@@ -1,4 +1,7 @@
 "use client";
+import { speak as ttsSpeak, detectLang as ttsDetectLang } from "@/lib/voice/tts";
+import { sfxSuccess as roomSfxSuccess } from "@/lib/sound/sfx";
+import { Volume2 as RoomVolume } from "lucide-react";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -692,6 +695,77 @@ export default function TalkPage() {
     });
   }, []);
 
+  // ── Speaking Room (Confident Speaking) — chrome state. Inert unless /learn
+  // wrote a handoff and the URL carries room=1. Normal /talk is untouched. ──
+  type RoomPhrase = { en: string; th: string; romanization: string | null };
+  type RoomHandoff = {
+    sessionId: string;
+    title_en: string;
+    level: "A1" | "A2" | "B1" | "B2" | "C1";
+    learningTarget: "th" | "en";
+    register: string;
+    plan: {
+      scene: string;
+      miomi_role: string;
+      objectives: string[];
+      stages: Array<{ id: string; title: string; activity: string; guidance: string }>;
+      phrases: RoomPhrase[];
+    };
+  };
+  const [roomSession, setRoomSession] = useState<RoomHandoff | null>(null);
+  const roomSessionRef = useRef<RoomHandoff | null>(null);
+  const [roomStageId, setRoomStageId] = useState<string>("warmup");
+  const [roomObjectivesDone, setRoomObjectivesDone] = useState<number[]>([]);
+  const [roomNotes, setRoomNotes] = useState<Array<{ kind: "glow" | "grow"; note: string }>>([]);
+  const [roomHintsOpen, setRoomHintsOpen] = useState(false);
+  const [roomEnding, setRoomEnding] = useState(false);
+  const roomStartedAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!window.location.search.includes("room=1")) return;
+    try {
+      const raw = window.sessionStorage.getItem("miomika.room_session");
+      if (!raw) return;
+      const handoff = JSON.parse(raw) as RoomHandoff;
+      if (!handoff?.sessionId || !handoff?.plan?.stages?.length) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot room handoff read on mount, matching the app's fetch-on-mount pattern
+      setRoomSession(handoff);
+      roomSessionRef.current = handoff;
+      roomStartedAtRef.current = Date.now();
+    } catch {
+      /* no room — normal talk */
+    }
+  }, []);
+  const endRoomSession = useCallback(async () => {
+    const room = roomSessionRef.current;
+    if (!room || roomEnding) return;
+    setRoomEnding(true);
+    const minutes = roomStartedAtRef.current
+      ? Math.max(1, Math.round((Date.now() - roomStartedAtRef.current) / 60000))
+      : 0;
+    try {
+      await fetch("/api/speaking/session", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: room.sessionId,
+          status: "completed",
+          objectives_done: roomObjectivesDone,
+          notes: roomNotes,
+          minutes,
+          exit_done: roomStageId === "exit",
+        }),
+      });
+    } catch {
+      /* results are best-effort; the session itself was the value */
+    }
+    try {
+      window.sessionStorage.removeItem("miomika.room_session");
+    } catch {
+      /* ignore */
+    }
+    window.location.href = `/learn?session=${room.sessionId}`;
+  }, [roomEnding, roomObjectivesDone, roomNotes, roomStageId]);
   const handleLiveMessage = useCallback((msg: LiveClientMessage) => {
     const runtime = ensureTurnRuntime();
     const suspended = isReplaySuspended(runtime, mediaRef.current);
@@ -758,6 +832,29 @@ export default function TalkPage() {
       }
       dispatchTurn({ type: "model_transcript", text: msg.text });
       appendTranscript("gemini", msg.text);
+      return;
+    }
+    if (msg.type === "tool_call" && msg.name === "report_stage") {
+      const args = (msg.args ?? {}) as {
+        event?: string;
+        stage_id?: string;
+        objective_index?: number;
+        note_kind?: string;
+        note?: string;
+      };
+      if (args.event === "stage" && typeof args.stage_id === "string") {
+        setRoomStageId(args.stage_id);
+      } else if (args.event === "objective" && typeof args.objective_index === "number") {
+        const idx = args.objective_index;
+        setRoomObjectivesDone((prev) =>
+          prev.includes(idx) || idx < 0 || idx > 2 ? prev : [...prev, idx],
+        );
+        try { roomSfxSuccess(); } catch { /* sound is best-effort */ }
+      } else if (args.event === "note" && typeof args.note === "string" && args.note.trim()) {
+        const kind = args.note_kind === "grow" ? "grow" : "glow";
+        const note = args.note.trim();
+        setRoomNotes((prev) => (prev.length >= 6 ? prev : [...prev, { kind, note }]));
+      }
       return;
     }
     if (
@@ -1047,7 +1144,24 @@ export default function TalkPage() {
       setConversationLang(uiLanguage);
       setUiLang(uiLanguage);
 
-      await clientRef.current!.connect({ uiLanguage, targetLanguage, resume: false, mode: config.mode, level: config.teach.level });
+      await clientRef.current!.connect({
+        uiLanguage,
+        targetLanguage,
+        resume: false,
+        mode: config.mode,
+        level: roomSessionRef.current?.level ?? config.teach.level,
+        session: roomSessionRef.current?.plan
+          ? {
+              title: roomSessionRef.current.title_en,
+              scene: roomSessionRef.current.plan.scene,
+              miomiRole: roomSessionRef.current.plan.miomi_role,
+              register: roomSessionRef.current.register,
+              objectives: roomSessionRef.current.plan.objectives,
+              stages: roomSessionRef.current.plan.stages,
+              phrases: roomSessionRef.current.plan.phrases,
+            }
+          : undefined,
+      });
       memberContextRef.current = clientRef.current!.getMemberContext();
       syncTeachWordContext();
       lessonHadStartedRef.current = true;
@@ -1587,6 +1701,37 @@ export default function TalkPage() {
         />
       )}
 
+      {roomSession ? (
+        <div style={{ flexShrink: 0, padding: "6px 12px 4px", zIndex: 7 }}>
+          <div style={{ display: "flex", gap: 3, marginBottom: 5 }}>
+            {roomSession.plan.stages.map((s, idx) => {
+              const order = roomSession.plan.stages.findIndex((x) => x.id === roomStageId);
+              return (
+                <span key={s.id} style={{
+                  flex: 1, height: 4, borderRadius: 4,
+                  background: idx < order ? "#34A98F" : idx === order ? "#E8C77A" : "#EDE8E0",
+                }} />
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 11, fontWeight: 700, color: "#3C352B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {roomSession.title_en} · {roomSession.plan.stages.find((s) => s.id === roomStageId)?.title ?? "Warm-up"}
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#2C8576" }}>
+                {roomObjectivesDone.length}/3 earned
+              </span>
+              <button onClick={() => void endRoomSession()} disabled={roomEnding} style={{
+                fontFamily: "'Quicksand', sans-serif", fontSize: 10.5, fontWeight: 700, padding: "4px 11px",
+                borderRadius: 99, border: "1px solid #EDE8E0", background: "#FFFFFF", color: "#9A8B73", cursor: "pointer",
+              }}>
+                {roomEnding ? "Saving…" : "End session"}
+              </button>
+            </span>
+          </div>
+        </div>
+      ) : null}
       <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <div
           ref={canvasRef}
@@ -1666,6 +1811,42 @@ export default function TalkPage() {
             {uiLang === "th" ? "แตะที่ไหนก็ได้เพื่อเริ่มค่า~" : "tap anywhere to begin~"}
           </p>
         )}
+        {roomSession ? (
+          <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 360, padding: "0 14px", marginBottom: 6 }}>
+            {roomHintsOpen ? (
+              <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 16, padding: "10px 12px", marginBottom: 6, boxShadow: "0 8px 22px rgba(74,65,54,.12)" }}>
+                {roomSession.plan.phrases.map((p, pi) => {
+                  const targetIsEn = roomSession.learningTarget === "en";
+                  const targetText = targetIsEn ? p.en : p.th;
+                  return (
+                    <div key={pi} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 0", borderBottom: pi < roomSession.plan.phrases.length - 1 ? "1px solid #EDE8E0" : "none" }}>
+                      <button
+                        onClick={() => { try { void ttsSpeak(targetText, ttsDetectLang(targetText)); } catch { /* best-effort */ } }}
+                        aria-label="Play sound"
+                        style={{ width: 24, height: 24, borderRadius: "50%", border: "1px solid #EDE8E0", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flex: "0 0 24px" }}
+                      >
+                        <RoomVolume style={{ width: 12, height: 12, color: "#3E9C82" }} aria-hidden />
+                      </button>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontFamily: targetIsEn ? "'Quicksand', sans-serif" : "'Sarabun', sans-serif", display: "block", fontSize: 13, fontWeight: 700, color: "#3C352B" }}>{targetText}</span>
+                        {!targetIsEn && p.romanization ? (
+                          <span style={{ fontFamily: "'Quicksand', sans-serif", display: "block", fontSize: 10.5, fontWeight: 600, color: "#6D5BBF" }}>{p.romanization}</span>
+                        ) : null}
+                        <span style={{ fontFamily: targetIsEn ? "'Sarabun', sans-serif" : "'Quicksand', sans-serif", display: "block", fontSize: 11, fontWeight: 600, color: "#9A8B73" }}>{targetIsEn ? p.th : p.en}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+            <button onClick={() => setRoomHintsOpen((v) => !v)} style={{
+              fontFamily: "'Quicksand', sans-serif", display: "block", margin: "0 auto 4px", fontSize: 11, fontWeight: 700,
+              padding: "6px 14px", borderRadius: 99, border: "1px solid #C4B5FD", background: "#F1EEFE", color: "#6D5BBF", cursor: "pointer",
+            }}>
+              {roomHintsOpen ? "Hide hints" : "Hints~"}
+            </button>
+          </div>
+        ) : null}
         <div style={{ pointerEvents: "auto" }}>
         <MicRow
           current={config.mode}

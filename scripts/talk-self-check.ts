@@ -1747,6 +1747,17 @@ assert(
     sessionClientSrc.includes("buildSessionLiveConfig"),
   "speaking room: client routes session config + relays report_stage",
 );
+const roomTalkSrc = readFileSync(join(ROOT, "app/(app)/talk/page.tsx"), "utf8");
+assert(
+  roomTalkSrc.includes("miomika.room_session") &&
+    roomTalkSrc.includes('msg.name === "report_stage"') &&
+    roomTalkSrc.includes("End session"),
+  "speaking room: /talk consumes handoff, relays the board, can end + save",
+);
+assert(
+  roomTalkSrc.includes("session: roomSessionRef.current?.plan"),
+  "speaking room: connect passes the session plan when a room is active",
+);
 const lessonsPageSrc = readFileSync(join(ROOT, "app/(app)/lessons/page.tsx"), "utf8");
 assert(
   lessonsPageSrc.includes('fetch("/api/lessons")') && lessonsPageSrc.includes("AmbientBackground"),
