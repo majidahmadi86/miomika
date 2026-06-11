@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { detectLang, speak } from "@/lib/voice/tts";
 
@@ -75,6 +75,7 @@ const OPT_MARKS = [
   { t: "ก", bg: "#FDEAF4", fg: "#C2497E" },
   { t: "ข", bg: "#F1EEFE", fg: "#6D5BBF" },
   { t: "ค", bg: "#EBFBF4", fg: "#3E7A66" },
+  { t: "ง", bg: "#FEF1E3", fg: "#B06A28" },
 ];
 
 /* DESIGN POLICY: every sound button is top-right of its block, same glyph, soft circle. */
@@ -117,6 +118,7 @@ function WordTile({ w, target, soft }: { w: WordItem; target: string; soft: stri
 
 export default function LessonPlayerPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const id = params?.id;
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [missing, setMissing] = useState(false);
@@ -207,12 +209,16 @@ export default function LessonPlayerPage() {
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/lessons" aria-label="Back to lessons" style={{
-            width: 34, height: 34, borderRadius: "50%", border: `1px solid ${BORDER}`,
-            background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", flex: "0 0 34px",
-          }}>
+          <button
+            onClick={() => { if (step > 0 && step < 5) go(step - 1); else router.push("/lessons"); }}
+            aria-label={step > 0 && step < 5 ? "Back one step" : "Back to lessons"}
+            style={{
+              width: 34, height: 34, borderRadius: "50%", border: `1px solid ${BORDER}`,
+              background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flex: "0 0 34px",
+            }}
+          >
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke={INK} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
-          </Link>
+          </button>
           <div>
             <div style={{ ...font, fontSize: 14, fontWeight: 700, color: INK_STRONG, lineHeight: 1.2 }}>{lesson.title_en}</div>
             <div style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, marginTop: 1 }}>
@@ -740,11 +746,20 @@ function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: Phra
     const pool = phrases.slice(0, 8);
     const numberFree = pool.filter((p) => !HAS_DIGIT.test(p.en) && !HAS_DIGIT.test(p.th));
     const qPool = numberFree.length >= 3 ? numberFree : pool;
-    return shuffle(qPool).slice(0, Math.min(3, qPool.length)).map((p, i) => {
-      const others = shuffle(pool.filter((x) => x.th !== p.th)).slice(0, 2).map((x) => x.th);
-      return { q: p.en, right: p.th, options: shuffle([p.th, ...others]), cando: candos[i]?.label ?? null };
+    // LEVEL-SCALED: A1 = 3 questions x 3 options; A2 = 4 x 4; B1+ adds reversed-direction questions.
+    const rank = Math.max(0, ["A1", "A2", "B1", "B2", "C1"].indexOf(level.toUpperCase()));
+    const qCount = Math.min(3 + Math.min(rank, 2), qPool.length);
+    const optCount = Math.min(rank >= 1 ? 4 : 3, pool.length);
+    return shuffle(qPool).slice(0, qCount).map((p, i) => {
+      const reversed = rank >= 2 && i % 2 === 1;
+      const others = shuffle(pool.filter((x) => x.th !== p.th)).slice(0, Math.max(optCount - 1, 1));
+      const cando = candos[i % Math.max(candos.length, 1)]?.label ?? null;
+      if (reversed) {
+        return { reversed, q: p.th, right: p.en, options: shuffle([p.en, ...others.map((x) => x.en)]), cando };
+      }
+      return { reversed, q: p.en, right: p.th, options: shuffle([p.th, ...others.map((x) => x.th)]), cando };
     });
-  }, [phrases, candos]);
+  }, [phrases, candos, level]);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
@@ -784,9 +799,15 @@ function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: Phra
           {level} · {q.cando}
         </span>
       ) : null}
-      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${LAV}`, borderRadius: 16, boxShadow: CARD_SHADOW, padding: "15px 16px", marginBottom: 12 }}>
-        <p style={{ ...font, fontSize: 16, fontWeight: 700, color: INK_STRONG, margin: 0, lineHeight: 1.45 }}>
-          How do you say: “{q.q}”
+      <div style={{ position: "relative", background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${LAV}`, borderRadius: 16, boxShadow: CARD_SHADOW, padding: "15px 16px", marginBottom: 12 }}>
+        {q.reversed ? (
+          <span style={{ position: "absolute", top: 10, right: 10 }}>
+            <SoundBtn onClick={() => say(q.q)} bg={LAV_SOFT} color={LAV_DEEP} size={28} />
+          </span>
+        ) : null}
+        <p style={{ ...font, fontSize: 12, fontWeight: 700, color: MUTED, margin: 0 }}>{q.reversed ? "What does this mean?" : "How do you say:"}</p>
+        <p style={{ ...(q.reversed ? thai : font), fontSize: q.reversed ? 17 : 16, fontWeight: q.reversed ? 600 : 700, color: INK_STRONG, margin: "5px 0 0", lineHeight: 1.5, paddingRight: q.reversed ? 36 : 0 }}>
+          “{q.q}”
         </p>
       </div>
       {q.options.map((opt, oi) => {
@@ -809,8 +830,8 @@ function CheckpointStep({ phrases, candos, level, say, onDone }: { phrases: Phra
             }}
           >
             <span style={{ ...thai, width: 26, height: 26, borderRadius: "50%", background: mark.bg, color: mark.fg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flex: "0 0 26px" }}>{mark.t}</span>
-            <span style={{ ...thai, fontSize: 15, fontWeight: 600, color: INK_STRONG, flex: 1, textAlign: "left" }}>{opt}</span>
-            <SoundBtn onClick={() => say(opt)} bg={PINK_SOFT} color={PINK_DEEP} size={28} />
+            <span style={{ ...(q.reversed ? font : thai), fontSize: q.reversed ? 13.5 : 15, fontWeight: 600, color: INK_STRONG, flex: 1, textAlign: "left" }}>{opt}</span>
+            {!q.reversed ? <SoundBtn onClick={() => say(opt)} bg={PINK_SOFT} color={PINK_DEEP} size={28} /> : null}
           </div>
         );
       })}
@@ -848,8 +869,23 @@ function RecapStep({ lesson, words, phrases, candos, result, onReview }: { lesso
   const cp = result ?? lesson.progress?.checkpoint ?? null;
   return (
     <div>
+      <style>{`
+        @keyframes lesson-pop { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.08) } 100% { transform: scale(1); opacity: 1 } }
+        @keyframes lesson-confetti { 0% { transform: translateY(0) scale(1); opacity: 0 } 15% { opacity: 1 } 100% { transform: translateY(-46px) scale(.5); opacity: 0 } }
+        @media (prefers-reduced-motion: reduce) { .lesson-pop, .lesson-confetti { animation: none !important } }
+      `}</style>
       <div style={{ textAlign: "center", padding: "4px 0 14px" }}>
-        <div style={{ position: "relative", display: "inline-block", marginBottom: 8 }}>
+        <div className="lesson-pop" style={{ position: "relative", display: "inline-block", marginBottom: 8, animation: "lesson-pop .6s cubic-bezier(.34,1.56,.64,1)" }}>
+          {[
+            { l: "6%", t: "12%", c: "#F9A8D4", d: "0s" },
+            { l: "88%", t: "20%", c: "#C4B5FD", d: ".3s" },
+            { l: "14%", t: "72%", c: "#E8C77A", d: ".6s" },
+            { l: "80%", t: "66%", c: "#A7F3D0", d: ".9s" },
+            { l: "50%", t: "2%", c: "#FCA5A5", d: "1.2s" },
+            { l: "96%", t: "44%", c: "#FDBA74", d: "1.5s" },
+          ].map((p, i) => (
+            <span key={i} className="lesson-confetti" style={{ position: "absolute", left: p.l, top: p.t, width: 7, height: 7, borderRadius: "50%", background: p.c, animation: "lesson-confetti 1.8s ease-out infinite", animationDelay: p.d }} />
+          ))}
           <Image src={CELEBRATION} alt="Miomi celebrating" width={132} height={132} style={{ objectFit: "contain" }} />
           <span style={{
             position: "absolute", right: -4, bottom: 6, width: 34, height: 34, borderRadius: "50%",
@@ -863,6 +899,7 @@ function RecapStep({ lesson, words, phrases, candos, result, onReview }: { lesso
         <h3 style={{ ...font, fontSize: 20, color: INK_STRONG, margin: 0 }}>A <span style={{ color: "#A8853F", fontWeight: 700 }}>golden</span> moment</h3>
         <p style={{ ...font, fontSize: 13, color: MUTED, margin: "6px 0 0", lineHeight: 1.5 }}>Earned, not given — these are things you can now do.</p>
       </div>
+      <MiomiBubble head={HEAD_HAPPY} text="You did it — เมี้ยว~ Now go say these out in the real world." />
       {candos.map((c, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 13, padding: "11px 13px", marginBottom: 8, boxShadow: CARD_SHADOW }}>
           <span style={{ width: 24, height: 24, borderRadius: "50%", background: TEAL_SOFT, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 24px" }}>

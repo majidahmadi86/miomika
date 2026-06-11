@@ -1803,6 +1803,14 @@ assert(
   "extension keeps the learner's place and grows phrases too",
 );
 assert(
+  playerPageSrc.includes("LEVEL-SCALED") && playerPageSrc.includes("lesson-confetti"),
+  "checkpoints scale with level and the golden moment celebrates",
+);
+assert(
+  lessonsPageSrc.includes("stepNow"),
+  "lesson cards show step-by-step progress dots",
+);
+assert(
   buildSystemInstruction("en", "th").includes("fabricate shared history") ||
     buildSystemInstruction("en", "th").includes("NEVER claim"),
   "system instruction forbids fabricated conversation context",

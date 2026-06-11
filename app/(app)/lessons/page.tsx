@@ -231,6 +231,7 @@ export default function LessonsPage() {
               const done = l.status === "completed";
               const inProgress = l.status === "in_progress";
               const pct = pctFor(l);
+              const stepNow = done ? 5 : Math.min(typeof l.progress?.step === "number" ? l.progress.step : 0, 5);
               return (
                 <div key={l.id} style={{
                   position: "relative", background: "#FFFFFF", border: `1px solid ${BORDER}`,
@@ -263,8 +264,19 @@ export default function LessonsPage() {
                     ))}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
-                    <span style={{ ...font, display: "inline-flex", alignItems: "center", fontSize: 10.5, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: done ? "#3E9C82" : MUTED }}>
-                      {done ? (<><GoldStar />Completed</>) : inProgress ? "In progress" : "Up next"}
+                    <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <span style={{ ...font, display: "inline-flex", alignItems: "center", fontSize: 10.5, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: done ? "#3E9C82" : MUTED }}>
+                        {done ? (<><GoldStar />Completed</>) : inProgress ? "In progress" : "Up next"}
+                      </span>
+                      <span style={{ display: "flex", gap: 4, alignItems: "center" }} aria-label={`Step ${Math.min(stepNow + 1, 5)} of 5`}>
+                        {[0, 1, 2, 3, 4].map((i) => (
+                          <span key={i} style={{
+                            width: 7, height: 7, borderRadius: "50%",
+                            background: done || i < stepNow ? "#7DD3C0" : "#FFFFFF",
+                            border: `1.5px solid ${done || i < stepNow ? "#7DD3C0" : i === stepNow && inProgress ? tc.edge : BORDER}`,
+                          }} />
+                        ))}
+                      </span>
                     </span>
                     <Link href={`/lessons/${l.id}`} style={{
                       ...font, fontSize: 12.5, fontWeight: 700, padding: "9px 18px",
