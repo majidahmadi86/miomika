@@ -719,6 +719,7 @@ export default function TalkPage() {
   const [roomNotes, setRoomNotes] = useState<Array<{ kind: "glow" | "grow"; note: string }>>([]);
   const [roomLearned, setRoomLearned] = useState<string[]>([]);
   const [roomHintsOpen, setRoomHintsOpen] = useState(false);
+  const [roomBoardOpen, setRoomBoardOpen] = useState(false);
   const [roomEnding, setRoomEnding] = useState(false);
   const roomStartedAtRef = useRef<number | null>(null);
   useEffect(() => {
@@ -829,11 +830,20 @@ export default function TalkPage() {
     if (msg.type === "gemini") {
       if (suspended) return;
       if (isHiddenLiveTranscript(msg.text)) return;
+      let geminiText = msg.text;
+      if (roomSessionRef.current && /report_?stage/i.test(geminiText)) {
+        // Backstop: the brain is forbidden from writing tool calls as text,
+        // but if a fragment leaks, it never reaches the learner.
+        geminiText = geminiText
+          .replace(/call:?\s*report_?stage\s*\{[^}]*\}?/gi, "")
+          .replace(/report_?stage/gi, "");
+        if (!geminiText.trim()) return;
+      }
       if (!userInputFinalizedRef.current && pendingUserTextRef.current) {
         finalizeUserInputTranscript();
       }
-      dispatchTurn({ type: "model_transcript", text: msg.text });
-      appendTranscript("gemini", msg.text);
+      dispatchTurn({ type: "model_transcript", text: geminiText });
+      appendTranscript("gemini", geminiText);
       return;
     }
     if (msg.type === "tool_call" && msg.name === "report_stage") {
@@ -1755,11 +1765,24 @@ export default function TalkPage() {
               <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FFFFFF", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {roomSession.title_en} · {roomSession.plan.stages.find((s) => s.id === roomStageId)?.title ?? "Warm-up"}
               </span>
-              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#FDE9B8", flexShrink: 0 }}>
-                {roomObjectivesDone.length}/3 earned
-              </span>
+              <button onClick={() => setRoomBoardOpen((v) => !v)} style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#FDE9B8", flexShrink: 0, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                {roomObjectivesDone.length}/{roomSession.plan.objectives.length} earned ▾
+              </button>
             </div>
           </div>
+          {roomBoardOpen ? (
+            <div style={{ background: "#FFFFFF", border: "1px solid #7DD3C0", borderRadius: 16, padding: "10px 12px", marginTop: 6, boxShadow: "0 8px 22px rgba(74,65,54,.12)" }}>
+              {roomSession.plan.objectives.map((o, oi) => {
+                const earned = roomObjectivesDone.includes(oi);
+                return (
+                  <div key={oi} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: oi < roomSession.plan.objectives.length - 1 ? "1px solid #EDE8E0" : "none" }}>
+                    <span style={{ width: 16, height: 16, borderRadius: "50%", flex: "0 0 16px", border: earned ? "2px solid transparent" : "2px solid #EDE8E0", background: earned ? "linear-gradient(135deg,#6ECDB8 0%,#34A98F 100%)" : "#FFFFFF" }} />
+                    <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 12, fontWeight: 700, color: earned ? "#2C8576" : "#9A8B73" }}>{o}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
           {roomHintsOpen ? (
             <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 16, padding: "10px 12px", marginTop: 6, boxShadow: "0 8px 22px rgba(74,65,54,.12)" }}>
               {roomLearned.length ? (

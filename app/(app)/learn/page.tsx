@@ -759,7 +759,7 @@ export default function LearnPage() {
               </button>
               <div style={{ textAlign: "center", padding: "2px 0 14px" }}>
                 <span style={{ width: 68, height: 68, borderRadius: "50%", background: "#FDEAF4", display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                  <Image src="/miomi/companion-celebration.png" alt="Miomi celebrating" width={60} height={60} style={{ objectFit: "contain" }} />
+                  <Image src="/miomi/head-happy.png" alt="Miomi celebrating" width={60} height={60} style={{ objectFit: "contain" }} />
                 </span>
                 <h2 style={{ ...font, fontSize: 18, fontWeight: 700, color: INK_STRONG, margin: "10px 0 0", lineHeight: 1.25 }}>
                   Session complete{typeof resultsSession.results?.minutes === "number" && resultsSession.results.minutes > 0 ? ` — you spoke for ${resultsSession.results.minutes} minute${resultsSession.results.minutes === 1 ? "" : "s"}.` : "~"}

@@ -218,9 +218,9 @@ export async function POST(req: NextRequest) {
         cefrLevel: level,
         learningTarget,
         exclude: [],
-        count: 3,
+        count: 5,
       });
-      if (phrases.length < 2) {
+      if (phrases.length < 3) {
         return NextResponse.json({ ok: false, reason: "content_incomplete" }, { status: 200 });
       }
       plan = { ...generated.plan, phrases };
