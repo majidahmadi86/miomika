@@ -834,13 +834,17 @@ export default function TalkPage() {
       if (suspended) return;
       if (isHiddenLiveTranscript(msg.text)) return;
       let geminiText = msg.text;
-      if (roomSessionRef.current && /report_?stage/i.test(geminiText)) {
+      if (roomSessionRef.current) {
         // Backstop: the brain is forbidden from writing tool calls as text,
-        // but if a fragment leaks, it never reaches the learner.
-        geminiText = geminiText
+        // but leaked fragments take many shapes — none may reach the learner.
+        const scrubbed = geminiText
           .replace(/call:?\s*report_?stage\s*\{[^}]*\}?/gi, "")
-          .replace(/report_?stage/gi, "");
-        if (!geminiText.trim()) return;
+          .replace(/report_?stage/gi, "")
+          .replace(/\(\s*["']?\s*(?:stage|event|objective|note|hint)\b[^)]{0,40}\)/gi, "");
+        if (scrubbed !== geminiText) {
+          geminiText = scrubbed;
+          if (!geminiText.trim()) return;
+        }
       }
       if (!userInputFinalizedRef.current && pendingUserTextRef.current) {
         finalizeUserInputTranscript();
