@@ -717,6 +717,7 @@ export default function TalkPage() {
   const [roomStageId, setRoomStageId] = useState<string>("warmup");
   const [roomObjectivesDone, setRoomObjectivesDone] = useState<number[]>([]);
   const [roomNotes, setRoomNotes] = useState<Array<{ kind: "glow" | "grow"; note: string }>>([]);
+  const [roomLearned, setRoomLearned] = useState<string[]>([]);
   const [roomHintsOpen, setRoomHintsOpen] = useState(false);
   const [roomEnding, setRoomEnding] = useState(false);
   const roomStartedAtRef = useRef<number | null>(null);
@@ -752,6 +753,7 @@ export default function TalkPage() {
           status: "completed",
           objectives_done: roomObjectivesDone,
           notes: roomNotes,
+          learned: roomLearned,
           minutes,
           exit_done: roomStageId === "exit",
         }),
@@ -765,7 +767,7 @@ export default function TalkPage() {
       /* ignore */
     }
     window.location.href = `/learn?session=${room.sessionId}`;
-  }, [roomEnding, roomObjectivesDone, roomNotes, roomStageId]);
+  }, [roomEnding, roomObjectivesDone, roomNotes, roomLearned, roomStageId]);
   const handleLiveMessage = useCallback((msg: LiveClientMessage) => {
     const runtime = ensureTurnRuntime();
     const suspended = isReplaySuspended(runtime, mediaRef.current);
@@ -854,6 +856,9 @@ export default function TalkPage() {
         const kind = args.note_kind === "grow" ? "grow" : "glow";
         const note = args.note.trim();
         setRoomNotes((prev) => (prev.length >= 6 ? prev : [...prev, { kind, note }]));
+      } else if (args.event === "hint" && typeof args.note === "string" && args.note.trim()) {
+        const hint = args.note.trim();
+        setRoomLearned((prev) => (prev.includes(hint) || prev.length >= 12 ? prev : [...prev, hint]));
       }
       return;
     }
@@ -1757,6 +1762,16 @@ export default function TalkPage() {
           </div>
           {roomHintsOpen ? (
             <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 16, padding: "10px 12px", marginTop: 6, boxShadow: "0 8px 22px rgba(74,65,54,.12)" }}>
+              {roomLearned.length ? (
+                <div style={{ borderBottom: "1px solid #EDE8E0", paddingBottom: 6, marginBottom: 6 }}>
+                  <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 9.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C2497E", margin: "0 0 4px" }}>
+                    From Miomi just now~
+                  </p>
+                  {roomLearned.map((h, hi) => (
+                    <p key={hi} style={{ fontFamily: "'Sarabun', 'Quicksand', sans-serif", fontSize: 12.5, fontWeight: 600, color: "#3C352B", margin: "0 0 4px", lineHeight: 1.45 }}>{h}</p>
+                  ))}
+                </div>
+              ) : null}
               {roomSession.plan.phrases.map((p, pi) => {
                 const targetIsEn = roomSession.learningTarget === "en";
                 const targetText = targetIsEn ? p.en : p.th;

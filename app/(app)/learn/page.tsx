@@ -111,6 +111,7 @@ type SessionDetail = {
     minutes?: number;
     objectives_done?: number[];
     notes?: Array<{ kind: string; note: string }>;
+    learned?: string[];
     exit_done?: boolean;
   };
   completed_at: string | null;
@@ -750,6 +751,12 @@ export default function LearnPage() {
           resultsSession && resultsSession.library ? (
             /* ---------- RESULTS / EXIT TICKET ---------- */
             <>
+              <button onClick={closeResults} style={{
+                ...font, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700,
+                color: MUTED, background: "transparent", border: "none", cursor: "pointer", padding: 0, marginBottom: 6,
+              }}>
+                <ChevronLeft style={{ width: 14, height: 14 }} aria-hidden />Confident Speaking
+              </button>
               <div style={{ textAlign: "center", padding: "2px 0 14px" }}>
                 <span style={{ width: 68, height: 68, borderRadius: "50%", background: "#FDEAF4", display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                   <Image src="/miomi/companion-celebration.png" alt="Miomi celebrating" width={60} height={60} style={{ objectFit: "contain" }} />
@@ -799,6 +806,17 @@ export default function LearnPage() {
                 </div>
               ) : null}
 
+              {(resultsSession.results?.learned ?? []).length ? (
+                <div style={{ background: "#FFFFFF", border: "1px solid #F9A8D4", borderRadius: 18, padding: "13px 14px", marginBottom: 11 }}>
+                  <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C2497E", margin: "0 0 6px" }}>New from your session — Miomi taught these in class~</p>
+                  {(resultsSession.results?.learned ?? []).map((h, hi) => (
+                    <div key={hi} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "7px 0", borderBottom: hi < (resultsSession.results?.learned ?? []).length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                      <SoundBtn onClick={() => say(h.split("—")[0]?.trim() || h)} />
+                      <p style={{ ...thaiFont, fontFamily: "'Sarabun', 'Quicksand', sans-serif", fontSize: 13, fontWeight: 600, color: INK_STRONG, margin: 0, lineHeight: 1.5, flex: 1 }}>{h}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 18, padding: "13px 14px", marginBottom: 11 }}>
                 <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#6D5BBF", margin: "0 0 6px" }}>Phrases from your session</p>
                 {resultsSession.library.plan.phrases.map((p, pi) => (
