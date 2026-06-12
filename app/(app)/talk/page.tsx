@@ -866,8 +866,14 @@ export default function TalkPage() {
         note?: string;
       };
       if (args.event === "stage" && typeof args.stage_id === "string") {
-        setRoomStageId(args.stage_id);
-        roomStageIdRef.current = args.stage_id;
+        // Stages move FORWARD only — a wobbling brain can never reset the bar.
+        const stages = roomSessionRef.current?.plan.stages ?? [];
+        const fromIdx = stages.findIndex((s) => s.id === roomStageIdRef.current);
+        const toIdx = stages.findIndex((s) => s.id === args.stage_id);
+        if (toIdx >= 0 && toIdx >= fromIdx) {
+          setRoomStageId(args.stage_id);
+          roomStageIdRef.current = args.stage_id;
+        }
       } else if (args.event === "objective" && typeof args.objective_index === "number") {
         const idx = args.objective_index;
         setRoomObjectivesDone((prev) =>
