@@ -1165,12 +1165,18 @@ export default function TalkPage() {
       memberContextRef.current = clientRef.current!.getMemberContext();
       syncTeachWordContext();
       lessonHadStartedRef.current = true;
+      const isRoom = !!roomSessionRef.current?.plan;
       dispatchTurn({
         type: "session_connected",
         isGuest: isGuestRef.current,
         guestExchanges: guestExchangesRef.current,
-        skipKickoff: kickoffSentRef.current,
+        skipKickoff: isRoom || kickoffSentRef.current,
       });
+      if (isRoom && !kickoffSentRef.current) {
+        // The Room opens in tutor voice — the companion greeting never fires here.
+        kickoffSentRef.current = true;
+        clientRef.current!.sendSessionKickoff(sessionUiLangRef.current);
+      }
     } catch (err) {
       logEvent({
         kind: "state",

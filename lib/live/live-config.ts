@@ -283,3 +283,10 @@ export function buildSessionLiveConfig(
     ],
   };
 }
+
+/** Speaking Room: session opener — the tutor starts stage one, never a companion hello. */
+export function buildSessionKickoffPrompt(lang: "th" | "en"): string {
+  return lang === "th"
+    ? "[session_open] เริ่มเซสชัน Confident Speaking เดี๋ยวนี้ — เปิดด่านแรก (warm-up) ตามแผนทันที: พูดหนึ่งถึงสองประโยคสั้นๆ อบอุ่นในเสียงติวเตอร์ เอ่ยชื่อซีนสั้นๆ แล้วถามคำถาม warm-up ข้อแรกเลย ห้ามทักทายแบบเพื่อนที่กลับมาเจอกัน ห้ามพูดต้อนรับกลับ ห้ามถามว่าอยากเรียนอะไร — แผนถูกวางไว้แล้ว เรียก report_stage ด้วย event \"stage\" และ stage_id \"warmup\" ก่อนพูด"
+    : "[session_open] Begin the Confident Speaking session NOW — open stage one (warm-up) from the plan immediately: ONE or two short warm sentences in your tutor voice that name the scene and ask the first warm-up question. Do NOT do a companion welcome-back greeting, do NOT say welcome back, do NOT ask what they want to learn — the plan is already set. Call report_stage with event \"stage\" and stage_id \"warmup\" before you speak.";
+}

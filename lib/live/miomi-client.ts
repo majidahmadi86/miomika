@@ -5,6 +5,7 @@ import {
   LIVE_MODEL,
   LIVE_VOICE,
   buildKickoffPrompt,
+  buildSessionKickoffPrompt,
   buildLiveConfig,
   buildSessionLiveConfig,
   buildResumePrompt,
@@ -462,6 +463,20 @@ export class MiomiLiveClient {
         {
           role: "user",
           parts: [{ text: buildKickoffPrompt(lang, audience, this.memberContext) }],
+        },
+      ],
+      turnComplete: true,
+    });
+  }
+
+  /** Speaking Room: open the session in tutor voice — replaces the companion kickoff. */
+  sendSessionKickoff(lang: "th" | "en"): void {
+    if (!this.session || !this.connected) return;
+    this.session.sendClientContent({
+      turns: [
+        {
+          role: "user",
+          parts: [{ text: buildSessionKickoffPrompt(lang) }],
         },
       ],
       turnComplete: true,

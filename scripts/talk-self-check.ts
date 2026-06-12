@@ -1758,6 +1758,12 @@ assert(
   roomTalkSrc.includes("session: roomSessionRef.current?.plan"),
   "speaking room: connect passes the session plan when a room is active",
 );
+assert(
+  sessionLiveConfigSrc.includes("buildSessionKickoffPrompt") &&
+    sessionClientSrc.includes("sendSessionKickoff") &&
+    roomTalkSrc.includes("sendSessionKickoff"),
+  "speaking room: tutor kickoff replaces the companion greeting in the room",
+);
 const lessonsPageSrc = readFileSync(join(ROOT, "app/(app)/lessons/page.tsx"), "utf8");
 assert(
   lessonsPageSrc.includes('fetch("/api/lessons")') && lessonsPageSrc.includes("AmbientBackground"),
