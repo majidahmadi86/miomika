@@ -213,13 +213,24 @@ export async function POST(req: NextRequest) {
       const generated = await generatePlan(level, targetName, topic, register);
       if (!generated) return NextResponse.json({ ok: false, reason: "plan_failed" }, { status: 200 });
       // Helper phrases pass the SAME accuracy gate as lessons.
-      const phrases = await buildExtraPhrases({
+      let phrases = await buildExtraPhrases({
         topic: `phrases a person actually says during: ${topic}`,
         cefrLevel: level,
         learningTarget,
         exclude: [],
         count: 5,
       });
+      if (phrases.length < 3) {
+        // One more honest attempt before giving up — entry must not feel flaky.
+        const more = await buildExtraPhrases({
+          topic: `phrases a person actually says during: ${topic}`,
+          cefrLevel: level,
+          learningTarget,
+          exclude: phrases.map((p) => p.en),
+          count: 5,
+        });
+        phrases = [...phrases, ...more].slice(0, 5);
+      }
       if (phrases.length < 3) {
         return NextResponse.json({ ok: false, reason: "content_incomplete" }, { status: 200 });
       }

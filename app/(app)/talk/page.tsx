@@ -720,6 +720,7 @@ export default function TalkPage() {
   const [roomLearned, setRoomLearned] = useState<string[]>([]);
   const [roomHintsOpen, setRoomHintsOpen] = useState(false);
   const [roomBoardOpen, setRoomBoardOpen] = useState(false);
+  const [roomSlow, setRoomSlow] = useState(false);
   const [roomEnding, setRoomEnding] = useState(false);
   const roomStartedAtRef = useRef<number | null>(null);
   useEffect(() => {
@@ -734,6 +735,7 @@ export default function TalkPage() {
       setRoomSession(handoff);
       roomSessionRef.current = handoff;
       roomStartedAtRef.current = Date.now();
+      setRoomSlow(handoff.level === "A1" || handoff.level === "A2");
     } catch {
       /* no room — normal talk */
     }
@@ -1736,6 +1738,12 @@ export default function TalkPage() {
                 Confident Speaking · Private room
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <button onClick={() => { const next = !roomSlow; setRoomSlow(next); try { clientRef.current?.sendRoomPace(sessionUiLangRef.current, next); } catch { /* best-effort */ } }} style={{
+                  fontFamily: "'Quicksand', sans-serif", fontSize: 10, fontWeight: 700, padding: "4px 11px",
+                  borderRadius: 99, border: "1px solid rgba(255,255,255,.45)", background: roomSlow ? "#FFFFFF" : "rgba(255,255,255,.14)", color: roomSlow ? "#1F7A68" : "#FFFFFF", cursor: "pointer",
+                }}>
+                  {roomSlow ? "Slow~" : "Normal"}
+                </button>
                 <button onClick={() => setRoomHintsOpen((v) => !v)} style={{
                   fontFamily: "'Quicksand', sans-serif", fontSize: 10, fontWeight: 700, padding: "4px 11px",
                   borderRadius: 99, border: "1px solid rgba(255,255,255,.45)", background: "rgba(255,255,255,.14)", color: "#FFFFFF", cursor: "pointer",
@@ -1781,6 +1789,14 @@ export default function TalkPage() {
                   </div>
                 );
               })}
+              {roomLearned.length ? (
+                <div style={{ borderTop: "1px solid #EDE8E0", paddingTop: 6, marginTop: 6 }}>
+                  <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 9.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C2497E", margin: "0 0 4px" }}>New today~</p>
+                  {roomLearned.map((h, hi) => (
+                    <p key={hi} style={{ fontFamily: "'Sarabun', 'Quicksand', sans-serif", fontSize: 12, fontWeight: 600, color: "#3C352B", margin: "0 0 3px", lineHeight: 1.45 }}>{h}</p>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
           {roomHintsOpen ? (

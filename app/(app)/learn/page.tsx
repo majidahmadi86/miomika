@@ -485,23 +485,13 @@ export default function LearnPage() {
 
   // Create (or bank-fetch) the session. Scenario doors enter directly;
   // custom (ESP) sessions show their door first so the plan is visible.
+  // Generation hiccups retry ONCE silently — entry must never feel flaky.
   const enterRoom = useCallback(async (args: { coursePos?: number; scenarioPos?: number; topic?: string; register?: string; showDoor?: boolean }) => {
     if (roomStarting) return;
     setRoomStarting(true);
     setSpeakMsg(args.showDoor ? "Miomi is planning your session — give her a moment…" : "Miomi is preparing your private room — give her a moment…");
     try {
-      const r = await fetch("/api/speaking/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          level: viewLevel ?? undefined,
-          course_position: args.coursePos,
-          scenario_position: args.scenarioPos,
-          topic: args.topic,
-          register: args.register,
-        }),
-      });
-      const j = (await r.json()) as {
+      type SessionResp = {
         ok?: boolean;
         reason?: string;
         sessionId?: string;
@@ -511,6 +501,25 @@ export default function LearnPage() {
         register?: string;
         plan?: RoomPlan;
       };
+      let j: SessionResp = {};
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const r = await fetch("/api/speaking/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            level: viewLevel ?? undefined,
+            course_position: args.coursePos,
+            scenario_position: args.scenarioPos,
+            topic: args.topic,
+            register: args.register,
+          }),
+        });
+        j = (await r.json()) as SessionResp;
+        if (j.ok || (j.reason !== "plan_failed" && j.reason !== "content_incomplete")) break;
+        if (attempt === 0) {
+          setSpeakMsg("Almost ready — Miomi is trying once more~");
+        }
+      }
       if (j.ok && j.sessionId && j.plan) {
         const handoff: RoomHandoff = {
           sessionId: j.sessionId,

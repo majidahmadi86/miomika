@@ -6,6 +6,7 @@ import {
   LIVE_VOICE,
   buildKickoffPrompt,
   buildSessionKickoffPrompt,
+  buildRoomPacePrompt,
   buildLiveConfig,
   buildSessionLiveConfig,
   buildResumePrompt,
@@ -477,6 +478,20 @@ export class MiomiLiveClient {
         {
           role: "user",
           parts: [{ text: buildSessionKickoffPrompt(lang) }],
+        },
+      ],
+      turnComplete: true,
+    });
+  }
+
+  /** Speaking Room: learner taps Slow~/Normal — silent pace instruction, never shown. */
+  sendRoomPace(lang: "th" | "en", slow: boolean): void {
+    if (!this.session || !this.connected) return;
+    this.session.sendClientContent({
+      turns: [
+        {
+          role: "user",
+          parts: [{ text: buildRoomPacePrompt(lang, slow) }],
         },
       ],
       turnComplete: true,

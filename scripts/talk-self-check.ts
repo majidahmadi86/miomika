@@ -1764,6 +1764,10 @@ assert(
     roomTalkSrc.includes("sendSessionKickoff"),
   "speaking room: tutor kickoff replaces the companion greeting in the room",
 );
+assert(
+  sessionClientSrc.includes("sendRoomPace") && roomTalkSrc.includes("sendRoomPace"),
+  "speaking room: learner pace control wired (Slow~/Normal)",
+);
 const lessonsPageSrc = readFileSync(join(ROOT, "app/(app)/lessons/page.tsx"), "utf8");
 assert(
   lessonsPageSrc.includes('fetch("/api/lessons")') && lessonsPageSrc.includes("AmbientBackground"),
