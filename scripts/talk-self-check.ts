@@ -1765,8 +1765,8 @@ assert(
   "speaking room: tutor kickoff replaces the companion greeting in the room",
 );
 assert(
-  sessionClientSrc.includes("sendRoomPace") && roomTalkSrc.includes("sendRoomPace"),
-  "speaking room: learner pace control wired (Slow~/Normal)",
+  sessionLiveConfigSrc.includes("paceSlow") && roomTalkSrc.includes("toggleRoomPace"),
+  "speaking room: learner pace baked into the session brain (reconnect on toggle)",
 );
 assert(
   sessionClientSrc.includes("sendSessionResume") && roomTalkSrc.includes("sendSessionResume"),

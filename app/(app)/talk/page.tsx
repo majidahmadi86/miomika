@@ -722,6 +722,7 @@ export default function TalkPage() {
   const [roomHintsOpen, setRoomHintsOpen] = useState(false);
   const [roomBoardOpen, setRoomBoardOpen] = useState(false);
   const [roomSlow, setRoomSlow] = useState(false);
+  const roomSlowRef = useRef(false);
   const [roomEnding, setRoomEnding] = useState(false);
   const roomStartedAtRef = useRef<number | null>(null);
   useEffect(() => {
@@ -736,7 +737,9 @@ export default function TalkPage() {
       setRoomSession(handoff);
       roomSessionRef.current = handoff;
       roomStartedAtRef.current = Date.now();
-      setRoomSlow(handoff.level === "A1" || handoff.level === "A2");
+      const startSlow = handoff.level === "A1" || handoff.level === "A2";
+      setRoomSlow(startSlow);
+      roomSlowRef.current = startSlow;
     } catch {
       /* no room — normal talk */
     }
@@ -840,7 +843,8 @@ export default function TalkPage() {
         const scrubbed = geminiText
           .replace(/call:?\s*report_?stage\s*\{[^}]*\}?/gi, "")
           .replace(/report_?stage/gi, "")
-          .replace(/\(\s*["']?\s*(?:stage|event|objective|note|hint)\b[^)]{0,40}\)/gi, "");
+          .replace(/\(\s*["']?\s*(?:stage|event|objective|note|hint)\b[^)]{0,40}\)/gi, "")
+          .replace(/\bhint:\s*(—\s*)?/gi, "");
         if (scrubbed !== geminiText) {
           geminiText = scrubbed;
           if (!geminiText.trim()) return;
@@ -947,6 +951,7 @@ export default function TalkPage() {
           level: roomSessionRef.current?.level ?? config.teach.level,
           session: roomSessionRef.current?.plan
             ? {
+                paceSlow: roomSlowRef.current,
                 title: roomSessionRef.current.title_en,
                 scene: roomSessionRef.current.plan.scene,
                 miomiRole: roomSessionRef.current.plan.miomi_role,
@@ -1012,6 +1017,24 @@ export default function TalkPage() {
       config.teach.level,
     ],
   );
+  // Speaking Room: pace is baked into the session brain — the toggle does a
+  // seamless reconnect (same plan, same stage) at the new speed. The silent
+  // context-injection approach did not hold.
+  const toggleRoomPace = useCallback(async () => {
+    if (!roomSessionRef.current?.plan) return;
+    if (!clientRef.current || reconnectInFlightRef.current) return;
+    const runtime = turnRuntimeRef.current;
+    const wasListening = runtime?.state.phase === "listening";
+    const next = !roomSlowRef.current;
+    roomSlowRef.current = next;
+    setRoomSlow(next);
+    const snapshot = clientRef.current.getSessionSnapshot();
+    mediaRef.current?.stopAudioPlayback();
+    clientRef.current.disconnectIntentionally();
+    clientRef.current = null;
+    liveClientEpochRef.current = null;
+    await resumeLiveSession(snapshot, wasListening ?? false);
+  }, [resumeLiveSession]);
 
   /** Mid-session mode flick: snapshot → soft reconnect with the new brain. */
   const pendingModeSwitchRef = useRef<TalkConfig["mode"] | null>(null);
@@ -1196,6 +1219,7 @@ export default function TalkPage() {
         level: roomSessionRef.current?.level ?? config.teach.level,
         session: roomSessionRef.current?.plan
           ? {
+              paceSlow: roomSlowRef.current,
               title: roomSessionRef.current.title_en,
               scene: roomSessionRef.current.plan.scene,
               miomiRole: roomSessionRef.current.plan.miomi_role,
@@ -1765,7 +1789,7 @@ export default function TalkPage() {
                 Confident Speaking · Private room
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                <button onClick={() => { const next = !roomSlow; setRoomSlow(next); try { clientRef.current?.sendRoomPace(sessionUiLangRef.current, next); } catch { /* best-effort */ } }} style={{
+                <button onClick={() => { void toggleRoomPace(); }} style={{
                   fontFamily: "'Quicksand', sans-serif", fontSize: 10, fontWeight: 700, padding: "4px 11px",
                   borderRadius: 99, border: "1px solid rgba(255,255,255,.45)", background: roomSlow ? "#FFFFFF" : "rgba(255,255,255,.14)", color: roomSlow ? "#1F7A68" : "#FFFFFF", cursor: "pointer",
                 }}>
