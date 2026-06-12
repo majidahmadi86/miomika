@@ -87,6 +87,23 @@ type SessionLite = {
   scenario_position?: number | null;
 };
 
+type RoomPlan = {
+  scene: string;
+  miomi_role: string;
+  objectives: string[];
+  stages: Array<{ id: string; title: string; activity: string; guidance: string }>;
+  phrases: Array<{ en: string; th: string; romanization: string | null }>;
+};
+
+type RoomHandoff = {
+  sessionId: string;
+  title_en: string;
+  level: string;
+  learningTarget: string;
+  register: string;
+  plan: RoomPlan;
+};
+
 type SessionDetail = {
   id: string;
   status: string;
@@ -102,13 +119,7 @@ type SessionDetail = {
     cefr_level: string;
     learning_target: string;
     register: string;
-    plan: {
-      scene: string;
-      miomi_role: string;
-      objectives: string[];
-      stages: Array<{ id: string; title: string; activity: string; guidance: string }>;
-      phrases: Array<{ en: string; th: string; romanization: string | null }>;
-    };
+    plan: RoomPlan;
   } | null;
 };
 
@@ -124,6 +135,17 @@ const REGISTER_OPTIONS = [
   { v: "genz", t: "Gen-Z", minRank: 2 },
   { v: "social", t: "Creator", minRank: 2 },
 ] as const;
+
+const PRESET_TOPICS = [
+  "Job interview",
+  "Meeting your partner's family",
+  "Business meeting",
+  "Hotel check-in",
+  "At the doctor",
+  "Presenting my work",
+] as const;
+
+const SESSION_ARC = ["Warm-up", "Phrases", "Activity", "Practice", "Check-up", "Exit ticket"] as const;
 
 const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
   peach: { edge: "#FDBA74", soft: "#FEF1E3" },
@@ -190,6 +212,26 @@ function SoundBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
+function ArcStrip() {
+  return (
+    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+      {SESSION_ARC.map((s, i) => (
+        <span key={s} style={{
+          ...font, display: "inline-flex", alignItems: "center", gap: 5,
+          fontSize: 10.5, fontWeight: 700, color: TEAL_DEEP,
+          background: "#E9F8F4", border: "1px solid #C9EEE4", borderRadius: 99, padding: "4px 10px",
+        }}>
+          <span style={{
+            ...font, width: 14, height: 14, borderRadius: "50%", background: "#34A98F", color: "#fff",
+            display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 8.5, fontWeight: 700,
+          }}>{i + 1}</span>
+          {s}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function LearnPage() {
   const router = useRouter();
   const { isGuest, authReady } = useGuestExploration();
@@ -209,6 +251,7 @@ export default function LearnPage() {
   const [expandedCourse, setExpandedCourse] = useState<number | null>(null);
   const [activeScenario, setActiveScenario] = useState<{ c: number; s: number } | null>(null);
   const [resultsSession, setResultsSession] = useState<SessionDetail | null>(null);
+  const [pendingRoom, setPendingRoom] = useState<RoomHandoff | null>(null);
   const [planning, setPlanning] = useState(false);
   const [building, setBuilding] = useState(false);
   const [speakPlanning, setSpeakPlanning] = useState(false);
@@ -290,6 +333,7 @@ export default function LearnPage() {
         const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(id)}`);
         const j = (await r.json()) as { session?: SessionDetail | null };
         if (j.session?.library) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot results load on mount, matching the app's fetch-on-mount pattern
           setResultsSession(j.session);
           setSurface("Speak");
           try { sfxSuccess(); } catch { /* best-effort */ }
@@ -313,7 +357,7 @@ export default function LearnPage() {
         setGenMsg(null);
         await refresh(viewLevel ?? undefined);
       } else {
-        setGenMsg("Miomi couldn't finish planning — try once more in a moment.");
+        setGenMsg("Miomi could not finish planning — try once more in a moment.");
       }
     } catch {
       setGenMsg("Something slipped — try once more.");
@@ -337,7 +381,7 @@ export default function LearnPage() {
         setGenMsg(null);
         router.push(`/lessons/${j.lessonId}`);
       } else {
-        setGenMsg("Miomi couldn't finish that one — try once more.");
+        setGenMsg("Miomi could not finish that one — try once more.");
       }
     } catch {
       setGenMsg("Something slipped — try once more.");
@@ -367,7 +411,7 @@ export default function LearnPage() {
         setAskOpen(false);
         await refresh(viewLevel ?? undefined);
       } else {
-        setCreateMsg("Miomi couldn't finish planning that one — try once more, or a different topic.");
+        setCreateMsg("Miomi could not finish planning that one — try once more, or a different topic.");
       }
     } catch {
       setCreateMsg("Something slipped — try once more.");
@@ -391,7 +435,7 @@ export default function LearnPage() {
         setSpeakMsg(null);
         await refresh(viewLevel ?? undefined);
       } else {
-        setSpeakMsg("Miomi couldn't finish planning — try once more in a moment.");
+        setSpeakMsg("Miomi could not finish planning — try once more in a moment.");
       }
     } catch {
       setSpeakMsg("Something slipped — try once more.");
@@ -416,9 +460,9 @@ export default function LearnPage() {
         await refresh(viewLevel ?? undefined);
         setActiveScenario({ c: coursePos, s: scenarioPos });
       } else if (j.reason === "pro_required") {
-        setSpeakMsg("This scene unlocks with Pro — the first scene of every course is yours free~");
+        setSpeakMsg("This scene unlocks with Pro — the first session of every course is yours free~");
       } else {
-        setSpeakMsg("Miomi couldn't set that scene — try once more.");
+        setSpeakMsg("Miomi could not set that scene — try once more.");
       }
     } catch {
       setSpeakMsg("Something slipped — try once more.");
@@ -427,11 +471,24 @@ export default function LearnPage() {
     }
   }, [scenarioBuilding, viewLevel, refresh]);
 
-  // THE DOOR → THE ROOM: create the session, hand it to /talk, walk in.
-  const enterRoom = useCallback(async (args: { coursePos?: number; scenarioPos?: number; topic?: string; register?: string }) => {
+  // Write the handoff and walk into the Room.
+  const walkIn = useCallback((handoff: RoomHandoff): boolean => {
+    try {
+      window.sessionStorage.setItem("miomika.room_session", JSON.stringify(handoff));
+    } catch {
+      setSpeakMsg("Your browser blocked the room key — try once more.");
+      return false;
+    }
+    window.location.href = "/talk?room=1";
+    return true;
+  }, []);
+
+  // Create (or bank-fetch) the session. Scenario doors enter directly;
+  // custom (ESP) sessions show their door first so the plan is visible.
+  const enterRoom = useCallback(async (args: { coursePos?: number; scenarioPos?: number; topic?: string; register?: string; showDoor?: boolean }) => {
     if (roomStarting) return;
     setRoomStarting(true);
-    setSpeakMsg("Miomi is preparing your private room — give her a moment…");
+    setSpeakMsg(args.showDoor ? "Miomi is planning your session — give her a moment…" : "Miomi is preparing your private room — give her a moment…");
     try {
       const r = await fetch("/api/speaking/session", {
         method: "POST",
@@ -452,40 +509,64 @@ export default function LearnPage() {
         level?: string;
         learningTarget?: string;
         register?: string;
-        plan?: Record<string, unknown>;
+        plan?: RoomPlan;
       };
       if (j.ok && j.sessionId && j.plan) {
-        try {
-          window.sessionStorage.setItem(
-            "miomika.room_session",
-            JSON.stringify({
-              sessionId: j.sessionId,
-              title_en: j.title_en ?? "Speaking session",
-              level: j.level ?? (viewLevel ?? myLevel),
-              learningTarget: j.learningTarget ?? (profile?.learning_target_language ?? "th"),
-              register: j.register ?? "everyday",
-              plan: j.plan,
-            }),
-          );
-        } catch {
-          setSpeakMsg("Your browser blocked the room key — try once more.");
-          setRoomStarting(false);
+        const handoff: RoomHandoff = {
+          sessionId: j.sessionId,
+          title_en: j.title_en ?? "Speaking session",
+          level: j.level ?? (viewLevel ?? myLevel),
+          learningTarget: j.learningTarget ?? (profile?.learning_target_language ?? "th"),
+          register: j.register ?? "everyday",
+          plan: j.plan,
+        };
+        setSpeakMsg(null);
+        if (args.showDoor) {
+          setPendingRoom(handoff);
+        } else {
+          walkIn(handoff);
           return;
         }
-        window.location.href = "/talk?room=1";
-        return;
-      }
-      if (j.reason === "pro_required") {
-        setSpeakMsg("Sessions beyond the first scene of each course are Pro — your free room is scene one~");
+      } else if (j.reason === "pro_required") {
+        setSpeakMsg("Sessions beyond the first of each course are Pro — your free room is session one~");
       } else {
-        setSpeakMsg("Miomi couldn't prepare the room — try once more.");
+        setSpeakMsg("Miomi could not prepare the room — try once more.");
       }
     } catch {
       setSpeakMsg("Something slipped — try once more.");
     } finally {
       setRoomStarting(false);
     }
-  }, [roomStarting, viewLevel, myLevel, profile]);
+  }, [roomStarting, viewLevel, myLevel, profile, walkIn]);
+
+  // Re-enter an unfinished session from its saved plan.
+  const continueSession = useCallback(async (id: string) => {
+    if (roomStarting) return;
+    setRoomStarting(true);
+    setSpeakMsg("Opening your room again — one moment…");
+    try {
+      const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(id)}`);
+      const j = (await r.json()) as { session?: SessionDetail | null };
+      const lib = j.session?.library;
+      if (j.session && lib) {
+        setSpeakMsg(null);
+        walkIn({
+          sessionId: j.session.id,
+          title_en: lib.title_en,
+          level: lib.cefr_level,
+          learningTarget: lib.learning_target,
+          register: lib.register,
+          plan: lib.plan,
+        });
+        return;
+      }
+      setSpeakMsg("Could not reopen that session — try once more.");
+    } catch {
+      setSpeakMsg("Something slipped — try once more.");
+    } finally {
+      setRoomStarting(false);
+    }
+  }, [roomStarting, walkIn]);
 
   const myRank = Math.max(0, (LADDER as readonly string[]).indexOf(myLevel));
   const targetName = profile?.learning_target_language === "en" ? "English" : "Thai";
@@ -502,6 +583,7 @@ export default function LearnPage() {
   );
   const scenesDone = completedScenes.size;
   const scenesTotal = courses.reduce((n, c) => n + (c.scenario_titles?.length ?? 0), 0);
+  const unfinished = sessions.find((s) => !s.completed_at) ?? null;
 
   const unitLessons = useCallback((u: CurriculumUnit): LessonLite[] =>
     (u.lesson_ids ?? []).map((id) => lessonsById.get(id)).filter(Boolean) as LessonLite[],
@@ -555,7 +637,7 @@ export default function LearnPage() {
             const isView = (viewLevel ?? myLevel) === lv;
             const open = i <= myRank + 1;
             return (
-              <button key={lv} onClick={() => { if (!open) return; setViewLevel(lv); setExpandedUnit(null); setExpandedCourse(null); setActiveScenario(null); void refresh(lv); }} style={{
+              <button key={lv} onClick={() => { if (!open) return; setViewLevel(lv); setExpandedUnit(null); setExpandedCourse(null); setActiveScenario(null); setPendingRoom(null); void refresh(lv); }} style={{
                 ...font, display: "inline-flex", alignItems: "center", gap: 4,
                 fontSize: 12.5, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
                 border: isView ? "1px solid transparent" : `1px solid ${done ? "#E8C77A" : BORDER}`,
@@ -606,7 +688,7 @@ export default function LearnPage() {
 
         {/* CONFIDENT SPEAKING — flagship */}
         {authReady && !isGuest ? (
-          <button onClick={() => { setSurface("Speak"); setActiveScenario(null); setResultsSession(null); }} style={{
+          <button onClick={() => { setSurface("Speak"); setActiveScenario(null); setResultsSession(null); setPendingRoom(null); }} style={{
             display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
             background: "linear-gradient(135deg,#34A98F 0%,#1F7A68 100%)", border: "none", borderRadius: 18,
             padding: "14px 15px", marginBottom: 12, cursor: "pointer",
@@ -636,7 +718,7 @@ export default function LearnPage() {
         {shownSurfaces.length > 1 ? (
           <div style={{ display: "flex", background: "#F1ECE3", borderRadius: 14, padding: 4, gap: 4, marginBottom: 16 }}>
             {shownSurfaces.map((s) => (
-              <button key={s} onClick={() => { setSurface(s); setActiveScenario(null); setResultsSession(null); }} style={{
+              <button key={s} onClick={() => { setSurface(s); setActiveScenario(null); setResultsSession(null); setPendingRoom(null); }} style={{
                 ...font, flex: 1, fontSize: 12, fontWeight: 700, padding: "8px 0",
                 borderRadius: 10, border: "none", cursor: "pointer",
                 background: surface === s ? "#FFFFFF" : "transparent",
@@ -754,8 +836,65 @@ export default function LearnPage() {
                 {`Notes are Miomi's coaching read — sound grading is coming in an update~`}
               </p>
             </>
+          ) : pendingRoom ? (
+            /* ---------- CUSTOM SESSION DOOR (plan preview) ---------- */
+            <>
+              <button onClick={() => setPendingRoom(null)} style={{
+                ...font, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700,
+                color: MUTED, background: "transparent", border: "none", cursor: "pointer", padding: 0, marginBottom: 10,
+              }}>
+                <ChevronLeft style={{ width: 14, height: 14 }} aria-hidden />Back
+              </button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+                <h2 style={{ ...font, fontSize: 17, fontWeight: 700, color: INK_STRONG, margin: 0 }}>{pendingRoom.title_en}</h2>
+                <ProChip />
+              </div>
+              <div style={{ background: "#FEF1E3", border: "1px solid #F4D9BC", borderRadius: 18, padding: "13px 14px", marginBottom: 12 }}>
+                <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: "#7A4F26", margin: 0, lineHeight: 1.55 }}>
+                  <b style={{ fontWeight: 700 }}>The scene:</b> {pendingRoom.plan.scene} <b style={{ fontWeight: 700 }}>Just you and Miomi — no one else hears a thing~</b>
+                </p>
+              </div>
+              <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 12 }}>
+                <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: MUTED, margin: "0 0 8px" }}>
+                  {`What you'll walk out with — Miomi checks each as you earn it`}
+                </p>
+                {pendingRoom.plan.objectives.map((g, gi) => (
+                  <div key={gi} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: gi < pendingRoom.plan.objectives.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                    <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid #7DD3C0", flex: "0 0 18px" }} />
+                    <span style={{ ...font, fontSize: 13, fontWeight: 700, color: INK_STRONG }}>{g}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 14 }}>
+                <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: MUTED, margin: "0 0 8px" }}>
+                  {`How you'll learn — Miomi leads every stage`}
+                </p>
+                {pendingRoom.plan.stages.map((st, si) => (
+                  <div key={st.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "7px 0", borderBottom: si < pendingRoom.plan.stages.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                    <span style={{
+                      ...font, width: 20, height: 20, borderRadius: "50%", background: "#E9F8F4", color: TEAL_DEEP,
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flex: "0 0 20px", marginTop: 1,
+                    }}>{si + 1}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ ...font, display: "block", fontSize: 12.5, fontWeight: 700, color: INK_STRONG }}>{st.title}</span>
+                      <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.45 }}>{st.activity}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => walkIn(pendingRoom)} disabled={roomStarting} style={{
+                ...font, display: "block", width: "100%", textAlign: "center", fontSize: 14, fontWeight: 700,
+                padding: "14px 20px", borderRadius: 99, border: "none", cursor: "pointer",
+                background: CTA, color: "#fff", boxShadow: CTA_SHADOW,
+              }}>
+                Enter your room
+              </button>
+              <p style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 }}>
+                A full guided session — warm-up to exit ticket, ~15 minutes. Uses your speaking minutes.
+              </p>
+            </>
           ) : activeScene && activeCourse && activeScenario ? (
-            /* ---------- THE DOOR ---------- */
+            /* ---------- SCENARIO DOOR ---------- */
             <>
               <button onClick={() => setActiveScenario(null)} style={{
                 ...font, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700,
@@ -785,22 +924,14 @@ export default function LearnPage() {
                   </div>
                 ))}
               </div>
-              <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 18, padding: "13px 14px", marginBottom: 14 }}>
-                <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#6D5BBF", margin: "0 0 6px" }}>
-                  {`Phrases that help — they'll be on your hint drawer inside`}
+              <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 14 }}>
+                <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: MUTED, margin: "0 0 9px" }}>
+                  {`How you'll learn — a full session, Miomi leading`}
                 </p>
-                {activeScene.phrases.map((p, pi) => (
-                  <div key={pi} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: pi < activeScene.phrases.length - 1 ? `1px solid ${BORDER}` : "none" }}>
-                    <SoundBtn onClick={() => say(targetIsEn ? p.en : p.th)} />
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ ...(targetIsEn ? font : thaiFont), display: "block", fontSize: 14, fontWeight: 700, color: INK_STRONG }}>{targetIsEn ? p.en : p.th}</span>
-                      {!targetIsEn && p.romanization ? (
-                        <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: "#6D5BBF", marginTop: 1 }}>{p.romanization}</span>
-                      ) : null}
-                      <span style={{ ...(targetIsEn ? thaiFont : font), display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginTop: 1 }}>{targetIsEn ? p.th : p.en}</span>
-                    </span>
-                  </div>
-                ))}
+                <ArcStrip />
+                <p style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, margin: "9px 0 0", lineHeight: 1.5 }}>
+                  Helper phrases wait on your hint drawer inside — one tap whenever you need them~
+                </p>
               </div>
               <button onClick={() => void enterRoom({ coursePos: activeScenario.c, scenarioPos: activeScenario.s })} disabled={roomStarting} style={{
                 ...font, display: "block", width: "100%", textAlign: "center", fontSize: 14, fontWeight: 700,
@@ -839,6 +970,27 @@ export default function LearnPage() {
                 <b style={{ color: INK_STRONG }}>Your private speaking room.</b> Warm-up to exit ticket, Miomi leading every step — the first session of every course is free~
               </p>
 
+              {/* Continue banner — an unfinished room is one tap away */}
+              {unfinished ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF", border: "1.5px solid #7DD3C0", borderRadius: 18, boxShadow: CARD_SHADOW, padding: "12px 14px", marginBottom: 12 }}>
+                  <span style={{ width: 34, height: 34, borderRadius: "50%", background: "#FDEAF4", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px", overflow: "hidden" }}>
+                    <Image src="/miomi/head-idle.png" alt="Miomi" width={30} height={30} style={{ objectFit: "contain" }} />
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ ...font, display: "block", fontSize: 13, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {unfinished.title_en || "Your session"} is waiting~
+                    </span>
+                    <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>Pick up right where you left off</span>
+                  </span>
+                  <button onClick={() => void continueSession(unfinished.id)} disabled={roomStarting} style={{
+                    ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
+                    border: "none", cursor: "pointer", background: CTA, color: "#fff", boxShadow: CTA_SHADOW, flexShrink: 0,
+                  }}>
+                    Continue
+                  </button>
+                </div>
+              ) : null}
+
               {/* ESP — create your own session */}
               <div style={{
                 border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: csOpen ? 16 : 0,
@@ -866,7 +1018,7 @@ export default function LearnPage() {
                       What do you want to speak about?
                     </p>
                     <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 12 }}>
-                      {["Job interview", "Meeting your partner's family", "Business meeting", "Hotel check-in", "At the doctor", "Presenting my work"].map((t) => (
+                      {PRESET_TOPICS.map((t) => (
                         <button key={t} onClick={() => setCsTopic(t)} disabled={roomStarting} style={{
                           ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer",
                           border: `1px solid ${csTopic === t ? "#F9A8D4" : BORDER}`,
@@ -906,13 +1058,13 @@ export default function LearnPage() {
                         );
                       })}
                     </div>
-                    <button onClick={() => { if (csTopic.trim()) void enterRoom({ topic: csTopic.trim(), register: csRegister }); }} disabled={roomStarting || !csTopic.trim()} style={{
+                    <button onClick={() => { if (csTopic.trim()) void enterRoom({ topic: csTopic.trim(), register: csRegister, showDoor: true }); }} disabled={roomStarting || !csTopic.trim()} style={{
                       ...font, width: "100%", marginTop: 10, fontSize: 14, fontWeight: 700,
                       padding: "13px 20px", borderRadius: 99, border: "none",
                       cursor: roomStarting || !csTopic.trim() ? "default" : "pointer",
                       background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: roomStarting || !csTopic.trim() ? 0.7 : 1,
                     }}>
-                      {roomStarting ? "Preparing your room…" : "Enter your room"}
+                      {roomStarting ? "Miomi is planning…" : "Plan my session"}
                     </button>
                     <button onClick={() => { if (!roomStarting) setCsOpen(false); }} style={{
                       ...font, width: "100%", marginTop: 6, fontSize: 12, fontWeight: 700, padding: "8px 0",
@@ -1013,10 +1165,10 @@ export default function LearnPage() {
                     <span style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED }}>{sessions.length}</span>
                   </div>
                   {sessions.map((s) => (
-                    <button key={s.id} onClick={() => { window.history.replaceState(null, "", `/learn?session=${s.id}`); void (async () => { try { const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(s.id)}`); const j = (await r.json()) as { session?: SessionDetail | null }; if (j.session?.library) setResultsSession(j.session); } catch { /* row stays */ } })(); }} style={{
-                      display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+                    <div key={s.id} style={{
+                      display: "flex", alignItems: "center", gap: 10, width: "100%",
                       background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW,
-                      padding: "12px 14px", marginBottom: 10, cursor: "pointer",
+                      padding: "12px 14px", marginBottom: 10,
                     }}>
                       <span style={{
                         width: 18, height: 18, borderRadius: "50%", flex: "0 0 18px",
@@ -1032,8 +1184,22 @@ export default function LearnPage() {
                           {s.completed_at ? `Completed${typeof s.results?.minutes === "number" && s.results.minutes > 0 ? ` · ${s.results.minutes} min spoken` : ""}` : "Not finished"}
                         </span>
                       </span>
-                      <span style={{ ...font, fontSize: 12, fontWeight: 700, color: TEAL_DEEP }}>Review</span>
-                    </button>
+                      {s.completed_at ? (
+                        <button onClick={() => { window.history.replaceState(null, "", `/learn?session=${s.id}`); void (async () => { try { const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(s.id)}`); const j = (await r.json()) as { session?: SessionDetail | null }; if (j.session?.library) setResultsSession(j.session); } catch { /* row stays */ } })(); }} style={{
+                          ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
+                          border: `1px solid ${BORDER}`, background: "transparent", color: MUTED, cursor: "pointer", flexShrink: 0,
+                        }}>
+                          Review
+                        </button>
+                      ) : (
+                        <button onClick={() => void continueSession(s.id)} disabled={roomStarting} style={{
+                          ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
+                          border: "none", background: CTA, color: "#fff", boxShadow: CTA_SHADOW, cursor: "pointer", flexShrink: 0,
+                        }}>
+                          Continue
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </>
               ) : null}
