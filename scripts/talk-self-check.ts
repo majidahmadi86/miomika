@@ -1773,9 +1773,14 @@ assert(
   "speaking room: transport resume keeps the session brain + current stage",
 );
 const lessonsPageSrc = readFileSync(join(ROOT, "app/(app)/lessons/page.tsx"), "utf8");
+const learnPageSrc = readFileSync(join(ROOT, "app/(app)/learn/page.tsx"), "utf8");
 assert(
-  lessonsPageSrc.includes('fetch("/api/lessons")') && lessonsPageSrc.includes("AmbientBackground"),
-  "lessons page lists from the API under the real ambient background",
+  lessonsPageSrc.includes('redirect("/learn")') && lessonsPageSrc.includes("LessonsListRedirect"),
+  "lessons list retired — /lessons redirects to /learn; player at /lessons/[id] untouched",
+);
+assert(
+  learnPageSrc.includes('fetch("/api/lessons")') && learnPageSrc.includes("AmbientBackground"),
+  "learn surface lists lessons from the API under the real ambient background",
 );
 const playerPageSrc = readFileSync(join(ROOT, "app/(app)/lessons/[id]/page.tsx"), "utf8");
 assert(
@@ -1807,20 +1812,20 @@ assert(
   "server enforces: completed status requires a passed checkpoint",
 );
 assert(
-  lessonsPageSrc.includes("head-idle.png"),
-  "lessons list greets with real Miomi art",
+  learnPageSrc.includes("head-idle.png") || learnPageSrc.includes("head-happy.png"),
+  "learn greets with real Miomi art",
 );
 assert(
   lessonsRouteSrc.includes("levelAsk") && lessonsRouteSrc.includes("targetAsk"),
   "plan API accepts level and direction adjustments",
 );
 assert(
-  lessonsPageSrc.includes("My level") && lessonsPageSrc.includes("Ordering food"),
-  "plan panel has adjustments and one-tap starters",
+  learnPageSrc.includes("My level") && learnPageSrc.includes("Plan my lesson"),
+  "plan panel has level adjustments and lesson planning",
 );
 assert(
-  lessonsPageSrc.includes("Day streak") && lessonsPageSrc.includes("useProfile"),
-  "lessons hero card shows the learner's stats",
+  learnPageSrc.includes("Day streak") && learnPageSrc.includes("useProfile"),
+  "learn hero card shows the learner's stats",
 );
 assert(
   playerPageSrc.includes("handleDone") && playerPageSrc.includes("OPT_MARKS"),
@@ -1836,8 +1841,8 @@ assert(
   "extend endpoint enforces ownership and uses the verified pipeline",
 );
 assert(
-  lessonsPageSrc.includes("scrollIntoView"),
-  "pinned plan button opens and reveals the plan panel",
+  learnPageSrc.includes("setAskOpen(true)"),
+  "create-lesson control opens and reveals the plan panel",
 );
 assert(
   lessonBuilderSrc.includes("buildExtraPhrases") && lessonBuilderSrc.includes("TYPICAL OF"),
@@ -1852,8 +1857,8 @@ assert(
   "checkpoints scale with level and the golden moment celebrates",
 );
 assert(
-  lessonsPageSrc.includes("stepNow"),
-  "lesson cards show step-by-step progress dots",
+  learnPageSrc.includes("In progress") && learnPageSrc.includes("ownLessons.map"),
+  "lesson rows show progress state on the learn surface",
 );
 assert(
   lessonBuilderSrc.includes("makeExample") && lessonBuilderSrc.includes("looksSyllabic"),
@@ -1864,7 +1869,7 @@ assert(
   "audio reaches every game per the sound-button standard",
 );
 assert(
-  lessonsRouteSrc.includes("LEVEL ACCESS") && lessonsPageSrc.includes("Unlocks as your level grows"),
+  lessonsRouteSrc.includes("LEVEL ACCESS") && learnPageSrc.includes("Unlocks as your level grows"),
   "levels above the learner's reach are locked, client and server",
 );
 assert(

@@ -54,13 +54,16 @@ function getGemini(): GoogleGenAI | null {
   return _gemini;
 }
 
-export async function callGroqJson(system: string, user: string): Promise<string | null> {
+export async function callGroqJson(system: string, user: string, maxTokens: number = 600): Promise<string | null> {
   const groq = getGroq();
-  if (!groq) return null;
+  if (!groq) {
+    console.error("[brain] groq unavailable: GROQ_API_KEY missing");
+    return null;
+  }
   try {
     const r = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      max_tokens: 600,
+      max_tokens: maxTokens,
       temperature: 0.3,
       response_format: { type: "json_object" },
       messages: [
@@ -68,15 +71,23 @@ export async function callGroqJson(system: string, user: string): Promise<string
         { role: "user", content: user },
       ],
     });
+    const finish = r.choices[0]?.finish_reason;
+    if (finish && finish !== "stop") {
+      console.error(`[brain] groq finish_reason=${finish} (likely truncated at max_tokens=${maxTokens})`);
+    }
     return r.choices[0]?.message?.content ?? null;
-  } catch {
+  } catch (err) {
+    console.error("[brain] groq call failed:", String(err));
     return null;
   }
 }
 
-export async function callGeminiJson(system: string, user: string): Promise<string | null> {
+export async function callGeminiJson(system: string, user: string, maxTokens: number = 800): Promise<string | null> {
   const gemini = getGemini();
-  if (!gemini) return null;
+  if (!gemini) {
+    console.error("[brain] gemini unavailable: GEMINI_API_KEY missing");
+    return null;
+  }
   try {
     const chat = gemini.chats.create({
       model: "gemini-2.5-flash",
@@ -85,14 +96,18 @@ export async function callGeminiJson(system: string, user: string): Promise<stri
         // gemini-2.5-flash thinks by default; without thinkingBudget: 0 the thinking
         // silently eats maxOutputTokens and r.text returns empty → "bank drew a blank".
         thinkingConfig: { thinkingBudget: 0 },
-        maxOutputTokens: 800,
+        maxOutputTokens: maxTokens,
         temperature: 0.3,
         responseMimeType: "application/json",
       },
     });
     const r = await chat.sendMessage({ message: user });
+    if (!r.text) {
+      console.error("[brain] gemini returned empty text (possible truncation or block)");
+    }
     return r.text ?? null;
-  } catch {
+  } catch (err) {
+    console.error("[brain] gemini call failed:", String(err));
     return null;
   }
 }

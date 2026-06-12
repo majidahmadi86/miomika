@@ -99,9 +99,17 @@ async function generatePlan(
   const system = buildSessionPlanSystem(level, targetName, register);
   const user = `Design the session about: ${topic}`;
   for (let attempt = 0; attempt < 3; attempt++) {
-    const raw = attempt === 0 ? await callGroqJson(system, user) : await callGeminiJson(system, user);
+    const raw =
+      attempt === 0
+        ? await callGroqJson(system, user, 2048)
+        : await callGeminiJson(system, user, 2048);
     const parsed = parseJson<PlanReply>(raw);
-    if (!parsed) continue;
+    if (!parsed) {
+      console.error(
+        `[api/speaking/session] plan attempt ${attempt + 1}/3 unparseable (raw ${raw ? `${raw.length} chars` : "null"})`,
+      );
+      continue;
+    }
     const title = String(parsed.title_en ?? "").trim();
     const scene = String(parsed.scene ?? "").trim();
     const role = String(parsed.miomi_role ?? "").trim();
@@ -119,6 +127,9 @@ async function generatePlan(
     if (title && scene && role && objectives.length === 3 && stages.length === 6) {
       return { title_en: title, plan: { scene, miomi_role: role, objectives, stages } };
     }
+    console.error(
+      `[api/speaking/session] plan attempt ${attempt + 1}/3 invalid (objectives=${objectives.length}, stages=${stages.length})`,
+    );
   }
   return null; // withhold over a thin session
 }

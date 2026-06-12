@@ -628,7 +628,9 @@ export default function LearnPage() {
 
   const closeResults = useCallback(() => {
     setResultsSession(null);
-    if (typeof window !== "undefined") {
+    // Only clean the URL if we actually arrived via /learn?session= — the
+    // results view itself never touches browser history.
+    if (typeof window !== "undefined" && window.location.search.includes("session=")) {
       window.history.replaceState(null, "", "/learn");
     }
     void refresh(viewLevel ?? undefined);
@@ -1211,7 +1213,7 @@ export default function LearnPage() {
                         </span>
                       </span>
                       {s.completed_at ? (
-                        <button onClick={() => { window.history.replaceState(null, "", `/learn?session=${s.id}`); void (async () => { try { const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(s.id)}`); const j = (await r.json()) as { session?: SessionDetail | null }; if (j.session?.library) setResultsSession(j.session); } catch { /* row stays */ } })(); }} style={{
+                        <button onClick={() => { void (async () => { try { const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(s.id)}`); const j = (await r.json()) as { session?: SessionDetail | null }; if (j.session?.library) setResultsSession(j.session); } catch { /* row stays */ } })(); }} style={{
                           ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
                           border: `1px solid ${BORDER}`, background: "transparent", color: MUTED, cursor: "pointer", flexShrink: 0,
                         }}>
