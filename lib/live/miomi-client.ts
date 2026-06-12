@@ -495,7 +495,9 @@ export class MiomiLiveClient {
           parts: [{ text: buildRoomPacePrompt(lang, slow) }],
         },
       ],
-      turnComplete: true,
+      // turnComplete:false — pace is CONTEXT, not a message: she must never
+      // start a new turn (or interrupt her current one) because of a tap.
+      turnComplete: false,
     });
   }
 
