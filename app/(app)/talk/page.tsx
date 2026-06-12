@@ -1633,7 +1633,9 @@ export default function TalkPage() {
         maxHeight: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "#FEFCF7",
+        background: roomSession
+          ? "linear-gradient(168deg,#E9F8F4 0%,#FEFCF7 36%,#FDF3E3 100%)"
+          : "#FEFCF7",
         width: "100%",
         overflow: "hidden",
       }}
@@ -1703,33 +1705,76 @@ export default function TalkPage() {
 
       {roomSession ? (
         <div style={{ flexShrink: 0, padding: "6px 12px 4px", zIndex: 7 }}>
-          <div style={{ display: "flex", gap: 3, marginBottom: 5 }}>
-            {roomSession.plan.stages.map((s, idx) => {
-              const order = roomSession.plan.stages.findIndex((x) => x.id === roomStageId);
-              return (
-                <span key={s.id} style={{
-                  flex: 1, height: 4, borderRadius: 4,
-                  background: idx < order ? "#34A98F" : idx === order ? "#E8C77A" : "#EDE8E0",
-                }} />
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 11, fontWeight: 700, color: "#3C352B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {roomSession.title_en} · {roomSession.plan.stages.find((s) => s.id === roomStageId)?.title ?? "Warm-up"}
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#2C8576" }}>
+          <div style={{
+            background: "linear-gradient(135deg,#34A98F 0%,#1F7A68 100%)",
+            borderRadius: 16, padding: "10px 12px",
+            boxShadow: "0 8px 20px -6px rgba(31,122,104,0.45)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.9)" }}>
+                Confident Speaking · Private room
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <button onClick={() => setRoomHintsOpen((v) => !v)} style={{
+                  fontFamily: "'Quicksand', sans-serif", fontSize: 10, fontWeight: 700, padding: "4px 11px",
+                  borderRadius: 99, border: "1px solid rgba(255,255,255,.45)", background: "rgba(255,255,255,.14)", color: "#FFFFFF", cursor: "pointer",
+                }}>
+                  {roomHintsOpen ? "Hide hints" : "Hints~"}
+                </button>
+                <button onClick={() => void endRoomSession()} disabled={roomEnding} style={{
+                  fontFamily: "'Quicksand', sans-serif", fontSize: 10, fontWeight: 700, padding: "4px 11px",
+                  borderRadius: 99, border: "none", background: "#FFFFFF", color: "#1F7A68", cursor: "pointer",
+                }}>
+                  {roomEnding ? "Saving…" : "End session"}
+                </button>
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 3, marginBottom: 6 }}>
+              {roomSession.plan.stages.map((s, idx) => {
+                const order = roomSession.plan.stages.findIndex((x) => x.id === roomStageId);
+                return (
+                  <span key={s.id} style={{
+                    flex: 1, height: 4, borderRadius: 4,
+                    background: idx < order ? "#FFFFFF" : idx === order ? "#E8C77A" : "rgba(255,255,255,.25)",
+                  }} />
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 11.5, fontWeight: 700, color: "#FFFFFF", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {roomSession.title_en} · {roomSession.plan.stages.find((s) => s.id === roomStageId)?.title ?? "Warm-up"}
+              </span>
+              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 10.5, fontWeight: 700, color: "#FDE9B8", flexShrink: 0 }}>
                 {roomObjectivesDone.length}/3 earned
               </span>
-              <button onClick={() => void endRoomSession()} disabled={roomEnding} style={{
-                fontFamily: "'Quicksand', sans-serif", fontSize: 10.5, fontWeight: 700, padding: "4px 11px",
-                borderRadius: 99, border: "1px solid #EDE8E0", background: "#FFFFFF", color: "#9A8B73", cursor: "pointer",
-              }}>
-                {roomEnding ? "Saving…" : "End session"}
-              </button>
-            </span>
+            </div>
           </div>
+          {roomHintsOpen ? (
+            <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 16, padding: "10px 12px", marginTop: 6, boxShadow: "0 8px 22px rgba(74,65,54,.12)" }}>
+              {roomSession.plan.phrases.map((p, pi) => {
+                const targetIsEn = roomSession.learningTarget === "en";
+                const targetText = targetIsEn ? p.en : p.th;
+                return (
+                  <div key={pi} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 0", borderBottom: pi < roomSession.plan.phrases.length - 1 ? "1px solid #EDE8E0" : "none" }}>
+                    <button
+                      onClick={() => { try { void ttsSpeak(targetText, ttsDetectLang(targetText)); } catch { /* best-effort */ } }}
+                      aria-label="Play sound"
+                      style={{ width: 24, height: 24, borderRadius: "50%", border: "1px solid #EDE8E0", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flex: "0 0 24px" }}
+                    >
+                      <RoomVolume style={{ width: 12, height: 12, color: "#3E9C82" }} aria-hidden />
+                    </button>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontFamily: targetIsEn ? "'Quicksand', sans-serif" : "'Sarabun', sans-serif", display: "block", fontSize: 13, fontWeight: 700, color: "#3C352B" }}>{targetText}</span>
+                      {!targetIsEn && p.romanization ? (
+                        <span style={{ fontFamily: "'Quicksand', sans-serif", display: "block", fontSize: 10.5, fontWeight: 600, color: "#6D5BBF" }}>{p.romanization}</span>
+                      ) : null}
+                      <span style={{ fontFamily: targetIsEn ? "'Sarabun', sans-serif" : "'Quicksand', sans-serif", display: "block", fontSize: 11, fontWeight: 600, color: "#9A8B73" }}>{targetIsEn ? p.th : p.en}</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       ) : null}
       <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
@@ -1811,48 +1856,12 @@ export default function TalkPage() {
             {uiLang === "th" ? "แตะที่ไหนก็ได้เพื่อเริ่มค่า~" : "tap anywhere to begin~"}
           </p>
         )}
-        {roomSession ? (
-          <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 360, padding: "0 14px", marginBottom: 6 }}>
-            {roomHintsOpen ? (
-              <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 16, padding: "10px 12px", marginBottom: 6, boxShadow: "0 8px 22px rgba(74,65,54,.12)" }}>
-                {roomSession.plan.phrases.map((p, pi) => {
-                  const targetIsEn = roomSession.learningTarget === "en";
-                  const targetText = targetIsEn ? p.en : p.th;
-                  return (
-                    <div key={pi} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 0", borderBottom: pi < roomSession.plan.phrases.length - 1 ? "1px solid #EDE8E0" : "none" }}>
-                      <button
-                        onClick={() => { try { void ttsSpeak(targetText, ttsDetectLang(targetText)); } catch { /* best-effort */ } }}
-                        aria-label="Play sound"
-                        style={{ width: 24, height: 24, borderRadius: "50%", border: "1px solid #EDE8E0", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flex: "0 0 24px" }}
-                      >
-                        <RoomVolume style={{ width: 12, height: 12, color: "#3E9C82" }} aria-hidden />
-                      </button>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ fontFamily: targetIsEn ? "'Quicksand', sans-serif" : "'Sarabun', sans-serif", display: "block", fontSize: 13, fontWeight: 700, color: "#3C352B" }}>{targetText}</span>
-                        {!targetIsEn && p.romanization ? (
-                          <span style={{ fontFamily: "'Quicksand', sans-serif", display: "block", fontSize: 10.5, fontWeight: 600, color: "#6D5BBF" }}>{p.romanization}</span>
-                        ) : null}
-                        <span style={{ fontFamily: targetIsEn ? "'Sarabun', sans-serif" : "'Quicksand', sans-serif", display: "block", fontSize: 11, fontWeight: 600, color: "#9A8B73" }}>{targetIsEn ? p.th : p.en}</span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-            <button onClick={() => setRoomHintsOpen((v) => !v)} style={{
-              fontFamily: "'Quicksand', sans-serif", display: "block", margin: "0 auto 4px", fontSize: 11, fontWeight: 700,
-              padding: "6px 14px", borderRadius: 99, border: "1px solid #C4B5FD", background: "#F1EEFE", color: "#6D5BBF", cursor: "pointer",
-            }}>
-              {roomHintsOpen ? "Hide hints" : "Hints~"}
-            </button>
-          </div>
-        ) : null}
         <div style={{ pointerEvents: "auto" }}>
         <MicRow
           current={config.mode}
           orbState={orbState}
           uiLang={uiLang}
-          showModes
+          showModes={!roomSession}
           onModeChange={(m) => {
             const next = { ...config, mode: m };
             setConfig(next);

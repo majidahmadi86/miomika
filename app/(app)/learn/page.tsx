@@ -865,10 +865,20 @@ export default function LearnPage() {
                     <p style={{ ...font, fontSize: 14, fontWeight: 700, color: INK_STRONG, margin: 0, textAlign: "center" }}>
                       What do you want to speak about?
                     </p>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 12 }}>
+                      {["Job interview", "Meeting your partner's family", "Business meeting", "Hotel check-in", "At the doctor", "Presenting my work"].map((t) => (
+                        <button key={t} onClick={() => setCsTopic(t)} disabled={roomStarting} style={{
+                          ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer",
+                          border: `1px solid ${csTopic === t ? "#F9A8D4" : BORDER}`,
+                          background: csTopic === t ? "#FDEAF4" : "#FFFFFF",
+                          color: csTopic === t ? "#C2497E" : MUTED,
+                        }}>{t}</button>
+                      ))}
+                    </div>
                     <input
                       value={csTopic}
                       onChange={(e) => setCsTopic(e.target.value)}
-                      placeholder="e.g. job interview, presenting my project, hotel check-in"
+                      placeholder="…or type your own"
                       disabled={roomStarting}
                       style={{
                         ...font, width: "100%", fontSize: 13.5, padding: "11px 14px", marginTop: 12,
