@@ -2,8 +2,8 @@
 
 // /learn — the Learn surface (Curriculum milestone). Nav-linked.
 // Live: Course (journey + creator + own lessons) and SPEAK — Confident
-// Speaking, the flagship: hero card, courses, scenario view with goal
-// self-check and verified phrases. Tests/Reading/Fun ship next.
+// Speaking with the SPEAKING ROOM: door → live session in /talk → results.
+// Tests/Reading/Fun ship next.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -14,7 +14,7 @@ import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLef
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
 import { detectLang, speak } from "@/lib/voice/tts";
-import { sfxPop, sfxSuccess } from "@/lib/sound/sfx";
+import { sfxSuccess } from "@/lib/sound/sfx";
 
 const AmbientBackground = dynamic(
   () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
@@ -73,13 +73,57 @@ type SpeakingRow = {
   learning_target: string;
   status: string;
   plan: { courses?: SpeakingCourse[] };
-  progress: { completed?: Record<string, { goals_done: number; completed_at?: string | null }>; current_course?: number };
+  progress: Record<string, unknown>;
+};
+
+type SessionLite = {
+  id: string;
+  title_en: string;
+  status: string;
+  results: { minutes?: number; objectives_done?: number[]; notes?: Array<{ kind: string; note: string }> };
+  created_at: string;
+  completed_at: string | null;
+  course_position?: number | null;
+  scenario_position?: number | null;
+};
+
+type SessionDetail = {
+  id: string;
+  status: string;
+  results: {
+    minutes?: number;
+    objectives_done?: number[];
+    notes?: Array<{ kind: string; note: string }>;
+    exit_done?: boolean;
+  };
+  completed_at: string | null;
+  library: {
+    title_en: string;
+    cefr_level: string;
+    learning_target: string;
+    register: string;
+    plan: {
+      scene: string;
+      miomi_role: string;
+      objectives: string[];
+      stages: Array<{ id: string; title: string; activity: string; guidance: string }>;
+      phrases: Array<{ en: string; th: string; romanization: string | null }>;
+    };
+  } | null;
 };
 
 const LADDER = ["A1", "A2", "B1", "B2", "C1"] as const;
 const SURFACES = ["Course", "Speak", "Tests", "Reading", "Fun"] as const;
 const BUILT_SURFACES: ReadonlyArray<(typeof SURFACES)[number]> = ["Course", "Speak"];
 type Surface = (typeof SURFACES)[number];
+
+const REGISTER_OPTIONS = [
+  { v: "polite", t: "Polite", minRank: 0 },
+  { v: "everyday", t: "Everyday", minRank: 0 },
+  { v: "casual", t: "Casual", minRank: 0 },
+  { v: "genz", t: "Gen-Z", minRank: 2 },
+  { v: "social", t: "Creator", minRank: 2 },
+] as const;
 
 const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
   peach: { edge: "#FDBA74", soft: "#FEF1E3" },
@@ -154,6 +198,7 @@ export default function LearnPage() {
   const [viewLevel, setViewLevel] = useState<string | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumRow | null>(null);
   const [speaking, setSpeaking] = useState<SpeakingRow | null>(null);
+  const [sessions, setSessions] = useState<SessionLite[]>([]);
   const [allLessons, setAllLessons] = useState<LessonLite[]>([]);
   const [lessonsById, setLessonsById] = useState<Map<string, LessonLite>>(new Map());
   const [goldCount, setGoldCount] = useState(0);
@@ -163,10 +208,12 @@ export default function LearnPage() {
   const [expandedUnit, setExpandedUnit] = useState<number | null>(null);
   const [expandedCourse, setExpandedCourse] = useState<number | null>(null);
   const [activeScenario, setActiveScenario] = useState<{ c: number; s: number } | null>(null);
+  const [resultsSession, setResultsSession] = useState<SessionDetail | null>(null);
   const [planning, setPlanning] = useState(false);
   const [building, setBuilding] = useState(false);
   const [speakPlanning, setSpeakPlanning] = useState(false);
   const [scenarioBuilding, setScenarioBuilding] = useState(false);
+  const [roomStarting, setRoomStarting] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
   const [speakMsg, setSpeakMsg] = useState<string | null>(null);
   const [askOpen, setAskOpen] = useState(false);
@@ -175,6 +222,9 @@ export default function LearnPage() {
   const [planTarget, setPlanTarget] = useState<string>("auto");
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState<string | null>(null);
+  const [csOpen, setCsOpen] = useState(false);
+  const [csTopic, setCsTopic] = useState("");
+  const [csRegister, setCsRegister] = useState("everyday");
 
   const say = useCallback((text: string) => {
     try { void speak(text, detectLang(text)); } catch { /* audio is best-effort */ }
@@ -183,13 +233,15 @@ export default function LearnPage() {
   const refresh = useCallback(async (levelAsk?: string) => {
     try {
       const q = levelAsk ? `?level=${encodeURIComponent(levelAsk)}` : "";
-      const [curRes, spkRes, lesRes] = await Promise.all([
+      const [curRes, spkRes, sesRes, lesRes] = await Promise.all([
         fetch(`/api/curriculum${q}`),
         fetch(`/api/speaking${q}`),
+        fetch("/api/speaking/session"),
         fetch("/api/lessons"),
       ]);
       const curJson = (await curRes.json()) as { curriculum?: CurriculumRow | null; level?: string };
       const spkJson = (await spkRes.json()) as { speaking?: SpeakingRow | null };
+      const sesJson = (await sesRes.json()) as { sessions?: SessionLite[] };
       const lesJson = (await lesRes.json()) as { lessons?: LessonLite[]; cefrLevel?: string | null };
       const lessons = Array.isArray(lesJson.lessons) ? lesJson.lessons : [];
       const map = new Map<string, LessonLite>();
@@ -211,6 +263,7 @@ export default function LearnPage() {
       }
       setCurriculum(curJson.curriculum ?? null);
       setSpeaking(spkJson.speaking ?? null);
+      setSessions(Array.isArray(sesJson.sessions) ? sesJson.sessions : []);
       if (curJson.level) setViewLevel(curJson.level);
     } catch {
       setCurriculum(null);
@@ -224,6 +277,26 @@ export default function LearnPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; state is set only after await, matching the app's existing pattern
     void refresh();
   }, [authReady, isGuest, refresh]);
+
+  // Results view: arriving back from the Room with ?session=<id>.
+  useEffect(() => {
+    if (!authReady || isGuest) return;
+    if (typeof window === "undefined") return;
+    const m = window.location.search.match(/[?&]session=([0-9a-f-]+)/i);
+    if (!m) return;
+    const id = m[1]!;
+    void (async () => {
+      try {
+        const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(id)}`);
+        const j = (await r.json()) as { session?: SessionDetail | null };
+        if (j.session?.library) {
+          setResultsSession(j.session);
+          setSurface("Speak");
+          try { sfxSuccess(); } catch { /* best-effort */ }
+        }
+      } catch { /* results can be reopened from Your sessions */ }
+    })();
+  }, [authReady, isGuest]);
 
   const planJourney = useCallback(async () => {
     if (planning) return;
@@ -354,31 +427,65 @@ export default function LearnPage() {
     }
   }, [scenarioBuilding, viewLevel, refresh]);
 
-  const saveGoals = useCallback((coursePos: number, scenarioPos: number, goalsDone: number) => {
-    setSpeaking((prev) => {
-      if (!prev) return prev;
-      const key = `${coursePos}-${scenarioPos}`;
-      const prevEntry = prev.progress?.completed?.[key];
-      return {
-        ...prev,
-        progress: {
-          ...prev.progress,
-          completed: {
-            ...(prev.progress?.completed ?? {}),
-            [key]: {
-              goals_done: goalsDone,
-              completed_at: goalsDone >= 3 ? (prevEntry?.completed_at ?? new Date().toISOString()) : null,
-            },
-          },
-        },
+  // THE DOOR → THE ROOM: create the session, hand it to /talk, walk in.
+  const enterRoom = useCallback(async (args: { coursePos?: number; scenarioPos?: number; topic?: string; register?: string }) => {
+    if (roomStarting) return;
+    setRoomStarting(true);
+    setSpeakMsg("Miomi is preparing your private room — give her a moment…");
+    try {
+      const r = await fetch("/api/speaking/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          level: viewLevel ?? undefined,
+          course_position: args.coursePos,
+          scenario_position: args.scenarioPos,
+          topic: args.topic,
+          register: args.register,
+        }),
+      });
+      const j = (await r.json()) as {
+        ok?: boolean;
+        reason?: string;
+        sessionId?: string;
+        title_en?: string;
+        level?: string;
+        learningTarget?: string;
+        register?: string;
+        plan?: Record<string, unknown>;
       };
-    });
-    void fetch("/api/speaking/scenario", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ level: viewLevel ?? undefined, course_position: coursePos, scenario_position: scenarioPos, goals_done: goalsDone }),
-    }).catch(() => { /* progress save is best-effort; local state already holds it */ });
-  }, [viewLevel]);
+      if (j.ok && j.sessionId && j.plan) {
+        try {
+          window.sessionStorage.setItem(
+            "miomika.room_session",
+            JSON.stringify({
+              sessionId: j.sessionId,
+              title_en: j.title_en ?? "Speaking session",
+              level: j.level ?? (viewLevel ?? myLevel),
+              learningTarget: j.learningTarget ?? (profile?.learning_target_language ?? "th"),
+              register: j.register ?? "everyday",
+              plan: j.plan,
+            }),
+          );
+        } catch {
+          setSpeakMsg("Your browser blocked the room key — try once more.");
+          setRoomStarting(false);
+          return;
+        }
+        window.location.href = "/talk?room=1";
+        return;
+      }
+      if (j.reason === "pro_required") {
+        setSpeakMsg("Sessions beyond the first scene of each course are Pro — your free room is scene one~");
+      } else {
+        setSpeakMsg("Miomi couldn't prepare the room — try once more.");
+      }
+    } catch {
+      setSpeakMsg("Something slipped — try once more.");
+    } finally {
+      setRoomStarting(false);
+    }
+  }, [roomStarting, viewLevel, myLevel, profile]);
 
   const myRank = Math.max(0, (LADDER as readonly string[]).indexOf(myLevel));
   const targetName = profile?.learning_target_language === "en" ? "English" : "Thai";
@@ -387,8 +494,13 @@ export default function LearnPage() {
   const units = Array.isArray(curriculum?.plan?.units) ? curriculum.plan.units : [];
   const checkpoints = Array.isArray(curriculum?.plan?.checkpoints) ? curriculum.plan.checkpoints : [];
   const courses = Array.isArray(speaking?.plan?.courses) ? speaking.plan.courses : [];
-  const completedMap = speaking?.progress?.completed ?? {};
-  const scenesDone = Object.values(completedMap).filter((c) => c?.completed_at).length;
+  // Scene completion now derives from REAL completed sessions.
+  const completedScenes = new Set(
+    sessions
+      .filter((s) => s.completed_at && s.course_position && s.scenario_position)
+      .map((s) => `${s.course_position}-${s.scenario_position}`),
+  );
+  const scenesDone = completedScenes.size;
   const scenesTotal = courses.reduce((n, c) => n + (c.scenario_titles?.length ?? 0), 0);
 
   const unitLessons = useCallback((u: CurriculumUnit): LessonLite[] =>
@@ -422,8 +534,14 @@ export default function LearnPage() {
   const activeScene = activeCourse && activeScenario
     ? activeCourse.scenarios?.find((s) => s.position === activeScenario.s) ?? null
     : null;
-  const activeKey = activeScenario ? `${activeScenario.c}-${activeScenario.s}` : "";
-  const activeGoalsDone = activeScenario ? (completedMap[activeKey]?.goals_done ?? 0) : 0;
+
+  const closeResults = useCallback(() => {
+    setResultsSession(null);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", "/learn");
+    }
+    void refresh(viewLevel ?? undefined);
+  }, [refresh, viewLevel]);
 
   return (
     <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "#FAFAF6" }}>
@@ -486,9 +604,9 @@ export default function LearnPage() {
           ) : null}
         </div>
 
-        {/* CONFIDENT SPEAKING — the flagship, always present. */}
+        {/* CONFIDENT SPEAKING — flagship */}
         {authReady && !isGuest ? (
-          <button onClick={() => { setSurface("Speak"); setActiveScenario(null); }} style={{
+          <button onClick={() => { setSurface("Speak"); setActiveScenario(null); setResultsSession(null); }} style={{
             display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
             background: "linear-gradient(135deg,#34A98F 0%,#1F7A68 100%)", border: "none", borderRadius: 18,
             padding: "14px 15px", marginBottom: 12, cursor: "pointer",
@@ -505,10 +623,10 @@ export default function LearnPage() {
                 </span>
               </span>
               <span style={{ ...font, display: "block", fontSize: 14.5, fontWeight: 700, color: "#fff", marginTop: 2 }}>
-                {courses.length ? `${scenesDone} of ${scenesTotal} scenes spoken` : "Speak from day one — real scenes with Miomi"}
+                {courses.length ? `${scenesDone} of ${scenesTotal} sessions spoken` : "Your private speaking room with Miomi"}
               </span>
               <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,.85)", marginTop: 1 }}>
-                The first scene of every course is free~
+                The first session of every course is free~
               </span>
             </span>
           </button>
@@ -518,7 +636,7 @@ export default function LearnPage() {
         {shownSurfaces.length > 1 ? (
           <div style={{ display: "flex", background: "#F1ECE3", borderRadius: 14, padding: 4, gap: 4, marginBottom: 16 }}>
             {shownSurfaces.map((s) => (
-              <button key={s} onClick={() => { setSurface(s); setActiveScenario(null); }} style={{
+              <button key={s} onClick={() => { setSurface(s); setActiveScenario(null); setResultsSession(null); }} style={{
                 ...font, flex: 1, fontSize: 12, fontWeight: 700, padding: "8px 0",
                 borderRadius: 10, border: "none", cursor: "pointer",
                 background: surface === s ? "#FFFFFF" : "transparent",
@@ -548,8 +666,96 @@ export default function LearnPage() {
             </Link>
           </div>
         ) : surface === "Speak" ? (
-          activeScene && activeCourse && activeScenario ? (
-            /* ---------- SCENARIO VIEW ---------- */
+          resultsSession && resultsSession.library ? (
+            /* ---------- RESULTS / EXIT TICKET ---------- */
+            <>
+              <div style={{ textAlign: "center", padding: "2px 0 14px" }}>
+                <span style={{ width: 68, height: 68, borderRadius: "50%", background: "#FDEAF4", display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                  <Image src="/miomi/companion-celebration.png" alt="Miomi celebrating" width={60} height={60} style={{ objectFit: "contain" }} />
+                </span>
+                <h2 style={{ ...font, fontSize: 18, fontWeight: 700, color: INK_STRONG, margin: "10px 0 0", lineHeight: 1.25 }}>
+                  Session complete{typeof resultsSession.results?.minutes === "number" && resultsSession.results.minutes > 0 ? ` — you spoke for ${resultsSession.results.minutes} minute${resultsSession.results.minutes === 1 ? "" : "s"}.` : "~"}
+                </h2>
+                <p style={{ ...font, fontSize: 12, fontWeight: 600, color: MUTED, margin: "4px 0 0" }}>
+                  {resultsSession.library.title_en} · {resultsSession.library.cefr_level} · {(resultsSession.results?.objectives_done ?? []).length} of {resultsSession.library.plan.objectives.length} objectives earned
+                </p>
+              </div>
+
+              <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 11 }}>
+                <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: MUTED, margin: "0 0 7px" }}>Objectives</p>
+                {resultsSession.library.plan.objectives.map((o, oi) => {
+                  const earned = (resultsSession.results?.objectives_done ?? []).includes(oi);
+                  return (
+                    <div key={oi} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 0", borderBottom: oi < resultsSession.library!.plan.objectives.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                      <span style={{
+                        width: 20, height: 20, borderRadius: "50%", flex: "0 0 20px",
+                        border: earned ? "2px solid transparent" : `2px solid ${BORDER}`,
+                        background: earned ? CTA : "#FFFFFF",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {earned ? <Check style={{ width: 11, height: 11, color: "#fff" }} strokeWidth={3} aria-hidden /> : null}
+                      </span>
+                      <span style={{ ...font, fontSize: 12.5, fontWeight: 700, color: earned ? TEAL_DEEP : MUTED }}>{o}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {(resultsSession.results?.notes ?? []).length ? (
+                <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 11 }}>
+                  <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: MUTED, margin: "0 0 7px" }}>{`Miomi's notes — your tutor's honest read`}</p>
+                  {(resultsSession.results?.notes ?? []).map((n, ni) => (
+                    <div key={ni} style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "6px 0", borderBottom: ni < (resultsSession.results?.notes ?? []).length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                      <span style={{
+                        ...font, fontSize: 9, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase",
+                        borderRadius: 6, padding: "3px 7px", flex: "0 0 auto", marginTop: 1,
+                        background: n.kind === "grow" ? "#FEF1E3" : "#E9F8F4",
+                        color: n.kind === "grow" ? "#B06A28" : TEAL_DEEP,
+                      }}>{n.kind === "grow" ? "Grow" : "Glow"}</span>
+                      <p style={{ ...font, fontSize: 12.5, fontWeight: 600, lineHeight: 1.5, color: INK, margin: 0 }}>{n.note}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 18, padding: "13px 14px", marginBottom: 11 }}>
+                <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#6D5BBF", margin: "0 0 6px" }}>Phrases from your session</p>
+                {resultsSession.library.plan.phrases.map((p, pi) => (
+                  <div key={pi} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: pi < resultsSession.library!.plan.phrases.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                    <SoundBtn onClick={() => say(targetIsEn ? p.en : p.th)} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ ...(targetIsEn ? font : thaiFont), display: "block", fontSize: 14, fontWeight: 700, color: INK_STRONG }}>{targetIsEn ? p.en : p.th}</span>
+                      {!targetIsEn && p.romanization ? (
+                        <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: "#6D5BBF", marginTop: 1 }}>{p.romanization}</span>
+                      ) : null}
+                      <span style={{ ...(targetIsEn ? thaiFont : font), display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginTop: 1 }}>{targetIsEn ? p.th : p.en}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#FFFFFF", border: "1px solid #C9A96E", borderRadius: 16, padding: "10px 13px", marginBottom: 11 }}>
+                <p style={{ ...font, fontSize: 11, fontWeight: 600, color: INK, lineHeight: 1.45, margin: 0 }}>
+                  <b>Share this session</b> — your friend gets their first room free, you earn 30฿
+                </p>
+                <button onClick={() => { try { void navigator.share?.({ title: "Miomika", text: `I just finished a Confident Speaking session with Miomi~ ${resultsSession.library?.title_en ?? ""}`, url: "https://miomika.com" }); } catch { /* share sheet optional */ } }} style={{
+                  ...font, display: "inline-flex", alignItems: "center", gap: 5, border: "1.5px solid #34A98F", background: "#FFFFFF",
+                  color: TEAL_DEEP, borderRadius: 99, padding: "7px 13px", fontSize: 11, fontWeight: 700, cursor: "pointer", flexShrink: 0,
+                }}>Share</button>
+              </div>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={closeResults} style={{
+                  ...font, flex: 1, textAlign: "center", fontSize: 12.5, fontWeight: 700, padding: "12px 0",
+                  borderRadius: 99, border: `1.5px solid #34A98F`, background: "#FFFFFF", color: TEAL_DEEP, cursor: "pointer",
+                }}>Back to Speak</button>
+              </div>
+              <p style={{ ...font, fontSize: 10.5, fontWeight: 600, color: MUTED, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 }}>
+                {`Notes are Miomi's coaching read — sound grading is coming in an update~`}
+              </p>
+            </>
+          ) : activeScene && activeCourse && activeScenario ? (
+            /* ---------- THE DOOR ---------- */
             <>
               <button onClick={() => setActiveScenario(null)} style={{
                 ...font, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700,
@@ -560,82 +766,53 @@ export default function LearnPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
                 <h2 style={{ ...font, fontSize: 17, fontWeight: 700, color: INK_STRONG, margin: 0 }}>{activeScene.title_en}</h2>
                 {activeScenario.s === 1 ? (
-                  <span style={{ ...font, fontSize: 9.5, fontWeight: 700, letterSpacing: ".05em", color: "#3E7A66", background: "#EBFBF4", borderRadius: 7, padding: "3px 8px", flex: "0 0 auto" }}>FREE SCENE</span>
+                  <span style={{ ...font, fontSize: 9.5, fontWeight: 700, letterSpacing: ".05em", color: "#3E7A66", background: "#EBFBF4", borderRadius: 7, padding: "3px 8px", flex: "0 0 auto" }}>FREE SESSION</span>
                 ) : <ProChip />}
               </div>
               <div style={{ background: "#FEF1E3", border: "1px solid #F4D9BC", borderRadius: 18, padding: "13px 14px", marginBottom: 12 }}>
                 <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: "#7A4F26", margin: 0, lineHeight: 1.55 }}>
-                  <b style={{ fontWeight: 700 }}>The scene:</b> {activeScene.scene_en}
+                  <b style={{ fontWeight: 700 }}>The scene:</b> {activeScene.scene_en} <b style={{ fontWeight: 700 }}>Just you and Miomi — no one else hears a thing~</b>
                 </p>
               </div>
               <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 12 }}>
                 <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: MUTED, margin: "0 0 8px" }}>
-                  Your goals — tap each one you said out loud
+                  {`What you'll walk out with — Miomi checks each as you earn it`}
                 </p>
-                {activeScene.goals.map((g, gi) => {
-                  const checked = gi < activeGoalsDone;
-                  return (
-                    <button key={gi} onClick={() => {
-                      const next = checked ? gi : gi + 1;
-                      if (!checked) {
-                        if (next >= 3) { try { sfxSuccess(); } catch { /* best-effort */ } }
-                        else { try { sfxPop(); } catch { /* best-effort */ } }
-                      }
-                      saveGoals(activeScenario.c, activeScenario.s, next);
-                    }} style={{
-                      display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 0",
-                      background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
-                      borderBottom: gi < activeScene.goals.length - 1 ? `1px solid ${BORDER}` : "none",
-                    }}>
-                      <span style={{
-                        width: 20, height: 20, borderRadius: "50%", flex: "0 0 20px",
-                        border: checked ? "2px solid transparent" : `2px solid ${BORDER}`,
-                        background: checked ? CTA : "#FFFFFF",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        {checked ? <Check style={{ width: 11, height: 11, color: "#fff" }} strokeWidth={3} aria-hidden /> : null}
-                      </span>
-                      <span style={{ ...font, fontSize: 13, fontWeight: 700, color: checked ? TEAL_DEEP : INK_STRONG }}>{g}</span>
-                    </button>
-                  );
-                })}
-                {activeGoalsDone >= 3 ? (
-                  <p style={{ ...font, fontSize: 12, fontWeight: 700, color: TEAL_DEEP, margin: "10px 0 0" }}>
-                    Scene completed — you said it all out loud~
-                  </p>
-                ) : null}
+                {activeScene.goals.map((g, gi) => (
+                  <div key={gi} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: gi < activeScene.goals.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                    <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid #7DD3C0", flex: "0 0 18px" }} />
+                    <span style={{ ...font, fontSize: 13, fontWeight: 700, color: INK_STRONG }}>{g}</span>
+                  </div>
+                ))}
               </div>
-              <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 18, padding: "13px 14px", marginBottom: 12 }}>
+              <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 18, padding: "13px 14px", marginBottom: 14 }}>
                 <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#6D5BBF", margin: "0 0 6px" }}>
-                  Phrases that help
+                  {`Phrases that help — they'll be on your hint drawer inside`}
                 </p>
                 {activeScene.phrases.map((p, pi) => (
                   <div key={pi} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: pi < activeScene.phrases.length - 1 ? `1px solid ${BORDER}` : "none" }}>
                     <SoundBtn onClick={() => say(targetIsEn ? p.en : p.th)} />
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ ...(targetIsEn ? font : thaiFont), display: "block", fontSize: 14, fontWeight: 700, color: INK_STRONG }}>
-                        {targetIsEn ? p.en : p.th}
-                      </span>
+                      <span style={{ ...(targetIsEn ? font : thaiFont), display: "block", fontSize: 14, fontWeight: 700, color: INK_STRONG }}>{targetIsEn ? p.en : p.th}</span>
                       {!targetIsEn && p.romanization ? (
                         <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: "#6D5BBF", marginTop: 1 }}>{p.romanization}</span>
                       ) : null}
-                      <span style={{ ...(targetIsEn ? thaiFont : font), display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginTop: 1 }}>
-                        {targetIsEn ? p.th : p.en}
-                      </span>
+                      <span style={{ ...(targetIsEn ? thaiFont : font), display: "block", fontSize: 12, fontWeight: 600, color: MUTED, marginTop: 1 }}>{targetIsEn ? p.th : p.en}</span>
                     </span>
                   </div>
                 ))}
               </div>
-              <Link href="/talk" style={{
-                ...font, display: "block", textAlign: "center", fontSize: 14, fontWeight: 700,
-                padding: "14px 20px", borderRadius: 99, background: CTA, color: "#fff",
-                textDecoration: "none", boxShadow: CTA_SHADOW,
+              <button onClick={() => void enterRoom({ coursePos: activeScenario.c, scenarioPos: activeScenario.s })} disabled={roomStarting} style={{
+                ...font, display: "block", width: "100%", textAlign: "center", fontSize: 14, fontWeight: 700,
+                padding: "14px 20px", borderRadius: 99, border: "none", cursor: roomStarting ? "default" : "pointer",
+                background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: roomStarting ? 0.7 : 1,
               }}>
-                Talk it through with Miomi
-              </Link>
+                {roomStarting ? "Preparing your room…" : "Enter your room"}
+              </button>
               <p style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 }}>
-                Miomi listens and plays her part live — sound grading is coming in an update~
+                A full guided session — warm-up to exit ticket, ~15 minutes. Uses your speaking minutes.
               </p>
+              {speakMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "8px 0 0", textAlign: "center" }}>{speakMsg}</p> : null}
             </>
           ) : !speaking || !courses.length ? (
             /* ---------- SPEAK EMPTY STATE ---------- */
@@ -644,7 +821,7 @@ export default function LearnPage() {
                 Speak {targetName} from day one
               </p>
               <p style={{ ...font, fontSize: 12, color: MUTED, margin: "6px 0 14px", lineHeight: 1.5 }}>
-                Real scenes, your voice, out loud — Miomi plays the other side. 4 courses, 16 scenes, planned for {viewLevel ?? myLevel}.
+                Private guided sessions — Miomi plays the other side, you do the talking. 4 courses, 16 sessions, planned for {viewLevel ?? myLevel}.
               </p>
               <button onClick={() => void planSpeaking()} disabled={speakPlanning} style={{
                 ...font, fontSize: 14, fontWeight: 700, padding: "13px 26px", borderRadius: 99,
@@ -656,16 +833,92 @@ export default function LearnPage() {
               {speakMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "10px 0 0" }}>{speakMsg}</p> : null}
             </div>
           ) : (
-            /* ---------- COURSE LIST ---------- */
+            /* ---------- COURSE LIST + ESP + YOUR SESSIONS ---------- */
             <>
               <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: MUTED, margin: "0 2px 12px", lineHeight: 1.55 }}>
-                <b style={{ color: INK_STRONG }}>Speak from day one.</b> Miomi plays the other side — the vendor, the receptionist, the friend. The first scene of every course is free~
+                <b style={{ color: INK_STRONG }}>Your private speaking room.</b> Warm-up to exit ticket, Miomi leading every step — the first session of every course is free~
               </p>
+
+              {/* ESP — create your own session */}
+              <div style={{
+                border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: csOpen ? 16 : 0,
+                background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)", marginBottom: 12, overflow: "hidden",
+              }}>
+                {!csOpen ? (
+                  <button onClick={() => setCsOpen(true)} style={{
+                    display: "flex", alignItems: "center", gap: 11, width: "100%", padding: "13px 14px",
+                    background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+                  }}>
+                    <span style={{ width: 34, height: 34, borderRadius: 11, background: CTA, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px", boxShadow: CTA_SHADOW }}>
+                      <Mic style={{ width: 16, height: 16 }} strokeWidth={2.2} aria-hidden />
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Create your own session</span>
+                      <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
+                        Interview prep, business meetings, anything — your topic, your style~
+                      </span>
+                    </span>
+                    <ProChip />
+                  </button>
+                ) : (
+                  <div>
+                    <p style={{ ...font, fontSize: 14, fontWeight: 700, color: INK_STRONG, margin: 0, textAlign: "center" }}>
+                      What do you want to speak about?
+                    </p>
+                    <input
+                      value={csTopic}
+                      onChange={(e) => setCsTopic(e.target.value)}
+                      placeholder="e.g. job interview, presenting my project, hotel check-in"
+                      disabled={roomStarting}
+                      style={{
+                        ...font, width: "100%", fontSize: 13.5, padding: "11px 14px", marginTop: 12,
+                        borderRadius: 12, border: `1px solid ${BORDER}`, color: INK,
+                        background: "#FFFFFF", outline: "none", boxSizing: "border-box",
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 10 }}>
+                      {REGISTER_OPTIONS.map((o) => {
+                        const locked = myRank < o.minRank;
+                        return (
+                          <button key={o.v} onClick={() => !locked && setCsRegister(o.v)} disabled={roomStarting || locked}
+                            title={locked ? "Unlocks from B1" : undefined}
+                            style={{
+                              ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
+                              cursor: locked ? "default" : "pointer", opacity: locked ? 0.4 : 1,
+                              border: `1px solid ${csRegister === o.v ? "#7DD3C0" : BORDER}`,
+                              background: csRegister === o.v ? "#E9F8F4" : "#FFFFFF",
+                              color: csRegister === o.v ? "#3E9C82" : MUTED,
+                              display: "inline-flex", alignItems: "center", gap: 4,
+                            }}>
+                            {locked ? <Lock style={{ width: 10, height: 10 }} aria-hidden /> : null}
+                            {o.t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button onClick={() => { if (csTopic.trim()) void enterRoom({ topic: csTopic.trim(), register: csRegister }); }} disabled={roomStarting || !csTopic.trim()} style={{
+                      ...font, width: "100%", marginTop: 10, fontSize: 14, fontWeight: 700,
+                      padding: "13px 20px", borderRadius: 99, border: "none",
+                      cursor: roomStarting || !csTopic.trim() ? "default" : "pointer",
+                      background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: roomStarting || !csTopic.trim() ? 0.7 : 1,
+                    }}>
+                      {roomStarting ? "Preparing your room…" : "Enter your room"}
+                    </button>
+                    <button onClick={() => { if (!roomStarting) setCsOpen(false); }} style={{
+                      ...font, width: "100%", marginTop: 6, fontSize: 12, fontWeight: 700, padding: "8px 0",
+                      borderRadius: 99, border: "none", cursor: "pointer", background: "transparent", color: MUTED,
+                    }}>
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {courses.map((c) => {
                 const tc = TOPIC_HEX[c.color] ?? TOPIC_HEX.peach;
                 const deep = TOPIC_DEEP[c.color] ?? TOPIC_DEEP.peach;
                 const isOpen = expandedCourse === c.position;
-                const courseDone = (c.scenario_titles ?? []).filter((_, si) => completedMap[`${c.position}-${si + 1}`]?.completed_at).length;
+                const courseDone = (c.scenario_titles ?? []).filter((_, si) => completedScenes.has(`${c.position}-${si + 1}`)).length;
                 return (
                   <div key={c.position} style={{
                     background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18,
@@ -685,7 +938,7 @@ export default function LearnPage() {
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.title_en}</span>
                         <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED }}>
-                          {courseDone} of {c.scenario_titles?.length ?? 4} scenes spoken
+                          {courseDone} of {c.scenario_titles?.length ?? 4} sessions spoken
                         </span>
                       </span>
                       {!isPro ? <ProChip /> : null}
@@ -695,8 +948,7 @@ export default function LearnPage() {
                         {(c.scenario_titles ?? []).map((title, si) => {
                           const pos = si + 1;
                           const built = (c.scenarios ?? []).find((s) => s.position === pos);
-                          const entry = completedMap[`${c.position}-${pos}`];
-                          const isDone = !!entry?.completed_at;
+                          const isDone = completedScenes.has(`${c.position}-${pos}`);
                           const isNextBuild = !built && pos === (c.scenarios ?? []).length + 1;
                           const needsPro = pos > 1 && !isPro;
                           return (
@@ -712,7 +964,7 @@ export default function LearnPage() {
                               <span style={{ flex: 1, minWidth: 0 }}>
                                 <span style={{ ...font, display: "block", fontSize: 12.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
                                 <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>
-                                  {isDone ? "Completed" : built ? "Ready" : pos === 1 ? "Free scene" : needsPro ? "Unlocks with Pro" : "Up next"}
+                                  {isDone ? "Completed" : built ? "Ready" : pos === 1 ? "Free session" : needsPro ? "Unlocks with Pro" : "Up next"}
                                 </span>
                               </span>
                               {built ? (
@@ -722,7 +974,7 @@ export default function LearnPage() {
                                   color: isDone ? MUTED : "#fff", background: isDone ? "transparent" : CTA,
                                   boxShadow: isDone ? "none" : CTA_SHADOW,
                                 }}>
-                                  {isDone ? "Replay" : "Open"}
+                                  {isDone ? "Again" : "Open"}
                                 </button>
                               ) : isNextBuild && !needsPro ? (
                                 <button onClick={() => void buildScenario(c.position, pos)} disabled={scenarioBuilding} style={{
@@ -743,9 +995,42 @@ export default function LearnPage() {
                   </div>
                 );
               })}
+
+              {sessions.length ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "16px 2px 10px" }}>
+                    <h2 style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>Your sessions</h2>
+                    <span style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED }}>{sessions.length}</span>
+                  </div>
+                  {sessions.map((s) => (
+                    <button key={s.id} onClick={() => { window.history.replaceState(null, "", `/learn?session=${s.id}`); void (async () => { try { const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(s.id)}`); const j = (await r.json()) as { session?: SessionDetail | null }; if (j.session?.library) setResultsSession(j.session); } catch { /* row stays */ } })(); }} style={{
+                      display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+                      background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW,
+                      padding: "12px 14px", marginBottom: 10, cursor: "pointer",
+                    }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: "50%", flex: "0 0 18px",
+                        border: s.completed_at ? "2px solid transparent" : `2px solid ${BORDER}`,
+                        background: s.completed_at ? CTA : "#FFFFFF",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {s.completed_at ? <Check style={{ width: 10, height: 10, color: "#fff" }} strokeWidth={3} aria-hidden /> : null}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ ...font, display: "block", fontSize: 13, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title_en || "Speaking session"}</span>
+                        <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>
+                          {s.completed_at ? `Completed${typeof s.results?.minutes === "number" && s.results.minutes > 0 ? ` · ${s.results.minutes} min spoken` : ""}` : "Not finished"}
+                        </span>
+                      </span>
+                      <span style={{ ...font, fontSize: 12, fontWeight: 700, color: TEAL_DEEP }}>Review</span>
+                    </button>
+                  ))}
+                </>
+              ) : null}
               {speakMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "4px 0 0", textAlign: "center" }}>{speakMsg}</p> : null}
             </>
           )
+
         ) : (
           <>
             {/* Create your own lesson */}
