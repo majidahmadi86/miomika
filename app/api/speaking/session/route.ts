@@ -291,6 +291,13 @@ export async function POST(req: NextRequest) {
         scenario_position: scenarioPos > 0 ? scenarioPos : null,
         status: "ready",
         results: {},
+        plan_snapshot: {
+          title_en: titleEn,
+          cefr_level: level,
+          learning_target: learningTarget,
+          register,
+          plan,
+        },
       })
       .select("id")
       .single();
@@ -322,27 +329,37 @@ export async function GET(req: NextRequest) {
     if (id) {
       const { data, error } = await supabase
         .from("speaking_sessions")
-        .select("id, library_id, course_position, scenario_position, status, results, created_at, completed_at")
+        .select("id, library_id, course_position, scenario_position, status, results, created_at, completed_at, plan_snapshot")
         .eq("id", id)
         .eq("user_id", profile.id)
         .maybeSingle();
       if (error) throw error;
       if (!data) return NextResponse.json({ session: null });
-      const { data: lib } = await supabase
-        .from("session_library")
-        .select("title_en, cefr_level, learning_target, register, plan")
-        .eq("id", data.library_id as string)
-        .maybeSingle();
-      return NextResponse.json({ session: { ...data, library: lib ?? null } });
+      // Library if it still exists; otherwise the frozen snapshot — user
+      // history never depends on the shared library's lifecycle.
+      let lib: Record<string, unknown> | null = null;
+      if (data.library_id) {
+        const { data: libRow } = await supabase
+          .from("session_library")
+          .select("title_en, cefr_level, learning_target, register, plan")
+          .eq("id", data.library_id as string)
+          .maybeSingle();
+        lib = (libRow as Record<string, unknown> | null) ?? null;
+      }
+      if (!lib) {
+        const snap = (data.plan_snapshot ?? {}) as Record<string, unknown>;
+        lib = snap.plan ? snap : null;
+      }
+      return NextResponse.json({ session: { ...data, library: lib } });
     }
     const { data, error } = await supabase
       .from("speaking_sessions")
-      .select("id, library_id, status, results, created_at, completed_at")
+      .select("id, library_id, course_position, scenario_position, status, results, created_at, completed_at, plan_snapshot")
       .eq("user_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(20);
     if (error) throw error;
-    const libIds = [...new Set((data ?? []).map((s) => s.library_id as string))];
+    const libIds = [...new Set((data ?? []).map((s) => s.library_id as string).filter(Boolean))];
     const titles = new Map<string, string>();
     if (libIds.length) {
       const { data: libs } = await supabase
@@ -351,14 +368,19 @@ export async function GET(req: NextRequest) {
         .in("id", libIds);
       for (const l of libs ?? []) titles.set(l.id as string, (l.title_en as string) ?? "");
     }
-    const sessions = (data ?? []).map((s) => ({
-      id: s.id as string,
-      title_en: titles.get(s.library_id as string) ?? "",
-      status: (s.status as string) ?? "ready",
-      results: (s.results ?? {}) as Record<string, unknown>,
-      created_at: s.created_at as string,
-      completed_at: (s.completed_at as string | null) ?? null,
-    }));
+    const sessions = (data ?? []).map((s) => {
+      const snap = (s.plan_snapshot ?? {}) as { title_en?: string };
+      return {
+        id: s.id as string,
+        title_en: titles.get((s.library_id as string) ?? "") || snap.title_en || "",
+        status: (s.status as string) ?? "ready",
+        course_position: (s.course_position as number | null) ?? null,
+        scenario_position: (s.scenario_position as number | null) ?? null,
+        results: (s.results ?? {}) as Record<string, unknown>,
+        created_at: s.created_at as string,
+        completed_at: (s.completed_at as string | null) ?? null,
+      };
+    });
     return NextResponse.json({ sessions });
   } catch (err) {
     console.error("[api/speaking/session] read failed:", err);
