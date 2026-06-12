@@ -333,7 +333,6 @@ export default function LearnPage() {
         const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(id)}`);
         const j = (await r.json()) as { session?: SessionDetail | null };
         if (j.session?.library) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot results load on mount, matching the app's fetch-on-mount pattern
           setResultsSession(j.session);
           setSurface("Speak");
           try { sfxSuccess(); } catch { /* best-effort */ }
