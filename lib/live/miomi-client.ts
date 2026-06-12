@@ -7,6 +7,7 @@ import {
   buildKickoffPrompt,
   buildSessionKickoffPrompt,
   buildRoomPacePrompt,
+  buildSessionResumePrompt,
   buildLiveConfig,
   buildSessionLiveConfig,
   buildResumePrompt,
@@ -492,6 +493,20 @@ export class MiomiLiveClient {
         {
           role: "user",
           parts: [{ text: buildRoomPacePrompt(lang, slow) }],
+        },
+      ],
+      turnComplete: true,
+    });
+  }
+
+  /** Speaking Room: after a transport drop, resume the SAME session at the same stage. */
+  sendSessionResume(lang: "th" | "en", stageId: string): void {
+    if (!this.session || !this.connected) return;
+    this.session.sendClientContent({
+      turns: [
+        {
+          role: "user",
+          parts: [{ text: buildSessionResumePrompt(lang, stageId) }],
         },
       ],
       turnComplete: true,

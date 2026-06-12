@@ -715,6 +715,7 @@ export default function TalkPage() {
   const [roomSession, setRoomSession] = useState<RoomHandoff | null>(null);
   const roomSessionRef = useRef<RoomHandoff | null>(null);
   const [roomStageId, setRoomStageId] = useState<string>("warmup");
+  const roomStageIdRef = useRef<string>("warmup");
   const [roomObjectivesDone, setRoomObjectivesDone] = useState<number[]>([]);
   const [roomNotes, setRoomNotes] = useState<Array<{ kind: "glow" | "grow"; note: string }>>([]);
   const [roomLearned, setRoomLearned] = useState<string[]>([]);
@@ -858,6 +859,7 @@ export default function TalkPage() {
       };
       if (args.event === "stage" && typeof args.stage_id === "string") {
         setRoomStageId(args.stage_id);
+        roomStageIdRef.current = args.stage_id;
       } else if (args.event === "objective" && typeof args.objective_index === "number") {
         const idx = args.objective_index;
         setRoomObjectivesDone((prev) =>
@@ -933,7 +935,24 @@ export default function TalkPage() {
       try {
         const uiLanguage = sessionUiLangRef.current;
         const targetLanguage = sessionTargetLangRef.current;
-        await client.connect({ uiLanguage, targetLanguage, resume: true, mode: config.mode, level: config.teach.level });
+        await client.connect({
+          uiLanguage,
+          targetLanguage,
+          resume: true,
+          mode: config.mode,
+          level: roomSessionRef.current?.level ?? config.teach.level,
+          session: roomSessionRef.current?.plan
+            ? {
+                title: roomSessionRef.current.title_en,
+                scene: roomSessionRef.current.plan.scene,
+                miomiRole: roomSessionRef.current.plan.miomi_role,
+                register: roomSessionRef.current.register,
+                objectives: roomSessionRef.current.plan.objectives,
+                stages: roomSessionRef.current.plan.stages,
+                phrases: roomSessionRef.current.plan.phrases,
+              }
+            : undefined,
+        });
         memberContextRef.current = client.getMemberContext();
         syncTeachWordContext();
         lessonHadStartedRef.current = true;
@@ -943,11 +962,15 @@ export default function TalkPage() {
           guestExchanges: guestExchangesRef.current,
           skipKickoff: true,
         });
-        const nextWord = nextResumeWordHint(
-          snapshot.teachWord.lessonPlan,
-          snapshot.teachWord.introducedIdx,
-        );
-        client.sendResume(uiLanguage, nextWord);
+        if (roomSessionRef.current?.plan) {
+          client.sendSessionResume(uiLanguage, roomStageIdRef.current);
+        } else {
+          const nextWord = nextResumeWordHint(
+            snapshot.teachWord.lessonPlan,
+            snapshot.teachWord.introducedIdx,
+          );
+          client.sendResume(uiLanguage, nextWord);
+        }
         if (!restoreMic) {
           stopContinuousMic();
           setLiveUiState("idle");
