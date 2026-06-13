@@ -555,6 +555,15 @@ export class MiomiLiveClient {
     this.session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true });
   }
 
+  /** Speaking Room: the 10-min cap is reached. ONE short warm goodbye, then voice ends. */
+  sendRoomTimeUp(lang: "th" | "en"): void {
+    if (!this.session || !this.connected) return;
+    const text = lang === "th"
+      ? "[room_timeup] ครบเวลาของห้องนี้แล้ว — พูดปิดท้ายอบอุ่นสั้นๆ หนึ่งประโยค ชมเขาแล้วบอกลา ห้ามถามคำถามใหม่ ห้ามสอนเพิ่ม"
+      : "[room_timeup] Time is up for this room — say ONE short warm closing line: a quick compliment and goodbye. Do NOT ask any new question, do NOT teach anything more.";
+    this.session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true });
+  }
+
   /** Speaking Room: after a transport drop, resume the SAME session at the same stage. */
   sendSessionResume(lang: "th" | "en", stageId: string): void {
     if (!this.session || !this.connected) return;

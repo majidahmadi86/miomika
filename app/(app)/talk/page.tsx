@@ -735,6 +735,7 @@ export default function TalkPage() {
   const roomSlowRef = useRef(false);
   const [voiceExhausted, setVoiceExhausted] = useState(false);
   const [voiceWarn, setVoiceWarn] = useState(false);
+  const [roomTimeUp, setRoomTimeUp] = useState(false);
   const [roomEnding, setRoomEnding] = useState(false);
   const roomStartedAtRef = useRef<number | null>(null);
   useEffect(() => {
@@ -839,7 +840,13 @@ export default function TalkPage() {
       }
       if (elapsed >= ROOM_MAX_SECONDS) {
         window.clearInterval(id);
-        void endRoomSession(); // warm finalize → results
+        // End the LIVE voice (stops cost) but keep the learner in the room to read
+        // the transcript. They tap "See results" when ready — no harsh redirect.
+        try { clientRef.current?.sendRoomTimeUp?.(sessionUiLangRef.current); } catch { /* best-effort */ }
+        setRoomTimeUp(true);
+        window.setTimeout(() => {
+          try { clientRef.current?.disconnectIntentionally(); clientRef.current = null; } catch { /* best-effort */ }
+        }, 6000); // let her finish ONE short goodbye line, then cut the voice
       }
     }, 5000);
     return () => window.clearInterval(id);
@@ -1905,9 +1912,20 @@ export default function TalkPage() {
                 Confident Speaking · Private room
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                {voiceWarn && !voiceExhausted ? (
+                {voiceWarn && !voiceExhausted && !roomTimeUp ? (
                   <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "12px", color: "#9A8B73", textAlign: "center", padding: "4px 0" }}>
                     {uiLang === "en" ? "About a minute of voice left~ then we can keep going by text" : "เหลือเสียงอีกประมาณหนึ่งนาที~ จากนั้นเราคุยกันต่อด้วยข้อความได้นะ"}
+                  </div>
+                ) : null}
+                {roomTimeUp ? (
+                  <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: 12, color: "#1F7A68", textAlign: "center", padding: "6px 0", display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
+                    <span>{uiLang === "en" ? "That's our session~ take a moment to read back, then see your results." : "ครบเวลาแล้วน้า~ อ่านทบทวนได้เลย แล้วค่อยกดดูผลลัพธ์"}</span>
+                    <button onClick={() => void endRoomSession()} disabled={roomEnding} style={{
+                      fontFamily: "'Quicksand', sans-serif", fontSize: 12, fontWeight: 700, padding: "6px 16px",
+                      borderRadius: 99, border: "none", background: "linear-gradient(135deg,#6ECDB8,#34A98F)", color: "#FFFFFF", cursor: "pointer",
+                    }}>
+                      {roomEnding ? (uiLang === "en" ? "Saving…" : "กำลังบันทึก…") : (uiLang === "en" ? "See my results" : "ดูผลลัพธ์ของฉัน")}
+                    </button>
                   </div>
                 ) : null}
                 <button onClick={() => { void toggleRoomPace(); }} style={{
