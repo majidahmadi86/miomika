@@ -570,6 +570,16 @@ export class MiomiLiveClient {
     this.session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true });
   }
 
+  /** Speaking Room: every objective earned + exit reached. ONE warm closing line —
+   *  a specific compliment + goodbye. No new questions, no more teaching, no recap loop. */
+  sendLessonComplete(lang: "th" | "en"): void {
+    if (!this.session || !this.connected) return;
+    const text = lang === "th"
+      ? "[lesson_complete] ผู้เรียนทำครบทุกเป้าหมายแล้ว — พูดปิดท้ายอบอุ่นสั้นๆ หนึ่งครั้ง ชมสิ่งที่เขาทำได้จริงแล้วบอกลา ห้ามถามคำถามใหม่ ห้ามสอนเพิ่ม ห้ามชวนทำต่อ"
+      : "[lesson_complete] The learner earned every objective — give ONE short warm closing: a specific compliment on what they did, then goodbye. Do NOT ask a new question, do NOT teach more, do NOT invite another round.";
+    this.session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true });
+  }
+
   /** Speaking Room: the 10-min cap is reached. ONE short warm goodbye, then voice ends. */
   sendRoomTimeUp(lang: "th" | "en"): void {
     if (!this.session || !this.connected) return;

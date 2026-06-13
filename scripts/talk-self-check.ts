@@ -1755,6 +1755,16 @@ assert(
   "speaking room: /talk consumes handoff, relays the board, can end + save",
 );
 assert(
+  roomTalkSrc.includes("lastUserTranscriptRef") &&
+    roomTalkSrc.includes("VERIFIED-ATTEMPT GATE") &&
+    roomTalkSrc.includes("isRealAttempt") &&
+    roomTalkSrc.includes("lessonClosedRef") &&
+    roomTalkSrc.includes("sendLessonComplete") &&
+    sessionClientSrc.includes("sendLessonComplete") &&
+    sessionClientSrc.includes("[lesson_complete]"),
+  "speaking room: verified-attempt gate + system-driven lesson close",
+);
+assert(
   roomTalkSrc.includes("session: roomSessionRef.current?.plan"),
   "speaking room: connect passes the session plan when a room is active",
 );

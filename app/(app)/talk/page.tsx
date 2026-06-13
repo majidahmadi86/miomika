@@ -179,6 +179,9 @@ export default function TalkPage() {
   const currentTurnSeqRef = useRef(0);
   const pendingUserTextRef = useRef("");
   const userInputFinalizedRef = useRef(false);
+  // Verified-attempt: the last REAL thing the learner said, used to gate whether
+  // the brain's "objective earned" claim is honest. Updated on finalize.
+  const lastUserTranscriptRef = useRef("");
   const cardedPlanWordsRef = useRef<Set<string>>(new Set());
   const memberContextRef = useRef<MemberContextBundle | null>(null);
   const planWordCacheRef = useRef<Map<string, TeachWordResult>>(new Map());
@@ -641,6 +644,9 @@ export default function TalkPage() {
     if (userInputFinalizedRef.current) return "";
     userInputFinalizedRef.current = true;
     const finalUserText = commitUserTranscript();
+    if (finalUserText && finalUserText.trim().length > 0) {
+      lastUserTranscriptRef.current = finalUserText.trim();
+    }
     if (finalUserText) {
       void honorContentIntent(finalUserText);
       void honorExplicitLessonRequest(finalUserText);
@@ -821,6 +827,23 @@ export default function TalkPage() {
     window.location.href = `/learn?session=${room.sessionId}`;
   }, [roomEnding, roomObjectivesDone, roomNotes, roomLearned, roomStageId]);
 
+  // LESSON COMPLETE: once every objective is genuinely earned and the exit stage is
+  // reached, the SYSTEM closes — one warm goodbye, no more teaching or questions —
+  // so she can't ramble past the finish line. Fires once.
+  const lessonClosedRef = useRef(false);
+  useEffect(() => {
+    if (!roomSession || lessonClosedRef.current) return;
+    const total = roomSession.plan.objectives.length;
+    const allEarned = total > 0 && roomObjectivesDone.length >= total;
+    const atExit = roomStageId === "exit";
+    if (allEarned && atExit) {
+      lessonClosedRef.current = true;
+      try { clientRef.current?.sendLessonComplete?.(sessionUiLangRef.current); } catch { /* best-effort */ }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot lesson close when exit + all objectives earned
+      setRoomTimeUp(true); // surfaces the "See my results" button; she gives one goodbye
+    }
+  }, [roomSession, roomObjectivesDone, roomStageId]);
+
   // ROOM HARD-STOP: the room is a bounded 10-min unit. A ticking clock warns
   // once in voice at 8 min, then warmly auto-ends at 10 min — the session can
   // NEVER run indefinitely (the money-leak fix). Survives refresh via the
@@ -967,9 +990,23 @@ export default function TalkPage() {
         }
       } else if (args.event === "objective" && typeof args.objective_index === "number") {
         const idx = args.objective_index;
+        // VERIFIED-ATTEMPT GATE: the system — not the model — decides if this is
+        // real. Reject when the learner's last utterance was a bare acknowledgement
+        // or too short to be a genuine spoken attempt. Kills false-praise mechanically.
+        const said = lastUserTranscriptRef.current.toLowerCase().trim();
+        const ACK_ONLY = /^(ok(ay)?|yes|yeah|yep|sure|right|uh-?huh|hmm+|khrap|krub|ka|kha|ค่ะ|ครับ|ใช่|โอเค|haha|55+)[\s.!~]*$/i;
+        const wordCount = said ? said.split(/\s+/).filter(Boolean).length : 0;
+        const isRealAttempt = said.length >= 3 && !ACK_ONLY.test(said) && wordCount >= 1;
+        if (!isRealAttempt) {
+          // Not earned — the learner hasn't actually produced it yet. Stay silent;
+          // the brain's own contract will re-invite the real attempt.
+          return;
+        }
         setRoomObjectivesDone((prev) =>
           prev.includes(idx) || idx < 0 || idx > 2 ? prev : [...prev, idx],
         );
+        // Consume the transcript so the same utterance can't earn two objectives.
+        lastUserTranscriptRef.current = "";
         try { roomSfxSuccess(); } catch { /* sound is best-effort */ }
       } else if (args.event === "note" && typeof args.note === "string" && args.note.trim()) {
         const kind = args.note_kind === "grow" ? "grow" : "glow";
