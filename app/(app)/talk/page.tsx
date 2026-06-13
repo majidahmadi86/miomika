@@ -71,6 +71,7 @@ import {
   buildContentIntentNudge,
   detectLessonContentIntent,
 } from "@/lib/talk/lesson-intent";
+import { ROOM_MAX_SECONDS, ROOM_WARN_SECONDS } from "@/lib/live/voice-allowance";
 import { TurnRuntime, isReplaySuspended } from "@/lib/live/turn-runtime";
 import type { LiveUiPhase } from "@/lib/live/turn-controller";
 import { replayWordAudio } from "@/lib/talk/word-replay";
@@ -797,6 +798,32 @@ export default function TalkPage() {
     }
     window.location.href = `/learn?session=${room.sessionId}`;
   }, [roomEnding, roomObjectivesDone, roomNotes, roomLearned, roomStageId]);
+
+  // ROOM HARD-STOP: the room is a bounded 10-min unit. A ticking clock warns
+  // once in voice at 8 min, then warmly auto-ends at 10 min — the session can
+  // NEVER run indefinitely (the money-leak fix). Survives refresh via the
+  // persisted start stamp. Checks every 5s (cheap, no per-second churn).
+  useEffect(() => {
+    if (!roomSession) return;
+    const warnedRef = { current: false };
+    const id = window.setInterval(() => {
+      const startedAt = roomStartedAtRef.current;
+      if (!startedAt) return;
+      const elapsed = (Date.now() - startedAt) / 1000;
+      if (!warnedRef.current && elapsed >= ROOM_WARN_SECONDS && elapsed < ROOM_MAX_SECONDS) {
+        warnedRef.current = true;
+        // Ask Miomi to give a warm in-voice heads-up — once.
+        try { clientRef.current?.sendRoomWrapUp?.(sessionUiLangRef.current); } catch { /* best-effort */ }
+        setVoiceWarn(true);
+      }
+      if (elapsed >= ROOM_MAX_SECONDS) {
+        window.clearInterval(id);
+        void endRoomSession(); // warm finalize → results
+      }
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [roomSession, endRoomSession]);
+
   const handleLiveMessage = useCallback((msg: LiveClientMessage) => {
     const runtime = ensureTurnRuntime();
     const suspended = isReplaySuspended(runtime, mediaRef.current);

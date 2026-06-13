@@ -11,8 +11,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const VOICE_FREE_WEEKLY_SECONDS = 120; // 2 minutes / week (Mike's call)
+export const VOICE_FREE_WEEKLY_SECONDS = 180; // 3 minutes / week (Mike's call)
 export const VOICE_WARN_RATIO = 0.8;          // warn at 80% consumed
+// Speaking Room is a BOUNDED unit — the whole pricing model depends on it.
+export const ROOM_MAX_SECONDS = 600;   // 10 min hard cap
+export const ROOM_WARN_SECONDS = 480;  // warn (in voice) at 8 min
 
 // Pro allowances are stamped at the pricing session against verified rates.
 // Placeholder values here are NOT yet wired to any gate (M1 is foundation only).

@@ -1774,6 +1774,14 @@ assert(
   "metering: voice allowance policy + weekly ledger key exist",
 );
 assert(
+  voiceAllowanceSrc.includes("ROOM_MAX_SECONDS") &&
+    voiceAllowanceSrc.includes("ROOM_WARN_SECONDS") &&
+    sessionClientSrc.includes("sendRoomWrapUp") &&
+    roomTalkSrc.includes("ROOM HARD-STOP") &&
+    roomTalkSrc.includes("sendRoomWrapUp"),
+  "speaking room: 10-min hard-stop — voice wrap-up at 8min, warm auto-end at 10min",
+);
+assert(
   sessionClientSrc.includes("sendSessionResume") && roomTalkSrc.includes("sendSessionResume"),
   "speaking room: transport resume keeps the session brain + current stage",
 );

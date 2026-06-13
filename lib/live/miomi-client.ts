@@ -538,6 +538,16 @@ export class MiomiLiveClient {
     });
   }
 
+  /** Speaking Room: warm one-time heads-up that the 10-min session is nearly done.
+   *  Spoken naturally; she wraps the current point and moves toward the exit ticket. */
+  sendRoomWrapUp(lang: "th" | "en"): void {
+    if (!this.session || !this.connected) return;
+    const text = lang === "th"
+      ? "[room_wrapup] เหลือเวลาอีกประมาณสองนาทีในห้องนี้ — ค่อยๆ พาผู้เรียนไปปิดท้าย: สรุปสั้นๆ อบอุ่น ทำ exit ticket แล้วบอกลาอย่างอบอุ่น ห้ามเริ่มหัวข้อใหม่"
+      : "[room_wrapup] About two minutes left in this room — gently guide toward closing now: a short warm recap, do the exit ticket, then a warm goodbye. Do NOT start anything new.";
+    this.session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true });
+  }
+
   /** Speaking Room: after a transport drop, resume the SAME session at the same stage. */
   sendSessionResume(lang: "th" | "en", stageId: string): void {
     if (!this.session || !this.connected) return;
