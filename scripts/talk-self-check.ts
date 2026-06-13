@@ -1678,8 +1678,8 @@ assert(
   "sentence rule applies on the first ask, not after correction",
 );
 assert(
-  buildSystemInstruction("en", "th").includes("card accuracy") &&
-    buildTeachingModeContract("en", "th").includes("CARD GUARANTEE"),
+  buildSystemInstruction("en", "th").includes("isn't actually on their screen") &&
+    buildTeachingModeContract("th", "en").includes("ยังไม่ขึ้นบนหน้าจอจริง"),
   "persona forbids narrating phantom or invented card content",
 );
 assert(
