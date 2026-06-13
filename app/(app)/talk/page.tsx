@@ -995,11 +995,11 @@ export default function TalkPage() {
         // or too short to be a genuine spoken attempt. Kills false-praise mechanically.
         const said = lastUserTranscriptRef.current.toLowerCase().trim();
         const ACK_ONLY = /^(ok(ay)?|yes|yeah|yep|sure|right|uh-?huh|hmm+|khrap|krub|ka|kha|ค่ะ|ครับ|ใช่|โอเค|haha|55+)[\s.!~]*$/i;
-        const wordCount = said ? said.split(/\s+/).filter(Boolean).length : 0;
-        const isRealAttempt = said.length >= 3 && !ACK_ONLY.test(said) && wordCount >= 1;
-        if (!isRealAttempt) {
-          // Not earned — the learner hasn't actually produced it yet. Stay silent;
-          // the brain's own contract will re-invite the real attempt.
+        // Block ONLY the unambiguous ack-only case (clear even through bad transcription).
+        // For anything else — including empty/garbled transcripts — trust the brain's
+        // audio-based earn, since the recognizer text is unreliable but the audio wasn't.
+        if (said.length > 0 && ACK_ONLY.test(said)) {
+          // Pure acknowledgement, no real attempt — re-invite, don't mark earned.
           return;
         }
         setRoomObjectivesDone((prev) =>

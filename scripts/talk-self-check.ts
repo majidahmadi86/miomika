@@ -1757,7 +1757,8 @@ assert(
 assert(
   roomTalkSrc.includes("lastUserTranscriptRef") &&
     roomTalkSrc.includes("VERIFIED-ATTEMPT GATE") &&
-    roomTalkSrc.includes("isRealAttempt") &&
+    roomTalkSrc.includes("ACK_ONLY") &&
+    roomTalkSrc.includes("trust the brain's") &&
     roomTalkSrc.includes("lessonClosedRef") &&
     roomTalkSrc.includes("sendLessonComplete") &&
     sessionClientSrc.includes("sendLessonComplete") &&
