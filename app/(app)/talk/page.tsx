@@ -1125,28 +1125,18 @@ export default function TalkPage() {
       config.teach.level,
     ],
   );
-  // Speaking Room: pace is baked into the session brain — the toggle does a
-  // seamless reconnect (same plan, same stage) at the new speed. The silent
-  // context-injection approach did not hold.
-  const toggleRoomPace = useCallback(async () => {
+  // Speaking Room: pace nudge on the live session — no reconnect.
+  const toggleRoomPace = useCallback(() => {
     if (!roomSessionRef.current?.plan) return;
-    if (!clientRef.current || reconnectInFlightRef.current) return;
-    const runtime = turnRuntimeRef.current;
-    const wasListening = runtime?.state.phase === "listening";
+    if (!clientRef.current) return;
     const next = !roomSlowRef.current;
     roomSlowRef.current = next;
     setRoomSlow(next);
-    // Pace change wants the NEW contract, not a resumed old one. Clear the
-    // resume handle FIRST so the reconnect builds a fresh server session that
-    // actually honors the new pace (resumption would keep the old contract).
-    clientRef.current.clearResumeHandle();
-    const snapshot = clientRef.current.getSessionSnapshot(); // handle now null
-    mediaRef.current?.stopAudioPlayback();
-    clientRef.current.disconnectIntentionally();
-    clientRef.current = null;
-    liveClientEpochRef.current = null;
-    await resumeLiveSession(snapshot, wasListening ?? false);
-  }, [resumeLiveSession]);
+    // Change pace IN PLACE on the live session — no reconnect, so she never
+    // restarts or re-greets. (Live can't change waveform speed; this asks for
+    // slower delivery. Precise slow pronunciation lives in the banked buttons.)
+    try { clientRef.current.sendPaceChange(sessionUiLangRef.current, next); } catch { /* best-effort */ }
+  }, []);
 
   /** Mid-session mode flick: snapshot → soft reconnect with the new brain. */
   const pendingModeSwitchRef = useRef<TalkConfig["mode"] | null>(null);

@@ -555,6 +555,21 @@ export class MiomiLiveClient {
     this.session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true });
   }
 
+  /** Speaking Room: change delivery pace on the LIVE session in place — no reconnect.
+   *  Live cannot change audio waveform speed, so this asks for slower DELIVERY:
+   *  shorter chunks, clearer enunciation, small pauses between phrases. */
+  sendPaceChange(lang: "th" | "en", slow: boolean): void {
+    if (!this.session || !this.connected) return;
+    const text = slow
+      ? (lang === "th"
+          ? "[pace_slow] ผู้เรียนกดช้า — พูดช้าลงและชัดขึ้น ประโยคสั้นๆ เว้นจังหวะเล็กน้อยระหว่างวลี ออกเสียงทีละพยางค์ชัดเจน ไปต่อจากตรงที่ค้างไว้ ห้ามทักทายใหม่ ห้ามเริ่มใหม่"
+          : "[pace_slow] The learner tapped SLOW — speak more slowly and clearly from now on: shorter chunks, crisp enunciation, a small pause between phrases, syllables clear. Continue from where you are — do NOT greet or restart.")
+      : (lang === "th"
+          ? "[pace_normal] ผู้เรียนกดปกติ — กลับมาพูดด้วยจังหวะธรรมชาติ ไปต่อจากตรงที่ค้างไว้ ห้ามทักทายใหม่"
+          : "[pace_normal] The learner tapped NORMAL — return to a natural pace. Continue from where you are — do NOT greet or restart.");
+    this.session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true });
+  }
+
   /** Speaking Room: the 10-min cap is reached. ONE short warm goodbye, then voice ends. */
   sendRoomTimeUp(lang: "th" | "en"): void {
     if (!this.session || !this.connected) return;
