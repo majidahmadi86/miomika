@@ -827,6 +827,17 @@ export default function TalkPage() {
       }
       return;
     }
+    if (msg.type === "go_away") {
+      if (!clientRef.current || reconnectInFlightRef.current) return;
+      const wasListening = runtime.state.phase === "listening";
+      const snapshot = clientRef.current.getSessionSnapshot();
+      logEvent({ kind: "state", level: "info", message: "live go_away — proactive resume" });
+      clientRef.current.disconnectIntentionally();
+      clientRef.current = null;
+      liveClientEpochRef.current = null;
+      void resumeLiveSessionRef.current(snapshot, wasListening);
+      return;
+    }
     if (msg.type === "audio") {
       if (suspended) return;
       logEvent({

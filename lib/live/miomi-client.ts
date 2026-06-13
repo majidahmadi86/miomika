@@ -38,6 +38,7 @@ export type LiveClientMessage =
   | { type: "user"; text: string; finished?: boolean }
   | { type: "gemini"; text: string }
   | { type: "turn_complete" }
+  | { type: "go_away" }
   | { type: "tool_call"; name: string; args: Record<string, unknown>; result: unknown };
 
 export type LiveClientCloseDetail = {
@@ -86,6 +87,7 @@ export type TeachWordContext = {
 export type LiveSessionSnapshot = {
   teachWord: TeachWordContext;
   reviewServed: string[];
+  resumeHandle?: string | null;
 };
 
 export class MiomiLiveClient {
@@ -105,6 +107,9 @@ export class MiomiLiveClient {
   };
   private memberContext: MemberContextBundle | null = null;
   private voiceBudget: { usedSeconds: number; budgetSeconds: number } | null = null;
+  // Gemini session-resumption handle — lets a reconnect resume the SAME server
+  // session (no context re-billing, no lost state). Valid 2h after termination.
+  private resumeHandle: string | null = null;
 
   constructor(private callbacks: LiveClientCallbacks) {
     this.epochId = createLiveClientEpoch();
@@ -147,12 +152,14 @@ export class MiomiLiveClient {
 
   getSessionSnapshot(): LiveSessionSnapshot {
     return {
+      resumeHandle: this.resumeHandle,
       teachWord: { ...this.teachWordContext, sessionIntroduced: [...this.teachWordContext.sessionIntroduced] },
       reviewServed: [...this.sessionReviewServed],
     };
   }
 
   restoreSessionSnapshot(snapshot: LiveSessionSnapshot): void {
+    if (snapshot.resumeHandle) this.resumeHandle = snapshot.resumeHandle;
     this.teachWordContext = {
       ...snapshot.teachWord,
       sessionIntroduced: [...snapshot.teachWord.sessionIntroduced],
@@ -234,11 +241,20 @@ export class MiomiLiveClient {
 
     const boundEpoch = this.epochId;
 
+    const baseConfig = opts.session
+      ? buildSessionLiveConfig(voice, uiLanguage, targetLanguage, level, opts.session, this.memberContext)
+      : buildLiveConfig(voice, uiLanguage, targetLanguage, this.memberContext, mode, level);
     this.session = (await ai.live.connect({
       model: LIVE_MODEL,
-      config: opts.session
-        ? buildSessionLiveConfig(voice, uiLanguage, targetLanguage, level, opts.session, this.memberContext)
-        : buildLiveConfig(voice, uiLanguage, targetLanguage, this.memberContext, mode, level),
+      config: {
+        ...baseConfig,
+        // Resume the same server session across WebSocket resets (~10 min) instead
+        // of re-billing the full system instruction on every reconnect.
+        sessionResumption: this.resumeHandle ? { handle: this.resumeHandle } : {},
+        // Sliding-window compression: keeps the session under the 15-min audio cap
+        // and stops context (and cost) growing unbounded on long sessions.
+        contextWindowCompression: { slidingWindow: {} },
+      },
       callbacks: {
         onopen: () => {
           this.connected = true;
@@ -287,6 +303,15 @@ export class MiomiLiveClient {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Live SDK message shape is loosely typed
   private async handleMessage(message: any): Promise<void> {
+    // Store the rolling resumption handle — used to resume on the next connect.
+    if (message.sessionResumptionUpdate?.resumable && message.sessionResumptionUpdate?.newHandle) {
+      this.resumeHandle = message.sessionResumptionUpdate.newHandle as string;
+    }
+    // GoAway: server will close this connection soon. Surface it so the page can
+    // resume seamlessly BEFORE the cut, not after a dead-air gap.
+    if (message.goAway) {
+      this.callbacks.onMessage?.({ type: "go_away" });
+    }
     const sc = message.serverContent;
 
     if (sc?.interrupted) {
