@@ -1097,7 +1097,11 @@ export default function TalkPage() {
     const next = !roomSlowRef.current;
     roomSlowRef.current = next;
     setRoomSlow(next);
-    const snapshot = clientRef.current.getSessionSnapshot();
+    // Pace change wants the NEW contract, not a resumed old one. Clear the
+    // resume handle FIRST so the reconnect builds a fresh server session that
+    // actually honors the new pace (resumption would keep the old contract).
+    clientRef.current.clearResumeHandle();
+    const snapshot = clientRef.current.getSessionSnapshot(); // handle now null
     mediaRef.current?.stopAudioPlayback();
     clientRef.current.disconnectIntentionally();
     clientRef.current = null;

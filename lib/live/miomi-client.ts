@@ -150,6 +150,13 @@ export class MiomiLiveClient {
     }
   }
 
+  /** Drop the stored resume handle so the NEXT connect starts a fresh server
+   *  session that honors the rebuilt contract (e.g. a new pace setting). Used by
+   *  the pace toggle, which deliberately wants the new contract, not a resume. */
+  clearResumeHandle(): void {
+    this.resumeHandle = null;
+  }
+
   getSessionSnapshot(): LiveSessionSnapshot {
     return {
       resumeHandle: this.resumeHandle,
