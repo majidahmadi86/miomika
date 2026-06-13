@@ -852,14 +852,11 @@ export default function TalkPage() {
         const scrubbed = geminiText
           .replace(/call:?\s*report_?stage\s*\{[^}]*\}?/gi, "")
           .replace(/report_?stage/gi, "")
-          // curly tool shapes: {event:hint,note:...} {event:objective,objective_index:0} {stage_id:...}
           .replace(/\{\s*(?:event|stage_id|objective_index|note_kind|note)\b[^}]*\}?/gi, "")
           .replace(/\(\s*["']?\s*(?:stage|event|objective|note|hint)\b[^)]{0,40}\)/gi, "")
-          // bare spoken fragments: "stage phrases call", "call stage", "report progress"
-          .replace(/\b(?:call\s+)?(?:report\s+)?stage(?:\s+phrases)?(?:\s+call)?\b\s*:?/gi, (m) => (/\bphrases\b|\bcall\b|\breport\b/i.test(m) ? "" : m))
-          .replace(/\bhint:\s*(—\s*)?/gi, "")
-          .replace(/\s{2,}/g, " ")
-          .trim();
+          .replace(/\bhint:\s*(—\s*)?/gi, "");
+        // NOTE: deliberately NO whitespace-collapsing here — streamed fragments
+        // concatenate, and \s{2,}->" " was eating the single spaces between words.
         if (scrubbed !== geminiText) {
           geminiText = scrubbed;
           if (!geminiText.trim()) return;
