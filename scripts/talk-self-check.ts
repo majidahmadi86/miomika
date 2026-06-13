@@ -1768,6 +1768,11 @@ assert(
   sessionLiveConfigSrc.includes("paceSlow") && roomTalkSrc.includes("toggleRoomPace"),
   "speaking room: learner pace baked into the session brain (reconnect on toggle)",
 );
+const voiceAllowanceSrc = readFileSync(join(ROOT, "lib/live/voice-allowance.ts"), "utf8");
+assert(
+  voiceAllowanceSrc.includes("VOICE_FREE_WEEKLY_SECONDS") && voiceAllowanceSrc.includes("isoWeekStart"),
+  "metering: voice allowance policy + weekly ledger key exist",
+);
 assert(
   sessionClientSrc.includes("sendSessionResume") && roomTalkSrc.includes("sendSessionResume"),
   "speaking room: transport resume keeps the session brain + current stage",
