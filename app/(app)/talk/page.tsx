@@ -756,9 +756,20 @@ export default function TalkPage() {
     const room = roomSessionRef.current;
     if (!room || roomEnding) return;
     setRoomEnding(true);
-    const minutes = roomStartedAtRef.current
-      ? Math.max(1, Math.round((Date.now() - roomStartedAtRef.current) / 60000))
-      : 0;
+    const elapsedMs = roomStartedAtRef.current ? Date.now() - roomStartedAtRef.current : 0;
+    const minutes = elapsedMs ? Math.max(1, Math.round(elapsedMs / 60000)) : 0;
+    // Account the live-voice seconds to the metering ledger (server-side,
+    // refresh-proof). Best-effort — never block the results flow.
+    if (elapsedMs > 0) {
+      try {
+        void fetch("/api/voice-usage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seconds: Math.round(elapsedMs / 1000) }),
+          keepalive: true,
+        });
+      } catch { /* best-effort */ }
+    }
     try {
       await fetch("/api/speaking/session", {
         method: "PATCH",

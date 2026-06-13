@@ -3,6 +3,8 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
+import { createServiceClient } from "@/lib/supabase/service";
+import { hasVoiceBudget } from "@/lib/live/voice-allowance";
 import { assembleMemberContext } from "@/lib/live/member-context";
 import { LIVE_MODEL } from "@/lib/live/live-config";
 import { liveTokenDurations } from "@/lib/live/token-policy";
@@ -35,6 +37,28 @@ export async function GET() {
     return NextResponse.json({ error: "Live voice unavailable" }, { status: 503 });
   }
 
+  // METERING GATE: a member out of live-voice budget gets no token. Guests are
+  // gated by exchange-count elsewhere, not minutes, so they skip this.
+  if (profile) {
+    try {
+      const supabase = await createServiceClient();
+      const { ok, usedSeconds, budgetSeconds } = await hasVoiceBudget(supabase, profile.id, profile.tier);
+      if (!ok) {
+        log("live-token", "voice budget exhausted", { userId: profile.id, tier: profile.tier, usedSeconds, budgetSeconds });
+        return NextResponse.json(
+          { error: "voice_exhausted", reason: "voice_exhausted", usedSeconds, budgetSeconds },
+          { status: 200 },
+        );
+      }
+    } catch (err) {
+      // Read error: fail CLOSED for free, OPEN for paid (don't strand a payer).
+      if (profile.tier !== "pro" && profile.tier !== "pro_max") {
+        logError("live-token", "budget check failed — free user blocked", err);
+        return NextResponse.json({ error: "voice_check_failed", reason: "voice_exhausted" }, { status: 200 });
+      }
+      logError("live-token", "budget check failed — paid user allowed through", err);
+    }
+  }
   const { sessionMinutes, expireMinutes } = liveTokenDurations(isGuest);
   const expireTime = new Date(Date.now() + expireMinutes * 60 * 1000).toISOString();
   const newSessionExpireTime = new Date(
