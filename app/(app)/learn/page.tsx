@@ -930,7 +930,7 @@ export default function LearnPage() {
                 Enter your room
               </button>
               <p style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 }}>
-                A full guided session — warm-up to exit ticket, ~15 minutes. Uses your speaking minutes.
+                A full guided session — warm-up to exit ticket, ~10 minutes. Uses your speaking minutes.
               </p>
             </>
           ) : activeScene && activeCourse && activeScenario ? (
@@ -981,7 +981,7 @@ export default function LearnPage() {
                 {roomStarting ? "Preparing your room…" : "Enter your room"}
               </button>
               <p style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 }}>
-                A full guided session — warm-up to exit ticket, ~15 minutes. Uses your speaking minutes.
+                A full guided session — warm-up to exit ticket, ~10 minutes. Uses your speaking minutes.
               </p>
               {speakMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "8px 0 0", textAlign: "center" }}>{speakMsg}</p> : null}
             </>
