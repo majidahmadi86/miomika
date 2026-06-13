@@ -261,7 +261,7 @@ export async function buildExtraPhrases(args: {
   exclude: string[];
   count?: number;
 }): Promise<LessonPhraseItem[]> {
-  const n = Math.min(Math.max(args.count ?? 2, 1), 3);
+  const n = Math.min(Math.max(args.count ?? 2, 1), 5);
   const level = args.cefrLevel.trim() || "A1";
   const targetName = args.learningTarget === "en" ? "English" : "Thai";
   const avoid = args.exclude.slice(0, 30).join(" | ");

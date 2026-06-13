@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
         });
         phrases = [...phrases, ...more].slice(0, 5);
       }
-      if (phrases.length < 3) {
+      if (phrases.length < 4) {
         return NextResponse.json({ ok: false, reason: "content_incomplete" }, { status: 200 });
       }
       plan = { ...generated.plan, phrases };
