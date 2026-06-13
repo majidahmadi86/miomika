@@ -720,6 +720,15 @@ export default function TalkPage() {
   const [roomObjectivesDone, setRoomObjectivesDone] = useState<number[]>([]);
   const [roomNotes, setRoomNotes] = useState<Array<{ kind: "glow" | "grow"; note: string }>>([]);
   const [roomLearned, setRoomLearned] = useState<string[]>([]);
+  // Persist bookkeeping across refresh — a reload must not wipe earned progress.
+  useEffect(() => {
+    if (!roomSession) return;
+    try {
+      window.sessionStorage.setItem("miomika.room_progress", JSON.stringify({
+        stageId: roomStageId, objectives: roomObjectivesDone, notes: roomNotes, learned: roomLearned,
+      }));
+    } catch { /* best-effort */ }
+  }, [roomSession, roomStageId, roomObjectivesDone, roomNotes, roomLearned]);
   const [roomHintsOpen, setRoomHintsOpen] = useState(false);
   const [roomBoardOpen, setRoomBoardOpen] = useState(false);
   const [roomSlow, setRoomSlow] = useState(false);
@@ -751,6 +760,17 @@ export default function TalkPage() {
       const startSlow = handoff.level === "A1" || handoff.level === "A2";
       setRoomSlow(startSlow);
       roomSlowRef.current = startSlow;
+      // Restore bookkeeping if this is a refresh mid-session.
+      try {
+        const savedProg = window.sessionStorage.getItem("miomika.room_progress");
+        if (savedProg) {
+          const p = JSON.parse(savedProg) as { stageId?: string; objectives?: number[]; notes?: Array<{ kind: "glow" | "grow"; note: string }>; learned?: string[] };
+          if (p.stageId) { setRoomStageId(p.stageId); roomStageIdRef.current = p.stageId; }
+          if (Array.isArray(p.objectives)) setRoomObjectivesDone(p.objectives);
+          if (Array.isArray(p.notes)) setRoomNotes(p.notes);
+          if (Array.isArray(p.learned)) setRoomLearned(p.learned);
+        }
+      } catch { /* best-effort */ }
     } catch {
       /* no room — normal talk */
     }
@@ -793,6 +813,7 @@ export default function TalkPage() {
     try {
       window.sessionStorage.removeItem("miomika.room_session");
       window.sessionStorage.removeItem("miomika.room_started_at");
+      window.sessionStorage.removeItem("miomika.room_progress");
     } catch {
       /* ignore */
     }
@@ -949,7 +970,18 @@ export default function TalkPage() {
         setRoomNotes((prev) => (prev.length >= 6 ? prev : [...prev, { kind, note }]));
       } else if (args.event === "hint" && typeof args.note === "string" && args.note.trim()) {
         const hint = args.note.trim();
-        setRoomLearned((prev) => (prev.includes(hint) || prev.length >= 12 ? prev : [...prev, hint]));
+        // Only accept a "learned" item that corresponds to a REAL plan phrase —
+        // the brain must not invent learned items that were never in the lesson.
+        const phrases = roomSessionRef.current?.plan.phrases ?? [];
+        const isReal = phrases.some((p) => {
+          const en = (p.en ?? "").toLowerCase();
+          const th = (p.th ?? "").toLowerCase();
+          const h = hint.toLowerCase();
+          return (en && (h.includes(en) || en.includes(h))) || (th && (h.includes(th) || th.includes(h)));
+        });
+        if (isReal) {
+          setRoomLearned((prev) => (prev.includes(hint) || prev.length >= 12 ? prev : [...prev, hint]));
+        }
       }
       return;
     }
