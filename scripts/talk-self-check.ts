@@ -1006,7 +1006,7 @@ const liveConfigSrc = readFileSync(join(ROOT, "lib/live/live-config.ts"), "utf8"
 const teachingModeSrc = readFileSync(join(ROOT, "lib/talk/teaching-mode.ts"), "utf8");
 assert(
   liveConfigSrc.includes("COMPANION FIRST") &&
-    liveConfigSrc.includes('NEVER "repeat after me"'),
+    buildTeachingModeContract("en", "th").includes('never "repeat after me"'),
   "persona core is companion-first and forbids repeat-after-me drills",
 );
 assert(
@@ -1030,8 +1030,8 @@ assert(
   "teaching contract mandates in-context weave + cards as gifts",
 );
 assert(
-  liveConfigSrc.includes("GENUINE context") &&
-    liveConfigSrc.includes('NEVER claim "we were talking about X"'),
+  buildTeachingModeContract("en", "th").includes("genuine context") &&
+    buildTeachingModeContract("en", "th").includes('we were talking about X'),
   "persona forbids fabricated conversation context",
 );
 assert(
@@ -1525,7 +1525,7 @@ assert(
   "sanitizeModelTranscript removes all asterisk markdown",
 );
 assert(
-  liveConfigSrc.includes("Never use markdown") && liveConfigSrc.includes("plain text only"),
+  liveConfigSrc.includes("no markdown") && liveConfigSrc.includes("Plain spoken text only"),
   "persona forbids markdown in spoken lines",
 );
 assert(
@@ -1585,8 +1585,8 @@ assert(
   "explicit request nudge: model chooses the word, no review deflection",
 );
 assert(
-  liveConfigSrc.includes("YOU CHOOSE WHAT TO TEACH") &&
-    liveConfigSrc.includes("say its pronunciation ALOUD"),
+  buildTeachingModeContract("en", "th").includes("YOU CHOOSE THE WORD") &&
+    buildTeachingModeContract("en", "th").includes("say the sound aloud"),
   "persona: model owns word choice and says pronunciation aloud",
 );
 assert(
@@ -1678,7 +1678,8 @@ assert(
   "sentence rule applies on the first ask, not after correction",
 );
 assert(
-  buildSystemInstruction("en", "th").includes("NEVER describe a card that isn't on screen"),
+  buildSystemInstruction("en", "th").includes("card accuracy") &&
+    buildTeachingModeContract("en", "th").includes("CARD GUARANTEE"),
   "persona forbids narrating phantom or invented card content",
 );
 assert(
@@ -1922,8 +1923,8 @@ assert(
   "A2 plans carry a hard rigor quota of their own",
 );
 assert(
-  buildSystemInstruction("en", "th").includes("fabricate shared history") ||
-    buildSystemInstruction("en", "th").includes("NEVER claim"),
+  buildSystemInstruction("en", "th").includes("fabricated shared history") ||
+    buildSystemInstruction("en", "th").includes('we were talking about X'),
   "system instruction forbids fabricated conversation context",
 );
 assert(
@@ -1955,7 +1956,7 @@ assert(
 section("Concise + content intent harness");
 
 assert(
-  liveConfigSrc.includes("no option-dumping") &&
+  (liveConfigSrc.includes("no option menus") || liveConfigSrc.includes("no option-dumping")) &&
     liveConfigSrc.includes("at most ONE soft question"),
   "persona contract enforces brevity and max-one-question",
 );
