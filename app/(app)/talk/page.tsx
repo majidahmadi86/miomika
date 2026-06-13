@@ -723,6 +723,8 @@ export default function TalkPage() {
   const [roomBoardOpen, setRoomBoardOpen] = useState(false);
   const [roomSlow, setRoomSlow] = useState(false);
   const roomSlowRef = useRef(false);
+  const [voiceExhausted, setVoiceExhausted] = useState(false);
+  const [voiceWarn, setVoiceWarn] = useState(false);
   const [roomEnding, setRoomEnding] = useState(false);
   const roomStartedAtRef = useRef<number | null>(null);
   useEffect(() => {
@@ -1260,6 +1262,12 @@ export default function TalkPage() {
           : undefined,
       });
       memberContextRef.current = clientRef.current!.getMemberContext();
+      {
+        const vb = clientRef.current!.getVoiceBudget();
+        if (vb && vb.budgetSeconds > 0 && vb.usedSeconds / vb.budgetSeconds >= 0.8) {
+          setVoiceWarn(true);
+        }
+      }
       syncTeachWordContext();
       lessonHadStartedRef.current = true;
       const isRoom = !!roomSessionRef.current?.plan;
@@ -1275,6 +1283,11 @@ export default function TalkPage() {
         clientRef.current!.sendSessionKickoff(sessionUiLangRef.current);
       }
     } catch (err) {
+      if ((err as Error & { code?: string })?.code === "voice_exhausted"
+          || (err as Error)?.message === "voice_exhausted") {
+        setVoiceExhausted(true);
+        return;
+      }
       logEvent({
         kind: "state",
         level: "error",
@@ -1818,6 +1831,11 @@ export default function TalkPage() {
                 Confident Speaking · Private room
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                {voiceWarn && !voiceExhausted ? (
+                  <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "12px", color: "#9A8B73", textAlign: "center", padding: "4px 0" }}>
+                    {uiLang === "en" ? "About a minute of voice left~ then we can keep going by text" : "เหลือเสียงอีกประมาณหนึ่งนาที~ จากนั้นเราคุยกันต่อด้วยข้อความได้นะ"}
+                  </div>
+                ) : null}
                 <button onClick={() => { void toggleRoomPace(); }} style={{
                   fontFamily: "'Quicksand', sans-serif", fontSize: 10, fontWeight: 700, padding: "4px 11px",
                   borderRadius: 99, border: "1px solid rgba(255,255,255,.45)", background: roomSlow ? "#FFFFFF" : "rgba(255,255,255,.14)", color: roomSlow ? "#1F7A68" : "#FFFFFF", cursor: "pointer",
@@ -2037,6 +2055,13 @@ export default function TalkPage() {
         ) : null}
       </div>
       <div style={{ flexShrink: 0, padding: "4px 12px 8px", background: "transparent" }}>
+        {voiceExhausted ? (
+          <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "12px", color: "#9A8B73", textAlign: "center", padding: "0 4px 8px", lineHeight: 1.45 }}>
+            {uiLang === "en"
+              ? "Voice time for today is all used up~ type here and I'll still be with you"
+              : "เวลาเสียงวันนี้หมดแล้วนะ~ พิมพ์ตรงนี้ได้เลย หนูยังอยู่กับคุณค่ะ"}
+          </div>
+        ) : null}
         <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#FFFFFF", border: "0.5px solid #EDE8E0", borderRadius: "26px", padding: "5px 5px 5px 16px", boxShadow: "0 2px 10px rgba(26,26,24,0.04)" }}>
           <input
             type="text"

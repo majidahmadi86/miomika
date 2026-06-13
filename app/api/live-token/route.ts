@@ -39,10 +39,12 @@ export async function GET() {
 
   // METERING GATE: a member out of live-voice budget gets no token. Guests are
   // gated by exchange-count elsewhere, not minutes, so they skip this.
+  let voiceBudgetInfo: { usedSeconds: number; budgetSeconds: number } | null = null;
   if (profile) {
     try {
       const supabase = await createServiceClient();
       const { ok, usedSeconds, budgetSeconds } = await hasVoiceBudget(supabase, profile.id, profile.tier);
+      voiceBudgetInfo = { usedSeconds, budgetSeconds };
       if (!ok) {
         log("live-token", "voice budget exhausted", { userId: profile.id, tier: profile.tier, usedSeconds, budgetSeconds });
         return NextResponse.json(
@@ -98,6 +100,7 @@ export async function GET() {
       model: LIVE_MODEL,
       guest: isGuest,
       memberContext,
+      voiceBudget: voiceBudgetInfo, // { usedSeconds, budgetSeconds } | null for guests
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

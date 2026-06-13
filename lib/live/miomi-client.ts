@@ -104,6 +104,7 @@ export class MiomiLiveClient {
     excludeTopics: [],
   };
   private memberContext: MemberContextBundle | null = null;
+  private voiceBudget: { usedSeconds: number; budgetSeconds: number } | null = null;
 
   constructor(private callbacks: LiveClientCallbacks) {
     this.epochId = createLiveClientEpoch();
@@ -111,6 +112,9 @@ export class MiomiLiveClient {
 
   getMemberContext(): MemberContextBundle | null {
     return this.memberContext;
+  }
+  getVoiceBudget(): { usedSeconds: number; budgetSeconds: number } | null {
+    return this.voiceBudget;
   }
 
   setTeachWordContext(
@@ -203,9 +207,17 @@ export class MiomiLiveClient {
     const tokenPayload = (await tokenRes.json()) as {
       token?: string;
       memberContext?: MemberContextBundle | null;
+      reason?: string;
+      voiceBudget?: { usedSeconds: number; budgetSeconds: number } | null;
     };
     const { token, memberContext } = tokenPayload;
     this.memberContext = memberContext ?? null;
+    this.voiceBudget = tokenPayload.voiceBudget ?? null;
+    if (tokenPayload.reason === "voice_exhausted") {
+      const e = new Error("voice_exhausted");
+      (e as Error & { code?: string }).code = "voice_exhausted";
+      throw e;
+    }
     if (!token) throw new Error("No ephemeral token in /api/live-token response");
 
     const ai = new GoogleGenAI({
