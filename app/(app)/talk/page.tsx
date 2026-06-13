@@ -736,7 +736,15 @@ export default function TalkPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot room handoff read on mount, matching the app's fetch-on-mount pattern
       setRoomSession(handoff);
       roomSessionRef.current = handoff;
-      roomStartedAtRef.current = Date.now();
+      // Preserve the original start across refreshes — a reload must not reset
+      // the clock (full minute-enforcement lands with metering at /api/live-token).
+      let startedAt = Date.now();
+      try {
+        const saved = window.sessionStorage.getItem("miomika.room_started_at");
+        if (saved && Number(saved) > 0) startedAt = Number(saved);
+        else window.sessionStorage.setItem("miomika.room_started_at", String(startedAt));
+      } catch { /* best-effort */ }
+      roomStartedAtRef.current = startedAt;
       const startSlow = handoff.level === "A1" || handoff.level === "A2";
       setRoomSlow(startSlow);
       roomSlowRef.current = startSlow;
@@ -770,6 +778,7 @@ export default function TalkPage() {
     }
     try {
       window.sessionStorage.removeItem("miomika.room_session");
+      window.sessionStorage.removeItem("miomika.room_started_at");
     } catch {
       /* ignore */
     }
@@ -843,8 +852,14 @@ export default function TalkPage() {
         const scrubbed = geminiText
           .replace(/call:?\s*report_?stage\s*\{[^}]*\}?/gi, "")
           .replace(/report_?stage/gi, "")
+          // curly tool shapes: {event:hint,note:...} {event:objective,objective_index:0} {stage_id:...}
+          .replace(/\{\s*(?:event|stage_id|objective_index|note_kind|note)\b[^}]*\}?/gi, "")
           .replace(/\(\s*["']?\s*(?:stage|event|objective|note|hint)\b[^)]{0,40}\)/gi, "")
-          .replace(/\bhint:\s*(—\s*)?/gi, "");
+          // bare spoken fragments: "stage phrases call", "call stage", "report progress"
+          .replace(/\b(?:call\s+)?(?:report\s+)?stage(?:\s+phrases)?(?:\s+call)?\b\s*:?/gi, (m) => (/\bphrases\b|\bcall\b|\breport\b/i.test(m) ? "" : m))
+          .replace(/\bhint:\s*(—\s*)?/gi, "")
+          .replace(/\s{2,}/g, " ")
+          .trim();
         if (scrubbed !== geminiText) {
           geminiText = scrubbed;
           if (!geminiText.trim()) return;
