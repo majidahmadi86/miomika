@@ -471,8 +471,8 @@ export default function LearnPage() {
     }
   }, [scenarioBuilding, viewLevel, refresh]);
 
-  // Write the handoff and walk into the Room.
-  const walkIn = useCallback((handoff: RoomHandoff): boolean => {
+  const [roomIntro, setRoomIntro] = useState<RoomHandoff | null>(null);
+  const doWalkIn = useCallback((handoff: RoomHandoff): boolean => {
     try {
       window.sessionStorage.setItem("miomika.room_session", JSON.stringify(handoff));
     } catch {
@@ -482,6 +482,18 @@ export default function LearnPage() {
     window.location.href = "/talk?room=1";
     return true;
   }, []);
+  const walkIn = useCallback((handoff: RoomHandoff): boolean => {
+    let seen = false;
+    try { seen = window.localStorage.getItem("miomika-room-intro-v1") === "1"; } catch { /* ignore */ }
+    if (!seen) { setRoomIntro(handoff); return true; }
+    return doWalkIn(handoff);
+  }, [doWalkIn]);
+  const acceptRoomIntro = useCallback(() => {
+    try { window.localStorage.setItem("miomika-room-intro-v1", "1"); } catch { /* ignore */ }
+    const h = roomIntro;
+    setRoomIntro(null);
+    if (h) doWalkIn(h);
+  }, [roomIntro, doWalkIn]);
 
   // Create (or bank-fetch) the session. Scenario doors enter directly;
   // custom (ESP) sessions show their door first so the plan is visible.
@@ -1567,6 +1579,21 @@ export default function LearnPage() {
           </>
         )}
       </div>
+      {roomIntro ? (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(31,30,28,0.55)", padding: 20 }}>
+          <div style={{ maxWidth: 360, width: "100%", background: "#FFFDF8", borderRadius: 20, padding: "24px 22px", boxShadow: "0 12px 40px rgba(0,0,0,0.18)", fontFamily: "'Sarabun', sans-serif", color: "#3A332B" }}>
+            <h3 style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 18, fontWeight: 700, margin: "0 0 12px", color: "#1F7A68" }}>How Speaking Rooms work~</h3>
+            <ul style={{ margin: "0 0 18px", padding: "0 0 0 18px", fontSize: 14, lineHeight: 1.6 }}>
+              <li>Each room is one <strong>10-minute</strong> live speaking session with Miomi.</li>
+              <li>Re-doing a lesson starts a fresh session and uses another room from your pack.</li>
+              <li>Your results, notes, and phrase sounds stay saved — review them anytime, free.</li>
+            </ul>
+            <button onClick={acceptRoomIntro} style={{ width: "100%", fontFamily: "'Quicksand', sans-serif", fontSize: 14, fontWeight: 700, padding: "11px 0", borderRadius: 99, border: "none", background: "linear-gradient(135deg,#6ECDB8,#34A98F)", color: "#FFFFFF", cursor: "pointer" }}>
+              Got it — enter my room
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
