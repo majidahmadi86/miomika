@@ -492,11 +492,26 @@ function letterCount(s: string): number {
   return (s.match(/[\u0E00-\u0E7FA-Za-z]/g) ?? []).length;
 }
 
+// A Thai run that is NOTHING but sentence-final particles (e.g. a lone "ค่ะ"
+// tacked onto an English line). Synthesized in isolation these become a
+// drawn-out "kâ-à"; they must ride along with their neighbour instead.
+const THAI_PARTICLE_ONLY =
+  /^(?:\s|~|ๆ|ค่ะ|ค่า|คะ|ค๊ะ|คับ|ครับ|นะคะ|นะ|น่ะ|จ้ะ|จ้า|จ๊ะ|ฮะ|สิ|ล่ะ|ละ|เหรอ|หรอ|เนอะ)+$/;
+
+function isMergeableFragment(seg: LangSegment): boolean {
+  const t = seg.text.trim();
+  // Too small to deserve its own clip, OR a lone Thai final-particle.
+  if (letterCount(t) < 2) return true;
+  if (seg.lang === "th" && THAI_PARTICLE_ONLY.test(t)) return true;
+  return false;
+}
+
 /**
  * Split text into ordered Thai/English segments by script.
  * Neutral characters (spaces, digits, punctuation) attach to the current run.
- * Runs with fewer than 2 letters are merged into a neighbor so we never
- * synthesize a stray fragment. `fallback` voices any all-neutral text.
+ * Mergeable fragments (sub-2-letter runs, or lone Thai final-particles) are
+ * folded into a neighbour so we never synthesize a stray fragment alone.
+ * `fallback` voices any all-neutral text.
  */
 export function segmentByLanguage(text: string, fallback: TtsLang): LangSegment[] {
   const segs: LangSegment[] = [];
@@ -529,18 +544,19 @@ export function segmentByLanguage(text: string, fallback: TtsLang): LangSegment[
     return text.trim() ? [{ text, lang: fallback }] : [];
   }
 
-  // Backward-merge tiny runs (e.g. a lone "a" or "ๆ") into the previous segment.
+  // Backward-merge fragments into the previous segment (kept in its language) so
+  // a lone particle / tiny run never gets its own isolated synthesis.
   const out: LangSegment[] = [];
   for (const seg of segs) {
-    if (out.length > 0 && letterCount(seg.text) < 2) {
+    if (out.length > 0 && isMergeableFragment(seg)) {
       const prev = out[out.length - 1]!;
       out[out.length - 1] = { ...prev, text: prev.text + seg.text };
     } else {
       out.push(seg);
     }
   }
-  // A tiny FIRST run has no previous neighbor — fold it forward into the next.
-  if (out.length > 1 && letterCount(out[0]!.text) < 2) {
+  // A mergeable FIRST run has no previous neighbour — fold it forward into the next.
+  if (out.length > 1 && isMergeableFragment(out[0]!)) {
     const first = out.shift()!;
     out[0] = { ...out[0]!, text: first.text + out[0]!.text };
   }
