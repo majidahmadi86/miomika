@@ -462,7 +462,8 @@ export function stripForTts(text: string): string {
   s = s.replace(/ฮ+(?:า|่า)?(?:ฮ+(?:า|่า)?)*/g, " ");
   s = s.replace(/5{2,}/g, " ");
   // Her name reads as "MY-omi" in Leda — spell it phonetically so it says "Mee-oh-mi".
-  s = s.replace(/\bMiomi\b/g, "Mee-oh-mee");
+  s = s.replace(/\bMiomi\b/gi, "Mee-oh-mee");
+  s = s.replace(/Mio-?mi/gi, "Mee-oh-mee");
   s = s.replace(/มิโอมิ/g, "มิ-โอ-มิ");
   s = s.replace(/\s+/g, " ").trim();
   return s;

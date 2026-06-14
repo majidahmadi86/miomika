@@ -36,6 +36,8 @@ interface MicButtonProps {
   onVadSpeechEnd?: () => void | boolean;
   /** Fired when /api/talk/transcribe returns OK (turn timing anchor b). */
   onTranscribeReceived?: (meta: { servedBy: string }) => void;
+  /** Fired when user taps mic during Miomi TTS to interrupt playback. */
+  onStopSpeaking?: () => void;
 }
 
 type MicVADInstance = {
@@ -77,6 +79,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     speakingActive = false,
     onVadSpeechEnd,
     onTranscribeReceived,
+    onStopSpeaking,
   },
   ref,
 ) {
@@ -381,6 +384,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     if (state === "speaking") {
       setUserListening(false);
       onStateChange("idle");
+      onStopSpeaking?.();
       return;
     }
     if (state === "listening") {
@@ -391,7 +395,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     if (state === "idle") {
       setUserListening(true);
     }
-  }, [disabled, locked, onLockedTap, state, onStateChange, setUserListening]);
+  }, [disabled, locked, onLockedTap, state, onStateChange, onStopSpeaking, setUserListening]);
 
   const onPointerDown = useCallback(() => {
     longPressTimerRef.current = window.setTimeout(() => {

@@ -125,6 +125,7 @@ export async function POST(req: NextRequest) {
       });
 
       adaptivePrompt = buildBrainPrompt({ state: brainState, userInput, mode });
+      adaptivePrompt += `\n\nNAME: Your name is Miomi. Never spell it out, never count its syllables, never write it in Thai script when speaking English. Just say "Miomi" naturally.`;
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
       }

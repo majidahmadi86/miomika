@@ -8,7 +8,7 @@ import {
   type MicState,
 } from "@/components/talk/MicButton";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
-import { speak, speakReply, unlockTtsPlayback } from "@/lib/voice/tts";
+import { killAllAudio, speak, speakReply, unlockTtsPlayback } from "@/lib/voice/tts";
 import { COLORS } from "@/lib/design/colors";
 
 type WordCardPayload = {
@@ -104,6 +104,7 @@ function resolvePhonetics(data: MiomiApiResponse): {
 
 export default function CheapTestPage() {
   const turnInFlightRef = useRef(false);
+  const stickyLangRef = useRef<"th" | "en" | null>(null);
   const pipelineStageRef = useRef<"idle" | "transcribing" | "miomi" | "tts">("idle");
   const speechEndAtRef = useRef<number | null>(null);
   const miomiStartAtRef = useRef<number | null>(null);
@@ -223,8 +224,26 @@ export default function CheapTestPage() {
         // Detect the language the user is SPEAKING from their words; they're LEARNING
         // the opposite. Pass both so the brain doesn't fall back to profile defaults
         // (which made "teach me Thai" from an English speaker teach English).
-        const hasThai = /[\u0E00-\u0E7F]/.test(userText);
-        const spokenLang: "th" | "en" = hasThai ? "th" : "en";
+        // Count scripts and pick the DOMINANT one (not "any Thai char = Thai").
+        const thaiChars = (userText.match(/[\u0E00-\u0E7F]/g) ?? []).length;
+        const latinChars = (userText.match(/[A-Za-z]/g) ?? []).length;
+        let spokenLang: "th" | "en";
+        if (thaiChars === 0 && latinChars === 0) {
+          // No clear script (numbers/punct) — keep the conversation's established language.
+          spokenLang = (stickyLangRef.current ?? "en");
+        } else if (thaiChars > latinChars) {
+          spokenLang = "th";
+        } else {
+          spokenLang = "en";
+        }
+        // Stickiness: a few mixed-in foreign words shouldn't flip an established language.
+        // Only switch if the new language clearly dominates (>70% of script chars).
+        const total = thaiChars + latinChars;
+        if (stickyLangRef.current && total > 0) {
+          const newLangShare = (spokenLang === "th" ? thaiChars : latinChars) / total;
+          if (newLangShare < 0.7) spokenLang = stickyLangRef.current;
+        }
+        stickyLangRef.current = spokenLang;
         const learnLang: "th" | "en" = spokenLang === "th" ? "en" : "th";
         const res = await fetch("/api/miomi", {
           method: "POST",
@@ -526,12 +545,18 @@ export default function CheapTestPage() {
         <MicButton
           state={micState}
           language="auto"
-          disabled={turnBusy}
+          disabled={turnBusy && micState !== "speaking"}
           onTranscript={handleTranscript}
           onStateChange={handleMicStateChange}
           speakingActive={micState === "speaking" || turnBusy}
           onVadSpeechEnd={handleVadSpeechEnd}
           onTranscribeReceived={handleTranscribeReceived}
+          onStopSpeaking={() => {
+            try { killAllAudio(); } catch { /* ignore */ }
+            releaseTurn();
+            setMicState("idle");
+            setStatusLine("Tap mic and speak~");
+          }}
         />
       </div>
     </div>
