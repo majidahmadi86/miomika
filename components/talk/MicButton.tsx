@@ -14,14 +14,12 @@ import * as Sentry from "@sentry/nextjs";
 import { COLORS } from "@/lib/design/colors";
 import { log, logError } from "@/lib/debug/log";
 import { logEvent } from "@/lib/debug/event-bus";
-
 export type MicState =
   | "idle"
   | "listening"
   | "processing"
   | "speaking"
   | "needs-permission";
-
 interface MicButtonProps {
   state: MicState;
   language?: "th" | "en" | "th-TH" | "en-US" | "auto";
@@ -39,26 +37,22 @@ interface MicButtonProps {
   /** Fired when user taps mic during Miomi TTS to interrupt playback. */
   onStopSpeaking?: () => void;
 }
-
 type MicVADInstance = {
   start: () => Promise<void>;
   pause: () => Promise<void>;
   destroy: () => Promise<void>;
 };
-
 export interface MicButtonHandle {
   start: () => void;
   stop: () => void;
   setInterruptMode: (enabled: boolean) => void;
 }
-
 /** Whisper ISO-639-1 hint for /api/talk/transcribe (auto when unknown). */
 function whisperTranscribeLang(language: MicButtonProps["language"]): "th" | "en" | "auto" {
   if (language === "th" || language === "th-TH") return "th";
   if (language === "en" || language === "en-US") return "en";
   return "auto";
 }
-
 /**
  * MicButton — explicit-intent VAD voice input.
  *
@@ -66,6 +60,8 @@ function whisperTranscribeLang(language: MicButtonProps["language"]): "th" | "en
  *   - VAD instance created once on mount, destroyed on unmount.
  *   - VAD only listens when user intent + not speaking/locked/disabled.
  *   - userIntentRef tracks whether user has asked to be listening.
+ *   - All vad.start()/vad.pause() calls are SERIALIZED so back-to-back
+ *     transitions can never race and strand the worklet paused.
  */
 export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function MicButton(
   {
@@ -88,30 +84,30 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const [listenIntent, setListenIntent] = useState(false);
   const [vadReady, setVadReady] = useState(false);
-
   const flowTagSetRef = useRef(false);
   const vadInstanceRef = useRef<MicVADInstance | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const userIntentRef = useRef(false);
-
+  // Serialized VAD control: every start/pause is queued onto one promise chain,
+  // and desiredListeningRef always holds the latest intended state so the chain
+  // converges to the right place even when several transitions land at once.
+  const vadOpRef = useRef<Promise<void>>(Promise.resolve());
+  const desiredListeningRef = useRef(false);
   const trace = useCallback((msg: string, data?: Record<string, unknown>) => {
     if (typeof window === "undefined") return;
     log("mic", msg, data);
     setDebugLog((prev) => [...prev.slice(-9), `${new Date().toLocaleTimeString()}  ${msg}`]);
   }, []);
-
   const ensureFlowTag = useCallback(() => {
     if (flowTagSetRef.current) return;
     flowTagSetRef.current = true;
     try { Sentry.setTag("flow", "voice"); } catch { /* ignore */ }
   }, []);
-
   const setUserListening = useCallback((on: boolean) => {
     userIntentRef.current = on;
     setListenIntent(on);
   }, []);
-
   const transcribeAndCommit = useCallback(
     async (audio: Float32Array) => {
       if (!mountedRef.current) return;
@@ -195,14 +191,12 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     },
     [trace, onStateChange, onTranscript, onTranscribeReceived, language],
   );
-
   // Callback refs — let the VAD effect read latest values without re-firing.
   const traceRef = useRef(trace);
   const ensureFlowTagRef = useRef(ensureFlowTag);
   const onStateChangeRef = useRef(onStateChange);
   const transcribeAndCommitRef = useRef(transcribeAndCommit);
   const onVadSpeechEndRef = useRef(onVadSpeechEnd);
-
   useEffect(() => {
     traceRef.current = trace;
     ensureFlowTagRef.current = ensureFlowTag;
@@ -210,19 +204,16 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     transcribeAndCommitRef.current = transcribeAndCommit;
     onVadSpeechEndRef.current = onVadSpeechEnd;
   });
-
   // Create VAD once on mount; destroy once on unmount.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- VAD instance must persist for the session; callbacks read via refs
   useEffect(() => {
     mountedRef.current = true;
     let cancelled = false;
-
     if (typeof window !== "undefined") {
       void import("@ricky0123/vad-web").catch(() => { /* ignore */ });
       const urls = ["/vad/silero_vad_v5.onnx", "/vad/ort-wasm-simd-threaded.wasm"];
       urls.forEach((u) => { void fetch(u, { cache: "force-cache" }).catch(() => { /* ignore */ }); });
     }
-
     const initVad = async () => {
       ensureFlowTagRef.current();
       try {
@@ -230,7 +221,6 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         logEvent({ kind: "vad", level: "info", message: "vad loading" });
         const { MicVAD } = await import("@ricky0123/vad-web");
         if (cancelled || !mountedRef.current) return;
-
         const vad = await MicVAD.new({
           model: "v5",
           baseAssetPath: "/vad/",
@@ -281,12 +271,10 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
             setAmplitude(probs.isSpeech);
           },
         });
-
         if (cancelled || !mountedRef.current) {
           try { await vad.destroy(); } catch { /* ignore */ }
           return;
         }
-
         vadInstanceRef.current = vad as unknown as MicVADInstance;
         logEvent({
           kind: "vad",
@@ -304,9 +292,7 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
         }
       }
     };
-
     void initVad();
-
     return () => {
       cancelled = true;
       mountedRef.current = false;
@@ -319,28 +305,38 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       }
     };
   }, []); // VAD created once on mount, destroyed on unmount
-
   const shouldListen =
     vadReady && !speakingActive && !locked && !disabled && listenIntent;
-
+  // Apply the desired listen state through a SERIALIZED queue. The turn-end
+  // flicker (micState→idle, then turnBusy→false on a later render) used to fire
+  // vad.pause() then vad.start() in parallel; the trailing pause could win and
+  // strand the mic paused for one round (the "dropped turn" bug). Chaining the
+  // ops + reading the latest desired state guarantees the last transition wins.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks read via refs
   useEffect(() => {
+    desiredListeningRef.current = shouldListen;
     const vad = vadInstanceRef.current;
     if (!vad) return;
-    if (shouldListen) {
-      void vad.start().then(() => {
-        if (mountedRef.current && userIntentRef.current && shouldListen) {
-          traceRef.current("VAD listening");
-          onStateChangeRef.current("listening");
+    vadOpRef.current = vadOpRef.current
+      .catch(() => { /* keep the chain alive across any rejection */ })
+      .then(async () => {
+        if (!mountedRef.current) return;
+        const want = desiredListeningRef.current;
+        try {
+          if (want) {
+            await vad.start();
+            if (mountedRef.current && userIntentRef.current && desiredListeningRef.current) {
+              traceRef.current("VAD listening");
+              onStateChangeRef.current("listening");
+            }
+          } else {
+            await vad.pause();
+          }
+        } catch (e) {
+          traceRef.current("VAD toggle failed", { error: (e as Error).message });
         }
-      }).catch((e) => {
-        traceRef.current("VAD start failed", { error: (e as Error).message });
       });
-    } else {
-      void vad.pause().catch(() => { /* ignore */ });
-    }
   }, [shouldListen]);
-
   const requestPermissionAgain = useCallback(async () => {
     trace("recovery: requesting permission");
     try {
@@ -352,7 +348,6 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       trace("recovery: still denied", { error: (e as Error).message });
     }
   }, [trace, onStateChange]);
-
   useImperativeHandle(
     ref,
     () => ({
@@ -373,7 +368,6 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     }),
     [disabled, locked, onLockedTap, setUserListening, onStateChange],
   );
-
   const handlePress = useCallback(() => {
     if (disabled) return;
     if (locked) {
@@ -396,27 +390,23 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       setUserListening(true);
     }
   }, [disabled, locked, onLockedTap, state, onStateChange, onStopSpeaking, setUserListening]);
-
   const onPointerDown = useCallback(() => {
     longPressTimerRef.current = window.setTimeout(() => {
       setDebugVisible((v) => !v);
     }, 800);
   }, []);
-
   const onPointerUp = useCallback(() => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
   }, []);
-
   useEffect(() => {
     if (locked) {
       setUserListening(false);
       if (mountedRef.current) onStateChange("idle");
     }
   }, [locked, setUserListening, onStateChange]);
-
   if (state === "needs-permission") {
     return (
       <div style={containerStyle}>
@@ -431,10 +421,8 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
       </div>
     );
   }
-
   const isActive = state === "listening";
   const ringScale = 1 + amplitude * 0.4;
-
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
       <motion.button
@@ -473,7 +461,6 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     </div>
   );
 });
-
 const containerStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" };
 function micButtonStyle(isActive: boolean, isProcessing: boolean = false, isLocked: boolean = false): CSSProperties {
   return {
@@ -491,7 +478,6 @@ const cardTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color
 const cardBodyStyle: CSSProperties = { fontSize: "11px", color: COLORS.textMuted, margin: 0, marginBottom: "10px", fontFamily: "Quicksand, sans-serif" };
 const cardCtaStyle: CSSProperties = { background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", border: "none", borderRadius: "999px", padding: "8px 20px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "Kanit, sans-serif" };
 const debugPanelStyle: CSSProperties = { position: "fixed", bottom: "16px", left: "16px", right: "16px", background: "rgba(26, 26, 24, 0.92)", color: "#FFFFFF", padding: "12px", borderRadius: "8px", fontSize: "11px", fontFamily: "monospace", maxHeight: "240px", overflow: "auto", zIndex: 9999 };
-
 function float32ToWav(samples: Float32Array, sampleRate: number): Blob {
   const numChannels = 1, bitsPerSample = 16;
   const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
