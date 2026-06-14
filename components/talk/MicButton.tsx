@@ -317,25 +317,35 @@ export const MicButton = forwardRef<MicButtonHandle, MicButtonProps>(function Mi
     desiredListeningRef.current = shouldListen;
     const vad = vadInstanceRef.current;
     if (!vad) return;
+    const applyDesired = async (attempt: number): Promise<void> => {
+      if (!mountedRef.current) return;
+      const want = desiredListeningRef.current;
+      try {
+        if (want) {
+          await vad.start();
+          if (mountedRef.current && userIntentRef.current && desiredListeningRef.current) {
+            traceRef.current("VAD listening");
+            onStateChangeRef.current("listening");
+          }
+        } else {
+          await vad.pause();
+        }
+      } catch (e) {
+        traceRef.current("VAD toggle failed", { error: (e as Error).message, attempt });
+        // Self-heal: if we still WANT to listen but start() failed (the audio worklet
+        // can hiccup after repeated start/pause cycles), retry with backoff so the mic
+        // can never silently die mid-conversation and strand the user.
+        if (desiredListeningRef.current && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+          if (mountedRef.current && desiredListeningRef.current) {
+            await applyDesired(attempt + 1);
+          }
+        }
+      }
+    };
     vadOpRef.current = vadOpRef.current
       .catch(() => { /* keep the chain alive across any rejection */ })
-      .then(async () => {
-        if (!mountedRef.current) return;
-        const want = desiredListeningRef.current;
-        try {
-          if (want) {
-            await vad.start();
-            if (mountedRef.current && userIntentRef.current && desiredListeningRef.current) {
-              traceRef.current("VAD listening");
-              onStateChangeRef.current("listening");
-            }
-          } else {
-            await vad.pause();
-          }
-        } catch (e) {
-          traceRef.current("VAD toggle failed", { error: (e as Error).message });
-        }
-      });
+      .then(() => applyDesired(0));
   }, [shouldListen]);
   const requestPermissionAgain = useCallback(async () => {
     trace("recovery: requesting permission");
