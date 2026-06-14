@@ -102,6 +102,32 @@ function resolvePhonetics(data: MiomiApiResponse): {
   return { phonetics: null, wordCard, phoneticsNote: null };
 }
 
+// Detect an EXPLICIT request to switch the conversation language. Returns the
+// requested medium, or null if it isn't a switch request. We ONLY flip the medium
+// on these — never on mere script detection — so practicing a phrase in the other
+// language can't hijack the conversation language.
+function detectLanguageSwitchRequest(text: string): "th" | "en" | null {
+  const t = text.toLowerCase();
+  // Thai-language phrasings first (explicit)
+  if (/ภาษาอังกฤษ|พูด[^\u0E00-\u0E7F]{0,4}อังกฤษ/.test(text)) return "en";
+  if (/ภาษาไทย|พูด[^\u0E00-\u0E7F]{0,4}ไทย/.test(text)) return "th";
+  const wantsVerb =
+    /\b(speak|talk|say|reply|respond|switch|change|use|chat|continue)\b/.test(t) ||
+    /\bin (english|thai)\b/.test(t) ||
+    /\bback to\b/.test(t);
+  if (!wantsVerb) return null; // "teach me Thai" / "learn Thai" must NOT switch
+  const english = /\benglish\b/.test(t);
+  const thai = /\bthai\b/.test(t);
+  if (english && thai) {
+    if (/not (thai)|don'?t .*thai|stop .*thai/.test(t)) return "en";
+    if (/not (english)|don'?t .*english|stop .*english/.test(t)) return "th";
+    return "en";
+  }
+  if (english) return "en";
+  if (thai) return "th";
+  return null;
+}
+
 export default function CheapTestPage() {
   const turnInFlightRef = useRef(false);
   const stickyLangRef = useRef<"th" | "en" | null>(null);
@@ -225,25 +251,19 @@ export default function CheapTestPage() {
         // the opposite. Pass both so the brain doesn't fall back to profile defaults
         // (which made "teach me Thai" from an English speaker teach English).
         // Count scripts and pick the DOMINANT one (not "any Thai char = Thai").
+        // MEDIUM = the conversation language. It is STICKY: it only changes when the
+        // user EXPLICITLY asks ("speak English", "พูดไทย"). Practicing a phrase in the
+        // other language must NOT flip it — that was the recurring "I practiced Thai
+        // and she switched to Thai" bug. Script detection only seeds the FIRST turn.
         const thaiChars = (userText.match(/[\u0E00-\u0E7F]/g) ?? []).length;
         const latinChars = (userText.match(/[A-Za-z]/g) ?? []).length;
-        let spokenLang: "th" | "en";
-        if (thaiChars === 0 && latinChars === 0) {
-          // No clear script (numbers/punct) — keep the conversation's established language.
-          spokenLang = (stickyLangRef.current ?? "en");
-        } else if (thaiChars > latinChars) {
-          spokenLang = "th";
-        } else {
-          spokenLang = "en";
+        const switchReq = detectLanguageSwitchRequest(userText);
+        if (switchReq) {
+          stickyLangRef.current = switchReq;
+        } else if (stickyLangRef.current == null && (thaiChars > 0 || latinChars > 0)) {
+          stickyLangRef.current = thaiChars > latinChars ? "th" : "en";
         }
-        // Stickiness: a few mixed-in foreign words shouldn't flip an established language.
-        // Only switch if the new language clearly dominates (>70% of script chars).
-        const total = thaiChars + latinChars;
-        if (stickyLangRef.current && total > 0) {
-          const newLangShare = (spokenLang === "th" ? thaiChars : latinChars) / total;
-          if (newLangShare < 0.7) spokenLang = stickyLangRef.current;
-        }
-        stickyLangRef.current = spokenLang;
+        const spokenLang: "th" | "en" = stickyLangRef.current ?? "en";
         const learnLang: "th" | "en" = spokenLang === "th" ? "en" : "th";
         const res = await fetch("/api/miomi", {
           method: "POST",
