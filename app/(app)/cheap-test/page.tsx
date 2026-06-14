@@ -8,7 +8,7 @@ import {
   type MicState,
 } from "@/components/talk/MicButton";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
-import { killAllAudio, speak, speakReply, unlockTtsPlayback } from "@/lib/voice/tts";
+import { killAllAudio, speakReply, unlockTtsPlayback } from "@/lib/voice/tts";
 import { COLORS } from "@/lib/design/colors";
 
 type WordCardPayload = {
@@ -337,10 +337,6 @@ export default function CheapTestPage() {
             setStatusLine("Voice hiccup — tap to try again~");
           },
         });
-
-        if (phonetics) {
-          await speak(phonetics, "en");
-        }
       } catch {
         setStatusLine("Network hiccup — tap to try again~");
         setMicState("idle");
