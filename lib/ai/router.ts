@@ -33,9 +33,26 @@ const MAX_HISTORY_MESSAGES = 8;
 // 200 tokens is a safety cap that (a) keeps a runaway reply from burning Groq's
 // per-minute token budget — which is what drops us onto slow Gemini — and (b) caps cost.
 const MAX_REPLY_TOKENS = 200;
+// Hard per-engine timeouts. A turn must NEVER hang the mic. We saw a 52-SECOND Gemini
+// call freeze the whole turn; with these, a slow engine is abandoned fast and we fall
+// through to the next option (or the instant library failover) instead of locking up.
+const GROQ_TIMEOUT_MS = 9000;
+const GEMINI_TIMEOUT_MS = 9000;
 /** Resolved model string after first successful call or 404 fallback. */
 let geminiModelInUse = GEMINI_MODEL;
 type Message = { role: "user" | "assistant"; content: string };
+// Reject a promise if it doesn't settle within `ms` — keeps one slow engine from
+// stalling the whole pipeline.
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms,
+    );
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
 // ─── MAIN ROUTER ─────────────────────────────────────────────────────────────
 function aiErrorFields(error: unknown): { message: string; status?: number } {
   const err = error as { status?: number; message?: string };
@@ -58,7 +75,11 @@ export async function getAIResponse(
   const recent = messages.slice(-MAX_HISTORY_MESSAGES);
   // Try Groq first — fast, reliable
   try {
-    const content = await callGroq(recent, systemPrompt);
+    const content = await withTimeout(
+      callGroq(recent, systemPrompt),
+      GROQ_TIMEOUT_MS,
+      "groq",
+    );
     if (content) return { content, engine: "groq", wasFailover: false };
   } catch (error) {
     const { message, status } = aiErrorFields(error);
@@ -66,7 +87,11 @@ export async function getAIResponse(
   }
   // Try Gemini second — Thai quality fallback
   try {
-    const content = await callGemini(recent, systemPrompt);
+    const content = await withTimeout(
+      callGemini(recent, systemPrompt),
+      GEMINI_TIMEOUT_MS,
+      "gemini",
+    );
     if (content) return { content, engine: "gemini", wasFailover: false };
   } catch (error) {
     const { message, status } = aiErrorFields(error);
