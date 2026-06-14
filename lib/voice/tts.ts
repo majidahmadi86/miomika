@@ -448,13 +448,25 @@ async function speakChunkedSequence(
   finish(true);
 }
 
+/** Strip written laughter, stage directions, and parenthetical asides before TTS. */
+export function stripForTts(text: string): string {
+  let s = text;
+  s = s.replace(/\([^)]*\)/g, " ");
+  s = s.replace(/\*[^*]+\*/g, " ");
+  s = s.replace(/\b(?:ha(?:ha)+|hehe|lol|lmao|rofl)\b/gi, " ");
+  s = s.replace(/ฮ+(?:า)?(?:ฮ+(?:า)?)+/g, " ");
+  s = s.replace(/\b5{2,}\b/g, " ");
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
 /** Speak a full reply: first sentence ASAP when cleanly splittable; otherwise identical to `speak()`. */
 export async function speakReply(
   text: string,
   lang: TtsLang,
   callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
 ): Promise<void> {
-  const trimmed = text.trim();
+  const trimmed = stripForTts(text.trim());
   if (!trimmed) {
     callbacks?.onEnd?.();
     return;

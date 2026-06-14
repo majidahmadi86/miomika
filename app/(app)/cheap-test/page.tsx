@@ -8,10 +8,34 @@ import {
   type MicState,
 } from "@/components/talk/MicButton";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
-import { speakReply, unlockTtsPlayback } from "@/lib/voice/tts";
+import { speak, speakReply, unlockTtsPlayback } from "@/lib/voice/tts";
 import { COLORS } from "@/lib/design/colors";
 
-type ChatBubble = { id: string; role: "user" | "miomi"; text: string };
+type WordCardPayload = {
+  word: string;
+  word_th: string;
+  word_en: string;
+  cefr_level?: string | null;
+  emoji?: string | null;
+  th_romanization?: string | null;
+};
+
+type PronunciationLessonPayload = {
+  word: string;
+  word_th: string;
+  syllables: string[];
+  meaning_en: string;
+  meaning_th: string;
+};
+
+type ChatBubble = {
+  id: string;
+  role: "user" | "miomi";
+  text: string;
+  phonetics?: string | null;
+  wordCard?: WordCardPayload | null;
+  phoneticsNote?: string | null;
+};
 
 type LegTimings = {
   transcribeMs: number | null;
@@ -24,6 +48,9 @@ type MiomiApiResponse = {
   content?: string;
   replyLanguage?: "th" | "en";
   sessionContext?: Record<string, unknown>;
+  wordCard?: WordCardPayload | null;
+  pronunciationLesson?: PronunciationLessonPayload | null;
+  servedVia?: string;
 };
 
 const EMPTY_TIMINGS: LegTimings = {
@@ -33,12 +60,56 @@ const EMPTY_TIMINGS: LegTimings = {
   totalMs: null,
 };
 
+function resolvePhonetics(data: MiomiApiResponse): {
+  phonetics: string | null;
+  wordCard: WordCardPayload | null;
+  phoneticsNote: string | null;
+} {
+  const wordCard = data.wordCard ?? null;
+  const lesson = data.pronunciationLesson ?? null;
+
+  if (lesson?.syllables?.length) {
+    return {
+      phonetics: lesson.syllables.join(" · "),
+      wordCard,
+      phoneticsNote: null,
+    };
+  }
+
+  const roman = wordCard?.th_romanization?.trim();
+  if (roman) {
+    return { phonetics: roman, wordCard, phoneticsNote: null };
+  }
+
+  if (wordCard?.word_th) {
+    return {
+      phonetics: null,
+      wordCard,
+      phoneticsNote:
+        "wordCard missing th_romanization — /api/miomi prompt should attach bank phonetics",
+    };
+  }
+
+  if (data.servedVia?.includes("__taught")) {
+    return {
+      phonetics: null,
+      wordCard: null,
+      phoneticsNote:
+        "Teaching flagged in servedVia but no wordCard — /api/miomi prompt gap",
+    };
+  }
+
+  return { phonetics: null, wordCard, phoneticsNote: null };
+}
+
 export default function CheapTestPage() {
   const turnInFlightRef = useRef(false);
+  const pipelineStageRef = useRef<"idle" | "transcribing" | "miomi" | "tts">("idle");
   const speechEndAtRef = useRef<number | null>(null);
   const miomiStartAtRef = useRef<number | null>(null);
 
   const [micState, setMicState] = useState<MicState>("idle");
+  const [turnBusy, setTurnBusy] = useState(false);
   const [bubbles, setBubbles] = useState<ChatBubble[]>([]);
   const [timings, setTimings] = useState<LegTimings>(EMPTY_TIMINGS);
   const [statusLine, setStatusLine] = useState("Tap mic and speak~");
@@ -46,6 +117,18 @@ export default function CheapTestPage() {
     Array<{ role: "user" | "assistant"; content: string }>
   >([]);
   const [sessionContext, setSessionContext] = useState<Record<string, unknown>>({});
+
+  const releaseTurn = useCallback(() => {
+    turnInFlightRef.current = false;
+    pipelineStageRef.current = "idle";
+    setTurnBusy(false);
+  }, []);
+
+  const armTurn = useCallback(() => {
+    turnInFlightRef.current = true;
+    pipelineStageRef.current = "transcribing";
+    setTurnBusy(true);
+  }, []);
 
   const mood: MiomiMood = (() => {
     if (micState === "listening") return "listening";
@@ -58,13 +141,29 @@ export default function CheapTestPage() {
     unlockTtsPlayback();
   }, []);
 
+  const handleMicStateChange = useCallback(
+    (state: MicState) => {
+      setMicState(state);
+      if (
+        state === "idle" &&
+        pipelineStageRef.current === "transcribing" &&
+        turnInFlightRef.current
+      ) {
+        releaseTurn();
+        setStatusLine("Tap mic and speak~");
+      }
+    },
+    [releaseTurn],
+  );
+
   const handleVadSpeechEnd = useCallback(() => {
     if (turnInFlightRef.current) return false;
+    armTurn();
     speechEndAtRef.current = performance.now();
     setTimings(EMPTY_TIMINGS);
     setStatusLine("Transcribing…");
     return true;
-  }, []);
+  }, [armTurn]);
 
   const handleTranscribeReceived = useCallback(() => {
     const anchor = speechEndAtRef.current;
@@ -78,12 +177,14 @@ export default function CheapTestPage() {
   const handleTranscript = useCallback(
     async (text: string, isFinal: boolean) => {
       if (!isFinal || !text.trim()) {
+        releaseTurn();
         setMicState("idle");
         setStatusLine("Tap mic and speak~");
         return;
       }
-      if (turnInFlightRef.current) return;
-      turnInFlightRef.current = true;
+      if (!turnInFlightRef.current) return;
+
+      pipelineStageRef.current = "miomi";
 
       const userText = text.trim();
       setBubbles((prev) => [
@@ -134,16 +235,26 @@ export default function CheapTestPage() {
           setSessionContext(data.sessionContext);
         }
 
+        const { phonetics, wordCard, phoneticsNote } = resolvePhonetics(data);
+
         setApiMessages([
           ...nextMessages,
           { role: "assistant", content: reply },
         ]);
         setBubbles((prev) => [
           ...prev,
-          { id: crypto.randomUUID(), role: "miomi", text: reply },
+          {
+            id: crypto.randomUUID(),
+            role: "miomi",
+            text: reply,
+            phonetics,
+            wordCard,
+            phoneticsNote,
+          },
         ]);
 
         const lang = data.replyLanguage ?? "th";
+        pipelineStageRef.current = "tts";
         setMicState("speaking");
         setStatusLine("Miomi is speaking…");
 
@@ -174,15 +285,19 @@ export default function CheapTestPage() {
             setStatusLine("Voice hiccup — tap to try again~");
           },
         });
+
+        if (phonetics) {
+          await speak(phonetics, "en");
+        }
       } catch {
         setStatusLine("Network hiccup — tap to try again~");
         setMicState("idle");
       } finally {
-        turnInFlightRef.current = false;
+        releaseTurn();
         miomiStartAtRef.current = null;
       }
     },
-    [apiMessages, sessionContext],
+    [apiMessages, sessionContext, releaseTurn],
   );
 
   return (
@@ -302,18 +417,70 @@ export default function CheapTestPage() {
             style={{
               alignSelf: b.role === "user" ? "flex-end" : "flex-start",
               maxWidth: "85%",
-              padding: "10px 14px",
-              borderRadius: b.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-              background: b.role === "user" ? COLORS.ctaGradient : COLORS.surface,
-              border: b.role === "user" ? "none" : `1px solid ${COLORS.borderLight}`,
-              color: b.role === "user" ? COLORS.ctaTextColor : COLORS.textPrimary,
-              fontFamily: "Quicksand, sans-serif",
-              fontSize: "14px",
-              lineHeight: 1.45,
-              boxShadow: b.role === "miomi" ? "0 2px 8px rgba(26,26,24,0.04)" : COLORS.ctaShadow,
             }}
           >
-            {b.text}
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: b.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                background: b.role === "user" ? COLORS.ctaGradient : COLORS.surface,
+                border: b.role === "user" ? "none" : `1px solid ${COLORS.borderLight}`,
+                color: b.role === "user" ? COLORS.ctaTextColor : COLORS.textPrimary,
+                fontFamily: "Quicksand, sans-serif",
+                fontSize: "14px",
+                lineHeight: 1.45,
+                boxShadow: b.role === "miomi" ? "0 2px 8px rgba(26,26,24,0.04)" : COLORS.ctaShadow,
+              }}
+            >
+              {b.text}
+            </div>
+            {b.role === "miomi" && b.phonetics ? (
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  paddingLeft: "4px",
+                  fontFamily: "'Quicksand', sans-serif",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: "#6D5BBF",
+                }}
+              >
+                {b.phonetics}
+              </p>
+            ) : null}
+            {b.role === "miomi" && b.wordCard ? (
+              <div
+                style={{
+                  marginTop: "8px",
+                  padding: "8px 10px",
+                  borderRadius: "10px",
+                  background: COLORS.surfaceWarm,
+                  border: `1px solid ${COLORS.borderLight}`,
+                  fontFamily: "'Sarabun', sans-serif",
+                  fontSize: "13px",
+                  color: COLORS.textPrimary,
+                }}
+              >
+                {b.wordCard.emoji ? `${b.wordCard.emoji} ` : ""}
+                <span style={{ fontWeight: 600 }}>{b.wordCard.word_th}</span>
+                <span style={{ color: COLORS.textMuted }}> · </span>
+                <span>{b.wordCard.word_en}</span>
+              </div>
+            ) : null}
+            {b.role === "miomi" && b.phoneticsNote ? (
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  paddingLeft: "4px",
+                  fontFamily: "monospace",
+                  fontSize: "10px",
+                  color: COLORS.textMuted,
+                  lineHeight: 1.4,
+                }}
+              >
+                {b.phoneticsNote}
+              </p>
+            ) : null}
           </div>
         ))}
       </div>
@@ -331,9 +498,10 @@ export default function CheapTestPage() {
         <MicButton
           state={micState}
           language="auto"
+          disabled={turnBusy}
           onTranscript={handleTranscript}
-          onStateChange={setMicState}
-          speakingActive={micState === "speaking"}
+          onStateChange={handleMicStateChange}
+          speakingActive={micState === "speaking" || turnBusy}
           onVadSpeechEnd={handleVadSpeechEnd}
           onTranscribeReceived={handleTranscribeReceived}
         />

@@ -76,6 +76,20 @@ function googleErrorDetails(err: unknown): { status: number | string; message: s
   return { status: "unknown", message: googleErrorMessage(err) };
 }
 
+function logGroqFallback(
+  status: number | string,
+  message: string,
+): void {
+  const payload = {
+    status,
+    message,
+    model: "whisper-large-v3-turbo",
+    next: "google_chirp2",
+  };
+  console.log("[voice.transcribe] groq failed, falling back", payload);
+  log("voice.transcribe", "groq failed, falling back", payload);
+}
+
 function logChirp2Fallback(
   status: number | string,
   message: string,
@@ -269,6 +283,44 @@ export async function POST(request: NextRequest) {
   const start = Date.now();
   const audioBytes = Buffer.from(await audioBlob.arrayBuffer());
 
+  if (groqKey) {
+    try {
+      const recognizeStart = Date.now();
+      const text = await transcribeWithGroq(audioBlob, explicitLang);
+      const recognizeMs = Date.now() - recognizeStart;
+      log("voice.transcribe", "asr-split", { uploadReadMs, recognizeMs });
+      const latency = Date.now() - start;
+      log("voice.transcribe", "transcribed", {
+        latency,
+        length: text.length,
+        preview: text.slice(0, 40),
+        servedBy: "groq_whisper",
+        model: "whisper-large-v3-turbo",
+        languageCodes: explicitLang
+          ? [explicitLang === "th" ? "th-TH" : "en-US"]
+          : ["th-TH", "en-US"],
+      });
+
+      if (text.length === 0) {
+        logGroqFallback("empty", "empty_groq_transcription");
+        throw new Error("empty_groq_transcription");
+      }
+      log("voice.transcribe", "success", {
+        textLen: text.length,
+        language: explicitLang ?? "auto",
+        servedBy: "groq_whisper",
+        model: "whisper-large-v3-turbo",
+      });
+      return NextResponse.json({ text, servedBy: "groq_whisper" });
+    } catch (e) {
+      log("voice.transcribe", "groq error, falling back to chirp", {
+        message: googleErrorMessage(e),
+      });
+      logError("voice.transcribe", "groq failed", e);
+      Sentry.captureException(e, { tags: { stage: "groq.transcribe" } });
+    }
+  }
+
   if (googleCredsJson) {
     try {
       const recognizeStart = Date.now();
@@ -295,7 +347,7 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ text: google.text, servedBy: google.servedBy });
     } catch (e) {
-      log("voice.transcribe", "google error, falling back to groq", {
+      log("voice.transcribe", "google error after groq fallback", {
         message: googleErrorMessage(e),
       });
       logError("voice.transcribe", "google failed", e);
@@ -303,49 +355,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (!groqKey) {
-    return NextResponse.json(
-      { error: "transcribe_failed", detail: "google_failed_and_groq_not_configured" },
-      { status: 500 },
-    );
-  }
-
-  try {
-    const recognizeStart = Date.now();
-    const text = await transcribeWithGroq(audioBlob, explicitLang);
-    const recognizeMs = Date.now() - recognizeStart;
-    log("voice.transcribe", "asr-split", { uploadReadMs, recognizeMs });
-    const latency = Date.now() - start;
-    log("voice.transcribe", "transcribed", {
-      latency,
-      length: text.length,
-      preview: text.slice(0, 40),
-      servedBy: "groq_whisper",
-      model: "whisper-large-v3-turbo",
-      languageCodes: explicitLang
-        ? [explicitLang === "th" ? "th-TH" : "en-US"]
-        : ["th-TH", "en-US"],
-    });
-
-    if (text.length === 0) {
-      log("voice.transcribe", "empty result");
-      return NextResponse.json({ error: "empty_transcription" }, { status: 422 });
-    }
-    log("voice.transcribe", "success", {
-      textLen: text.length,
-      language: explicitLang ?? "auto",
-      servedBy: "groq_whisper",
-      model: "whisper-large-v3-turbo",
-    });
-    return NextResponse.json({ text, servedBy: "groq_whisper" });
-  } catch (e) {
-    const err = e as { message?: string; status?: number };
-    log("voice.transcribe", "groq error", { message: err.message, status: err.status });
-    logError("voice.transcribe", "groq failed", e);
-    Sentry.captureException(e, { tags: { stage: "groq.transcribe" } });
-    return NextResponse.json(
-      { error: "transcribe_failed", detail: err.message ?? "unknown", status: err.status },
-      { status: 500 },
-    );
-  }
+  return NextResponse.json(
+    { error: "transcribe_failed", detail: "groq_and_google_unavailable_or_failed" },
+    { status: 500 },
+  );
 }
