@@ -271,6 +271,11 @@ export default function CheapTestPage() {
 
         const data = (await res.json()) as MiomiApiResponse;
         const reply = (data.content ?? "").trim();
+        if (data.servedVia) {
+          // TEMP DIAGNOSTIC — show engine per turn (groq vs gemini vs library/failover)
+          console.log("[cheap-test] servedVia:", data.servedVia, "miomiMs:", miomiMs);
+          setStatusLine(`served: ${data.servedVia} · ${miomiMs}ms`);
+        }
         if (!reply) {
           setStatusLine("No reply — try again~");
           setTimings((prev) => ({ ...prev, miomiMs }));

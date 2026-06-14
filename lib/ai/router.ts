@@ -92,21 +92,18 @@ async function callGroq(
 ): Promise<string> {
   const groq = getGroq();
   if (!groq) throw new Error("GROQ_API_KEY missing — Groq disabled");
-  const response = await Promise.race([
-    groq.chat.completions.create({
-      model: GROQ_MODEL,
-      max_tokens: 300,
-      temperature: 0.85,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
-      ],
-    }),
-    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("groq_timeout")), 4000)),
-  ]) as { choices: Array<{ message?: { content?: string | null } }> };
+  const response = await groq.chat.completions.create({
+    model: GROQ_MODEL,
+    max_tokens: 300,
+    temperature: 0.85,
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...messages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    ],
+  });
 
   const text = response.choices[0]?.message?.content ?? "";
   if (!text.trim()) throw new Error("Empty Groq response");
