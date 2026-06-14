@@ -342,6 +342,10 @@ export default function CheapTestPage() {
         setMicState("idle");
       } finally {
         releaseTurn();
+        // Safety net: guarantee the mic re-arms even if the TTS turn ended without
+        // firing onEnd (aborted/stale), which would otherwise strand micState="speaking"
+        // and the mic would never resume — the "stopped suddenly" bug.
+        setMicState("idle");
         miomiStartAtRef.current = null;
       }
     },
