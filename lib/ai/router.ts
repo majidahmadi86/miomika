@@ -29,6 +29,10 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 // client re-sends the ENTIRE growing transcript every call → token cost grows turn
 // over turn. The last few exchanges are plenty of context for a chat companion.
 const MAX_HISTORY_MESSAGES = 8;
+// Ceiling on reply length. Replies should be 1-2 sentences (the prompt enforces this);
+// 200 tokens is a safety cap that (a) keeps a runaway reply from burning Groq's
+// per-minute token budget — which is what drops us onto slow Gemini — and (b) caps cost.
+const MAX_REPLY_TOKENS = 200;
 /** Resolved model string after first successful call or 404 fallback. */
 let geminiModelInUse = GEMINI_MODEL;
 type Message = { role: "user" | "assistant"; content: string };
@@ -85,7 +89,7 @@ async function callGroq(
   if (!groq) throw new Error("GROQ_API_KEY missing — Groq disabled");
   const response = await groq.chat.completions.create({
     model: GROQ_MODEL,
-    max_tokens: 300,
+    max_tokens: MAX_REPLY_TOKENS,
     temperature: 0.85,
     messages: [
       { role: "system", content: systemPrompt },
@@ -149,12 +153,11 @@ async function callGeminiWithModel(
     model,
     config: {
       systemInstruction: systemPrompt,
-      maxOutputTokens: 300,
+      maxOutputTokens: MAX_REPLY_TOKENS,
       temperature: 0.85,
       // CRITICAL COST CONTROL: Gemini 2.5 Flash enables "thinking" by default and
       // bills those hidden reasoning tokens at the high $2.50/M output rate. Our
       // replies are short chat turns that need no reasoning, so disable thinking.
-      // This alone cuts Gemini cost ~5-10x.
       thinkingConfig: { thinkingBudget: 0 },
     },
     history,
