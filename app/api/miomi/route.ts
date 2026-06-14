@@ -14,12 +14,10 @@ import {
   type SessionState,
 } from "@/lib/ai/session";
 import { classifyIntentAdvanced } from "@/lib/ai/intents";
-import { buildClarificationPrompt } from "@/lib/ai/prompt";
 import { cefrToLevel } from "@/lib/ai/vocabulary";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
 import {
   pickPhrase,
-  RECOVERY_STRUGGLE,
   GUIDANCE_GUEST_LIMIT_HIT,
 } from "@/lib/voice/warmth";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
@@ -33,12 +31,7 @@ import {
   type IntroducedWord,
   type MasteryEvent,
 } from "@/lib/brain/teaching";
-import {
-  buildPronunciationLesson,
-  detectPronunciationRequest,
-  resolveContinuationWord,
-  type PronunciationLesson,
-} from "@/lib/brain/pronunciation";
+import type { PronunciationLesson } from "@/lib/brain/pronunciation";
 import { log } from "@/lib/debug/log";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -131,53 +124,6 @@ export async function POST(req: NextRequest) {
         overrideTargetLanguage: clientTargetLanguage,
       });
 
-      const pronReq = detectPronunciationRequest(userInput);
-      if (pronReq.isRequest) {
-        let pronWord = pronReq.word;
-        if (!pronWord) {
-          pronWord = await resolveContinuationWord(serverUserId, brainState.memory);
-        }
-        if (pronWord) {
-          const lesson = await buildPronunciationLesson(pronWord);
-          if (lesson) {
-            const replyTh = `ดีเลยค่า~ มาฝึกออกเสียงกันค่ะ คำว่า "${lesson.word_th || lesson.word}" แปลว่า ${lesson.meaning_th}. ลองพูดตามหนูทีละพยางค์นะคะ — ${lesson.syllables.join(" · ")}. พร้อมแล้วลองพูดให้หนูฟังได้เลยค่า~`;
-            const replyEn = `Let's practice~ The word "${lesson.word}" means ${lesson.meaning_en}. Try saying it with me, one syllable at a time — ${lesson.syllables.join(" · ")}. When you're ready, say it back to me~`;
-            const useLang = brainState.uiLanguage;
-            const content = useLang === "th" ? replyTh : replyEn;
-
-            persistExchangePair({
-              userId: serverUserId,
-              state,
-              userInput,
-              miomiContent: content,
-            });
-
-            state = { ...state, exchangeNumber: state.exchangeNumber + 1 };
-
-            const pronReplyLang = detectReplyLanguageFromContent(
-              content,
-              brainState.uiLanguage,
-            );
-            return NextResponse.json({
-              content,
-              wordCard: null,
-              phraseCard: null,
-              creatorAsset: null,
-              sessionContext: buildSessionContext(state),
-              servedVia: "pronunciation_lesson",
-              wasFailover: false,
-              intent: null,
-              sessionMode: state.sessionMode,
-              needsClarification: false,
-              masteryEvent: null,
-              pronunciationLesson: lesson,
-              replyLanguage: pronReplyLang,
-              userSpeaksLanguage: brainState.uiLanguage,
-            } satisfies MiomiResponse);
-          }
-        }
-      }
-
       adaptivePrompt = buildBrainPrompt({ state: brainState, userInput, mode });
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
@@ -253,76 +199,14 @@ export async function POST(req: NextRequest) {
     // ── STAGE 4: Update session mode ─────────────────────────────────────────
     state = updateSessionWithIntent(state, userInput);
 
-    // ── STAGE 4b: Recovery — negative emotion override ───────────────────────
-    // Never teach when user is frustrated. Face-saving is enforced.
-    if (intentResult.family === "social" && intentResult.primary.intent === "social_emotion_negative") {
-      const recoveryContent = pickPhrase(RECOVERY_STRUGGLE, {
-        lang: brainState.uiLanguage,
-      });
-      persistExchangePair({
-        userId: serverUserId,
-        state,
-        userInput,
-        miomiContent: recoveryContent,
-        intent: "social_emotion_negative",
-        emotionalSignal: "negative",
-      });
-      const recoveryReplyLang = detectReplyLanguageFromContent(
-        recoveryContent,
-        brainState.uiLanguage,
-      );
-      return NextResponse.json({
-        content: recoveryContent,
-        wordCard: null,
-        phraseCard: null,
-        creatorAsset: null,
-        sessionContext: buildSessionContext({ ...state, exchangeNumber: state.exchangeNumber + 1 }),
-        servedVia: "recovery_struggle",
-        wasFailover: false,
-        intent: "social_emotion_negative",
-        sessionMode: state.sessionMode,
-        needsClarification: false,
-        masteryEvent: null,
-        pronunciationLesson: null,
-        replyLanguage: recoveryReplyLang,
-        userSpeaksLanguage: brainState.userSpeaksLanguage,
-        guestHandoff: isLastFreeGuestTurn,
-      } satisfies MiomiResponse);
+    // ── STAGE 4b: Recovery — disabled; model comforts via prompt ─────────────
+    if (false && intentResult.family === "social" && intentResult.primary.intent === "social_emotion_negative") {
+      /* template hijack removed — brain prompt owns recovery */
     }
 
-    // ── STAGE 5: Handle clarification needed ─────────────────────────────────
-    if (intentResult.needsClarification) {
-      const clarification = buildClarificationPrompt(
-        brainState.uiLanguage === "en" ? "english" : "thai",
-      );
-      persistExchangePair({
-        userId: serverUserId,
-        state,
-        userInput,
-        miomiContent: clarification,
-        intent: "meta_clarification_needed",
-      });
-      const clarifyReplyLang = detectReplyLanguageFromContent(
-        clarification,
-        brainState.uiLanguage,
-      );
-      return NextResponse.json({
-        content: clarification,
-        wordCard: null,
-        phraseCard: null,
-        creatorAsset: null,
-        sessionContext: buildSessionContext(state),
-        servedVia: "clarification",
-        wasFailover: false,
-        intent: "meta_clarification_needed",
-        sessionMode: state.sessionMode,
-        needsClarification: true,
-        masteryEvent: null,
-        pronunciationLesson: null,
-        replyLanguage: clarifyReplyLang,
-        userSpeaksLanguage: brainState.userSpeaksLanguage,
-        guestHandoff: isLastFreeGuestTurn,
-      } satisfies MiomiResponse);
+    // ── STAGE 5: Clarification — disabled; model infers garbled speech ───────
+    if (false && intentResult.needsClarification) {
+      /* template hijack removed — brain prompt owns unclear input */
     }
 
     // ── BRAIN STEP 4: mastery detect + optional word introduce ───────────────
