@@ -222,6 +222,8 @@ export function stopTts(): void {
 }
 
 async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | null> {
+  const clean = text.trim();
+  if (!clean) return null;
   const maxAttempts = 3;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (attempt > 0) {
@@ -231,7 +233,7 @@ async function fetchServerAudio(text: string, lang: TtsLang): Promise<string | n
       const res = await fetch("/api/talk/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, lang }),
+        body: JSON.stringify({ text: clean, lang }),
       });
       if (res.status === 503) {
         if (attempt === maxAttempts - 1) {
@@ -448,9 +450,10 @@ async function speakChunkedSequence(
   finish(true);
 }
 
-/** Strip written laughter, stage directions, and parenthetical asides before TTS. */
+/** Strip written laughter, stage directions, emojis, and markdown before TTS. */
 export function stripForTts(text: string): string {
   let s = text;
+  // Parenthetical asides and *stage directions* are for the eyes, not the voice.
   s = s.replace(/\([^)]*\)/g, " ");
   s = s.replace(/\*[^*]+\*/g, " ");
   // Laughter — match even when glued to other scripts (no word-boundary needed),
@@ -458,9 +461,17 @@ export function stripForTts(text: string): string {
   s = s.replace(/(?:ha\s*){2,}/gi, " ");
   s = s.replace(/\bha\b/gi, " ");
   s = s.replace(/(?:he){2,}/gi, " ");
-  s = s.replace(/\b(?:lol|lmao|rofl|haha|hahaha)\b/gi, " ");
+  s = s.replace(/\b(?:lol|lmao|rofl|haha|hahaha|hehe)\b/gi, " ");
   s = s.replace(/ฮ+(?:า|่า)?(?:ฮ+(?:า|่า)?)*/g, " ");
   s = s.replace(/5{2,}/g, " ");
+  // Emoji, pictographs, dingbats, arrows, variation selectors, ZWJ, gender signs —
+  // invisible-to-meaning but spoken as "smiling face" / garbled noise by Leda.
+  s = s.replace(
+    /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}\u{2640}\u{2642}\u{FE0F}]/gu,
+    " ",
+  );
+  // Leftover markdown / decoration that would be read aloud as stray symbols.
+  s = s.replace(/[*_`#>~|]+/g, " ");
   // Her name reads as "MY-omi" in Leda — spell it phonetically so it says "Mee-oh-mi".
   s = s.replace(/\bMiomi\b/gi, "Mee-oh-mee");
   s = s.replace(/Mio-?mi/gi, "Mee-oh-mee");
@@ -469,22 +480,155 @@ export function stripForTts(text: string): string {
   return s;
 }
 
-/** Speak a full reply: first sentence ASAP when cleanly splittable; otherwise identical to `speak()`. */
+// ─── PER-SEGMENT LANGUAGE ROUTING ────────────────────────────────────────────
+// A bilingual reply must be spoken with the RIGHT voice for each part — feeding
+// English into the Thai Leda voice (or vice-versa) mangles it. We split the
+// already-cleaned reply into ordered Thai / English runs and synthesize each in
+// its own voice, stitched gaplessly on one element.
+
+export type LangSegment = { text: string; lang: TtsLang };
+
+function letterCount(s: string): number {
+  return (s.match(/[\u0E00-\u0E7FA-Za-z]/g) ?? []).length;
+}
+
+/**
+ * Split text into ordered Thai/English segments by script.
+ * Neutral characters (spaces, digits, punctuation) attach to the current run.
+ * Runs with fewer than 2 letters are merged into a neighbor so we never
+ * synthesize a stray fragment. `fallback` voices any all-neutral text.
+ */
+export function segmentByLanguage(text: string, fallback: TtsLang): LangSegment[] {
+  const segs: LangSegment[] = [];
+  let curLang: TtsLang | null = null;
+  let buf = "";
+
+  const push = () => {
+    if (buf.trim()) segs.push({ text: buf, lang: curLang ?? fallback });
+    buf = "";
+  };
+
+  for (const ch of text) {
+    const c: TtsLang | null = /[\u0E00-\u0E7F]/.test(ch)
+      ? "th"
+      : /[A-Za-z]/.test(ch)
+        ? "en"
+        : null;
+    if (c === null) {
+      buf += ch; // neutral sticks to the run in progress
+      continue;
+    }
+    if (curLang !== null && c !== curLang) push();
+    curLang = c;
+    buf += ch;
+  }
+  push();
+
+  if (segs.length <= 1) {
+    if (segs.length === 1) return segs;
+    return text.trim() ? [{ text, lang: fallback }] : [];
+  }
+
+  // Backward-merge tiny runs (e.g. a lone "a" or "ๆ") into the previous segment.
+  const out: LangSegment[] = [];
+  for (const seg of segs) {
+    if (out.length > 0 && letterCount(seg.text) < 2) {
+      const prev = out[out.length - 1]!;
+      out[out.length - 1] = { ...prev, text: prev.text + seg.text };
+    } else {
+      out.push(seg);
+    }
+  }
+  // A tiny FIRST run has no previous neighbor — fold it forward into the next.
+  if (out.length > 1 && letterCount(out[0]!.text) < 2) {
+    const first = out.shift()!;
+    out[0] = { ...out[0]!, text: first.text + out[0]!.text };
+  }
+  return out;
+}
+
+/**
+ * Speak an ordered list of language segments gaplessly, each in its own voice.
+ * KEY DIFFERENCE from speakChunkedSequence: a segment that fails to synthesize
+ * is SKIPPED, not fatal — the rest of the reply still plays. We only report
+ * failure (onError) if NOTHING played.
+ */
+async function speakSegments(
+  segments: LangSegment[],
+  callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
+): Promise<void> {
+  killAllAudio();
+  callbacks?.onStart?.();
+  const myGen = ++__audioGen;
+  setSpeaking(true);
+
+  let aborted = false;
+  __supersede = () => {
+    aborted = true;
+  };
+  const stale = () => aborted || myGen !== __audioGen;
+
+  const finish = (anyPlayed: boolean) => {
+    if (myGen !== __audioGen) return;
+    __supersede = null;
+    disconnectPlaybackSource();
+    __activeAudio = null;
+    setSpeaking(false);
+    if (anyPlayed) callbacks?.onEnd?.();
+    else callbacks?.onError?.();
+  };
+
+  // Prefetch every segment in parallel, each in its own voice — latency ≈ slowest leg.
+  const fetches = segments.map((seg) => fetchServerAudio(seg.text, seg.lang));
+
+  const el = new Audio();
+  __activeAudio = el;
+  routeElementThroughPlayback(el);
+  unlockTtsPlayback();
+
+  let anyPlayed = false;
+  for (let i = 0; i < segments.length; i++) {
+    if (stale()) return;
+    const audio = await fetches[i];
+    if (stale()) return;
+    if (!audio) {
+      // Skip this segment, keep the rest of the reply intact.
+      console.warn("[tts] segment synth failed; skipping segment, continuing reply");
+      continue;
+    }
+    const ok = await playMp3OnElement(el, audio, myGen);
+    if (stale()) return;
+    if (ok) anyPlayed = true;
+  }
+
+  finish(anyPlayed);
+}
+
+/**
+ * Speak a full reply with correct per-language voices.
+ * Cleans → segments by script → plays each segment in its matching voice.
+ * Single-language replies take the fast straight path.
+ */
 export async function speakReply(
   text: string,
   lang: TtsLang,
   callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
 ): Promise<void> {
-  const trimmed = stripForTts(text.trim());
-  if (!trimmed) {
+  const clean = stripForTts(text.trim());
+  if (!clean) {
     callbacks?.onEnd?.();
     return;
   }
-  const chunks = splitReplyIntoTtsChunks(trimmed);
-  if (chunks.length <= 1) {
-    return speak(trimmed, lang, callbacks);
+  const segments = segmentByLanguage(clean, lang);
+  if (segments.length === 0) {
+    callbacks?.onEnd?.();
+    return;
   }
-  await speakChunkedSequence(chunks, lang, callbacks);
+  if (segments.length === 1) {
+    // Single-language reply — lowest-latency straight path.
+    return speak(segments[0]!.text, segments[0]!.lang, callbacks);
+  }
+  await speakSegments(segments, callbacks);
 }
 
 export async function speak(
