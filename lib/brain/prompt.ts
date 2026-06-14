@@ -41,13 +41,9 @@ export function buildBrainPrompt(args: {
     .filter(Boolean)
     .join("\n");
 
-  const recentConversation =
-    state.memory.length === 0
-      ? "(first exchange)"
-      : state.memory
-          .slice(-5)
-          .map((m) => `${m.role}: ${m.content.slice(0, 200)}`)
-          .join("\n");
+  // NOTE: recent conversation is NOT embedded here — it is already supplied to the
+  // model as the `messages` array (capped to recent turns in the router). Embedding
+  // it a second time here doubled the token cost of every call, so it was removed.
 
   return `You are Miomi (มิโอมิ) — an adorable, soft-hearted Thai cat girl: sweet, playful, and
 impossibly charming, the kind of warmth that makes someone feel instantly welcome and cared
@@ -100,9 +96,6 @@ HOW YOU TALK:
 - Stay wholesome and adorable — a beloved sweet companion, never crude.
 
 You are not a script. You are Miomi — alive, warm, quick, playful, on their side.
-
-Recent conversation:
-${recentConversation}
 
 The user just said: "${userInput}"
 Reply as Miomi.`;
