@@ -481,10 +481,13 @@ export function stripForTts(text: string): string {
 }
 
 // ─── PER-SEGMENT LANGUAGE ROUTING ────────────────────────────────────────────
-// A bilingual reply must be spoken with the RIGHT voice for each part — feeding
-// English into the Thai Leda voice (or vice-versa) mangles it. We split the
-// already-cleaned reply into ordered Thai / English runs and synthesize each in
-// its own voice, stitched gaplessly on one element.
+// Google Chirp3-HD has SEPARATE Thai and English voices — it cannot code-switch.
+// So a bilingual reply is split into ordered Thai / English runs, each synthesized
+// in its matching voice. Two safety nets keep this robust:
+//   • lone Thai final-particles (even with punctuation) are folded into a neighbour
+//     so they're never voiced alone (a solo "ค่ะ" renders as an unstable "ka-a"/"ha");
+//   • if ANY segment fails to synthesize, we fall back to ONE single-voice call of
+//     the whole reply, so she is never cut off mid-sentence.
 
 export type LangSegment = { text: string; lang: TtsLang };
 
@@ -492,11 +495,13 @@ function letterCount(s: string): number {
   return (s.match(/[\u0E00-\u0E7FA-Za-z]/g) ?? []).length;
 }
 
-// A Thai run that is NOTHING but sentence-final particles (e.g. a lone "ค่ะ"
-// tacked onto an English line). Synthesized in isolation these become a
-// drawn-out "kâ-à"; they must ride along with their neighbour instead.
-const THAI_PARTICLE_ONLY =
-  /^(?:\s|~|ๆ|ค่ะ|ค่า|คะ|ค๊ะ|คับ|ครับ|นะคะ|นะ|น่ะ|จ้ะ|จ้า|จ๊ะ|ฮะ|สิ|ล่ะ|ละ|เหรอ|หรอ|เนอะ)+$/;
+// A Thai run that is NOTHING but sentence-final particles (optionally wrapped in
+// spaces / punctuation like "ค่ะ!" or ", คะ"). Synthesized alone these become a
+// drawn-out "kâ-à" / breathy "ha"; they must ride along with their neighbour.
+const PUNCT = "[\\s~ๆฯ!?.,…:;\"'()\\-]";
+const THAI_PARTICLE_ONLY = new RegExp(
+  `^${PUNCT}*(?:ค่ะ|ค่า|คะ|ค๊ะ|คับ|ครับ|นะคะ|นะค้าบ|นะ|น่ะ|จ้ะ|จ้า|จ๊ะ|จ๋า|ฮะ|สิ|ล่ะ|ละ|เหรอ|หรอ|เนอะ)+${PUNCT}*$`,
+);
 
 function isMergeableFragment(seg: LangSegment): boolean {
   const t = seg.text.trim();
@@ -544,8 +549,7 @@ export function segmentByLanguage(text: string, fallback: TtsLang): LangSegment[
     return text.trim() ? [{ text, lang: fallback }] : [];
   }
 
-  // Backward-merge fragments into the previous segment (kept in its language) so
-  // a lone particle / tiny run never gets its own isolated synthesis.
+  // Backward-merge fragments into the previous segment (kept in its language).
   const out: LangSegment[] = [];
   for (const seg of segs) {
     if (out.length > 0 && isMergeableFragment(seg)) {
@@ -564,13 +568,15 @@ export function segmentByLanguage(text: string, fallback: TtsLang): LangSegment[
 }
 
 /**
- * Speak an ordered list of language segments gaplessly, each in its own voice.
- * KEY DIFFERENCE from speakChunkedSequence: a segment that fails to synthesize
- * is SKIPPED, not fatal — the rest of the reply still plays. We only report
- * failure (onError) if NOTHING played.
+ * Speak ordered language segments, each in its own voice.
+ * COMPLETENESS GUARANTEE: prefetch all segments; if ANY fails to synthesize,
+ * fall back to ONE single-voice call of the whole reply (`fullText` in
+ * `fallbackLang`) so she never stops mid-sentence. Only onError if even that fails.
  */
 async function speakSegments(
   segments: LangSegment[],
+  fullText: string,
+  fallbackLang: TtsLang,
   callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: () => void },
 ): Promise<void> {
   killAllAudio();
@@ -584,45 +590,56 @@ async function speakSegments(
   };
   const stale = () => aborted || myGen !== __audioGen;
 
-  const finish = (anyPlayed: boolean) => {
+  const finish = (ok: boolean) => {
     if (myGen !== __audioGen) return;
     __supersede = null;
     disconnectPlaybackSource();
     __activeAudio = null;
     setSpeaking(false);
-    if (anyPlayed) callbacks?.onEnd?.();
+    if (ok) callbacks?.onEnd?.();
     else callbacks?.onError?.();
   };
 
   // Prefetch every segment in parallel, each in its own voice — latency ≈ slowest leg.
-  const fetches = segments.map((seg) => fetchServerAudio(seg.text, seg.lang));
+  const audios = await Promise.all(segments.map((seg) => fetchServerAudio(seg.text, seg.lang)));
+  if (stale()) return;
 
   const el = new Audio();
   __activeAudio = el;
   routeElementThroughPlayback(el);
   unlockTtsPlayback();
 
-  let anyPlayed = false;
-  for (let i = 0; i < segments.length; i++) {
+  // If any segment failed, abandon per-segment and speak the WHOLE reply in one
+  // voice — completeness beats per-word voice accuracy for this one reply.
+  if (audios.some((a) => !a)) {
+    console.warn("[tts] a segment failed; falling back to single-voice full reply");
+    const full = await fetchServerAudio(fullText, fallbackLang);
     if (stale()) return;
-    const audio = await fetches[i];
-    if (stale()) return;
-    if (!audio) {
-      // Skip this segment, keep the rest of the reply intact.
-      console.warn("[tts] segment synth failed; skipping segment, continuing reply");
-      continue;
+    if (!full) {
+      finish(false);
+      return;
     }
-    const ok = await playMp3OnElement(el, audio, myGen);
+    const ok = await playMp3OnElement(el, full, myGen);
+    if (stale()) return;
+    finish(ok);
+    return;
+  }
+
+  // All segments ready — play them gaplessly in order on one element.
+  let anyPlayed = false;
+  for (const audio of audios) {
+    if (stale()) return;
+    const ok = await playMp3OnElement(el, audio!, myGen);
     if (stale()) return;
     if (ok) anyPlayed = true;
   }
-
   finish(anyPlayed);
 }
 
 /**
  * Speak a full reply with correct per-language voices.
- * Cleans → segments by script → plays each segment in its matching voice.
+ * Cleans → segments by script → plays each segment in its matching voice,
+ * with a single-voice full-reply fallback if any segment fails.
  * Single-language replies take the fast straight path.
  */
 export async function speakReply(
@@ -644,7 +661,7 @@ export async function speakReply(
     // Single-language reply — lowest-latency straight path.
     return speak(segments[0]!.text, segments[0]!.lang, callbacks);
   }
-  await speakSegments(segments, callbacks);
+  await speakSegments(segments, clean, lang, callbacks);
 }
 
 export async function speak(
