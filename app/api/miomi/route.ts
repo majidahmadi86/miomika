@@ -1,3 +1,5 @@
+export const preferredRegion = ["sin1", "hnd1"];
+
 import { NextRequest, NextResponse } from "next/server";
 import { getAIResponse } from "@/lib/ai/router";
 import {
