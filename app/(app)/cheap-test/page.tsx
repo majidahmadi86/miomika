@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -117,6 +117,23 @@ export default function CheapTestPage() {
     Array<{ role: "user" | "assistant"; content: string }>
   >([]);
   const [sessionContext, setSessionContext] = useState<Record<string, unknown>>({});
+  // Persist conversation across remount/refresh so it never vanishes mid-chat.
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem("miomika.cheaptest");
+      if (raw) {
+        const saved = JSON.parse(raw) as { bubbles?: ChatBubble[]; apiMessages?: typeof apiMessages };
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot sessionStorage hydrate on mount
+        if (Array.isArray(saved.bubbles)) setBubbles(saved.bubbles);
+        if (Array.isArray(saved.apiMessages)) setApiMessages(saved.apiMessages);
+      }
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem("miomika.cheaptest", JSON.stringify({ bubbles, apiMessages }));
+    } catch { /* ignore */ }
+  }, [bubbles, apiMessages]);
 
   const releaseTurn = useCallback(() => {
     turnInFlightRef.current = false;

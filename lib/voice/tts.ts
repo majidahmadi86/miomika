@@ -453,9 +453,17 @@ export function stripForTts(text: string): string {
   let s = text;
   s = s.replace(/\([^)]*\)/g, " ");
   s = s.replace(/\*[^*]+\*/g, " ");
-  s = s.replace(/\b(?:ha(?:ha)+|hehe|lol|lmao|rofl)\b/gi, " ");
-  s = s.replace(/ฮ+(?:า)?(?:ฮ+(?:า)?)+/g, " ");
-  s = s.replace(/\b5{2,}\b/g, " ");
+  // Laughter — match even when glued to other scripts (no word-boundary needed),
+  // and lone "ha"/"haha"/"ha ha"/"hehe"/"lol"/"55+".
+  s = s.replace(/(?:ha\s*){2,}/gi, " ");
+  s = s.replace(/\bha\b/gi, " ");
+  s = s.replace(/(?:he){2,}/gi, " ");
+  s = s.replace(/\b(?:lol|lmao|rofl|haha|hahaha)\b/gi, " ");
+  s = s.replace(/ฮ+(?:า|่า)?(?:ฮ+(?:า|่า)?)*/g, " ");
+  s = s.replace(/5{2,}/g, " ");
+  // Her name reads as "MY-omi" in Leda — spell it phonetically so it says "Mee-oh-mi".
+  s = s.replace(/\bMiomi\b/g, "Mee-oh-mee");
+  s = s.replace(/มิโอมิ/g, "มิ-โอ-มิ");
   s = s.replace(/\s+/g, " ").trim();
   return s;
 }
