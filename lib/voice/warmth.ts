@@ -969,7 +969,7 @@ const HOME_GREETING_FIRST_DAY: WarmPhrase[] = [
   { th: "สวัสดีค่า~ มาเล่นกับหนูไหม", en: "Hello~ want to hang out with me?" },
 ];
 
-const HOME_REACT_TAP: WarmPhrase[] = [
+export const HOME_REACT_TAP: WarmPhrase[] = [
   { th: "เอ๊ะ~?", en: "Huh~?" },
   { th: "หนูตื่นแล้วค่า~", en: "I'm awake~" },
   { th: "Hi~!", en: "Hi~!" },
@@ -978,7 +978,7 @@ const HOME_REACT_TAP: WarmPhrase[] = [
   { th: "อุ๊ย~ ขี้เล่นจัง", en: "Oops~ so playful" },
 ];
 
-const HOME_REACT_DRAG: WarmPhrase[] = [
+export const HOME_REACT_DRAG: WarmPhrase[] = [
   { th: "เย้~!", en: "Wheee~!" },
   { th: "Wheee~!", en: "Wheee~!" },
   { th: "วู้~ฮู~", en: "Wheee~!" },
@@ -986,7 +986,7 @@ const HOME_REACT_DRAG: WarmPhrase[] = [
   { th: "สนุกจังเลย~", en: "So fun~" },
 ];
 
-const HOME_REACT_LOWFUEL: WarmPhrase[] = [
+export const HOME_REACT_LOWFUEL: WarmPhrase[] = [
   { th: "หนูหิวค่า~", en: "Feed me~?" },
   { th: "Feed me~?", en: "Feed me~?" },
   { th: "หิวแล้วค่า~ อยากได้เชื้อเพลิง", en: "I'm hungry~ need some fuel" },
