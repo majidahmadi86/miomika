@@ -82,6 +82,8 @@ export async function POST(req: NextRequest) {
       sessionContext: clientSessionContext,
     } = body;
     const mode = body?.mode as "auto" | "teach" | "social" | "translate" | "chat" | undefined;
+    const clientUiLanguage = body?.uiLanguage === "en" || body?.uiLanguage === "th" ? body.uiLanguage : null;
+    const clientTargetLanguage = body?.targetLanguage === "en" || body?.targetLanguage === "th" ? body.targetLanguage : null;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "Invalid messages" }, { status: 400 });
@@ -125,6 +127,8 @@ export async function POST(req: NextRequest) {
         userInput,
         sessionId: state.sessionId,
         exchangeNumber: state.exchangeNumber,
+        overrideUiLanguage: clientUiLanguage,
+        overrideTargetLanguage: clientTargetLanguage,
       });
 
       const pronReq = detectPronunciationRequest(userInput);

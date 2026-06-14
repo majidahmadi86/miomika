@@ -69,6 +69,8 @@ export async function readBrainState(args: {
   userInput: string;
   sessionId: string;
   exchangeNumber: number;
+  overrideUiLanguage?: "th" | "en" | null;
+  overrideTargetLanguage?: "th" | "en" | null;
 }): Promise<BrainState> {
   const { userInput, exchangeNumber } = args;
 
@@ -142,11 +144,11 @@ export async function readBrainState(args: {
   }
 
   const nowLanguage = detectLanguage(userInput, profileUiLang);
-  const uiLanguage = resolveUiLanguage({ profileUiLang });
-  const targetLanguage = resolveTargetLanguage({
-    profileTarget: learningTarget,
-    uiLanguage,
-  });
+  // Client may pass explicit languages (what the user is speaking vs learning),
+  // which override profile defaults — fixes "teach me Thai" from an English speaker.
+  const uiLanguage = args.overrideUiLanguage ?? resolveUiLanguage({ profileUiLang });
+  const targetLanguage = args.overrideTargetLanguage
+    ?? resolveTargetLanguage({ profileTarget: learningTarget, uiLanguage });
   const userSpeaksLanguage = uiLanguage;
   const learningTargetLanguage = targetLanguage;
   const isPracticeAttempt = detectPracticeAttempt({

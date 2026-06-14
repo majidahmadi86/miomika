@@ -161,10 +161,13 @@ export default function CheapTestPage() {
   const handleMicStateChange = useCallback(
     (state: MicState) => {
       setMicState(state);
+      // Any return to idle while a turn is armed but hasn't reached the miomi/tts
+      // stage (e.g. utterance too short, empty transcript, VAD misfire) must release
+      // the turn — otherwise the mic stays dead.
       if (
         state === "idle" &&
-        pipelineStageRef.current === "transcribing" &&
-        turnInFlightRef.current
+        turnInFlightRef.current &&
+        (pipelineStageRef.current === "transcribing" || pipelineStageRef.current === "idle")
       ) {
         releaseTurn();
         setStatusLine("Tap mic and speak~");
@@ -217,6 +220,12 @@ export default function CheapTestPage() {
       miomiStartAtRef.current = performance.now();
 
       try {
+        // Detect the language the user is SPEAKING from their words; they're LEARNING
+        // the opposite. Pass both so the brain doesn't fall back to profile defaults
+        // (which made "teach me Thai" from an English speaker teach English).
+        const hasThai = /[\u0E00-\u0E7F]/.test(userText);
+        const spokenLang: "th" | "en" = hasThai ? "th" : "en";
+        const learnLang: "th" | "en" = spokenLang === "th" ? "en" : "th";
         const res = await fetch("/api/miomi", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -225,6 +234,8 @@ export default function CheapTestPage() {
             messages: nextMessages,
             mode: "chat",
             sessionContext,
+            uiLanguage: spokenLang,
+            targetLanguage: learnLang,
           }),
         });
 
