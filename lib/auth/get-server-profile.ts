@@ -18,6 +18,7 @@ export interface ServerProfile {
   ui_language: "th" | "en";
   primary_language: string;
   learning_target_language: string;
+  cefr_level: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null;
   miomi_stars: number;
   xp: number;
   level: number;
@@ -47,6 +48,7 @@ export async function getServerProfile(): Promise<ServerProfile | null> {
     .select(
       `id, email, display_name, tier, journey_stage, gender,
        ui_language, primary_language, learning_target_language,
+       cefr_level,
        miomi_stars, xp, level, streak, mood,
        welcome_shown_at, onboarding_completed_at, last_seen_at`,
     )
@@ -66,6 +68,8 @@ export async function getServerProfile(): Promise<ServerProfile | null> {
     primary_language: (data.primary_language as string | null) ?? "th",
     learning_target_language:
       (data.learning_target_language as string | null) ?? "en",
+    cefr_level:
+      (data.cefr_level as "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null) ?? null,
     miomi_stars: (data.miomi_stars as number | null) ?? 0,
     xp: (data.xp as number | null) ?? 0,
     level: (data.level as number | null) ?? 1,

@@ -173,7 +173,7 @@ export async function readBrainState(args: {
       learningTarget,
       journeyStage: profile?.journey_stage ?? null,
       tier: profile?.tier ?? "guest",
-      cefrLevel: null,
+      cefrLevel: profile?.cefr_level ?? null,
       catName,
     },
     memory,

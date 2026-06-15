@@ -665,6 +665,21 @@ export default function MePage() {
           />
           <RowDivider />
           <ChevronRow
+            icon={<BookOpen size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
+            label={uiLang === "th" ? "ระดับของคุณ" : "Your level"}
+            value={
+              profile?.cefr_level
+                ? uiLang === "th"
+                  ? { A1: "เพิ่งเริ่ม", A2: "รู้บ้าง", B1: "พอคล่อง", B2: "คล่องแล้ว", C1: "คล่องแล้ว", C2: "คล่องแล้ว" }[profile.cefr_level]
+                  : { A1: "Just starting", A2: "Know some", B1: "Comfortable", B2: "Fluent", C1: "Fluent", C2: "Fluent" }[profile.cefr_level]
+                : uiLang === "th"
+                  ? "ยังไม่ได้ตั้ง"
+                  : "Not set"
+            }
+            onClick={() => router.push("/me/level")}
+          />
+          <RowDivider />
+          <ChevronRow
             icon={<Globe size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
             label={me.app.uiLang(uiLang)}
             value={uiLangLabel}

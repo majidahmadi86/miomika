@@ -41,6 +41,7 @@ export interface Profile {
   onboarding_completed_at: string | null;
   ui_language: "th" | "en" | null;
   learning_target_language: "th" | "en" | null;
+  cefr_level: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null;
   active_character_id: string | null;
   miomi_stars: number | null;
 }
@@ -79,7 +80,7 @@ export function useProfile(): ProfileState {
       const { data: row, error } = await supabase
         .from("profiles")
         .select(
-          "id, email, display_name, tier, journey_stage, gender, level, streak, last_seen_at, welcome_shown_at, onboarding_completed_at, ui_language, learning_target_language, active_character_id, miomi_stars",
+          "id, email, display_name, tier, journey_stage, gender, level, streak, last_seen_at, welcome_shown_at, onboarding_completed_at, ui_language, learning_target_language, cefr_level, active_character_id, miomi_stars",
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -108,6 +109,7 @@ export function useProfile(): ProfileState {
             onboarding_completed_at: null,
             ui_language: null,
             learning_target_language: null,
+            cefr_level: null,
             active_character_id: "miomi",
             miomi_stars: 0,
           },
@@ -133,6 +135,8 @@ export function useProfile(): ProfileState {
           ui_language: (row.ui_language as "th" | "en" | null) ?? null,
           learning_target_language:
             (row.learning_target_language as "th" | "en" | null) ?? null,
+          cefr_level:
+            (row.cefr_level as "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null) ?? null,
           active_character_id: (row.active_character_id as string | null) ?? "miomi",
           miomi_stars: (row.miomi_stars as number | null) ?? 0,
         },
