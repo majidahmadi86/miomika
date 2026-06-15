@@ -63,21 +63,34 @@ export function BottomNav() {
                   border: "none",
                 }}
               >
-                <Icon
+                <span
                   style={{
-                    width: "24px",
-                    height: "24px",
-                    color: active ? "#34A98F" : "#9A8B73",
-                    strokeWidth: 1.75,
-                    transition: "color 0.18s cubic-bezier(0.4,0,0.2,1)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "52px",
+                    height: "30px",
+                    borderRadius: "15px",
+                    background: active ? "rgba(110,205,184,0.16)" : "transparent",
+                    transition: "background 0.2s cubic-bezier(0.4,0,0.2,1)",
                   }}
-                  aria-hidden
-                />
+                >
+                  <Icon
+                    style={{
+                      width: "23px",
+                      height: "23px",
+                      color: active ? "#34A98F" : "#9A8B73",
+                      transition: "color 0.18s cubic-bezier(0.4,0,0.2,1)",
+                    }}
+                    strokeWidth={active ? 2.1 : 1.75}
+                    aria-hidden
+                  />
+                </span>
                 <span
                   style={{
                     fontFamily: lang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif",
                     fontSize: "11px",
-                    fontWeight: 500,
+                    fontWeight: active ? 600 : 500,
                     color: active ? "#34A98F" : "#9A8B73",
                     lineHeight: 1,
                     letterSpacing: "0.01em",
