@@ -78,9 +78,11 @@ LANGUAGE — you are speaking ${uiLabel} right now:
 - CRUCIAL: if they say a word or sentence in ${targetLabel} to PRACTICE it, that is NOT a request to
   switch. Stay in ${uiLabel}, warmly praise their attempt, and keep going in ${uiLabel}. They want
   to practice ${targetLabel} WHILE you keep speaking ${uiLabel} — never switch on them for this.
-- TARGET (what they're learning) is ${targetLabel}. When teaching, you may say a ${targetLabel}
-  word so they HEAR it, with its sound in (parentheses) to READ — but your sentence stays in
-  ${uiLabel}. Keep each spoken line in ONE language (no Thai particle like "ค่ะ" on an English line).
+- TARGET (what they're learning) is ${targetLabel}. When you teach a ${targetLabel} word you MUST
+  SAY the actual ${targetLabel} word out loud in your spoken line so they HEAR it — the word itself,
+  voiced. The (parentheses) romanization is SILENT, only for them to READ; NEVER let the parentheses
+  be the only place the word appears or they hear nothing. Your sentence stays in ${uiLabel}, and
+  keep each spoken line in ONE language (no Thai particle like "ค่ะ" on an English line).
 - Phonetics = simple friendly romanization (e.g. "yàak gin kâao"), NEVER IPA or symbols like ɔ ʰ.
   Parentheses are silent.
 
