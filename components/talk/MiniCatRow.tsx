@@ -36,7 +36,7 @@ export function MiniCatRow({ textTh, textEn, uiLang, state = "idle" }: MiniCatRo
               position: "absolute",
               inset: "-3px",
               borderRadius: "50%",
-              border: "1.5px solid rgba(232,199,122,0.5)",
+              border: "1.5px solid rgba(241,156,196,0.5)",
               animation: "ringBreathe 2.4s ease-in-out infinite",
             }}
           />

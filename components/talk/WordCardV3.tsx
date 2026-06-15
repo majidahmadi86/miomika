@@ -46,7 +46,7 @@ const FONT_LATIN = "'Quicksand', sans-serif";
 const FONT_THAI = "'Sarabun', sans-serif";
 const INK = "#1A1A18";
 const MUTE = "#9A8B73";
-const GOLD = "#C9A96E";
+const GOLD = "#34A98F";
 const LINE = "#E8E5DF";
 const CREAM = "#FAF6EC";
 
@@ -105,7 +105,7 @@ export function WordCardV3({
         border: `1px solid ${LINE}`,
         borderLeft: `3px solid ${GOLD}`,
         borderRadius: "14px",
-        boxShadow: "0 3px 12px rgba(201,169,110,0.13)",
+        boxShadow: "0 3px 12px rgba(52,169,143,0.13)",
         overflow: "hidden",
         marginBottom: "8px",
       }}
@@ -121,7 +121,7 @@ export function WordCardV3({
           style={{
             position: "absolute", top: "9px", right: "10px",
             width: "28px", height: "28px", borderRadius: "50%",
-            background: "rgba(201,169,110,0.10)", border: "none", cursor: "pointer",
+            background: "rgba(52,169,143,0.10)", border: "none", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
@@ -137,7 +137,7 @@ export function WordCardV3({
                 <IconComponent style={{ width: "28px", height: "28px", color: GOLD }} strokeWidth={1.6} />
               </div>
             ) : (
-              <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={{ fontFamily: primaryFont, fontSize: glyphText.length > 1 ? "20px" : "26px", fontWeight: 700, color: "#FFFFFF", lineHeight: 1 }}>{glyphText}</span>
               </div>
             )}
@@ -150,7 +150,7 @@ export function WordCardV3({
                 <span style={{ fontFamily: FONT_LATIN, fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: GOLD }}>{word.cefr_level}</span>
               )}
               {pronunciation && (
-                <span style={{ fontFamily: FONT_LATIN, fontSize: "11px", fontWeight: 600, color: GOLD, background: "rgba(201,169,110,0.10)", padding: "2px 9px", borderRadius: "14px" }}>{pronunciation}</span>
+                <span style={{ fontFamily: FONT_LATIN, fontSize: "11px", fontWeight: 600, color: GOLD, background: "rgba(52,169,143,0.10)", padding: "2px 9px", borderRadius: "14px" }}>{pronunciation}</span>
               )}
               {meaningWord && (
                 <span style={{ fontFamily: meaningFont, fontSize: "13.5px", fontWeight: 500, color: INK }}>{meaningWord}</span>
@@ -212,7 +212,7 @@ export function WordCardV3({
           <div style={{ marginTop: "9px", display: "flex", flexDirection: "column", gap: "7px" }}>
             {saveState &&
               (saveState === "saved" ? (
-                <div style={{ width: "100%", height: "38px", borderRadius: "11px", background: "rgba(201,169,110,0.08)", border: "1px solid rgba(201,169,110,0.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
+                <div style={{ width: "100%", height: "38px", borderRadius: "11px", background: "rgba(52,169,143,0.08)", border: "1px solid rgba(52,169,143,0.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
                   <BookmarkCheck style={{ width: "15px", height: "15px", color: GOLD }} strokeWidth={2} />
                   <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: GOLD }}>{isThaiLearner ? "บันทึกแล้วค่า~" : "Saved~"}</span>
                 </div>
@@ -223,7 +223,7 @@ export function WordCardV3({
                 </motion.button>
               ))}
             {onPronunciationCheck && (
-              <motion.button type="button" onClick={() => onPronunciationCheck(word)} whileTap={{ scale: 0.98 }} style={{ width: "100%", height: "38px", borderRadius: "11px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
+              <motion.button type="button" onClick={() => onPronunciationCheck(word)} whileTap={{ scale: 0.98 }} style={{ width: "100%", height: "38px", borderRadius: "11px", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
                 <Mic style={{ width: "15px", height: "15px", color: "#FFFFFF" }} strokeWidth={2} />
                 <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>{isThaiLearner ? "ลองพูดดูค่า~" : "Try saying this~"}</span>
               </motion.button>
