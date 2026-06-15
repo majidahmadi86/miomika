@@ -54,6 +54,8 @@ async function callGroqPhonetics(system: string, user: string): Promise<string |
 }
 
 async function callGeminiPhonetics(system: string, user: string): Promise<string | null> {
+  // Gemini OFF by default (wallet protection); callers fall back to Groq.
+  if (process.env.ENABLE_GEMINI_FALLBACK !== "true") return null;
   const gemini = getGemini();
   if (!gemini) return null;
   try {

@@ -83,6 +83,8 @@ export async function callGroqJson(system: string, user: string, maxTokens: numb
 }
 
 export async function callGeminiJson(system: string, user: string, maxTokens: number = 800): Promise<string | null> {
+  // Gemini OFF by default (wallet protection); callers fall back to Groq.
+  if (process.env.ENABLE_GEMINI_FALLBACK !== "true") return null;
   const gemini = getGemini();
   if (!gemini) {
     console.error("[brain] gemini unavailable: GEMINI_API_KEY missing");

@@ -560,7 +560,7 @@ export class MiomiTurnClient {
     this.history.push({ role: "assistant", content });
 
     // word card → tool_call so the page renders it exactly as in Live
-    if (reply.wordCard && (reply.wordCard.word || reply.wordCard.translation)) {
+    if (reply.wordCard && (reply.wordCard.word_en || reply.wordCard.word || reply.wordCard.translation)) {
       this.emit({
         type: "tool_call",
         name: "get_word_to_teach",

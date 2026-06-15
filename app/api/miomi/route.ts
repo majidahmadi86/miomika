@@ -25,6 +25,8 @@ import { saveExchange } from "@/lib/brain/memory";
 import { readBrainState, type BrainState } from "@/lib/brain/state";
 import { buildBrainPrompt } from "@/lib/brain/prompt";
 import { detectExplicitUiLanguageRequest } from "@/lib/brain/language";
+import { resolveOrGenerateWord } from "@/lib/brain/word-content";
+import { resolvePhonetics } from "@/lib/brain/phonetics";
 import {
   detectReuseAndAdvance,
   introduceWord,
@@ -37,9 +39,21 @@ import { log } from "@/lib/debug/log";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
+type TeachCard = {
+  word_en: string;
+  word_th: string;
+  emoji: string | null;
+  cefr_level: string | null;
+  phonetics: string;
+  phonetics_source: string;
+  th_romanization?: string;
+  en_ipa?: string;
+  example_th?: string;
+  example_en?: string;
+};
 type MiomiResponse = {
   content: string;
-  wordCard: IntroducedWord | null;
+  wordCard: TeachCard | null;
   phraseCard: unknown | null;
   creatorAsset: unknown | null;
   sessionContext: Partial<SessionState>;
@@ -221,6 +235,7 @@ export async function POST(req: NextRequest) {
 
     let masteryEvent: MasteryEvent = { type: "none" };
     let wordToIntroduce: IntroducedWord | null = null;
+    let teachCard: TeachCard | null = null;
 
     try {
       masteryEvent = await detectReuseAndAdvance({
@@ -254,18 +269,65 @@ export async function POST(req: NextRequest) {
       brainState.emotionalSignal !== "sad";
 
     if (shouldPickWord) {
-      try {
-        wordToIntroduce = await pickWordToIntroduce({
-          userId: serverUserId,
-          cefrLevel: brainState.profile.cefrLevel,
-          learningTarget: brainState.profile.learningTarget,
-          alreadyIntroducedWords: introducedWordKeys,
-          alreadyMasteredWords: masteredWordKeys,
-          tier: brainState.profile.tier,
-        });
-      } catch (err) {
-        console.error("[brain] pickWordToIntroduce failed:", err);
-        wordToIntroduce = null;
+      // The user's named word if they asked for one, else a level-appropriate word.
+      let sourceWord = extractRequestedWord(userInput);
+      if (!sourceWord) {
+        try {
+          const picked = await pickWordToIntroduce({
+            userId: serverUserId,
+            cefrLevel: brainState.profile.cefrLevel,
+            learningTarget: brainState.profile.learningTarget,
+            alreadyIntroducedWords: introducedWordKeys,
+            alreadyMasteredWords: masteredWordKeys,
+            tier: brainState.profile.tier,
+          });
+          sourceWord = picked?.word_en ?? null;
+        } catch (err) {
+          console.error("[brain] pickWordToIntroduce failed:", err);
+        }
+      }
+      // Resolve to a COMPLETE, verified card (phonetics + example) — same builder
+      // /api/teach-word uses. Bank hit = instant; miss = generate (Groq-only when
+      // Gemini is off). The model is told to teach exactly this word → card == speech.
+      if (sourceWord) {
+        try {
+          const target = brainState.profile.learningTarget ?? "th";
+          const resolved = await resolveOrGenerateWord({
+            word: sourceWord,
+            learningTarget: target,
+            cefrLevel: brainState.profile.cefrLevel,
+          });
+          if (resolved) {
+            const phon = await resolvePhonetics({
+              word_th: resolved.word_th,
+              word_en: resolved.word_en,
+              learningTarget: target,
+              bankRomanization: resolved.th_romanization,
+              bankIpa: resolved.en_ipa,
+            });
+            wordToIntroduce = {
+              word: resolved.word_en,
+              word_en: resolved.word_en,
+              word_th: resolved.word_th,
+              cefr_level: resolved.cefr_level,
+              emoji: resolved.emoji,
+            };
+            teachCard = {
+              word_en: resolved.word_en,
+              word_th: resolved.word_th,
+              emoji: resolved.emoji,
+              cefr_level: resolved.cefr_level,
+              phonetics: phon.phonetics,
+              phonetics_source: phon.phonetics_source,
+              ...(phon.th_romanization ? { th_romanization: phon.th_romanization } : {}),
+              ...(phon.en_ipa ? { en_ipa: phon.en_ipa } : {}),
+              ...(resolved.example_th ? { example_th: resolved.example_th } : {}),
+              ...(resolved.example_en ? { example_en: resolved.example_en } : {}),
+            };
+          }
+        } catch (err) {
+          console.error("[brain] card enrich failed:", err);
+        }
       }
     }
 
@@ -386,7 +448,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── STAGE 11: Extract teaching artifacts ─────────────────────────────────
-    const wordCard = wordToIntroduce ?? null;
+    const wordCard = teachCard ?? null;
     const responseMasteryEvent =
       masteryEvent.type === "none" ? null : masteryEvent;
 
@@ -474,6 +536,18 @@ export async function POST(req: NextRequest) {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+/** Pull a specific word/meaning the user named ("word for cat", "how do you say hello", "teach me dog"). */
+function extractRequestedWord(input: string): string | null {
+  const m = input.match(
+    /(?:word for|how (?:do you |to )?say|teach me(?: the word(?: for)?| how to say)?)\s+["']?([\p{L}][\p{L}\s'-]{1,30})["']?/iu,
+  );
+  if (!m) return null;
+  const w = m[1].trim().replace(/[?.!,]+$/, "").toLowerCase();
+  const generic = new Set(["a word", "word", "a new word", "new word", "another word", "something", "anything", "more", "that", "this", "a card", "one", "me", "you"]);
+  if (w.length < 2 || generic.has(w)) return null;
+  return w;
+}
 
 function detectReplyLanguageFromContent(
   text: string,
