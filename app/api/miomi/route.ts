@@ -24,6 +24,7 @@ import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 import { saveExchange } from "@/lib/brain/memory";
 import { readBrainState, type BrainState } from "@/lib/brain/state";
 import { buildBrainPrompt } from "@/lib/brain/prompt";
+import { detectExplicitUiLanguageRequest } from "@/lib/brain/language";
 import {
   detectReuseAndAdvance,
   introduceWord,
@@ -232,6 +233,13 @@ export async function POST(req: NextRequest) {
       masteryEvent = { type: "none" };
     }
 
+    // LANGUAGE SINGLE-OWNER: only an explicit request switches the medium; practising the
+    // target language never flips it. The medium owns the reply voice (no content-detection).
+    const explicitUiSwitch = detectExplicitUiLanguageRequest(userInput);
+    if (explicitUiSwitch && explicitUiSwitch !== brainState.uiLanguage) {
+      adaptivePrompt += `\n\nLANGUAGE SWITCH: The user explicitly asked you to speak ${explicitUiSwitch === "th" ? "Thai" : "English"}. Switch to ${explicitUiSwitch === "th" ? "Thai" : "English"} now and stay in it.`;
+    }
+
     // Teaching only when user is FLOWING and not asking a question. Better to skip than to interrupt.
     const shouldPickWord =
       (mode === "teach" || mode === "auto" || mode === undefined) &&
@@ -413,10 +421,7 @@ export async function POST(req: NextRequest) {
       lastUserSignal: userInput.slice(0, 100),
     };
 
-    const replyLanguage = detectReplyLanguageFromContent(
-      content,
-      brainState.uiLanguage,
-    );
+    const replyLanguage = explicitUiSwitch ?? brainState.uiLanguage;
     return NextResponse.json({
       content,
       wordCard,
