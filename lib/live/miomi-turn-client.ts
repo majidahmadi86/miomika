@@ -52,7 +52,7 @@ type AudioPayload = Parameters<MiomiLiveClient["sendAudio"]>[0];
 const SAMPLE_RATE = 16000;
 const START_RMS = 0.030; // onset threshold (int16-normalised RMS) — higher = rejects room/keyboard noise
 const END_RMS = 0.018; // offset threshold (hysteresis — lower than onset)
-const SILENCE_MS = 2500; // trailing silence that ends a turn — generous so the user can pause / think mid-thought
+const SILENCE_MS = 1100; // trailing silence that ends a turn — snappy chat feel, still lets the user breathe briefly
 const MIN_SPEECH_MS = 320; // shorter than this = misfire, discarded
 const ONSET_DEBOUNCE_MS = 120; // sound must stay above START_RMS this long to count as speech (kills taps/clicks)
 const MAX_UTTER_MS = 28000; // hard cap (paired with transcribe maxDuration=30s) — long monologues allowed
