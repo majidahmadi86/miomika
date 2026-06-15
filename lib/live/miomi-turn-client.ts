@@ -504,7 +504,10 @@ export class MiomiTurnClient {
     if (wav.size < 2000) return "";
     const form = new FormData();
     form.append("audio", wav, "utterance.wav");
-    form.append("language", this.uiLanguage);
+    // Auto-detect the SPOKEN language. The user's UI may be English while they're
+    // practising Thai (or code-switching) — forcing the UI language made Whisper
+    // hear "สวัสดีค่ะ" as broken English. Auto lets it transcribe what was actually said.
+    form.append("language", "auto");
     const ctrl = new AbortController();
     const t = window.setTimeout(() => ctrl.abort(), 8000);
     try {
