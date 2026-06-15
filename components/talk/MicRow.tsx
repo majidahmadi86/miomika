@@ -153,7 +153,7 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
           <motion.div
             animate={orbState === "listening" ? { scale: [1, 1.05, 1] } : { scale: 1 }}
             transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-            style={{ width: isHead ? "84px" : "68px", height: isHead ? "84px" : "68px", borderRadius: "50%", background: isHead ? "transparent" : "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: isHead ? (orbState === "listening" ? "0 4px 18px rgba(201,169,110,0.30)" : "none") : (orbState === "listening" ? "0 8px 30px rgba(201,169,110,0.8), 0 0 0 5px rgba(201,169,110,0.14)" : "0 8px 22px rgba(201,169,110,0.45), 0 0 0 1px rgba(255,255,255,0.5)"), position: "relative", zIndex: 2 }}
+            style={{ width: isHead ? "84px" : "68px", height: isHead ? "84px" : "68px", borderRadius: "50%", background: isHead ? "transparent" : "linear-gradient(135deg, #FCEBD8 0%, #F6C3DA 100%)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: isHead ? (orbState === "listening" ? "0 4px 18px rgba(201,169,110,0.30)" : "none") : (orbState === "listening" ? "0 8px 30px rgba(241,156,196,0.55), 0 0 0 5px rgba(241,156,196,0.16)" : "0 8px 22px rgba(241,156,196,0.42), 0 0 0 1px rgba(255,255,255,0.6)"), position: "relative", zIndex: 2 }}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -173,7 +173,7 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
                     style={{ objectFit: "contain" }}
                   />
                 ) : (
-                  <OrbIcon size={26} color="#FFFFFF" strokeWidth={2} />
+                  <OrbIcon size={26} color="#A24768" strokeWidth={2} />
                 )}
               </motion.div>
             </AnimatePresence>
@@ -187,7 +187,7 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -5 }}
               transition={{ type: "spring", stiffness: 300, damping: 26 }}
-              style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 600, color: "#B8985C", letterSpacing: "0.03em", marginTop: "4px" }}
+              style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 600, color: "#9A8B73", letterSpacing: "0.03em", marginTop: "4px" }}
             >
               {uiLang === "en" ? activeMode.labelEn : activeMode.labelTh}
             </motion.span>
@@ -210,7 +210,7 @@ function PulseRing({ delay, listening = false }: { delay: number; listening?: bo
     <motion.span
       animate={{ scale: listening ? [1, 1.7] : [1, 2], opacity: [listening ? 0.85 : 0.7, 0] }}
       transition={{ duration: listening ? 1.3 : 2.2, repeat: Infinity, delay, ease: "easeOut" }}
-      style={{ position: "absolute", top: "50%", left: "50%", width: "66px", height: "66px", marginTop: "-33px", marginLeft: "-33px", borderRadius: "50%", border: listening ? "2.5px solid rgba(201,169,110,0.7)" : "2px solid rgba(232,199,122,0.55)", pointerEvents: "none" }}
+      style={{ position: "absolute", top: "50%", left: "50%", width: "66px", height: "66px", marginTop: "-33px", marginLeft: "-33px", borderRadius: "50%", border: listening ? "2.5px solid rgba(241,156,196,0.7)" : "2px solid rgba(247,194,217,0.6)", pointerEvents: "none" }}
     />
   );
 }
