@@ -1861,6 +1861,7 @@ export default function TalkPage() {
       onPointerDown={handlePointerDown}
       style={{
         position: "relative",
+        zIndex: 0,
         flex: 1,
         minHeight: 0,
         height: "100%",
@@ -1874,7 +1875,9 @@ export default function TalkPage() {
         overflow: "hidden",
       }}
     >
-      <AmbientBackground mode="ambient" className="![z-index:-1]" />
+      <div style={{ position: "absolute", inset: 0, zIndex: -1, overflow: "hidden", pointerEvents: "none" }}>
+        <AmbientBackground mode="ambient" />
+      </div>
       <div
         onPointerDown={handleHeaderPointerDown}
         style={{
