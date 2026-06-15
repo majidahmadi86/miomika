@@ -31,7 +31,7 @@
 
 import { logEvent } from "@/lib/debug/event-bus";
 import { log, logError } from "@/lib/debug/log";
-import { speakReply, killAllAudio } from "@/lib/voice/tts";
+import { speakReply, killAllAudio, isSpeakingNow } from "@/lib/voice/tts";
 // Reuse the engine-we-stand-in-for's OWN parameter types (callbacks, connect
 // opts, sendAudio payload) via TS utilities. Nothing is guessed or redefined —
 // the page's existing callbacks object + call sites line up by construction, and
@@ -55,6 +55,7 @@ const END_RMS = 0.012; // offset threshold (hysteresis — lower than onset)
 const SILENCE_MS = 850; // trailing silence that ends a turn
 const MIN_SPEECH_MS = 320; // shorter than this = misfire, discarded
 const MAX_UTTER_MS = 14500; // hard cap (transcribe maxDuration is 15s)
+const ECHO_GUARD_MS = 450; // after Miomi speaks, ignore mic this long to skip her echo tail
 const PREROLL_MS = 250; // keep a little audio before onset
 
 type MiomiResponse = {
@@ -91,6 +92,7 @@ export class MiomiTurnClient {
   // turn lock — the dropped-turn guard. While a turn is mid-flight
   // (transcribe→miomi→speak) we ignore new endpoints.
   private turnInFlight = false;
+  private echoGuardUntil = 0; // Date.now() until which mic is ignored (echo guard)
 
   // energy-VAD accumulator
   private buf: Int16Array[] = [];
@@ -152,6 +154,18 @@ export class MiomiTurnClient {
   sendAudio(pcm: AudioPayload): void {
     if (!this.connected) return;
     if (this.turnInFlight) return; // drop input while a turn is processing (and while she speaks)
+    // Echo guard: her voice plays through tts.ts (not MediaHandler), so the page's
+    // mic gate can't see it. Drop mic while she's audibly speaking, and for a short
+    // tail afterwards, so her own audio + room echo never start a phantom turn.
+    if (isSpeakingNow()) {
+      this.echoGuardUntil = Date.now() + ECHO_GUARD_MS;
+      this.resetEndpoint();
+      return;
+    }
+    if (Date.now() < this.echoGuardUntil) {
+      this.resetEndpoint();
+      return;
+    }
     const frame =
       pcm instanceof Int16Array
         ? pcm
@@ -204,6 +218,16 @@ export class MiomiTurnClient {
       logEvent({ kind: "vad", level: "info", message: "speech end", data: { speechMs } });
       void this.runTurn(utterance);
     }
+  }
+
+  /** Clear any half-formed endpoint so echo/noise can't carry into a real turn. */
+  private resetEndpoint(): void {
+    this.inSpeech = false;
+    this.buf = [];
+    this.preroll = [];
+    this.prerollSamples = 0;
+    this.speechSamples = 0;
+    this.silenceSamples = 0;
   }
 
   // ---- kickoff / greeting -------------------------------------------------
@@ -398,7 +422,7 @@ export class MiomiTurnClient {
     if (wav.size < 2000) return "";
     const form = new FormData();
     form.append("audio", wav, "utterance.wav");
-    form.append("language", "auto");
+    form.append("language", this.uiLanguage);
     const ctrl = new AbortController();
     const t = window.setTimeout(() => ctrl.abort(), 8000);
     try {
@@ -538,6 +562,9 @@ export class MiomiTurnClient {
       logError("turn", "speakReply error", e);
     }
 
+    // She just finished speaking — guard the mic briefly so her echo tail
+    // doesn't trip the energy VAD into a phantom turn.
+    this.echoGuardUntil = Date.now() + ECHO_GUARD_MS;
     this.emit({ type: "turn_complete" } as LiveClientMessage);
   }
 

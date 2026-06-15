@@ -26,7 +26,7 @@ import {
   type SessionMiniCatItem,
 } from "@/lib/talk/session-canvas";
 import { useUILanguage } from "@/lib/i18n/client";
-import { unlockTtsPlayback } from "@/lib/voice/tts";
+import { unlockTtsPlayback, killAllAudio } from "@/lib/voice/tts";
 import { GUIDANCE_GUEST_LIMIT_HIT, pickPhrase } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
@@ -1673,6 +1673,7 @@ export default function TalkPage() {
       ) {
         return;
       }
+      killAllAudio();
       mediaRef.current?.stopAudioPlayback();
       dispatchTurn({ type: "interrupted" });
       return;
