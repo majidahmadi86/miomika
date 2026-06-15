@@ -1,7 +1,7 @@
 // Pin to Singapore — closer to Thai users than default iad1.
 export const preferredRegion = ["sin1", "hnd1"];
 export const runtime = "nodejs";
-export const maxDuration = 15;
+export const maxDuration = 30;
 
 import { NextResponse, type NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";

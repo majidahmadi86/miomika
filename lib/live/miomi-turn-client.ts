@@ -50,11 +50,12 @@ type AudioPayload = Parameters<MiomiLiveClient["sendAudio"]>[0];
 // These four are the only knobs likely to want a nudge after the first real test.
 // ---------------------------------------------------------------------------
 const SAMPLE_RATE = 16000;
-const START_RMS = 0.018; // onset threshold (int16-normalised RMS)
-const END_RMS = 0.012; // offset threshold (hysteresis — lower than onset)
-const SILENCE_MS = 1400; // trailing silence that ends a turn (lets the user pause between sentences)
+const START_RMS = 0.030; // onset threshold (int16-normalised RMS) — higher = rejects room/keyboard noise
+const END_RMS = 0.018; // offset threshold (hysteresis — lower than onset)
+const SILENCE_MS = 2500; // trailing silence that ends a turn — generous so the user can pause / think mid-thought
 const MIN_SPEECH_MS = 320; // shorter than this = misfire, discarded
-const MAX_UTTER_MS = 14500; // hard cap (transcribe maxDuration is 15s)
+const ONSET_DEBOUNCE_MS = 120; // sound must stay above START_RMS this long to count as speech (kills taps/clicks)
+const MAX_UTTER_MS = 28000; // hard cap (paired with transcribe maxDuration=30s) — long monologues allowed
 const ECHO_GUARD_MS = 450; // after Miomi speaks, ignore mic this long to skip her echo tail
 const PREROLL_MS = 250; // keep a little audio before onset
 
@@ -99,6 +100,7 @@ export class MiomiTurnClient {
   private preroll: Int16Array[] = [];
   private prerollSamples = 0;
   private inSpeech = false;
+  private voicedRunSamples = 0; // consecutive above-threshold samples (onset debounce)
   private speechSamples = 0;
   private silenceSamples = 0;
 
@@ -184,13 +186,21 @@ export class MiomiTurnClient {
         this.prerollSamples -= dropped?.length ?? 0;
       }
       if (rms >= START_RMS) {
-        this.inSpeech = true;
-        this.speechSamples = 0;
-        this.silenceSamples = 0;
-        this.buf = [...this.preroll];
-        this.preroll = [];
-        this.prerollSamples = 0;
-        logEvent({ kind: "vad", level: "info", message: "speech start" });
+        // require sustained sound before declaring speech — a keyboard tap or
+        // click spikes for one frame and dies; real speech holds above threshold.
+        this.voicedRunSamples += frame.length;
+        if (this.voicedRunSamples >= (ONSET_DEBOUNCE_MS / 1000) * SAMPLE_RATE) {
+          this.inSpeech = true;
+          this.speechSamples = 0;
+          this.silenceSamples = 0;
+          this.voicedRunSamples = 0;
+          this.buf = [...this.preroll];
+          this.preroll = [];
+          this.prerollSamples = 0;
+          logEvent({ kind: "vad", level: "info", message: "speech start" });
+        }
+      } else {
+        this.voicedRunSamples = 0; // a quiet frame breaks the run — transient noise can't accumulate
       }
       return;
     }
@@ -223,6 +233,7 @@ export class MiomiTurnClient {
   /** Clear any half-formed endpoint so echo/noise can't carry into a real turn. */
   private resetEndpoint(): void {
     this.inSpeech = false;
+    this.voicedRunSamples = 0;
     this.buf = [];
     this.preroll = [];
     this.prerollSamples = 0;
@@ -235,7 +246,7 @@ export class MiomiTurnClient {
   sendKickoff(lang: "th" | "en", _audience: "first_time" | "returning" = "first_time"): void {
     this.uiLanguage = lang ?? this.uiLanguage;
     void this.runHidden(
-      "[kickoff] Greet the user warmly in one or two short sentences and invite them to talk.",
+      "[kickoff] Open with a warm, playful hello — start with a friendly greeting like 'Hi!', 'Hey there~', or 'Oh, hello!' and sound genuinely delighted to see them. One or two short sentences, then warmly invite them to chat.",
       { isKickoff: true },
     );
   }
@@ -540,6 +551,12 @@ export class MiomiTurnClient {
   /** Common reply path: card → transcript(speaking) → voice → turn_complete. */
   private async deliverReply(reply: MiomiResponse): Promise<void> {
     const content = reply.content.trim();
+    // Persist the conversation medium the route resolved (it honours an explicit
+    // "speak English / พูดไทย" switch). This makes a language switch STICK across
+    // turns — and steers the next transcription hint to the right language.
+    if (reply.replyLanguage === "th" || reply.replyLanguage === "en") {
+      this.uiLanguage = reply.replyLanguage;
+    }
     this.history.push({ role: "assistant", content });
 
     // word card → tool_call so the page renders it exactly as in Live
