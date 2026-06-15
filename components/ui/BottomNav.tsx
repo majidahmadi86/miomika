@@ -67,7 +67,7 @@ export function BottomNav() {
                   style={{
                     width: "24px",
                     height: "24px",
-                    color: active ? "#C9A96E" : "#9A8B73",
+                    color: active ? "#34A98F" : "#9A8B73",
                     strokeWidth: 1.75,
                     transition: "color 0.18s cubic-bezier(0.4,0,0.2,1)",
                   }}
@@ -78,7 +78,7 @@ export function BottomNav() {
                     fontFamily: lang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif",
                     fontSize: "11px",
                     fontWeight: 500,
-                    color: active ? "#C9A96E" : "#9A8B73",
+                    color: active ? "#34A98F" : "#9A8B73",
                     lineHeight: 1,
                     letterSpacing: "0.01em",
                     transition: "color 0.18s cubic-bezier(0.4,0,0.2,1)",
