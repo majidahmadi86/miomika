@@ -240,17 +240,18 @@ export async function POST(req: NextRequest) {
       adaptivePrompt += `\n\nLANGUAGE SWITCH: The user explicitly asked you to speak ${explicitUiSwitch === "th" ? "Thai" : "English"}. Switch to ${explicitUiSwitch === "th" ? "Thai" : "English"} now and stay in it.`;
     }
 
-    // Teaching only when user is FLOWING and not asking a question. Better to skip than to interrupt.
+    // CARDS: show a word card ONLY when the user actually asks to learn one, and
+    // NEVER in chat mode (chat = relaxed practice). No more automatic every-4th cards.
+    const userAskedForWord =
+      brainState.intent === "want_to_learn" ||
+      /\b(teach me|a new word|new word|word for|how (do|to) (you )?say|another word|thai word|english word|a card|word card|สอนคำ|คำใหม่|คำศัพท์|ขอคำ|ขอศัพท์)\b/i.test(userInput);
     const shouldPickWord =
+      mode !== "chat" &&
       (mode === "teach" || mode === "auto" || mode === undefined) &&
-      state.exchangeNumber % 4 === 0 &&
-      state.exchangeNumber >= 4 &&
+      userAskedForWord &&
       masteryEvent.type === "none" &&
-      !userInput.includes("?") &&
-      userInput.trim().length > 15 &&
       brainState.emotionalSignal !== "stuck" &&
-      brainState.emotionalSignal !== "sad" &&
-      brainState.intent !== "want_to_learn";
+      brainState.emotionalSignal !== "sad";
 
     if (shouldPickWord) {
       try {
