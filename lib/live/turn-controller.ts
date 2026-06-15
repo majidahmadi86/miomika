@@ -68,6 +68,8 @@ export type TurnControllerState = {
   sessionActive: boolean;
   sessionGeneration: number;
   awaitingMic: boolean;
+  /** Latched true when the USER taps stop; blocks automatic mic re-arm until they tap start. */
+  userStoppedMic?: boolean;
   /** Guest exchange counter (mirrors localStorage). */
   guestExchanges: number;
   guestLocked: boolean;
@@ -340,10 +342,16 @@ export function reduceTurn(
         // LAST_TURN_HANDOFF (see beginUserExchange): the injection truncates the
         // 5th reply. The scripted invitation still performs the handoff.
         next = { ...next, pendingHandoffContext: false, handoffArmed: true, phase: "handoff" };
-        effects.push({ type: "start_continuous_mic" });
+        if (!next.userStoppedMic) effects.push({ type: "start_continuous_mic" });
       } else if (event.skipKickoff) {
-        effects.push({ type: "start_continuous_mic" });
-        next = { ...next, phase: "listening" };
+        // Respect an explicit user stop — a reconnect must not silently re-open the mic.
+        if (next.userStoppedMic) {
+          next = { ...next, phase: "idle" };
+          effects.push({ type: "set_live_ui", ui: "idle" });
+        } else {
+          effects.push({ type: "start_continuous_mic" });
+          next = { ...next, phase: "listening" };
+        }
       } else {
         effects.push({ type: "send_kickoff", lang: uiLang });
         next = { ...next, kickoffPending: true, phase: "kickoff" };
@@ -379,7 +387,7 @@ export function reduceTurn(
         effects.push({ type: "open_guest_sheet", reason: "talk" });
         break;
       }
-      next = { ...next, awaitingMic: false, phase: "listening" };
+      next = { ...next, awaitingMic: false, phase: "listening", userStoppedMic: false };
       effects.push({ type: "set_awaiting_mic", value: false });
       effects.push({ type: "start_continuous_mic" });
       break;
@@ -394,6 +402,7 @@ export function reduceTurn(
         invitationVoiceSent: false,
         phase: "idle",
         awaitingMic: false,
+        userStoppedMic: true,
       });
       effects.push({ type: "stop_continuous_mic" });
       effects.push({ type: "set_live_ui", ui: "idle" });
