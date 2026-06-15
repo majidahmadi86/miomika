@@ -75,6 +75,11 @@ type MiomiResponse = {
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
+// Minimal shape of @ricky0123/vad-web NonRealTimeVAD — the neural (silero) gate.
+type NonRealTimeVADInstance = {
+  run: (audio: Float32Array, sampleRate: number) => AsyncGenerator<unknown, void, unknown>;
+};
+
 export class MiomiTurnClient {
   private cb: Callbacks;
   private connected = false;
@@ -104,6 +109,10 @@ export class MiomiTurnClient {
   private speechSamples = 0;
   private silenceSamples = 0;
 
+  // neural speech gate (silero) — lazily loaded, reused across turns
+  private speechGate: NonRealTimeVADInstance | null = null;
+  private speechGatePromise: Promise<NonRealTimeVADInstance | null> | null = null;
+
   get epochId(): number {
     return this._epochId;
   }
@@ -124,6 +133,9 @@ export class MiomiTurnClient {
     this.sessionContext = undefined;
     this.resetVad();
     this.connected = true;
+    // Warm the neural speech gate now (loads the silero model in the background) so
+    // the first real turn isn't delayed by it. Non-blocking; errors are swallowed.
+    void this.getSpeechGate();
     log("turn", "connect", { uiLanguage: this.uiLanguage, mode: this.mode, level: this.level });
     this.cb.onOpen?.();
   }
@@ -226,8 +238,67 @@ export class MiomiTurnClient {
         return;
       }
       logEvent({ kind: "vad", level: "info", message: "speech end", data: { speechMs } });
-      void this.runTurn(utterance);
+      void this.gateAndRunTurn(utterance);
     }
+  }
+
+  /** Lazily load the silero neural VAD (reused across turns). Returns null on failure → caller fails open. */
+  private getSpeechGate(): Promise<NonRealTimeVADInstance | null> {
+    if (this.speechGate) return Promise.resolve(this.speechGate);
+    if (!this.speechGatePromise) {
+      this.speechGatePromise = (async () => {
+        try {
+          const { NonRealTimeVAD } = await import("@ricky0123/vad-web");
+          const vad = await NonRealTimeVAD.new({
+            modelURL: "/vad/silero_vad_legacy.onnx",
+            ortConfig: (ortInstance) => {
+              const o = ortInstance as { env?: { wasm?: { wasmPaths?: string } } };
+              if (o.env?.wasm) o.env.wasm.wasmPaths = "/vad/";
+            },
+            minSpeechMs: 250,
+            redemptionMs: 200,
+            preSpeechPadMs: 0,
+          });
+          this.speechGate = vad as unknown as NonRealTimeVADInstance;
+          return this.speechGate;
+        } catch (err) {
+          log("turn", "speech gate init failed (fail-open)", { error: String(err) });
+          return null;
+        }
+      })();
+    }
+    return this.speechGatePromise;
+  }
+
+  /**
+   * Neural speech gate. The energy endpointer is a loudness gate — it can't tell
+   * sustained keyboard/room noise from speech. Before transcribing, run the captured
+   * audio through silero (the same kind of neural detector the old Live engine used):
+   * if it holds no real speech, drop it silently. FAIL-OPEN — if the gate is
+   * unavailable or errors, the turn proceeds exactly as before, so a real utterance
+   * can never be lost to a gate hiccup. The gate can only ever remove noise.
+   */
+  private async gateAndRunTurn(utterance: Int16Array): Promise<void> {
+    let isSpeech = true;
+    try {
+      const vad = await this.getSpeechGate();
+      if (vad) {
+        const f32 = new Float32Array(utterance.length);
+        for (let i = 0; i < utterance.length; i++) f32[i] = utterance[i] / 32768;
+        const gen = vad.run(f32, SAMPLE_RATE);
+        const first = await gen.next();
+        isSpeech = first.done !== true; // a yielded segment = real speech present
+        if (typeof gen.return === "function") await gen.return();
+      }
+    } catch (err) {
+      isSpeech = true; // never drop a real turn because the gate hiccupped
+      log("turn", "speech gate error (fail-open)", { error: String(err) });
+    }
+    if (!isSpeech) {
+      logEvent({ kind: "vad", level: "info", message: "speech gate: noise dropped" });
+      return;
+    }
+    void this.runTurn(utterance);
   }
 
   /** Clear any half-formed endpoint so echo/noise can't carry into a real turn. */
