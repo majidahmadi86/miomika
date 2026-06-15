@@ -12,6 +12,7 @@ import { useGuestExploration } from "@/components/guest/GuestExplorationContext"
 import { useProfile } from "@/lib/auth/use-profile";
 import { FuelPill } from "@/components/talk/FuelPill";
 import { type OrbState } from "@/components/talk/VoiceOrb";
+import { MiomiTurnClient } from "@/lib/live/miomi-turn-client";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
 import { MicRow } from "@/components/talk/MicRow";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
@@ -95,7 +96,7 @@ type CanvasItem =
       roleOrder: number;
     };
 
-type LiveUiState = "idle" | "connecting" | "listening" | "speaking" | "error";
+type LiveUiState = "idle" | "connecting" | "thinking" | "listening" | "speaking" | "error";
 
 const TRANSCRIPT_CLIP = 180;
 const GUEST_COUNTER_KEY = "miomika.guest_exchanges";
@@ -497,11 +498,16 @@ export default function TalkPage() {
   }, []);
 
   const createLiveClient = useCallback((): MiomiLiveClient => {
-    return new MiomiLiveClient({
+    return new MiomiTurnClient({
       onOpen: () => {
         logEvent({ kind: "state", level: "info", message: "live connected" });
       },
       onMessage: (msg) => handleLiveMessageRef.current(msg),
+      onStatus: (status) => {
+        if ((status as { phase?: string } | null)?.phase === "thinking") {
+          setLiveUiState("thinking");
+        }
+      },
       onClose: (detail) => {
         void handleClientCloseRef.current(detail);
       },
@@ -512,7 +518,7 @@ export default function TalkPage() {
           setLiveUiState("error");
         }
       },
-    });
+    }) as unknown as MiomiLiveClient;
   }, [ensureTurnRuntime]);
 
   const primeAudio = useCallback(() => {
@@ -1798,6 +1804,7 @@ export default function TalkPage() {
 
   const orbState: OrbState = (() => {
     if (isLocked) return "locked";
+    if (liveUiState === "thinking") return "thinking";
     if (liveUiState === "listening") return "listening";
     if (liveUiState === "connecting") return "thinking";
     if (liveUiState === "speaking") return "speaking";
@@ -1834,6 +1841,7 @@ export default function TalkPage() {
     if (awaitingMic && liveUiState !== "speaking" && liveUiState !== "connecting") {
       return uiLang === "th" ? "กดไมค์เมื่อพร้อมพูดค่า~" : "press the mic when you're ready~";
     }
+    if (liveUiState === "thinking") return uiLang === "th" ? "หนูกำลังคิดอยู่ค่ะ~" : "thinking~";
     if (liveUiState === "connecting") return uiLang === "th" ? "กำลังเชื่อมต่อค่า..." : "connecting...";
     if (liveUiState === "listening") return uiLang === "th" ? "กำลังฟังค่า..." : "I'm listening...";
     if (liveUiState === "speaking") return uiLang === "th" ? "หนูกำลังพูดค่า..." : "Miomi is talking...";
