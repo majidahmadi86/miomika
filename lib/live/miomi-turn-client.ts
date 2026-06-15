@@ -282,7 +282,23 @@ export class MiomiTurnClient {
     return null; // PASS2 — metering was Live-era
   }
   getSessionSnapshot(): unknown {
-    return null; // PASS2
+    // The page reads getSessionSnapshot().teachWord WITHOUT a null guard in
+    // several spots, so this must NEVER be null. Mirror the page's own
+    // "no snapshot" fallback shape exactly. Turn mode has no real resume, so
+    // the empty defaults are inert (lessonPlan [] / introducedIdx 0 → the
+    // resume/restore paths no-op).
+    return {
+      teachWord: {
+        learningTarget: this.targetLanguage,
+        sessionIntroduced: [],
+        lessonPlan: [],
+        introducedIdx: 0,
+        lessonTopic: null,
+        topicHint: null,
+        excludeTopics: [],
+      },
+      reviewServed: [],
+    };
   }
   restoreSessionSnapshot(_v?: unknown): void {
     /* PASS2 */
