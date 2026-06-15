@@ -85,17 +85,21 @@ export async function getAIResponse(
     const { message, status } = aiErrorFields(error);
     log("ai.router", "groq failed", { message, status });
   }
-  // Try Gemini second — Thai quality fallback
-  try {
-    const content = await withTimeout(
-      callGemini(recent, systemPrompt),
-      GEMINI_TIMEOUT_MS,
-      "gemini",
-    );
-    if (content) return { content, engine: "gemini", wasFailover: false };
-  } catch (error) {
-    const { message, status } = aiErrorFields(error);
-    log("ai.router", "gemini failed", { message, status });
+  // Gemini fallback is OFF by default — Groq free-tier throttling was silently
+  // failing over to Gemini, which bills the AI Studio wallet. Re-enable ONLY by
+  // setting ENABLE_GEMINI_FALLBACK=true (e.g. once on a paid Groq plan).
+  if (process.env.ENABLE_GEMINI_FALLBACK === "true") {
+    try {
+      const content = await withTimeout(
+        callGemini(recent, systemPrompt),
+        GEMINI_TIMEOUT_MS,
+        "gemini",
+      );
+      if (content) return { content, engine: "gemini", wasFailover: false };
+    } catch (error) {
+      const { message, status } = aiErrorFields(error);
+      log("ai.router", "gemini failed", { message, status });
+    }
   }
   // Both failed — library failover, always works
   const failover = getFailoverResponse();
