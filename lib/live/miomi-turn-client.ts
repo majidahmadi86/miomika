@@ -317,7 +317,7 @@ export class MiomiTurnClient {
   sendKickoff(lang: "th" | "en", _audience: "first_time" | "returning" = "first_time"): void {
     this.uiLanguage = lang ?? this.uiLanguage;
     void this.runHidden(
-      "[kickoff] Open with a warm, playful hello — start with a friendly greeting like 'Hi!', 'Hey there~', or 'Oh, hello!' and sound genuinely delighted to see them. One or two short sentences, then warmly invite them to chat.",
+      "[kickoff] Greet like a cheeky, delighted little cat — playful and SHORT, in the user's language. Vibe: 'Oh! Hi hi~ I'm Miomi. So… what are we getting into today?'. Keep it to ONE short, breezy line. Do NOT be formal — never 'lovely to see you', 'thrilled', or 'have a wonderful time'. Warm, fun, a touch cheeky. No emojis.",
       { isKickoff: true },
     );
   }
