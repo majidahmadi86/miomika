@@ -52,7 +52,7 @@ type AudioPayload = Parameters<MiomiLiveClient["sendAudio"]>[0];
 const SAMPLE_RATE = 16000;
 const START_RMS = 0.018; // onset threshold (int16-normalised RMS)
 const END_RMS = 0.012; // offset threshold (hysteresis — lower than onset)
-const SILENCE_MS = 850; // trailing silence that ends a turn
+const SILENCE_MS = 1400; // trailing silence that ends a turn (lets the user pause between sentences)
 const MIN_SPEECH_MS = 320; // shorter than this = misfire, discarded
 const MAX_UTTER_MS = 14500; // hard cap (transcribe maxDuration is 15s)
 const ECHO_GUARD_MS = 450; // after Miomi speaks, ignore mic this long to skip her echo tail
