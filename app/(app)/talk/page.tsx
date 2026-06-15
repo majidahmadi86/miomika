@@ -2135,7 +2135,7 @@ export default function TalkPage() {
               fontFamily: "'Kanit', sans-serif",
               fontSize: "12px",
               fontWeight: 500,
-              color: "#C9A96E",
+              color: "#9A8B73",
               opacity: 0.85,
             }}
           >
@@ -2174,7 +2174,7 @@ export default function TalkPage() {
               margin: "2px 0 0",
               fontFamily: "'Quicksand', sans-serif",
               fontSize: "12px",
-              color: "#C9A96E",
+              color: "#9A8B73",
               opacity: 0.7,
             }}
           >
@@ -2202,7 +2202,7 @@ export default function TalkPage() {
             style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "'Kanit', sans-serif", fontSize: "13.5px", color: "#1A1A18", padding: "8px 0" }}
           />
           {textInput.trim() && (
-            <button type="button" onClick={handleSendText} aria-label="Send" style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <button type="button" onClick={handleSendText} aria-label="Send" style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
               </svg>
@@ -2260,7 +2260,7 @@ export default function TalkPage() {
               </p>
             </div>
             <div style={{ padding: "0 24px 24px", display: "flex", flexDirection: "column", gap: "10px" }}>
-              <Link href="/signup" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "56px", borderRadius: "999px", background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", fontFamily: "'Kanit', sans-serif", fontSize: "18px", fontWeight: 500, color: "#FFFFFF", textDecoration: "none", boxShadow: "0 6px 20px -4px rgba(201,169,110,0.45)" }}>
+              <Link href="/signup" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "56px", borderRadius: "999px", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", fontFamily: "'Kanit', sans-serif", fontSize: "18px", fontWeight: 500, color: "#FFFFFF", textDecoration: "none", boxShadow: "0 6px 20px -4px rgba(52,169,143,0.45)" }}>
                 {uiLang === "en" ? "Stay with me ✦" : "อยู่กับหนูค่า ✦"}
               </Link>
               <button type="button" onClick={() => setShowGuestSheet(false)} style={{ height: "44px", borderRadius: "999px", background: "none", border: "1.5px solid #EDE8E0", fontFamily: "'Quicksand', sans-serif", fontSize: "14px", fontWeight: 600, color: "#9A8B73", cursor: "pointer" }}>
