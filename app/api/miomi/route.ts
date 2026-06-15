@@ -269,7 +269,16 @@ export async function POST(req: NextRequest) {
       brainState.emotionalSignal !== "sad";
 
     if (shouldPickWord) {
-      // The user's named word if they asked for one, else a level-appropriate word.
+      // Don't "teach" what the user already produces. Gather everything they've said
+      // this conversation; exclude exact matches from the picker, and drop a picked
+      // word if it appears anywhere in their own speech (catches Thai particles —
+      // they said "สวัสดีค่ะ" so we never teach "สวัสดี").
+      const usedText = (Array.isArray(messages) ? messages : [])
+        .filter((m: { role?: string }) => m?.role === "user")
+        .map((m: { content?: string }) => (m?.content ?? ""))
+        .join(" ")
+        .toLowerCase();
+      const usedWordKeys = usedText.split(/[^\p{L}]+/u).filter((w) => w.length >= 2);
       let sourceWord = extractRequestedWord(userInput);
       if (!sourceWord) {
         try {
@@ -278,10 +287,16 @@ export async function POST(req: NextRequest) {
             cefrLevel: brainState.profile.cefrLevel,
             learningTarget: brainState.profile.learningTarget,
             alreadyIntroducedWords: introducedWordKeys,
-            alreadyMasteredWords: masteredWordKeys,
+            alreadyMasteredWords: [...masteredWordKeys, ...usedWordKeys],
             tier: brainState.profile.tier,
           });
-          sourceWord = picked?.word_en ?? null;
+          const alreadyUsed = picked
+            ? [picked.word_th, picked.word_en]
+                .map((x) => (x ?? "").toLowerCase())
+                .find((x) => x.length >= 2 && usedText.includes(x))
+            : undefined;
+          // If the pick is something the user already said, don't re-teach it.
+          sourceWord = alreadyUsed ? null : picked?.word_en ?? null;
         } catch (err) {
           console.error("[brain] pickWordToIntroduce failed:", err);
         }
