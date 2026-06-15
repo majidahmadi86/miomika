@@ -5,6 +5,7 @@ import { Volume2 as RoomVolume } from "lucide-react";
 
 import Image from "next/image";
 import Link from "next/link";
+import { AmbientBackground } from "@/components/AmbientBackground";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
@@ -1868,11 +1869,12 @@ export default function TalkPage() {
         flexDirection: "column",
         background: roomSession
           ? "linear-gradient(168deg,#E9F8F4 0%,#FEFCF7 36%,#FDF3E3 100%)"
-          : "#FEFCF7",
+          : "#FAFAF6",
         width: "100%",
         overflow: "hidden",
       }}
     >
+      <AmbientBackground mode="ambient" className="![z-index:-1]" />
       <div
         onPointerDown={handleHeaderPointerDown}
         style={{
