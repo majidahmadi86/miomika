@@ -77,7 +77,7 @@ export function GuidancePill() {
             padding: "12px 16px",
             background: "#FFFFFF",
             border: "1px solid #EDE8E0",
-            borderLeft: "3px solid #C9A96E",
+            borderLeft: "3px solid #34A98F",
             borderRadius: "12px",
             boxShadow: "0 2px 8px rgba(26,26,24,0.05)",
             maxWidth: "400px",

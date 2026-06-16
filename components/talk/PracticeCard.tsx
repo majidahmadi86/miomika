@@ -41,7 +41,7 @@ export function PracticeCard({
     <div
       style={{
         background: "linear-gradient(180deg, #FFFCF7 0%, #FFF6E8 100%)",
-        border: "0.5px solid rgba(232,199,122,0.4)",
+        border: "0.5px solid rgba(110,205,184,0.4)",
         borderRadius: "18px",
         padding: "14px",
       }}
@@ -52,7 +52,7 @@ export function PracticeCard({
             fontFamily: "'Quicksand', sans-serif",
             fontSize: "10px",
             fontWeight: 600,
-            color: "#C9A96E",
+            color: "#34A98F",
             letterSpacing: "0.06em",
             textTransform: "uppercase",
           }}
@@ -88,7 +88,7 @@ export function PracticeCard({
       <div
         style={{
           background: "rgba(255,255,255,0.75)",
-          border: "0.5px solid rgba(232,199,122,0.3)",
+          border: "0.5px solid rgba(110,205,184,0.3)",
           borderRadius: "12px",
           padding: "10px",
           marginBottom: "8px",
@@ -172,12 +172,12 @@ function ActionButton({
         background: primary
           ? "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)"
           : "rgba(255,255,255,0.7)",
-        border: primary ? "none" : "0.5px solid rgba(201,169,110,0.3)",
+        border: primary ? "none" : "0.5px solid rgba(52,169,143,0.3)",
         borderRadius: "999px",
         padding: "7px 4px",
         fontFamily: "'Quicksand', sans-serif",
         fontSize: "10.5px",
-        color: primary ? "#FFFFFF" : "#B8985C",
+        color: primary ? "#FFFFFF" : "#34A98F",
         fontWeight: 500,
         cursor: "pointer",
         display: "flex",

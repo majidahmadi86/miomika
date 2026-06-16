@@ -103,7 +103,7 @@ function ToolBtn({
         boxShadow: "0 6px 16px rgba(26,26,24,0.08), 0 2px 4px rgba(26,26,24,0.05), 0 0 0 0.5px rgba(255,255,255,0.8) inset",
       }}
     >
-      <Icon size={22} color={active ? "#C9A96E" : "#9A8B73"} strokeWidth={2} />
+      <Icon size={22} color={active ? "#34A98F" : "#9A8B73"} strokeWidth={2} />
       {label && (
         <span
           style={{
@@ -111,7 +111,7 @@ function ToolBtn({
             bottom: "-4px",
             fontFamily: "'Quicksand', sans-serif",
             fontSize: "8px",
-            color: active ? "#C9A96E" : "#9A8B73",
+            color: active ? "#34A98F" : "#9A8B73",
             fontWeight: 700,
             lineHeight: 1,
           }}

@@ -42,7 +42,7 @@ const DAILY_CHALLENGE = {
 };
 
 const tapFeedback =
-  "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A96E]";
+  "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#34A98F]";
 
 const TAP_BUBBLE_CYCLE = [
   { th: "วันนี้โพสต์อะไรดีคะ คิดถึงเลยค่า", en: "What are we posting today? I missed you~" },
@@ -1015,7 +1015,7 @@ export default function HomePage() {
                 display: "flex", alignItems: "center", gap: "10px",
                 height: meaningExpanded ? "auto" : "44px", minHeight: "44px",
                 flexShrink: 0, background: "#FDF8EE",
-                borderLeft: "3px solid #C9A96E",
+                borderLeft: "3px solid #34A98F",
                 padding: meaningExpanded ? "10px 16px" : "0 16px",
                 textAlign: "left", cursor: "pointer",
                 transition: "height 0.25s ease", width: "100%",
@@ -1024,7 +1024,7 @@ export default function HomePage() {
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.10em", color: "#C9A96E", textTransform: "uppercase", flexShrink: 0 }}>
+                  <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.10em", color: "#34A98F", textTransform: "uppercase", flexShrink: 0 }}>
                     ✦ MIOMI&apos;S PICK
                   </span>
                   <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -1061,7 +1061,7 @@ export default function HomePage() {
                   </div>
                 )}
               </div>
-              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", color: "#C9A96E", flexShrink: 0, transition: "transform 0.25s ease", transform: meaningExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
+              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", color: "#9A8B73", flexShrink: 0, transition: "transform 0.25s ease", transform: meaningExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
                 ▾
               </span>
             </button>
@@ -1122,8 +1122,8 @@ export default function HomePage() {
               <p className="text-base font-medium leading-[1.6] text-[#1A1A1A]">{WELCOME_BUBBLE.th}</p>
               <p className="mt-1 text-xs leading-[1.6] text-[#666666]">{WELCOME_BUBBLE.en}</p>
             </motion.div>
-            <motion.div className="rounded-2xl border-l-4 border-[#C9A96E] bg-[#FDF8EE] p-5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-[#C9A96E]">MIOMI&apos;S PICK · วันนี้</p>
+            <motion.div className="rounded-2xl border-l-4 border-[#34A98F] bg-[#FDF8EE] p-5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[#34A98F]">MIOMI&apos;S PICK · วันนี้</p>
               <p className="mt-2 text-lg font-medium leading-[1.6] text-[#1A1A1A]">{DAILY_CHALLENGE.phrase}</p>
               <p className="mt-1 text-sm leading-[1.6] text-[#1A1A1A]">{DAILY_CHALLENGE.th}</p>
               <p className="mt-2 text-xs leading-[1.6] text-[#666666]">{DAILY_CHALLENGE.meaning}</p>

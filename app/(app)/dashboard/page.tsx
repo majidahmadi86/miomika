@@ -101,7 +101,7 @@ export default function DashboardPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white">
       <div className="flex shrink-0 items-center gap-3 border-b border-[#EAD0DB] px-4 py-3">
-        <Link href="/home" className="text-[#C9A96E]">
+        <Link href="/home" className="text-[#34A98F]">
           <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
         </Link>
         <div>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
               ) : (
                 <>
                   <Icon
-                    className="mx-auto h-5 w-5 text-[#C9A96E]"
+                    className="mx-auto h-5 w-5 text-[#34A98F]"
                     strokeWidth={2}
                     aria-hidden
                   />

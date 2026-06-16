@@ -310,7 +310,7 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp
                     step={50}
                     value={draft.depth}
                     onChange={(e) => setDraft({ ...draft, depth: parseInt(e.target.value, 10) })}
-                    style={{ flex: 1, accentColor: "#C9A96E" }}
+                    style={{ flex: 1, accentColor: "#34A98F" }}
                   />
                   <span>{uiLang === "en" ? "Genius" : "อัจฉริยะ"}</span>
                 </div>
@@ -399,17 +399,17 @@ const chipStaticStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   padding: "6px 10px",
-  background: "rgba(232,199,122,0.12)",
-  border: "0.5px solid rgba(201,169,110,0.3)",
+  background: "rgba(110,205,184,0.12)",
+  border: "0.5px solid rgba(52,169,143,0.3)",
   borderRadius: "999px",
   fontFamily: "'Quicksand', sans-serif",
   fontSize: "11.5px",
-  color: "#B8985C",
+  color: "#34A98F",
 };
 const chipAddStyle: React.CSSProperties = {
   background: "transparent",
-  border: "0.5px dashed #C9A96E",
-  color: "#C9A96E",
+  border: "0.5px dashed #34A98F",
+  color: "#34A98F",
   fontFamily: "'Quicksand', sans-serif",
   fontSize: "11.5px",
   padding: "5px 10px",
@@ -448,10 +448,10 @@ function Section({ icon: Icon, title, badge, children }: { icon: React.Component
   return (
     <div style={{ background: "rgba(255,255,255,0.6)", border: "0.5px solid #EDE8E0", borderRadius: "16px", padding: "13px", marginBottom: "12px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-        <Icon size={14} color="#C9A96E" strokeWidth={2} />
+        <Icon size={14} color="#34A98F" strokeWidth={2} />
         <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", color: "#3D352B", fontWeight: 500, flex: 1 }}>{title}</span>
         {badge && (
-          <span style={{ background: "rgba(232,199,122,0.18)", color: "#B8985C", fontFamily: "'Quicksand', sans-serif", fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "999px" }}>{badge}</span>
+          <span style={{ background: "rgba(110,205,184,0.18)", color: "#34A98F", fontFamily: "'Quicksand', sans-serif", fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "999px" }}>{badge}</span>
         )}
       </div>
       {children}
@@ -484,13 +484,13 @@ function ModeGrid({ value, onChange, uiLang }: { value: TalkMode; onChange: (m: 
               gap: "4px",
               padding: "11px 12px",
               background: active ? "linear-gradient(135deg, #FFF4E8 0%, #FFE8D6 100%)" : "rgba(255,255,255,0.7)",
-              border: active ? "0.5px solid rgba(201,169,110,0.4)" : "0.5px solid #EDE8E0",
+              border: active ? "0.5px solid rgba(52,169,143,0.4)" : "0.5px solid #EDE8E0",
               borderRadius: "14px",
               cursor: "pointer",
               textAlign: "left",
             }}
           >
-            <m.icon size={18} color={active ? "#C9A96E" : "#9A8B73"} strokeWidth={2} />
+            <m.icon size={18} color={active ? "#34A98F" : "#9A8B73"} strokeWidth={2} />
             <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "13px", color: "#1A1A18", margin: 0, fontWeight: 500 }}>{uiLang === "en" ? m.en : m.th}</p>
             <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10.5px", color: "#9A8B73" }}>{uiLang === "en" ? m.descEn : m.descTh}</span>
           </button>
@@ -535,12 +535,12 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
         alignItems: "center",
         gap: "4px",
         padding: "6px 10px",
-        border: active ? "0.5px solid rgba(201,169,110,0.4)" : "0.5px solid #EDE8E0",
+        border: active ? "0.5px solid rgba(52,169,143,0.4)" : "0.5px solid #EDE8E0",
         background: active ? "linear-gradient(135deg, #FFF4E8 0%, #FFE8D6 100%)" : "rgba(255,255,255,0.7)",
         borderRadius: "999px",
         fontFamily: "'Quicksand', sans-serif",
         fontSize: "11.5px",
-        color: active ? "#B8985C" : "#9A8B73",
+        color: active ? "#34A98F" : "#9A8B73",
         cursor: "pointer",
       }}
     >
@@ -561,12 +561,12 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
       style={{
         flex: 1,
         padding: "8px",
-        border: active ? "0.5px solid rgba(201,169,110,0.4)" : "0.5px solid #EDE8E0",
+        border: active ? "0.5px solid rgba(52,169,143,0.4)" : "0.5px solid #EDE8E0",
         background: active ? "linear-gradient(135deg, #FFF4E8 0%, #FFE8D6 100%)" : "rgba(255,255,255,0.7)",
         borderRadius: "999px",
         fontFamily: "'Quicksand', sans-serif",
         fontSize: "11.5px",
-        color: active ? "#B8985C" : "#9A8B73",
+        color: active ? "#34A98F" : "#9A8B73",
         fontWeight: 500,
         cursor: "pointer",
       }}
@@ -588,7 +588,7 @@ function ToggleRow({ label, value, onToggle }: { label: string; value: boolean; 
           width: "32px",
           height: "18px",
           borderRadius: "999px",
-          background: value ? "#C9A96E" : "#EDE8E0",
+          background: value ? "#34A98F" : "#EDE8E0",
           border: "none",
           position: "relative",
           cursor: "pointer",

@@ -245,7 +245,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
             fontFamily: "'Quicksand', sans-serif",
             fontSize: "18px",
             fontWeight: 700,
-            color: "#C9A96E",
+            color: "#34A98F",
             letterSpacing: "0.18em",
           }}
         >

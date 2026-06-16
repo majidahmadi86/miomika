@@ -92,7 +92,7 @@ export function PronunciationCardV1({
           left: 0,
           top: 0,
           bottom: 0,
-          background: "linear-gradient(180deg, #E8C77A 0%, #C9A96E 100%)",
+          background: "linear-gradient(180deg, #6ECDB8 0%, #34A98F 100%)",
           borderRadius: "4px 0 0 4px",
         }}
       />
@@ -105,7 +105,7 @@ export function PronunciationCardV1({
             fontWeight: 700,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "#C9A96E",
+            color: "#34A98F",
             margin: "0 0 10px",
           }}
         >
@@ -172,10 +172,10 @@ export function PronunciationCardV1({
                 fontFamily: "'Sarabun', sans-serif",
                 fontSize: "18px",
                 fontWeight: 500,
-                color: activeSyllable === i ? "#C9A96E" : "#1A1A18",
+                color: activeSyllable === i ? "#34A98F" : "#1A1A18",
                 padding: "4px 8px",
                 borderRadius: "8px",
-                background: activeSyllable === i ? "rgba(232,199,122,0.2)" : "transparent",
+                background: activeSyllable === i ? "rgba(110,205,184,0.2)" : "transparent",
               }}
             >
               {syl}
@@ -244,8 +244,8 @@ export function PronunciationCardV1({
             width: "100%",
             height: "44px",
             borderRadius: "12px",
-            background: "linear-gradient(135deg, rgba(232,199,122,0.25) 0%, rgba(201,169,110,0.15) 100%)",
-            border: "1px solid rgba(201,169,110,0.35)",
+            background: "linear-gradient(135deg, rgba(110,205,184,0.25) 0%, rgba(52,169,143,0.15) 100%)",
+            border: "1px solid rgba(52,169,143,0.35)",
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
@@ -254,7 +254,7 @@ export function PronunciationCardV1({
             marginBottom: heardText ? "10px" : 0,
           }}
         >
-          <Mic style={{ width: "16px", height: "16px", color: "#C9A96E" }} strokeWidth={2} />
+          <Mic style={{ width: "16px", height: "16px", color: "#34A98F" }} strokeWidth={2} />
           <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18" }}>
             {uiLang === "en" ? "Try saying it~" : "ลองพูดให้หนูฟังนะคะ~"}
           </span>
