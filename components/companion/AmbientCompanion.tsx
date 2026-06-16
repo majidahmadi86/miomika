@@ -21,9 +21,13 @@ export function AmbientCompanion() {
   if (HIDDEN_ROUTES.has(pathname)) {
     return null;
   }
+  // On /home Miomi is already the centerpiece + the Talk CTA goes to /talk,
+  // so the floating button is a redundant second cat. Keep sheet/panel mounted
+  // (mobile Home still opens the sheet); just hide the button.
+  const hideButton = pathname === "/home";
   return (
     <>
-      <CompanionButton />
+      {!hideButton && <CompanionButton />}
       <CompanionSheet />
       <CompanionPanel />
     </>
