@@ -29,8 +29,8 @@ const WELCOME_BUBBLE = {
   en: "Hi! Want to speak better English today?",
 };
 const HOME_T = {
-  th: { greetSub: "มาฝึกพูดด้วยกันไหมคะ~", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ~", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
-  en: { greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
+  th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ~", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ~", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
+  en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
 } as const;
 
 const DAILY_CHALLENGE = {
@@ -217,6 +217,14 @@ export default function HomePage() {
     return readUiLang();
   }, [profile?.ui_language]);
   const lang = useUILanguage();
+  const targetLang = profile?.learning_target_language ?? null;
+  const targetName =
+    targetLang === "th" ? (lang === "en" ? "Thai" : "ภาษาไทย") : targetLang === "en" ? "English" : null;
+  const greeting = targetName
+    ? lang === "en"
+      ? `Hi! Want to speak better ${targetName} today?`
+      : `สวัสดีค่า~ วันนี้อยากพูด ${targetName} เก่งขึ้นไหมคะ?`
+    : WELCOME_BUBBLE[lang];
 
   const posX = useMotionValue(0);
   const posY = useMotionValue(0);
@@ -1118,8 +1126,16 @@ export default function HomePage() {
           <div className="hidden h-full md:flex md:flex-col md:overflow-hidden">
             <div className="mx-auto flex h-full w-full max-w-[1120px] flex-col px-8 py-6">
               <div className="mb-6">
-                <h1 className="text-[23px] font-medium leading-snug text-ink">{WELCOME_BUBBLE[lang]}</h1>
+                <h1 className="text-[23px] font-medium leading-snug text-ink">{greeting}</h1>
                 <p className="mt-1.5 text-sm text-ink-muted">{HOME_T[lang].greetSub}</p>
+                <Link
+                  href="/talk"
+                  className="mt-3.5 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold text-white shadow-cta"
+                  style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}
+                >
+                  <Sparkles className="h-4 w-4" strokeWidth={2} aria-hidden />
+                  {HOME_T[lang].greetCta}
+                </Link>
               </div>
 
               <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_260px]">
