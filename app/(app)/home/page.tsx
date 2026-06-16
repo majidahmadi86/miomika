@@ -23,13 +23,6 @@ import { useCompanionStore } from "@/lib/companion/store";
 import { home } from "@/lib/voice/warmth";
 import { detectLang, speak } from "@/lib/voice/tts";
 import type { Language } from "@/lib/i18n/server";
-import dynamic from "next/dynamic";
-
-const AmbientBackground = dynamic(
-  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
-  { ssr: false }
-);
-
 const WELCOME_BUBBLE = {
   th: "สวัสดีค่า~ วันนี้อยากพูด English เก่งขึ้นไหมคะ?",
   en: "Hi~ Want to speak better English today?",
@@ -770,10 +763,9 @@ export default function HomePage() {
             <div
               ref={stageRef}
               className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
-              style={{ background: "#FAFAF6" }}
+              style={{ background: "transparent" }}
               onPointerDown={handleStagePointerDown}
             >
-              <AmbientBackground mode="ambient" />
 
               {authReady && isGuest ? (
                 <div className="pointer-events-none absolute inset-x-4 top-4 z-30 flex justify-center">

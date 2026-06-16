@@ -3,14 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import { detectLang, speak } from "@/lib/voice/tts";
 import { sfxAlmost, sfxGold, sfxPop, sfxSilver, sfxSuccess, sfxWrong } from "@/lib/sound/sfx";
-
-const AmbientBackground = dynamic(
-  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
-  { ssr: false },
-);
 
 type WordItem = {
   word_en: string; word_th: string;
@@ -205,8 +199,7 @@ export default function LessonPlayerPage() {
   const trailPos = Math.min(step, 4);
 
   return (
-    <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "#FAFAF6" }}>
-      <AmbientBackground mode="ambient" />
+    <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "transparent" }}>
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

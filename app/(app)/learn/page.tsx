@@ -8,18 +8,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLeft } from "lucide-react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
 import { detectLang, speak } from "@/lib/voice/tts";
 import { sfxSuccess } from "@/lib/sound/sfx";
-
-const AmbientBackground = dynamic(
-  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
-  { ssr: false },
-);
 
 type LessonLite = {
   id: string;
@@ -649,8 +643,7 @@ export default function LearnPage() {
   }, [refresh, viewLevel]);
 
   return (
-    <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "#FAFAF6" }}>
-      <AmbientBackground mode="ambient" />
+    <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "transparent" }}>
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
 
         {/* Level rail */}

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -22,6 +23,11 @@ import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { cn } from "@/lib/utils";
 import { useUILanguage } from "@/lib/i18n/client";
 import { useRef, useCallback, useEffect } from "react";
+
+const AmbientBackground = dynamic(
+  () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
+  { ssr: false },
+);
 
 const navItems = [
   { href: "/home",      Icon: Home,       labelTh: "หน้าหลัก",  labelEn: "Home"   },
@@ -197,8 +203,11 @@ function AppLayoutInner({
   }
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden md:flex md:h-screen md:max-h-none md:bg-[#FAFAF6] md:overflow-hidden">
-      <aside className="hidden h-screen w-[80px] shrink-0 flex-col items-center border-r border-[#EFE9E0] bg-white py-5 md:flex">
+    <div className="relative isolate h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-[#FAFAF6] md:flex md:h-screen md:max-h-none md:overflow-hidden">
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <AmbientBackground mode="ambient" />
+      </div>
+      <aside className="relative z-10 hidden h-screen w-[80px] shrink-0 flex-col items-center border-r border-[#EFE9E0]/60 bg-white/55 py-5 backdrop-blur-xl md:flex">
         <Link
           href="/home"
           className="mb-6 text-[19px] font-medium leading-none text-[#C9A96E]"
@@ -269,7 +278,7 @@ function AppLayoutInner({
         </div>
       </aside>
 
-      <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[#FEFCF7] md:bg-transparent md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
+      <div className="relative z-10 flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-transparent md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
         <DesktopHoldBanner />
         <SwipeNavigator pathname={pathname}>
           {children}
