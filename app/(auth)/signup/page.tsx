@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useUILanguage } from "@/lib/i18n/client";
 
 const AmbientBackground = dynamic(
   () =>
@@ -15,7 +16,7 @@ const AmbientBackground = dynamic(
   { ssr: false }
 );
 
-function getSignupErrorThai(message: string): string {
+function getSignupError(message: string, isThai: boolean): string {
   const m = message.toLowerCase();
   if (
     m.includes("already registered") ||
@@ -23,21 +24,28 @@ function getSignupErrorThai(message: string): string {
     m.includes("user already exists") ||
     m.includes("duplicate")
   ) {
-    return "อีเมลนี้ถูกใช้สมัครแล้วค่า";
+    return isThai ? "อีเมลนี้ถูกใช้สมัครแล้วค่ะ" : "This email is already registered.";
   }
   if (m.includes("password") && m.includes("least")) {
-    return "รหัสผ่านสั้นเกินไปค่า กรุณาใช้อย่างน้อย 6 ตัวอักษร";
+    return isThai
+      ? "รหัสผ่านสั้นเกินไปค่ะ ใช้อย่างน้อย 6 ตัวอักษร"
+      : "Password is too short — use at least 6 characters.";
   }
   if (m.includes("invalid email") || m.includes("unable to validate email")) {
-    return "รูปแบบอีเมลไม่ถูกต้องค่า";
+    return isThai ? "รูปแบบอีเมลไม่ถูกต้องค่ะ" : "That email doesn't look right.";
   }
   if (m.includes("rate limit") || m.includes("too many")) {
-    return "ลองบ่อยเกินไปค่า กรุณารอสักครู่แล้วลองใหม่นะคะ";
+    return isThai
+      ? "ลองบ่อยเกินไปค่ะ รอสักครู่แล้วลองใหม่นะคะ"
+      : "Too many attempts — please wait a moment and try again.";
   }
-  return "สมัครสมาชิกไม่สำเร็จค่า กรุณาลองใหม่อีกครั้ง";
+  return isThai
+    ? "สมัครสมาชิกไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ"
+    : "Sign-up failed. Please try again.";
 }
 
 export default function SignupPage() {
+  const isThai = useUILanguage() === "th";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -45,6 +53,50 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const t = isThai
+    ? {
+        back: "กลับ",
+        title: "มาเริ่มต้นด้วยกันนะคะ",
+        google: "สมัครด้วย Google",
+        connecting: "กำลังเชื่อมต่อ...",
+        orEmail: "หรือใช้อีเมล",
+        email: "อีเมล",
+        password: "รหัสผ่าน",
+        confirm: "ยืนยันรหัสผ่าน",
+        submit: "สมัครสมาชิก",
+        submitting: "กำลังสมัคร...",
+        haveAccount: "มีบัญชีแล้ว? เข้าสู่ระบบค่ะ",
+        mismatch: "รหัสผ่านไม่ตรงกันค่ะ",
+        errGoogle: "เข้าสู่ระบบด้วย Google ไม่สำเร็จค่ะ ลองอีกครั้งนะคะ",
+        successTitle: "เช็คอีเมลของคุณด้วยนะคะ",
+        successBody: "เราส่งอีเมลยืนยันไปให้แล้ว กดลิงก์ในอีเมลเพื่อไปต่อได้เลยค่ะ",
+        successWarm: "พอกดลิงก์แล้ว เจอกันต่อนะคะ มีโอมิรออยู่เลย",
+        spamTitle: "ไม่เจออีเมล? เช็คโฟลเดอร์ spam ด้วยนะคะ",
+        spamSub: "",
+        backToLogin: "กลับไปหน้าเข้าสู่ระบบค่ะ",
+      }
+    : {
+        back: "Back",
+        title: "Let's get started",
+        google: "Continue with Google",
+        connecting: "Connecting…",
+        orEmail: "or use email",
+        email: "Email",
+        password: "Password",
+        confirm: "Confirm password",
+        submit: "Sign up",
+        submitting: "Signing up…",
+        haveAccount: "Already have an account? Log in",
+        mismatch: "Passwords don't match.",
+        errGoogle: "Google sign-in failed. Please try again.",
+        successTitle: "Check your email",
+        successBody: "We sent you a confirmation email. Click the link inside to continue.",
+        successWarm: "Once you click it, Miomi will be waiting for you.",
+        spamTitle: "Don't see it? Check your spam folder.",
+        spamSub: "",
+        backToLogin: "Back to log in",
+      };
 
   async function handleGoogle() {
     setError(null);
@@ -64,11 +116,11 @@ export default function SignupPage() {
         },
       });
       if (oauthError) {
-        setError("เข้าสู่ระบบด้วย Google ไม่สำเร็จค่า ลองอีกครั้งนะคะ");
+        setError(t.errGoogle);
         setGoogleLoading(false);
       }
     } catch {
-      setError("เข้าสู่ระบบด้วย Google ไม่สำเร็จค่า ลองอีกครั้งนะคะ");
+      setError(t.errGoogle);
       setGoogleLoading(false);
     }
   }
@@ -78,7 +130,7 @@ export default function SignupPage() {
     setError(null);
 
     if (password !== confirmPassword) {
-      setError("รหัสผ่านไม่ตรงกันค่า");
+      setError(t.mismatch);
       return;
     }
 
@@ -95,7 +147,7 @@ export default function SignupPage() {
         },
       });
       if (signUpError) {
-        setError(getSignupErrorThai(signUpError.message));
+        setError(getSignupError(signUpError.message, isThai));
         return;
       }
       setSuccess(true);
@@ -110,48 +162,43 @@ export default function SignupPage() {
         <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
           <AmbientBackground mode="ambient" />
         </div>
-        <div className="relative z-10 flex min-h-0 flex-1 overflow-y-auto px-4 py-6">
-          <div className="m-auto w-full max-w-[400px] rounded-card bg-surface p-6 shadow-card md:p-8">
+        <div className="relative z-10 flex min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div className="m-auto w-full max-w-[400px] rounded-card bg-surface p-6 shadow-card md:p-7">
             <p className="text-center text-2xl font-bold text-[#B8860B]">Miomika</p>
 
-            <div className="mt-5 flex justify-center">
-              <div className="miomi-login-float w-[110px] shrink-0">
+            <div className="mt-3 flex justify-center">
+              <div className="miomi-login-float w-[80px] shrink-0 md:w-[96px]">
                 <Image
                   src="/miomi/happy.png"
                   alt="Miomi"
-                  width={110}
-                  height={110}
-                  className="h-auto w-[110px] object-contain"
+                  width={96}
+                  height={96}
+                  className="h-auto w-full object-contain"
                   priority
                 />
               </div>
             </div>
 
-            <h1 className="mt-6 text-center text-lg font-semibold leading-snug text-ink">
-              เช็คอีเมลของคุณด้วยนะคะ 📧
+            <h1 className="mt-4 text-center text-lg font-semibold leading-snug text-ink">
+              {t.successTitle}
             </h1>
-            <p className="mt-3 text-center text-sm leading-relaxed text-ink-muted">
-              We sent you a confirmation email. Click the link inside to continue.
+            <p className="mt-2 text-center text-sm leading-relaxed text-ink-muted">
+              {t.successBody}
             </p>
-            <p className="mt-3 text-center text-xs leading-relaxed text-accent">
-              พอกดลิงก์ในอีเมลแล้ว เจอกันต่อนะคะ Miomi รออยู่เลย ✨
+            <p className="mt-2 text-center text-xs leading-relaxed text-accent">
+              {t.successWarm}
             </p>
 
-            <div className="mt-8 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-center">
-              <p className="text-sm leading-relaxed text-ink">
-                ไม่เจออีเมล? เช็ค spam ด้วยนะคะ
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-                Don&apos;t see it? Check your spam folder.
-              </p>
+            <div className="mt-5 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-center">
+              <p className="text-sm leading-relaxed text-ink">{t.spamTitle}</p>
             </div>
 
-            <p className="mt-8 text-center text-sm text-ink-muted">
+            <p className="mt-5 text-center text-sm text-ink-muted">
               <Link
                 href="/login"
                 className="font-medium text-accent underline underline-offset-2"
               >
-                กลับไปหน้าเข้าสู่ระบบค่า
+                {t.backToLogin}
               </Link>
             </p>
           </div>
@@ -166,45 +213,42 @@ export default function SignupPage() {
         <AmbientBackground mode="ambient" />
       </div>
 
-      <header className="relative z-10 flex h-12 shrink-0 items-center px-4">
+      <header className="relative z-10 flex h-14 shrink-0 items-center px-4">
         <Link
           href="/home"
-          aria-label="กลับหน้าหลัก"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-subtle transition-colors hover:bg-surface-2 hover:text-accent"
+          aria-label={t.back}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-surface/70 text-ink-muted shadow-card backdrop-blur transition hover:bg-surface hover:text-accent"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
         </Link>
       </header>
 
-      <div className="relative z-10 flex min-h-0 flex-1 overflow-y-auto px-4 py-6">
-        <div className="m-auto w-full max-w-[400px] rounded-card bg-surface p-6 shadow-card md:p-8">
+      <div className="relative z-10 flex min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+        <div className="m-auto w-full max-w-[400px] rounded-card bg-surface p-6 shadow-card md:p-7">
           <p className="text-center text-2xl font-bold text-[#B8860B]">Miomika</p>
 
-          <div className="mt-5 flex justify-center">
-            <div className="miomi-login-float w-[110px] shrink-0">
+          <div className="mt-3 flex justify-center">
+            <div className="miomi-login-float w-[76px] shrink-0 md:w-[92px]">
               <Image
                 src="/miomi/idle.png"
                 alt="Miomi"
-                width={110}
-                height={110}
-                className="h-auto w-[110px] object-contain"
+                width={92}
+                height={92}
+                className="h-auto w-full object-contain"
                 priority
               />
             </div>
           </div>
 
-          <h1 className="mt-5 text-center text-xl font-semibold text-ink">
-            มาเริ่มต้นด้วยกันนะคะ
+          <h1 className="mt-3 text-center text-xl font-semibold text-ink">
+            {t.title}
           </h1>
-          <p className="mt-1 text-center text-sm text-ink-muted">
-            Create your account
-          </p>
 
           <button
             type="button"
             onClick={() => void handleGoogle()}
             disabled={googleLoading || loading}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3 text-sm font-medium text-ink shadow-card transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3 text-sm font-medium text-ink shadow-card transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.75h3.57c2.08-1.92 3.28-4.74 3.28-8.07z"/>
@@ -212,18 +256,18 @@ export default function SignupPage() {
               <path fill="#FBBC05" d="M5.84 14.12c-.22-.66-.35-1.36-.35-2.12s.13-1.46.35-2.12V7.04H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.96l3.66-2.84z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.04l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
             </svg>
-            <span>{googleLoading ? "กำลังเชื่อมต่อ..." : "สมัครด้วย Google"}</span>
+            <span>{googleLoading ? t.connecting : t.google}</span>
           </button>
 
-          <div className="my-5 flex items-center gap-3">
+          <div className="my-4 flex items-center gap-3">
             <div className="h-px flex-1 bg-line" />
             <span className="text-[10px] font-medium uppercase tracking-wider text-ink-subtle">
-              หรือใช้อีเมล
+              {t.orEmail}
             </span>
             <div className="h-px flex-1 bg-line" />
           </div>
 
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+          <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
             {error ? (
               <p
                 className="rounded-lg border border-[#E7C9C4] bg-[#FBECEA] px-3 py-2 text-center text-sm text-[#C4564A]"
@@ -234,7 +278,7 @@ export default function SignupPage() {
             ) : null}
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-ink-muted">Email</span>
+              <span className="text-xs font-medium text-ink-muted">{t.email}</span>
               <input
                 type="email"
                 name="email"
@@ -248,7 +292,7 @@ export default function SignupPage() {
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-ink-muted">Password</span>
+              <span className="text-xs font-medium text-ink-muted">{t.password}</span>
               <input
                 type="password"
                 name="password"
@@ -262,9 +306,7 @@ export default function SignupPage() {
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-ink-muted">
-                Confirm password
-              </span>
+              <span className="text-xs font-medium text-ink-muted">{t.confirm}</span>
               <input
                 type="password"
                 name="confirmPassword"
@@ -280,18 +322,18 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 w-full rounded-full bg-accent py-3 text-sm font-semibold text-white shadow-cta transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-1 w-full rounded-full bg-accent py-3 text-sm font-semibold text-white shadow-cta transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "…" : "สมัครสมาชิก / Sign up"}
+              {loading ? t.submitting : t.submit}
             </button>
           </form>
 
-          <p className="mt-8 text-center text-sm text-ink-muted">
+          <p className="mt-4 text-center text-sm text-ink-muted">
             <Link
               href="/login"
               className="font-medium text-accent underline underline-offset-2"
             >
-              มีบัญชีแล้ว? เข้าสู่ระบบค่า
+              {t.haveAccount}
             </Link>
           </p>
         </div>
