@@ -242,6 +242,7 @@ export default function MePage() {
     }
   }, [profileId, supabase]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshAvatar();
   }, [refreshAvatar]);
   useEffect(() => {
@@ -269,6 +270,7 @@ export default function MePage() {
   const [soundsOn, setSoundsOn] = useState(true);
   const [notifyOn, setNotifyOn] = useState(false);
   const [theme, setThemeState] = useState<ThemeId>("warm");
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       setSoundsOn(localStorage.getItem("miomika.sounds_on") !== "false");
@@ -278,21 +280,25 @@ export default function MePage() {
       /* ignore */
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // ---- optimistic mirrors of server-backed fields ----
   const [learningTarget, setLearningTarget] = useState<string | null>(null);
   const [cefr, setCefr] = useState<string | null>(null);
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (profile) {
       setLearningTarget(profile.learning_target_language ?? null);
       setCefr(profile.cefr_level ?? null);
     }
   }, [profile]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const [levelOpen, setLevelOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [nameOpen, setNameOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [now] = useState(() => Date.now());
 
   const isFree = profile?.tier === "free";
   const isPro = !!profile && profile.tier !== "free";
@@ -387,12 +393,13 @@ export default function MePage() {
     router.push("/");
   };
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const daysTogether = useMemo(() => {
     if (!profile?.onboarding_completed_at) return null;
     const start = new Date(profile.onboarding_completed_at).getTime();
     if (Number.isNaN(start)) return null;
-    return Math.max(1, Math.floor((Date.now() - start) / 86_400_000) + 1);
-  }, [profile?.onboarding_completed_at]);
+    return Math.max(1, Math.floor((now - start) / 86_400_000) + 1);
+  }, [profile?.onboarding_completed_at, now]);
 
   if (!authReady || !profile) {
     return (
