@@ -85,12 +85,6 @@ function buildHomeGreeting(
   return th[tod][i];
 }
 
-const DAILY_CHALLENGE = {
-  phrase: "I'm up for it",
-  th: "ฉันพร้อมแล้ว — ใช้ตอบตกลงทำอะไรด้วยกัน",
-  meaning: 'แปลว่า "เอาล่ะ ทำได้" หรือ "ฉันพร้อมแล้ว" ไม่ใช่แค่ตื่นนอนนะคะ',
-};
-
 const tapFeedback =
   "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#34A98F]";
 
@@ -295,7 +289,6 @@ export default function HomePage() {
   const [xpTick, setXpTick] = useState(0);
   const [pet, setPet] = useState<PetStats>(DEFAULT_PET);
   const [petReady, setPetReady] = useState(false);
-  const [meaningExpanded, setMeaningExpanded] = useState(false);
   const [dragConstraints, setDragConstraints] = useState({
     left: 0,
     right: 0,
@@ -537,11 +530,6 @@ export default function HomePage() {
     });
     setXpTick((t) => t + 1);
   }, [markActivity, wakeFromSleep, triggerLevelUpCelebration, showGuestSignupIfFirst, isGuest, showBubble, scheduleHappyEnd]);
-
-  const handleGuestCreatePress = useCallback(() => {
-    showGuestSignupIfFirst();
-    window.location.href = "/create";
-  }, [showGuestSignupIfFirst]);
 
   // Home "Talk to Miomi" CTA opens the ambient companion sheet rather than
   // routing to /talk. /talk is reachable from the Fullscreen button inside
@@ -1047,65 +1035,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* MIOMI'S PICK — collapsed by default */}
-            <button
-              type="button"
-              onClick={() => setMeaningExpanded((v) => !v)}
-              style={{
-                display: "flex", alignItems: "center", gap: "10px",
-                height: meaningExpanded ? "auto" : "44px", minHeight: "44px",
-                flexShrink: 0, background: "#FDF8EE",
-                borderLeft: "3px solid #34A98F",
-                padding: meaningExpanded ? "10px 16px" : "0 16px",
-                textAlign: "left", cursor: "pointer",
-                transition: "height 0.25s ease", width: "100%",
-                borderTop: "none", borderRight: "none", borderBottom: "none",
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.10em", color: "#34A98F", textTransform: "uppercase", flexShrink: 0 }}>
-                    ✦ MIOMI&apos;S PICK
-                  </span>
-                  <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {DAILY_CHALLENGE.phrase}
-                  </span>
-                  <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#9A8B73", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }}>
-                    — {DAILY_CHALLENGE.th}
-                  </span>
-                </div>
-                {meaningExpanded && (
-                  <div style={{ marginTop: "8px" }}>
-                    <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "12px", color: "#6B7280", lineHeight: 1.6, marginBottom: "10px" }}>
-                      {DAILY_CHALLENGE.meaning}
-                    </p>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      {authReady && isGuest ? (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleGuestCreatePress(); }}
-                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", border: "none", cursor: "pointer" }}
-                        >
-                          ฝึกเลย
-                        </button>
-                      ) : (
-                        <Link
-                          href="/create"
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ display: "inline-flex", alignItems: "center", height: "28px", borderRadius: "999px", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", color: "#FFFFFF", fontFamily: "'Kanit', sans-serif", fontSize: "11px", fontWeight: 500, padding: "0 12px", textDecoration: "none" }}
-                        >
-                          ฝึกเลย
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", color: "#9A8B73", flexShrink: 0, transition: "transform 0.25s ease", transform: meaningExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
-                ▾
-              </span>
-            </button>
-
             {/* Action row */}
             <div style={{ display: "grid", gridTemplateColumns: "48px 48px 1fr", gap: "10px", padding: "10px 16px 12px", flexShrink: 0, alignItems: "center" }}>
               <button
@@ -1211,27 +1140,6 @@ export default function HomePage() {
 
                 <section className="flex flex-col gap-3">
                   <p className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle" style={{ fontFamily: "'Quicksand', sans-serif" }}>{HOME_T[lang].today}</p>
-
-                  <div className="rounded-card border p-4 shadow-card" style={{ background: "var(--mk-earned-soft)", borderColor: "#EFE6D2" }}>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent">{HOME_T[lang].pickEyebrow}</p>
-                    <p className="mt-2 text-[18px] font-medium leading-tight text-ink">{DAILY_CHALLENGE.phrase}</p>
-                    <p className="mt-1.5 text-[12px] leading-relaxed text-ink-muted">{DAILY_CHALLENGE.th}</p>
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { void speak(DAILY_CHALLENGE.phrase, detectLang(DAILY_CHALLENGE.phrase)); }}
-                        className={cn("inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-medium", tapFeedback)}
-                        style={{ background: "#fff", borderColor: "#DCEFE8", color: "var(--mk-accent-press)" }}
-                      >
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z" /></svg>
-                        {HOME_T[lang].listen}
-                      </button>
-                      <Link href="/talk" className={cn("inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
-                        <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
-                        {HOME_T[lang].practice}
-                      </Link>
-                    </div>
-                  </div>
 
                   <div className="rounded-card border border-line bg-surface p-4 shadow-card">
                     <div className="flex items-center justify-between">
