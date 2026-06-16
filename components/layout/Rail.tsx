@@ -152,7 +152,7 @@ export function Rail() {
           <div className="min-h-0 flex-1 overflow-y-auto">
             <p className="px-2 text-[12px] leading-relaxed text-[#A89C88]" style={{ fontFamily: lang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif" }}>
               {lang === "en"
-                ? "No chats yet~ start talking with Miomi and they'll appear here"
+                ? "No chats yet — start talking with Miomi and they'll appear here"
                 : "ยังไม่มีบทสนทนา~ เริ่มคุยกับมิโอมิแล้วจะมาอยู่ตรงนี้ค่า"}
             </p>
           </div>

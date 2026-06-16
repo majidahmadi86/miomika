@@ -26,11 +26,11 @@ import type { Language } from "@/lib/i18n/server";
 import { useUILanguage } from "@/lib/i18n/client";
 const WELCOME_BUBBLE = {
   th: "สวัสดีค่า~ วันนี้อยากพูด English เก่งขึ้นไหมคะ?",
-  en: "Hi~ Want to speak better English today?",
+  en: "Hi! Want to speak better English today?",
 };
 const HOME_T = {
   th: { greetSub: "มาฝึกพูดด้วยกันไหมคะ~", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ~", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
-  en: { greetSub: "let's get a little practice in~", bubbleDefault: "I'm right here whenever you are~", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
+  en: { greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
 } as const;
 
 const DAILY_CHALLENGE = {
