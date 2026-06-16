@@ -415,7 +415,8 @@ export default function MePage() {
   const avatarSrc = avatarUrl || DEFAULT_AVATAR;
 
   return (
-    <div className="mx-auto w-full max-w-[680px] px-4 py-6 md:px-6 md:py-10">
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-[920px] px-4 py-6 pb-16 md:px-6 md:py-10">
       <h1 className="sr-only">{t.title}</h1>
 
       {/* Header */}
@@ -447,6 +448,8 @@ export default function MePage() {
         </div>
       </section>
 
+      <div className="md:grid md:grid-cols-2 md:items-start md:gap-x-6">
+        <div>
       {/* Learning */}
       <Group title={t.learningGroup}>
         <Row
@@ -557,6 +560,8 @@ export default function MePage() {
         />
       </Group>
 
+        </div>
+        <div>
       {/* Things learned */}
       <Group>
         <Row
@@ -641,8 +646,12 @@ export default function MePage() {
         <Row danger icon={<LogOut className="h-[18px] w-[18px]" />} label={signingOut ? t.signingOut : t.signOut} onClick={handleSignOut} />
       </Group>
 
+        </div>
+      </div>
+
       <AvatarEditSheet open={avatarOpen} userId={profile.id} onClose={() => setAvatarOpen(false)} />
       <NameEditSheet open={nameOpen} userId={profile.id} currentName={profile.display_name ?? ""} onClose={() => setNameOpen(false)} />
+      </div>
     </div>
   );
 }
