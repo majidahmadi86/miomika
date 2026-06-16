@@ -1110,8 +1110,8 @@ export default function HomePage() {
           </div>
 
           {/* Desktop — Miomi-centered home (alive) */}
-          <div className="hidden h-full md:flex md:flex-col md:overflow-y-auto">
-            <div className="mx-auto w-full max-w-[1120px] px-8 py-8">
+          <div className="hidden h-full md:flex md:flex-col md:overflow-hidden">
+            <div className="mx-auto flex h-full w-full max-w-[1120px] flex-col px-8 py-6">
               <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
                   <h1 className="text-[23px] font-medium leading-snug text-ink">{WELCOME_BUBBLE.th}</h1>
@@ -1124,9 +1124,9 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_260px]">
                 <section
-                  className="relative flex flex-col items-center rounded-[24px] border border-[#E4EFE9] px-7 pb-6 pt-6"
+                  className="relative flex flex-col items-center justify-center overflow-hidden rounded-[24px] border border-[#E4EFE9] px-7 pb-6 pt-6"
                   style={{ background: "linear-gradient(180deg, #F2FAF7 0%, #FCFBF6 70%)" }}
                 >
                   <div className="mb-1 max-w-[72%] self-start">
@@ -1145,6 +1145,7 @@ export default function HomePage() {
                     onClick={handleMiomiTap}
                     aria-label="Tap Miomi"
                     className="relative my-1 block cursor-pointer appearance-none border-0 bg-transparent p-0 focus-visible:outline-none"
+                    style={{ width: "min(300px, 34vh)" }}
                   >
                     <MiomiCharacter
                       expression={miomiMood}
