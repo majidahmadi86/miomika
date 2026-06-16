@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
-import { Coffee, Crown, Heart, Sparkles, Zap, type LucideIcon } from "lucide-react";
+import { Coffee, Heart, Sparkles, Zap, type LucideIcon } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -16,7 +16,6 @@ import {
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { AppShell } from "@/components/layout/AppShell";
-import { Card } from "@/components/ui/Card";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { useProfile } from "@/lib/auth/use-profile";
 import { cn } from "@/lib/utils";
@@ -1112,16 +1111,9 @@ export default function HomePage() {
           {/* Desktop — Miomi-centered home (alive) */}
           <div className="hidden h-full md:flex md:flex-col md:overflow-hidden">
             <div className="mx-auto flex h-full w-full max-w-[1120px] flex-col px-8 py-6">
-              <div className="mb-6 flex items-start justify-between gap-4">
-                <div>
-                  <h1 className="text-[23px] font-medium leading-snug text-ink">{WELCOME_BUBBLE.th}</h1>
-                  <p className="mt-1.5 text-sm text-ink-muted">{WELCOME_BUBBLE.en}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 py-2 shadow-card">
-                  <Crown className="h-4 w-4 text-earned" strokeWidth={2} />
-                  <span className="text-sm font-medium text-earned-strong">{profile?.streak ?? 0}</span>
-                  <span className="text-xs text-ink-muted">วันต่อกัน</span>
-                </div>
+              <div className="mb-6">
+                <h1 className="text-[23px] font-medium leading-snug text-ink">{WELCOME_BUBBLE.th}</h1>
+                <p className="mt-1.5 text-sm text-ink-muted">{WELCOME_BUBBLE.en}</p>
               </div>
 
               <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_260px]">
@@ -1183,36 +1175,55 @@ export default function HomePage() {
                   </button>
                 </section>
 
-                <section className="flex flex-col gap-3.5">
-                  <Card className="border-l-4" style={{ background: "var(--mk-earned-soft)", borderLeftColor: "var(--mk-accent)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-accent">✦ MIOMI&apos;S PICK · วันนี้</p>
-                    <p className="mt-2 text-[17px] font-medium text-ink">{DAILY_CHALLENGE.phrase}</p>
-                    <p className="mt-1 text-[13px] text-ink">{DAILY_CHALLENGE.th}</p>
-                    <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-muted">{DAILY_CHALLENGE.meaning}</p>
-                    <Link href="/create" className={cn("mt-3 inline-flex items-center rounded-full px-4 py-2 text-[13px] font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
-                      ฝึกเลย
-                    </Link>
-                  </Card>
+                <section className="flex flex-col gap-3">
+                  <p className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle" style={{ fontFamily: "'Quicksand', sans-serif" }}>วันนี้กับมิโอมิ</p>
+
+                  <div className="rounded-card border p-4 shadow-card" style={{ background: "var(--mk-earned-soft)", borderColor: "#EFE6D2" }}>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent">✦ คำของมิโอมิ</p>
+                    <p className="mt-2 text-[18px] font-medium leading-tight text-ink">{DAILY_CHALLENGE.phrase}</p>
+                    <p className="mt-1.5 text-[12px] leading-relaxed text-ink-muted">{DAILY_CHALLENGE.th}</p>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { void speak(DAILY_CHALLENGE.phrase, detectLang(DAILY_CHALLENGE.phrase)); }}
+                        className={cn("inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-medium", tapFeedback)}
+                        style={{ background: "#fff", borderColor: "#DCEFE8", color: "var(--mk-accent-press)" }}
+                      >
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z" /></svg>
+                        ฟังเสียง
+                      </button>
+                      <Link href="/create" className={cn("inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
+                        <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+                        ฝึกเลย
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="rounded-card border border-line bg-surface p-4 shadow-card">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#B8860B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3c1 3-1 4-1 6a3 3 0 0 0 6 0c0-1 0-2-.5-3 2 1.5 3.5 4 3.5 7a7 7 0 0 1-14 0c0-4 3-6 6-10z" /></svg>
+                        <span className="text-[14px] font-semibold text-earned-strong" style={{ fontFamily: "'Quicksand', sans-serif" }}>{profile?.streak ?? 0}</span>
+                        <span className="text-[12px] text-ink-muted">วันต่อกัน</span>
+                      </span>
+                      <span className="text-[12.5px] font-medium text-ink-muted">เลเวล {pet.level}</span>
+                    </div>
+                    <div className="mt-3 h-[7px] overflow-hidden rounded-full" style={{ background: "#F1EAD9" }}>
+                      <div className="h-full rounded-full" style={{ width: `${pet.xp}%`, background: "linear-gradient(90deg, #E3C98B, var(--mk-earned))" }} />
+                    </div>
+                    <p className="mt-2 text-[11px] text-ink-muted">อีก {Math.max(0, 100 - Math.round(pet.xp))} XP ถึงเลเวลถัดไป</p>
+                  </div>
 
                   <Link href="/learn" className={cn("flex items-center gap-3 rounded-card border border-line bg-surface p-3.5 shadow-card", tapFeedback)}>
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]" style={{ background: "var(--mk-warm-soft)" }}>
-                      <Sparkles className="h-[18px] w-[18px]" style={{ color: "#993556" }} strokeWidth={2} />
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#993556" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
                     </span>
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block text-[13.5px] font-medium text-ink">ทบทวนคำศัพท์</span>
                       <span className="block text-[11.5px] text-ink-muted">5 คำกำลังรอให้ทวน</span>
                     </span>
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-subtle"><path d="M9 6l6 6-6 6" /></svg>
                   </Link>
-
-                  <div className="rounded-card border border-line bg-surface p-3.5 shadow-card">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-[13px] font-medium text-earned-strong">เลเวล {pet.level}</span>
-                      <span className="text-[11px] text-ink-muted">อีก {Math.max(0, 100 - Math.round(pet.xp))} XP</span>
-                    </div>
-                    <div className="h-[7px] overflow-hidden rounded-full" style={{ background: "#F1EAD9" }}>
-                      <div className="h-full rounded-full" style={{ width: `${pet.xp}%`, background: "linear-gradient(90deg, #E3C98B, var(--mk-earned))" }} />
-                    </div>
-                  </div>
                 </section>
               </div>
             </div>
