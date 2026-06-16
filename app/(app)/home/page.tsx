@@ -1,11 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
-import { BookOpen, Coffee, Crown, Heart, Sparkles, TrendingUp, User, Zap, type LucideIcon } from "lucide-react";
+import { Coffee, Crown, Heart, Sparkles, Zap, type LucideIcon } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -17,9 +16,7 @@ import {
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { AppShell } from "@/components/layout/AppShell";
-import { PageShell } from "@/components/ui/PageShell";
 import { Card } from "@/components/ui/Card";
-import { ActionTile } from "@/components/ui/ActionTile";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { useProfile } from "@/lib/auth/use-profile";
 import { cn } from "@/lib/utils";
@@ -1112,53 +1109,112 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Desktop — premium home on the design system */}
-          <div className="hidden h-full flex-col overflow-y-auto md:flex">
-            <PageShell>
+          {/* Desktop — Miomi-centered home (alive) */}
+          <div className="hidden h-full md:flex md:flex-col md:overflow-y-auto">
+            <div className="mx-auto w-full max-w-[1120px] px-8 py-8">
               <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
-                  <h1 className="text-[22px] font-medium leading-tight text-ink">{WELCOME_BUBBLE.th}</h1>
+                  <h1 className="text-[23px] font-medium leading-snug text-ink">{WELCOME_BUBBLE.th}</h1>
                   <p className="mt-1.5 text-sm text-ink-muted">{WELCOME_BUBBLE.en}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 shadow-card">
+                <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 py-2 shadow-card">
                   <Crown className="h-4 w-4 text-earned" strokeWidth={2} />
                   <span className="text-sm font-medium text-earned-strong">{profile?.streak ?? 0}</span>
+                  <span className="text-xs text-ink-muted">วันต่อกัน</span>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleTalkCTA}
-                className={cn("mb-6 flex w-full items-center justify-between gap-4 rounded-tile p-6 text-left shadow-cta", tapFeedback)}
-                style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}
-              >
-                <div>
-                  <p className="text-lg font-medium text-white">พูดกับมิโอมิเลยค่า</p>
-                  <p className="mt-1 text-xs text-white/85">คุยภาษาอังกฤษแบบสบายๆ หนูช่วยทุกคำ</p>
-                  <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-medium" style={{ color: "var(--mk-accent-press)" }}>
-                    <Sparkles className="h-4 w-4" strokeWidth={2} />
-                    เริ่มคุย
-                  </span>
-                </div>
-                <Image src="/miomi/idle.png" alt="Miomi" width={96} height={96} className="h-24 w-24 shrink-0 object-contain" priority />
-              </button>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_260px]">
+                <section
+                  className="relative flex flex-col items-center rounded-[24px] border border-[#E4EFE9] px-7 pb-6 pt-6"
+                  style={{ background: "linear-gradient(180deg, #F2FAF7 0%, #FCFBF6 70%)" }}
+                >
+                  <div className="mb-1 max-w-[72%] self-start">
+                    <div className="rounded-2xl border border-line bg-white px-3.5 py-2.5 shadow-card">
+                      <p className="text-sm font-medium text-ink" style={{ fontFamily: "'Kanit', sans-serif" }}>
+                        {bubbleVisible && bubbleTh ? bubbleTh : "พร้อมคุยกับหนูรึยังคะ~"}
+                      </p>
+                      {bubbleVisible && bubbleEn ? (
+                        <p className="mt-0.5 text-[11px] text-ink-muted" style={{ fontFamily: "'Quicksand', sans-serif" }}>{bubbleEn}</p>
+                      ) : null}
+                    </div>
+                  </div>
 
-              <div className="mb-6 grid grid-cols-3 gap-4">
-                <ActionTile icon={BookOpen} label="บทเรียน" sub="Lessons" tone="teal" href="/learn" />
-                <ActionTile icon={TrendingUp} label="ความก้าวหน้า" sub="Your progress" tone="violet" href="/dashboard" />
-                <ActionTile icon={User} label="โปรไฟล์" sub="You & Miomi" tone="pink" href="/me" />
+                  <button
+                    type="button"
+                    onClick={handleMiomiTap}
+                    aria-label="Tap Miomi"
+                    className="relative my-1 block cursor-pointer appearance-none border-0 bg-transparent p-0 focus-visible:outline-none"
+                  >
+                    <MiomiCharacter
+                      expression={miomiMood}
+                      sleeping={false}
+                      feedAnimKey={feedAnimKey}
+                      playAnimKey={playAnimKey}
+                      levelUpAnimKey={levelUpAnimKey}
+                      breathe={!reduceMotion}
+                    />
+                  </button>
+
+                  <div className="mb-5 mt-3 flex gap-2.5">
+                    <span className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-medium text-ink-muted">
+                      <Heart className="h-3.5 w-3.5" style={{ color: "#D4537E" }} strokeWidth={2.2} />{Math.round(pet.mood)}%
+                    </span>
+                    <span className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-medium text-ink-muted">
+                      <Zap className="h-3.5 w-3.5 text-earned" strokeWidth={2.2} />{Math.round(pet.energy)}%
+                    </span>
+                    <span className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-medium text-ink-muted">
+                      <Coffee className="h-3.5 w-3.5 text-accent" strokeWidth={2.2} />{Math.round(pet.hunger)}%
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleTalkCTA}
+                    className={cn("flex w-full max-w-[460px] items-center justify-center gap-2.5 rounded-[18px] p-4 shadow-cta", tapFeedback)}
+                    style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}
+                  >
+                    <Sparkles className="h-5 w-5 text-white" strokeWidth={2} />
+                    <span className="flex flex-col items-start leading-tight">
+                      <span className="text-[17px] font-medium text-white">เริ่มคุยกับมิโอมิ</span>
+                      <span className="text-[11px] font-semibold tracking-wide text-white/80" style={{ fontFamily: "'Quicksand', sans-serif" }}>TALK TO MIOMI</span>
+                    </span>
+                  </button>
+                </section>
+
+                <section className="flex flex-col gap-3.5">
+                  <Card className="border-l-4" style={{ background: "var(--mk-earned-soft)", borderLeftColor: "var(--mk-accent)" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-accent">✦ MIOMI&apos;S PICK · วันนี้</p>
+                    <p className="mt-2 text-[17px] font-medium text-ink">{DAILY_CHALLENGE.phrase}</p>
+                    <p className="mt-1 text-[13px] text-ink">{DAILY_CHALLENGE.th}</p>
+                    <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-muted">{DAILY_CHALLENGE.meaning}</p>
+                    <Link href="/create" className={cn("mt-3 inline-flex items-center rounded-full px-4 py-2 text-[13px] font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
+                      ฝึกเลย
+                    </Link>
+                  </Card>
+
+                  <Link href="/learn" className={cn("flex items-center gap-3 rounded-card border border-line bg-surface p-3.5 shadow-card", tapFeedback)}>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]" style={{ background: "var(--mk-warm-soft)" }}>
+                      <Sparkles className="h-[18px] w-[18px]" style={{ color: "#993556" }} strokeWidth={2} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[13.5px] font-medium text-ink">ทบทวนคำศัพท์</span>
+                      <span className="block text-[11.5px] text-ink-muted">5 คำกำลังรอให้ทวน</span>
+                    </span>
+                  </Link>
+
+                  <div className="rounded-card border border-line bg-surface p-3.5 shadow-card">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[13px] font-medium text-earned-strong">เลเวล {pet.level}</span>
+                      <span className="text-[11px] text-ink-muted">อีก {Math.max(0, 100 - Math.round(pet.xp))} XP</span>
+                    </div>
+                    <div className="h-[7px] overflow-hidden rounded-full" style={{ background: "#F1EAD9" }}>
+                      <div className="h-full rounded-full" style={{ width: `${pet.xp}%`, background: "linear-gradient(90deg, #E3C98B, var(--mk-earned))" }} />
+                    </div>
+                  </div>
+                </section>
               </div>
-
-              <Card className="border-l-4" style={{ background: "var(--mk-earned-soft)", borderLeftColor: "var(--mk-accent)" }}>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-accent">✦ MIOMI&apos;S PICK · วันนี้</p>
-                <p className="mt-2 text-lg font-medium leading-relaxed text-ink">{DAILY_CHALLENGE.phrase}</p>
-                <p className="mt-1 text-sm leading-relaxed text-ink">{DAILY_CHALLENGE.th}</p>
-                <p className="mt-2 text-xs leading-relaxed text-ink-muted">{DAILY_CHALLENGE.meaning}</p>
-                <Link href="/create" className={cn("mt-4 inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
-                  ฝึกเลย
-                </Link>
-              </Card>
-            </PageShell>
+            </div>
           </div>
         </div>
       </AppShell>
