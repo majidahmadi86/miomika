@@ -218,7 +218,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="h-full overflow-y-auto bg-white md:bg-transparent">
+    <div className="h-full overflow-y-auto bg-transparent">
       <div className="mx-auto w-full max-w-[1040px] px-4 py-5 md:px-8 md:py-7">
         <h1 className="text-[22px] font-semibold tracking-tight text-ink md:text-[25px]">{t.title}</h1>
         <p className="mt-1 text-[13.5px] text-ink-muted md:text-sm">{t.sub}</p>
