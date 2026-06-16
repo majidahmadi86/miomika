@@ -1,10 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
-import { Coffee, Heart, Zap, type LucideIcon } from "lucide-react";
+import { BookOpen, Coffee, Crown, Heart, Sparkles, TrendingUp, User, Zap, type LucideIcon } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -16,6 +17,9 @@ import {
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { AppShell } from "@/components/layout/AppShell";
+import { PageShell } from "@/components/ui/PageShell";
+import { Card } from "@/components/ui/Card";
+import { ActionTile } from "@/components/ui/ActionTile";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { useProfile } from "@/lib/auth/use-profile";
 import { cn } from "@/lib/utils";
@@ -1108,21 +1112,53 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Desktop */}
-          <div className="hidden flex-col gap-4 md:flex">
-            <motion.div className="rounded-2xl border border-[#EAD0DB] bg-white p-5">
-              <p className="text-base font-medium leading-[1.6] text-[#1A1A1A]">{WELCOME_BUBBLE.th}</p>
-              <p className="mt-1 text-xs leading-[1.6] text-[#666666]">{WELCOME_BUBBLE.en}</p>
-            </motion.div>
-            <motion.div className="rounded-2xl border-l-4 border-[#34A98F] bg-[#FDF8EE] p-5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-[#34A98F]">MIOMI&apos;S PICK · วันนี้</p>
-              <p className="mt-2 text-lg font-medium leading-[1.6] text-[#1A1A1A]">{DAILY_CHALLENGE.phrase}</p>
-              <p className="mt-1 text-sm leading-[1.6] text-[#1A1A1A]">{DAILY_CHALLENGE.th}</p>
-              <p className="mt-2 text-xs leading-[1.6] text-[#666666]">{DAILY_CHALLENGE.meaning}</p>
-              <Link href="/create" className={cn("mt-4 inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)" }}>
-                ฝึกเลย
-              </Link>
-            </motion.div>
+          {/* Desktop — premium home on the design system */}
+          <div className="hidden h-full flex-col overflow-y-auto md:flex">
+            <PageShell>
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="text-[22px] font-medium leading-tight text-ink">{WELCOME_BUBBLE.th}</h1>
+                  <p className="mt-1.5 text-sm text-ink-muted">{WELCOME_BUBBLE.en}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 shadow-card">
+                  <Crown className="h-4 w-4 text-earned" strokeWidth={2} />
+                  <span className="text-sm font-medium text-earned-strong">{profile?.streak ?? 0}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleTalkCTA}
+                className={cn("mb-6 flex w-full items-center justify-between gap-4 rounded-tile p-6 text-left shadow-cta", tapFeedback)}
+                style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}
+              >
+                <div>
+                  <p className="text-lg font-medium text-white">พูดกับมิโอมิเลยค่า</p>
+                  <p className="mt-1 text-xs text-white/85">คุยภาษาอังกฤษแบบสบายๆ หนูช่วยทุกคำ</p>
+                  <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-medium" style={{ color: "var(--mk-accent-press)" }}>
+                    <Sparkles className="h-4 w-4" strokeWidth={2} />
+                    เริ่มคุย
+                  </span>
+                </div>
+                <Image src="/miomi/idle.png" alt="Miomi" width={96} height={96} className="h-24 w-24 shrink-0 object-contain" priority />
+              </button>
+
+              <div className="mb-6 grid grid-cols-3 gap-4">
+                <ActionTile icon={BookOpen} label="บทเรียน" sub="Lessons" tone="teal" href="/learn" />
+                <ActionTile icon={TrendingUp} label="ความก้าวหน้า" sub="Your progress" tone="violet" href="/dashboard" />
+                <ActionTile icon={User} label="โปรไฟล์" sub="You & Miomi" tone="pink" href="/me" />
+              </div>
+
+              <Card className="border-l-4" style={{ background: "var(--mk-earned-soft)", borderLeftColor: "var(--mk-accent)" }}>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-accent">✦ MIOMI&apos;S PICK · วันนี้</p>
+                <p className="mt-2 text-lg font-medium leading-relaxed text-ink">{DAILY_CHALLENGE.phrase}</p>
+                <p className="mt-1 text-sm leading-relaxed text-ink">{DAILY_CHALLENGE.th}</p>
+                <p className="mt-2 text-xs leading-relaxed text-ink-muted">{DAILY_CHALLENGE.meaning}</p>
+                <Link href="/create" className={cn("mt-4 inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
+                  ฝึกเลย
+                </Link>
+              </Card>
+            </PageShell>
           </div>
         </div>
       </AppShell>

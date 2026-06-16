@@ -3,15 +3,17 @@ import { cn } from "@/lib/utils";
 type CardProps = {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 };
 
-export function Card({ children, className }: CardProps) {
+export function Card({ children, className, style }: CardProps) {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-rose-border bg-white p-4 shadow-sm",
+        "rounded-card border border-line bg-surface p-5 shadow-card",
         className,
       )}
+      style={style}
     >
       {children}
     </div>
