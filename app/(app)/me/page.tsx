@@ -560,8 +560,6 @@ export default function MePage() {
         />
       </Group>
 
-        </div>
-        <div>
       {/* Things learned */}
       <Group>
         <Row
@@ -578,6 +576,8 @@ export default function MePage() {
         />
       </Group>
 
+        </div>
+        <div>
       {/* Plan */}
       <Group title={t.plan}>
         <Row
