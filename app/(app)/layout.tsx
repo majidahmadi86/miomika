@@ -196,7 +196,7 @@ function AppLayoutInner({
           {children}
         </SwipeNavigator>
         <div className="md:hidden"><BottomNav /></div>
-        {pathname !== "/talk" && <InstallPrompt />}
+        {pathname !== "/talk" && <div className="md:hidden"><InstallPrompt /></div>}
         <AmbientCompanion />
         <GuidanceHost />
       </div>
