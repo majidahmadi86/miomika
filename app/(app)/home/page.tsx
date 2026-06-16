@@ -25,8 +25,8 @@ import { detectLang, speak } from "@/lib/voice/tts";
 import type { Language } from "@/lib/i18n/server";
 import { useUILanguage } from "@/lib/i18n/client";
 const WELCOME_BUBBLE = {
-  th: "สวัสดีค่า~ วันนี้อยากพูด English เก่งขึ้นไหมคะ?",
-  en: "Hi! Want to speak better English today?",
+  th: "สวัสดีค่า~ วันนี้อยากฝึกพูดด้วยกันไหมคะ?",
+  en: "Hi! Ready to practice with me today?",
 };
 const HOME_T = {
   th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ~", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ~", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
@@ -772,7 +772,7 @@ export default function HomePage() {
             }
           `}</style>
 
-          <div className="flex h-full flex-col overflow-hidden bg-white md:hidden">
+          <div className="flex h-full flex-col overflow-hidden md:hidden">
             {/* Miomi stage */}
             <div
               ref={stageRef}
