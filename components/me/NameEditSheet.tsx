@@ -1,15 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { useUILanguage } from "@/lib/i18n/client";
-import { CTA_GRADIENT, COLORS } from "@/lib/design/colors";
-import { me } from "@/lib/voice/warmth";
-
-const SHEET_SHADOW =
-  "0 -8px 32px rgba(26, 26, 24, 0.08), 0 -2px 8px rgba(26, 26, 24, 0.04)";
-const FONT = "'Kanit', 'Quicksand', sans-serif";
 
 interface NameEditSheetProps {
   open: boolean;
@@ -18,31 +12,39 @@ interface NameEditSheetProps {
   onClose: () => void;
 }
 
-export function NameEditSheet({
-  open,
-  userId,
-  currentName,
-  onClose,
-}: NameEditSheetProps) {
+export function NameEditSheet({ open, userId, currentName, onClose }: NameEditSheetProps) {
   const uiLang = useUILanguage();
+  const C = {
+    th: { title: "ฉันควรเรียกคุณว่าอะไร?", save: "บันทึก", cancel: "ยกเลิก", placeholder: "ชื่อของคุณ", error: "บันทึกไม่สำเร็จ ลองอีกครั้ง" },
+    en: { title: "What should I call you?", save: "Save", cancel: "Cancel", placeholder: "Your name", error: "Save failed. Please try again." },
+  }[uiLang === "th" ? "th" : "en"];
+
   const [name, setName] = useState(currentName);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (open) {
+      setName(currentName);
+      setError(null);
+    }
+  }, [open, currentName]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSave = async () => {
     const trimmed = name.trim();
     if (!trimmed) return;
     setSaving(true);
+    setError(null);
     try {
       const supabase = createClient();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ display_name: trimmed.slice(0, 32) })
-        .eq("id", userId);
-      if (error) throw error;
+      const { error: e } = await supabase.from("profiles").update({ display_name: trimmed.slice(0, 32) }).eq("id", userId);
+      if (e) throw e;
       window.dispatchEvent(new Event("miomika:profile-refresh"));
       onClose();
     } catch {
-      /* noop */
+      setError(C.error);
     } finally {
       setSaving(false);
     }
@@ -55,110 +57,48 @@ export function NameEditSheet({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(26, 26, 24, 0.5)",
-            zIndex: 300,
-            display: "flex",
-            alignItems: "flex-end",
-          }}
+          className="fixed inset-0 z-[300] flex items-end justify-center bg-black/40 md:items-center"
           onClick={onClose}
         >
           <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+            data-horizontal-scroll-zone
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              background: "rgba(255, 255, 255, 0.92)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              borderRadius: "16px 16px 0 0",
-              padding: "24px 24px calc(24px + env(safe-area-inset-bottom, 0px))",
-              boxShadow: SHEET_SHADOW,
-            }}
+            className="w-full rounded-t-[20px] bg-surface p-6 shadow-float md:max-w-[420px] md:rounded-[20px]"
+            style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
           >
-            <h2
-              style={{
-                fontFamily: FONT,
-                fontSize: "17px",
-                lineHeight: "24px",
-                fontWeight: 600,
-                color: COLORS.textPrimary,
-                margin: "0 0 16px",
-              }}
-            >
-              {me.name.title(uiLang)}
-            </h2>
-
+            <h2 className="mb-4 text-[17px] font-semibold text-ink">{C.title}</h2>
             <input
               type="text"
               value={name}
               maxLength={32}
+              placeholder={C.placeholder}
               onChange={(e) => setName(e.target.value)}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                fontFamily: FONT,
-                fontSize: "16px",
-                padding: "12px 16px",
-                border: `1px solid ${COLORS.borderMedium}`,
-                borderRadius: "12px",
-                outline: "none",
-                color: COLORS.textPrimary,
-                marginBottom: "16px",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = COLORS.ctaSolid;
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = COLORS.borderMedium;
-              }}
+              className="mb-4 w-full rounded-[12px] border border-line bg-surface-2 px-4 py-3 text-[16px] text-ink outline-none focus:border-[var(--mk-accent)]"
             />
-
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div className="flex gap-2">
               <button
                 type="button"
                 disabled={saving || !name.trim()}
                 onClick={() => void handleSave()}
-                style={{
-                  flex: 1,
-                  height: "52px",
-                  borderRadius: "999px",
-                  background: CTA_GRADIENT,
-                  color: COLORS.ctaTextColor,
-                  border: "none",
-                  fontFamily: FONT,
-                  fontSize: "16px",
-                  fontWeight: 600,
-                  cursor: saving ? "wait" : "pointer",
-                }}
+                className="h-12 flex-1 rounded-full text-[15px] font-semibold text-white shadow-cta disabled:opacity-60"
+                style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from), var(--mk-accent-grad-to))" }}
               >
-                {me.name.save(uiLang)}
+                {C.save}
               </button>
               <button
                 type="button"
                 disabled={saving}
                 onClick={onClose}
-                style={{
-                  flex: 1,
-                  height: "44px",
-                  borderRadius: "999px",
-                  background: "transparent",
-                  border: `1px solid ${COLORS.borderMedium}`,
-                  color: COLORS.textMuted,
-                  fontFamily: FONT,
-                  fontSize: "15px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="h-12 flex-1 rounded-full border border-line bg-surface-2 text-[14px] font-semibold text-ink-muted disabled:opacity-60"
               >
-                {me.name.cancel(uiLang)}
+                {C.cancel}
               </button>
             </div>
+            {error ? <p className="mt-3 text-center text-[13px] text-[#C4564A]">{error}</p> : null}
           </motion.div>
         </motion.div>
       ) : null}
