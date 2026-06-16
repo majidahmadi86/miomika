@@ -638,9 +638,7 @@ export default function MePage() {
           icon={<Download className="h-[18px] w-[18px]" />}
           label={t.yourData}
           sub={t.yourDataSub}
-          onClick={() => {
-            window.location.href = "mailto:privacy@miomika.com?subject=Data%20request";
-          }}
+          onClick={() => router.push("/me/data")}
           right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
         />
         <Row danger icon={<LogOut className="h-[18px] w-[18px]" />} label={signingOut ? t.signingOut : t.signOut} onClick={handleSignOut} />
