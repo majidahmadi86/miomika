@@ -1185,7 +1185,7 @@ export default function HomePage() {
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z" /></svg>
                         {HOME_T[lang].listen}
                       </button>
-                      <Link href="/create" className={cn("inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
+                      <Link href="/talk" className={cn("inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
                         <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
                         {HOME_T[lang].practice}
                       </Link>
