@@ -28,6 +28,7 @@ export type ProgressResponse = {
   streakDays: number;
   cefrLevel: string | null;
   learningTargetLanguage: "th" | "en" | null;
+  activityDates: string[];
   learningWords: LearningWord[];
 };
 
@@ -38,6 +39,7 @@ const ZEROED: ProgressResponse = {
   streakDays: 0,
   cefrLevel: null,
   learningTargetLanguage: null,
+  activityDates: [],
   learningWords: [],
 };
 
@@ -214,6 +216,7 @@ export async function GET() {
       streakDays,
       cefrLevel,
       learningTargetLanguage,
+      activityDates: Array.from(new Set(activityDates)),
       learningWords,
     };
 
