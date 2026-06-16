@@ -20,6 +20,7 @@ import { AmbientCompanion } from "@/components/companion/AmbientCompanion";
 import { GuidanceHost } from "@/components/guidance/GuidanceHost";
 import { DesktopHoldBanner } from "@/components/layout/DesktopHoldBanner";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { useUILanguage } from "@/lib/i18n/client";
 import { useRef, useCallback, useEffect } from "react";
@@ -203,7 +204,7 @@ function AppLayoutInner({
   }
 
   return (
-    <div className="relative isolate h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-[#FAFAF6] md:flex md:h-screen md:max-h-none md:overflow-hidden">
+    <div className="relative isolate h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-[var(--mk-canvas)] md:flex md:h-screen md:max-h-none md:overflow-hidden">
       <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <AmbientBackground mode="ambient" />
       </div>
@@ -267,7 +268,8 @@ function AppLayoutInner({
             );
           })}
         </nav>
-        <div className="mt-auto pt-3">
+        <div className="mt-auto flex flex-col items-center gap-3 pt-3">
+          <ThemeToggle />
           <Image
             src="/miomi/idle.png"
             alt="Miomi"

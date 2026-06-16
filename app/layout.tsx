@@ -113,13 +113,19 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} ${geistSans.variable} ${geistMono.variable} overflow-hidden bg-white antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
+      suppressHydrationWarning
+      className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} ${geistSans.variable} ${geistMono.variable} overflow-hidden bg-[var(--mk-canvas)] antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
     >
       <head>
         <link rel="icon" type="image/png" href="/miomi/icon-512.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("miomika-theme");if(t!=="cool"&&t!=="blush"&&t!=="dark"&&t!=="warm")t="warm";document.documentElement.dataset.theme=t;}catch(e){}})();`,
+          }}
+        />
       </head>
-      <body className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} overflow-hidden bg-white text-[var(--miomika-foreground)] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible`}>
-        <div className="relative miomika-app-height min-h-0 w-full overflow-hidden bg-white md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
+      <body className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} overflow-hidden bg-[var(--mk-canvas)] text-[var(--mk-ink)] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible`}>
+        <div className="relative miomika-app-height min-h-0 w-full overflow-hidden bg-[var(--mk-canvas)] md:h-auto md:max-h-none md:min-h-screen md:overflow-visible">
           {children}
         </div>
         <script
