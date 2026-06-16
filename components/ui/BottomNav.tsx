@@ -68,18 +68,23 @@ export function BottomNav() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    width: "52px",
-                    height: "30px",
-                    borderRadius: "15px",
-                    background: active ? "rgba(110,205,184,0.16)" : "transparent",
+                    width: "44px",
+                    height: "32px",
+                    borderRadius: "14px",
+                    background: active
+                      ? "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)"
+                      : "transparent",
+                    boxShadow: active
+                      ? "0 6px 14px -5px rgba(52,169,143,0.45)"
+                      : "none",
                     transition: "background 0.2s cubic-bezier(0.4,0,0.2,1)",
                   }}
                 >
                   <Icon
                     style={{
-                      width: "23px",
-                      height: "23px",
-                      color: active ? "#34A98F" : "#9A8B73",
+                      width: "22px",
+                      height: "22px",
+                      color: active ? "#FFFFFF" : "#9A8B73",
                       transition: "color 0.18s cubic-bezier(0.4,0,0.2,1)",
                     }}
                     strokeWidth={active ? 2.1 : 1.75}
