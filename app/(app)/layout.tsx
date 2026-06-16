@@ -1,17 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BottomNav } from "@/components/ui/BottomNav";
-import {
-  BookOpen,
-  Home,
-  Sparkles,
-  TrendingUp,
-  User,
-} from "lucide-react";
 import {
   GuestExplorationProvider,
   useGuestExploration,
@@ -20,23 +11,13 @@ import { AmbientCompanion } from "@/components/companion/AmbientCompanion";
 import { GuidanceHost } from "@/components/guidance/GuidanceHost";
 import { DesktopHoldBanner } from "@/components/layout/DesktopHoldBanner";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { cn } from "@/lib/utils";
-import { useUILanguage } from "@/lib/i18n/client";
+import { Rail } from "@/components/layout/Rail";
 import { useRef, useCallback, useEffect } from "react";
 
 const AmbientBackground = dynamic(
   () => import("@/components/AmbientBackground").then((m) => ({ default: m.AmbientBackground })),
   { ssr: false },
 );
-
-const navItems = [
-  { href: "/home",      Icon: Home,       labelTh: "หน้าหลัก",  labelEn: "Home"   },
-  { href: "/learn",     Icon: BookOpen,   labelTh: "เรียน",      labelEn: "Learn"  },
-  { href: "/talk",      Icon: Sparkles,   labelTh: "คุย",        labelEn: "Talk"   },
-  { href: "/dashboard", Icon: TrendingUp, labelTh: "แดชบอร์ด",  labelEn: "Growth" },
-  { href: "/me",        Icon: User,       labelTh: "ฉัน",        labelEn: "Me"     },
-] as const;
 
 export default function AppLayout({
   children,
@@ -185,7 +166,6 @@ function AppLayoutInner({
 }>) {
   const pathname = usePathname();
   const { authReady } = useGuestExploration();
-  const lang = useUILanguage();
 
   // Block render until auth is resolved to prevent home-content flash
   // before WelcomeScreen takes over on first visit.
@@ -208,77 +188,7 @@ function AppLayoutInner({
       <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <AmbientBackground mode="ambient" />
       </div>
-      <aside className="relative z-10 hidden h-screen w-[80px] shrink-0 flex-col items-center border-r border-[#EFE9E0]/60 bg-white/55 py-5 backdrop-blur-xl md:flex">
-        <Link
-          href="/home"
-          className="mb-6 text-[19px] font-medium leading-none text-[#C9A96E]"
-          aria-label="Miomika"
-        >
-          m
-        </Link>
-        <nav className="flex w-full flex-1 flex-col items-center gap-1.5 px-1.5">
-          {navItems.map(({ href, Icon, labelTh, labelEn }) => {
-            const active =
-              pathname === href || pathname.startsWith(href + "/");
-            const label = lang === "en" ? labelEn : labelTh;
-            return (
-              <Link
-                key={href}
-                href={href}
-                className="flex w-full flex-col items-center gap-1 py-1"
-                aria-label={labelEn}
-              >
-                <span
-                  className="flex h-11 w-11 items-center justify-center rounded-[14px] transition-colors"
-                  style={
-                    active
-                      ? {
-                          background:
-                            "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
-                          boxShadow: "0 6px 14px -5px rgba(52,169,143,0.45)",
-                        }
-                      : undefined
-                  }
-                >
-                  <Icon
-                    className={cn(
-                      "h-[22px] w-[22px]",
-                      active ? "text-white" : "text-[#A89C88]",
-                    )}
-                    strokeWidth={active ? 2.1 : 1.85}
-                    aria-hidden
-                  />
-                </span>
-                <span
-                  className={cn(
-                    "leading-none",
-                    active ? "font-medium text-[#34A98F]" : "text-[#A89C88]",
-                  )}
-                  style={{
-                    fontFamily:
-                      lang === "en"
-                        ? "'Quicksand', sans-serif"
-                        : "'Kanit', sans-serif",
-                    fontSize: "9.5px",
-                  }}
-                >
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="mt-auto flex flex-col items-center gap-3 pt-3">
-          <ThemeToggle />
-          <Image
-            src="/miomi/idle.png"
-            alt="Miomi"
-            width={40}
-            height={40}
-            className="h-10 w-10 object-contain"
-          />
-        </div>
-      </aside>
+      <Rail />
 
       <div className="relative z-10 flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-transparent md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
         <DesktopHoldBanner />
