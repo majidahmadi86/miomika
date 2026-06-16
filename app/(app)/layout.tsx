@@ -7,7 +7,6 @@ import {
   GuestExplorationProvider,
   useGuestExploration,
 } from "@/components/guest/GuestExplorationContext";
-import { AmbientCompanion } from "@/components/companion/AmbientCompanion";
 import { GuidanceHost } from "@/components/guidance/GuidanceHost";
 import { DesktopHoldBanner } from "@/components/layout/DesktopHoldBanner";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
@@ -197,7 +196,6 @@ function AppLayoutInner({
         </SwipeNavigator>
         <div className="md:hidden"><BottomNav /></div>
         {pathname !== "/talk" && <div className="md:hidden"><InstallPrompt /></div>}
-        <AmbientCompanion />
         <GuidanceHost />
       </div>
 
