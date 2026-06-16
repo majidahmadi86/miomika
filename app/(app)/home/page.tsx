@@ -23,10 +23,15 @@ import { useCompanionStore } from "@/lib/companion/store";
 import { home } from "@/lib/voice/warmth";
 import { detectLang, speak } from "@/lib/voice/tts";
 import type { Language } from "@/lib/i18n/server";
+import { useUILanguage } from "@/lib/i18n/client";
 const WELCOME_BUBBLE = {
   th: "สวัสดีค่า~ วันนี้อยากพูด English เก่งขึ้นไหมคะ?",
   en: "Hi~ Want to speak better English today?",
 };
+const HOME_T = {
+  th: { greetSub: "มาฝึกพูดด้วยกันไหมคะ~", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ~", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
+  en: { greetSub: "let's get a little practice in~", bubbleDefault: "I'm right here whenever you are~", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
+} as const;
 
 const DAILY_CHALLENGE = {
   phrase: "I'm up for it",
@@ -211,6 +216,7 @@ export default function HomePage() {
     if (profile?.ui_language === "en" || profile?.ui_language === "th") return profile.ui_language;
     return readUiLang();
   }, [profile?.ui_language]);
+  const lang = useUILanguage();
 
   const posX = useMotionValue(0);
   const posY = useMotionValue(0);
@@ -1112,8 +1118,8 @@ export default function HomePage() {
           <div className="hidden h-full md:flex md:flex-col md:overflow-hidden">
             <div className="mx-auto flex h-full w-full max-w-[1120px] flex-col px-8 py-6">
               <div className="mb-6">
-                <h1 className="text-[23px] font-medium leading-snug text-ink">{WELCOME_BUBBLE.th}</h1>
-                <p className="mt-1.5 text-sm text-ink-muted">{WELCOME_BUBBLE.en}</p>
+                <h1 className="text-[23px] font-medium leading-snug text-ink">{WELCOME_BUBBLE[lang]}</h1>
+                <p className="mt-1.5 text-sm text-ink-muted">{HOME_T[lang].greetSub}</p>
               </div>
 
               <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_260px]">
@@ -1124,7 +1130,7 @@ export default function HomePage() {
                   <div className="mb-1 max-w-[72%] self-start">
                     <div className="rounded-2xl border border-line bg-white px-3.5 py-2.5 shadow-card">
                       <p className="text-sm font-medium text-ink" style={{ fontFamily: "'Kanit', sans-serif" }}>
-                        {bubbleVisible && bubbleTh ? bubbleTh : "พร้อมคุยกับหนูรึยังคะ~"}
+                        {bubbleVisible && bubbleTh ? bubbleTh : HOME_T[lang].bubbleDefault}
                       </p>
                       {bubbleVisible && bubbleEn ? (
                         <p className="mt-0.5 text-[11px] text-ink-muted" style={{ fontFamily: "'Quicksand', sans-serif" }}>{bubbleEn}</p>
@@ -1149,37 +1155,24 @@ export default function HomePage() {
                     />
                   </button>
 
-                  <div className="mb-5 mt-3 flex gap-2.5">
-                    <span className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-medium text-ink-muted">
-                      <Heart className="h-3.5 w-3.5" style={{ color: "#D4537E" }} strokeWidth={2.2} />{Math.round(pet.mood)}%
-                    </span>
-                    <span className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-medium text-ink-muted">
-                      <Zap className="h-3.5 w-3.5 text-earned" strokeWidth={2.2} />{Math.round(pet.energy)}%
-                    </span>
-                    <span className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-medium text-ink-muted">
-                      <Coffee className="h-3.5 w-3.5 text-accent" strokeWidth={2.2} />{Math.round(pet.hunger)}%
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleTalkCTA}
-                    className={cn("flex w-full max-w-[460px] items-center justify-center gap-2.5 rounded-[18px] p-4 shadow-cta", tapFeedback)}
+                  <Link
+                    href="/talk"
+                    className={cn("mt-4 flex w-full max-w-[460px] items-center justify-center gap-2.5 rounded-[18px] p-4 shadow-cta", tapFeedback)}
                     style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}
                   >
                     <Sparkles className="h-5 w-5 text-white" strokeWidth={2} />
                     <span className="flex flex-col items-start leading-tight">
-                      <span className="text-[17px] font-medium text-white">เริ่มคุยกับมิโอมิ</span>
-                      <span className="text-[11px] font-semibold tracking-wide text-white/80" style={{ fontFamily: "'Quicksand', sans-serif" }}>TALK TO MIOMI</span>
+                      <span className="text-[17px] font-medium text-white">{HOME_T[lang].talkCta}</span>
+                      <span className="text-[11px] font-semibold tracking-wide text-white/80" style={{ fontFamily: "'Quicksand', sans-serif" }}>{HOME_T[lang].talkSub}</span>
                     </span>
-                  </button>
+                  </Link>
                 </section>
 
                 <section className="flex flex-col gap-3">
-                  <p className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle" style={{ fontFamily: "'Quicksand', sans-serif" }}>วันนี้กับมิโอมิ</p>
+                  <p className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle" style={{ fontFamily: "'Quicksand', sans-serif" }}>{HOME_T[lang].today}</p>
 
                   <div className="rounded-card border p-4 shadow-card" style={{ background: "var(--mk-earned-soft)", borderColor: "#EFE6D2" }}>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent">✦ คำของมิโอมิ</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent">{HOME_T[lang].pickEyebrow}</p>
                     <p className="mt-2 text-[18px] font-medium leading-tight text-ink">{DAILY_CHALLENGE.phrase}</p>
                     <p className="mt-1.5 text-[12px] leading-relaxed text-ink-muted">{DAILY_CHALLENGE.th}</p>
                     <div className="mt-3 flex gap-2">
@@ -1190,11 +1183,11 @@ export default function HomePage() {
                         style={{ background: "#fff", borderColor: "#DCEFE8", color: "var(--mk-accent-press)" }}
                       >
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z" /></svg>
-                        ฟังเสียง
+                        {HOME_T[lang].listen}
                       </button>
                       <Link href="/create" className={cn("inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-white", tapFeedback)} style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
                         <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
-                        ฝึกเลย
+                        {HOME_T[lang].practice}
                       </Link>
                     </div>
                   </div>
@@ -1204,14 +1197,14 @@ export default function HomePage() {
                       <span className="flex items-center gap-1.5">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#B8860B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3c1 3-1 4-1 6a3 3 0 0 0 6 0c0-1 0-2-.5-3 2 1.5 3.5 4 3.5 7a7 7 0 0 1-14 0c0-4 3-6 6-10z" /></svg>
                         <span className="text-[14px] font-semibold text-earned-strong" style={{ fontFamily: "'Quicksand', sans-serif" }}>{profile?.streak ?? 0}</span>
-                        <span className="text-[12px] text-ink-muted">วันต่อกัน</span>
+                        <span className="text-[12px] text-ink-muted">{HOME_T[lang].streakUnit}</span>
                       </span>
-                      <span className="text-[12.5px] font-medium text-ink-muted">เลเวล {pet.level}</span>
+                      <span className="text-[12.5px] font-medium text-ink-muted">{HOME_T[lang].level} {pet.level}</span>
                     </div>
                     <div className="mt-3 h-[7px] overflow-hidden rounded-full" style={{ background: "#F1EAD9" }}>
                       <div className="h-full rounded-full" style={{ width: `${pet.xp}%`, background: "linear-gradient(90deg, #E3C98B, var(--mk-earned))" }} />
                     </div>
-                    <p className="mt-2 text-[11px] text-ink-muted">อีก {Math.max(0, 100 - Math.round(pet.xp))} XP ถึงเลเวลถัดไป</p>
+                    <p className="mt-2 text-[11px] text-ink-muted">{lang === "en" ? `${Math.max(0, 100 - Math.round(pet.xp))} XP to next level` : `อีก ${Math.max(0, 100 - Math.round(pet.xp))} XP ถึงเลเวลถัดไป`}</p>
                   </div>
 
                   <Link href="/learn" className={cn("flex items-center gap-3 rounded-card border border-line bg-surface p-3.5 shadow-card", tapFeedback)}>
@@ -1219,8 +1212,8 @@ export default function HomePage() {
                       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#993556" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[13.5px] font-medium text-ink">ทบทวนคำศัพท์</span>
-                      <span className="block text-[11.5px] text-ink-muted">5 คำกำลังรอให้ทวน</span>
+                      <span className="block text-[13.5px] font-medium text-ink">{HOME_T[lang].review}</span>
+                      <span className="block text-[11.5px] text-ink-muted">{HOME_T[lang].reviewSub}</span>
                     </span>
                     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-subtle"><path d="M9 6l6 6-6 6" /></svg>
                   </Link>
