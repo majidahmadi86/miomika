@@ -56,14 +56,14 @@ export function Rail() {
           <Link href="/home" className="text-[20px] font-medium leading-none text-[#C9A96E]" aria-label="Miomika">m</Link>
           <Link href="/home" className="flex-1 text-[17px] font-semibold leading-none text-[#C9A96E]" style={{ fontFamily: "'Quicksand', sans-serif" }}>miomika</Link>
           <button type="button" onClick={toggle} aria-label="ย่อแถบเมนู" className="flex h-7 w-7 items-center justify-center rounded-lg text-[#A89C88] transition hover:bg-[#F4F1EA]">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5" /><line x1="9" y1="4" x2="9" y2="20" /></svg>
           </button>
         </div>
       ) : (
         <div className="mb-5 flex flex-col items-center gap-2.5">
           <Link href="/home" className="text-[19px] font-medium leading-none text-[#C9A96E]" aria-label="Miomika">m</Link>
           <button type="button" onClick={toggle} aria-label="ขยายแถบเมนู" className="flex h-7 w-7 items-center justify-center rounded-lg text-[#A89C88] transition hover:bg-[#F4F1EA]">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5" /><line x1="9" y1="4" x2="9" y2="20" /></svg>
           </button>
         </div>
       )}
