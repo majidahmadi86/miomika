@@ -43,18 +43,18 @@ const tapFeedback =
   "transition-transform active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#34A98F]";
 
 const TAP_BUBBLE_CYCLE = [
-  { th: "วันนี้โพสต์อะไรดีคะ คิดถึงเลยค่า", en: "What are we posting today? I missed you~" },
-  { th: "อยากให้หนูช่วยอะไร บอกได้เลยนะคะ", en: "Tell me what you need — I'm all ears~" },
-  { th: "มาอยู่ข้างๆ แบบนี้ก็อบอุ่นดีนะคะ", en: "Having you here with me feels warm~" },
-  { th: "หนูพร้อมฟังทุกเรื่องของคุณเลยค่า", en: "I'm ready to hear everything~" },
-  { th: "พักสายตาแล้วมาคุยกับหนูหน่อยไหมคะ", en: "Rest your eyes and chat with me a bit~" },
+  { th: "วันนี้โพสต์อะไรดีคะ คิดถึงเลยค่า", en: "What are we posting today? I missed you" },
+  { th: "อยากให้หนูช่วยอะไร บอกได้เลยนะคะ", en: "Tell me what you need — I'm all ears" },
+  { th: "มาอยู่ข้างๆ แบบนี้ก็อบอุ่นดีนะคะ", en: "Having you here with me feels warm" },
+  { th: "หนูพร้อมฟังทุกเรื่องของคุณเลยค่า", en: "I'm ready to hear everything" },
+  { th: "พักสายตาแล้วมาคุยกับหนูหน่อยไหมคะ", en: "Rest your eyes and chat with me a bit" },
 ] as const;
 
 const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
-const FEED_BUBBLE = { th: "อิ่มแล้วค่า~", en: "All full now~" };
-const PLAY_BUBBLE = { th: "เย้~ สนุกจัง!", en: "Yay~ so fun~" };
+const FEED_BUBBLE = { th: "อิ่มแล้วค่า~", en: "All full now" };
+const PLAY_BUBBLE = { th: "เย้~ สนุกจัง!", en: "Yay, so fun!" };
 const GUEST_SIGNUP_STORAGE_KEY = "miomika-guest-signup-moment-v1";
-const LEVEL_UP_BUBBLE = { th: "เลเวลอัพแล้วค่า~!", en: "You leveled up~!" };
+const LEVEL_UP_BUBBLE = { th: "เลเวลอัพแล้วค่า~!", en: "You leveled up!" };
 
 const PET_STORAGE_KEY = "miomika-home-pet-v1";
 const DECAY_INTERVAL_MS = 10 * 60 * 1000;

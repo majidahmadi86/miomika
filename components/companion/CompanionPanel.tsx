@@ -143,7 +143,7 @@ export function CompanionPanel() {
               lineHeight: 1.5,
             }}
           >
-            {lang === "th" ? "อยู่ตรงนี้กับคุณค่า~" : "I'm right here with you~"}
+            {lang === "th" ? "อยู่ตรงนี้กับคุณค่า~" : "I'm right here with you"}
           </p>
           <p
             style={{

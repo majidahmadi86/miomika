@@ -66,7 +66,7 @@ export function useProGate() {
       useGuidanceStore.getState().setMoment({
         trigger: "feature_pro_locked" as import("@/lib/guidance/types").GuidanceTrigger,
         miomi_says_th: `ฟีเจอร์นี้สำหรับ Pro Miomi ค่า~ อยากปลดล็อกไหมคะ?`,
-        miomi_says_en: `This is a Pro Miomi feature~ want to unlock it?`,
+        miomi_says_en: `This is a Pro Miomi feature — want to unlock it?`,
         next_action: {
           label_th: "ดู Pro Miomi",
           label_en: "See Pro Miomi",

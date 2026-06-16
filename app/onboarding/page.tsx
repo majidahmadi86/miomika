@@ -237,7 +237,7 @@ export default function OnboardingPage() {
         transition={{ duration: 0.5, delay: 0.5 }}
         className="mt-2 text-center text-sm text-neutral-500"
       >
-        Welcome {displayName ? displayName : "friend"}~ So happy you&apos;re
+        Welcome {displayName ? displayName : "friend"}! So happy you&apos;re
         here!
       </motion.p>
       <motion.p

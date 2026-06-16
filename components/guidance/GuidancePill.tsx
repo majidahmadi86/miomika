@@ -40,7 +40,7 @@ export function GuidancePill() {
       case "share_now":
         if (typeof navigator !== "undefined" && "share" in navigator) {
           void navigator
-            .share({ title: "Miomika", text: "I'm learning English with Miomi — try it~", url: "https://miomika.com" })
+            .share({ title: "Miomika", text: "I'm learning English with Miomi — try it", url: "https://miomika.com" })
             .catch(() => {});
         }
         break;

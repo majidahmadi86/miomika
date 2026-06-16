@@ -140,7 +140,7 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp
                       if (replyLang === "en") return;
                       setOptimisticReplyLang("en");
                       void updateUiLanguage("en").then(() => {
-                        setLangConfirm("Now replying in English~");
+                        setLangConfirm("Now replying in English");
                         window.setTimeout(() => setLangConfirm(null), 2500);
                       });
                     }}
@@ -153,7 +153,7 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp
                       if (replyLang === "th") return;
                       setOptimisticReplyLang("th");
                       void updateUiLanguage("th").then(() => {
-                        setLangConfirm("Now replying in ไทย~");
+                        setLangConfirm("Now replying in ไทย");
                         window.setTimeout(() => setLangConfirm(null), 2500);
                       });
                     }}

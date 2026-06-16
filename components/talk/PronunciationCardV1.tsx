@@ -256,7 +256,7 @@ export function PronunciationCardV1({
         >
           <Mic style={{ width: "16px", height: "16px", color: "#34A98F" }} strokeWidth={2} />
           <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#1A1A18" }}>
-            {uiLang === "en" ? "Try saying it~" : "ลองพูดให้หนูฟังนะคะ~"}
+            {uiLang === "en" ? "Try saying it" : "ลองพูดให้หนูฟังนะคะ~"}
           </span>
         </motion.button>
 

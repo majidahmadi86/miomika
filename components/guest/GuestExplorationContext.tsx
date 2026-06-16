@@ -12,12 +12,12 @@ import { createClient } from "@/lib/supabase/client";
 
 export const GUEST_TAB_LOCK_COPY = {
   th: "สมัครฟรีเพื่อใช้งานนะคะ~",
-  en: "Sign up free to unlock everything~",
+  en: "Sign up free to unlock everything",
 } as const;
 
 export const GUEST_SOFT_SIGNUP_COPY = {
   th: "อยากให้หนูช่วยโพสต์ไหมคะ? สมัครฟรีได้เลยนะ~",
-  en: "Want help posting? You can sign up free~",
+  en: "Want help posting? You can sign up free",
 } as const;
 
 type GuestInvitePhase = "none" | "tab_lock" | "soft_nudge";

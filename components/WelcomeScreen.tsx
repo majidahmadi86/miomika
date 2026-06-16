@@ -128,7 +128,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
   const heading =
     lang === "th"
       ? ["ยินดีต้อนรับนะคะ~", "หนูรอคุณอยู่ค่า"]
-      : ["Welcome~", "I've been waiting for you"];
+      : ["Welcome", "I've been waiting for you"];
 
   return (
     <div
