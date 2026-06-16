@@ -32,7 +32,7 @@ export function VoiceOrb({ state, size = 88, onTap, ariaLabel }: VoiceOrbProps) 
         borderRadius: "50%",
         border: "none",
         background: isListening
-          ? "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)"
+          ? "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)"
           : "linear-gradient(135deg, #FFFFFF 0%, #FFF8F2 100%)",
         boxShadow: isListening
           ? "0 8px 24px rgba(201,169,110,0.4), 0 0 0 2px rgba(232,199,122,0.5), 0 0 0 10px rgba(232,199,122,0.12)"
@@ -65,8 +65,8 @@ export function VoiceOrb({ state, size = 88, onTap, ariaLabel }: VoiceOrbProps) 
             height: `${coreSize}px`,
             borderRadius: "50%",
             background: isLocked
-              ? "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)"
-              : "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
+              ? "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)"
+              : "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

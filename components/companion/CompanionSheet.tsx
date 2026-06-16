@@ -251,13 +251,13 @@ function CompanionInner({ onClose, lang }: { onClose: () => void; lang: "th" | "
             justifyContent: "center",
             height: "48px",
             borderRadius: "999px",
-            background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
+            background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
             color: "#FFFFFF",
             fontFamily: "'Kanit', sans-serif",
             fontSize: "14px",
             fontWeight: 500,
             textDecoration: "none",
-            boxShadow: "0 4px 16px -4px rgba(201,169,110,0.40)",
+            boxShadow: "0 4px 16px -4px rgba(52,169,143,0.40)",
           }}
         >
           {tr("companion_open_in_talk", lang)}

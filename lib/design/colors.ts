@@ -2,17 +2,17 @@
  * Miomika color system — canonical.
  * See /docs/COLOR-SYSTEM.md for full rules.
  *
- * Honey gold is the primary CTA. Pink is reserved for the heart fuel bar
- * and tiny accents only. Everything else is warm neutral.
+ * Teal is the primary CTA. Gold is reserved for EARNED moments (medals,
+ * achievements, Pro). Pink is the heart fuel bar. Everything else warm neutral.
  */
 
 export const COLORS = {
-  // PRIMARY CTA — the new conversion color (honey gold)
-  ctaGradient: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
-  ctaSolid: "#C9A96E",
-  ctaHover: "#B8985C",
+  // PRIMARY CTA — teal (gold is earned-only)
+  ctaGradient: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
+  ctaSolid: "#34A98F",
+  ctaHover: "#2E9580",
   ctaTextColor: "#FFFFFF",
-  ctaShadow: "0 4px 16px -4px rgba(201,169,110,0.40)",
+  ctaShadow: "0 4px 16px -4px rgba(52,169,143,0.40)",
 
   // SECONDARY / ghost
   ghostBorder: "#EDE8E0",

@@ -129,7 +129,7 @@ export function GuidancePill() {
               onClick={handleAction}
               style={{
                 padding: "8px 16px",
-                background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
+                background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
                 color: "#FFFFFF",
                 border: "none",
                 borderRadius: "999px",

@@ -87,7 +87,7 @@ export function MiomiInvitationCard({
             fontWeight: 700,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
+            background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -190,7 +190,7 @@ export function MiomiInvitationCard({
             style={{
               height: "44px",
               borderRadius: "999px",
-              background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
+              background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
               border: "none",
               padding: "0 20px",
               fontFamily: "'Kanit', sans-serif",

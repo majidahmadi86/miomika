@@ -107,7 +107,7 @@ function PracticeButton({
         borderRadius: "999px",
         border: highlighted ? "none" : "1.5px solid #EDE8E0",
         background: highlighted
-          ? "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)"
+          ? "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)"
           : "#FFFFFF",
         color: highlighted ? "#FFFFFF" : "#3D352B",
         fontFamily: "'Kanit', sans-serif",
@@ -115,7 +115,7 @@ function PracticeButton({
         fontWeight: 500,
         cursor: "pointer",
         boxShadow: highlighted
-          ? "0 6px 20px -4px rgba(201,169,110,0.45)"
+          ? "0 6px 20px -4px rgba(52,169,143,0.45)"
           : "0 2px 10px rgba(26,26,24,0.04)",
       }}
     >

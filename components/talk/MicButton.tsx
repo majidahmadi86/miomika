@@ -486,7 +486,7 @@ function micButtonStyle(isActive: boolean, isProcessing: boolean = false, isLock
 const cardStyle: CSSProperties = { background: COLORS.surface, border: `1px solid ${COLORS.borderLight}`, borderRadius: "12px", padding: "12px 16px", maxWidth: "280px", textAlign: "center" };
 const cardTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: COLORS.textPrimary, margin: 0, marginBottom: "4px", fontFamily: "Kanit, sans-serif" };
 const cardBodyStyle: CSSProperties = { fontSize: "11px", color: COLORS.textMuted, margin: 0, marginBottom: "10px", fontFamily: "Quicksand, sans-serif" };
-const cardCtaStyle: CSSProperties = { background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)", color: "#FFFFFF", border: "none", borderRadius: "999px", padding: "8px 20px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "Kanit, sans-serif" };
+const cardCtaStyle: CSSProperties = { background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", color: "#FFFFFF", border: "none", borderRadius: "999px", padding: "8px 20px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "Kanit, sans-serif" };
 const debugPanelStyle: CSSProperties = { position: "fixed", bottom: "16px", left: "16px", right: "16px", background: "rgba(26, 26, 24, 0.92)", color: "#FFFFFF", padding: "12px", borderRadius: "8px", fontSize: "11px", fontFamily: "monospace", maxHeight: "240px", overflow: "auto", zIndex: 9999 };
 function float32ToWav(samples: Float32Array, sampleRate: number): Blob {
   const numChannels = 1, bitsPerSample = 16;

@@ -224,7 +224,7 @@ export function PronunciationCardV1({
               height: "36px",
               borderRadius: "10px",
               border: "none",
-              background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
+              background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
               fontFamily: "'Kanit', sans-serif",
               fontSize: "12px",
               fontWeight: 500,

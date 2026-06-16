@@ -165,7 +165,7 @@ export default function OnboardingPage() {
           className="mt-6 rounded-full px-6 py-3 text-sm font-semibold text-white"
           style={{
             background:
-              "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
+              "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
           }}
         >
           ลองอีกครั้ง / Try again

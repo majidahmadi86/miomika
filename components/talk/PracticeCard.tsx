@@ -170,7 +170,7 @@ function ActionButton({
       style={{
         flex: 1,
         background: primary
-          ? "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)"
+          ? "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)"
           : "rgba(255,255,255,0.7)",
         border: primary ? "none" : "0.5px solid rgba(201,169,110,0.3)",
         borderRadius: "999px",

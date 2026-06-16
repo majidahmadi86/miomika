@@ -346,7 +346,7 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp
                   width: "100%",
                   height: "46px",
                   borderRadius: "999px",
-                  background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)",
+                  background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
                   border: "none",
                   color: "#FFFFFF",
                   fontFamily: "'Kanit', sans-serif",

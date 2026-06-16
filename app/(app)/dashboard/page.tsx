@@ -225,7 +225,7 @@ export default function DashboardPage() {
               <Link
                 href="/talk"
                 className="mt-4 inline-flex rounded-full px-6 py-2 text-sm font-medium text-white"
-                style={{ background: "linear-gradient(135deg, #E8C77A 0%, #C9A96E 100%)" }}
+                style={{ background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)" }}
               >
                 {uiLang === "en" ? "Start learning" : "เริ่มเรียนเลย"}
               </Link>
