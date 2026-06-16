@@ -33,6 +33,58 @@ const HOME_T = {
   en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
 } as const;
 
+function buildHomeGreeting(
+  lang: Language,
+  targetName: string | null,
+  streak: number,
+  hour: number,
+): string {
+  if (!targetName) return WELCOME_BUBBLE[lang];
+  const tod =
+    hour < 5 ? "night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 22 ? "evening" : "night";
+  const i = streak > 0 ? 1 : 0;
+  if (lang === "en") {
+    const en: Record<string, [string, string]> = {
+      morning: [
+        `Good morning! Ready to start your ${targetName}?`,
+        `Good morning! Day ${streak} — let's keep your ${targetName} going.`,
+      ],
+      afternoon: [
+        `Good afternoon! Up for a little ${targetName}?`,
+        `Afternoon! ${streak} days strong — more ${targetName}?`,
+      ],
+      evening: [
+        `Good evening! Wind down with some ${targetName}?`,
+        `Evening! Keep your ${streak}-day streak alive with some ${targetName}.`,
+      ],
+      night: [
+        `Up late? A little ${targetName} before bed?`,
+        `Late night, day ${streak} — a bit of ${targetName}?`,
+      ],
+    };
+    return en[tod][i];
+  }
+  const th: Record<string, [string, string]> = {
+    morning: [
+      `อรุณสวัสดิ์ค่ะ มาเริ่มฝึก${targetName}กันไหมคะ?`,
+      `อรุณสวัสดิ์ค่ะ วันที่ ${streak} แล้ว มาฝึก${targetName}ต่อกันค่ะ`,
+    ],
+    afternoon: [
+      `สวัสดีตอนบ่ายค่ะ ฝึก${targetName}สักนิดไหมคะ?`,
+      `บ่ายแล้วค่ะ ${streak} วันติดแล้ว มาฝึก${targetName}กันต่อค่ะ`,
+    ],
+    evening: [
+      `สวัสดีตอนเย็นค่ะ มาผ่อนคลายกับ${targetName}กันไหมคะ?`,
+      `เย็นแล้วค่ะ รักษาสตรีค ${streak} วันไว้นะคะ มาฝึก${targetName}กันค่ะ`,
+    ],
+    night: [
+      `ดึกแล้วนะคะ อยากฝึก${targetName}สักหน่อยไหมคะ?`,
+      `ดึกแล้วค่ะ วันที่ ${streak} เลยนะคะ มาฝึก${targetName}กันไหมคะ`,
+    ],
+  };
+  return th[tod][i];
+}
+
 const DAILY_CHALLENGE = {
   phrase: "I'm up for it",
   th: "ฉันพร้อมแล้ว — ใช้ตอบตกลงทำอะไรด้วยกัน",
@@ -217,14 +269,11 @@ export default function HomePage() {
     return readUiLang();
   }, [profile?.ui_language]);
   const lang = useUILanguage();
+  const [greetHour] = useState(() => new Date().getHours());
   const targetLang = profile?.learning_target_language ?? null;
   const targetName =
     targetLang === "th" ? (lang === "en" ? "Thai" : "ภาษาไทย") : targetLang === "en" ? "English" : null;
-  const greeting = targetName
-    ? lang === "en"
-      ? `Hi! Want to speak better ${targetName} today?`
-      : `สวัสดีค่า~ วันนี้อยากพูด ${targetName} เก่งขึ้นไหมคะ?`
-    : WELCOME_BUBBLE[lang];
+  const greeting = buildHomeGreeting(lang, targetName, profile?.streak ?? 0, greetHour);
 
   const posX = useMotionValue(0);
   const posY = useMotionValue(0);
@@ -263,7 +312,6 @@ export default function HomePage() {
   const pointerStartPosRef = useRef({ x: 0, y: 0 });
   const isDragModeRef = useRef(false);
   const bubbleHideTimeoutRef = useRef<number | null>(null);
-  const greetingShownRef = useRef(false);
   const dragControls = useDragControls();
   const wanderTimeoutRef = useRef<number | null>(null);
   const wanderPausedUntilRef = useRef(0);
@@ -556,20 +604,6 @@ export default function HomePage() {
     if (isDragModeRef.current) return;
     if (elapsed < 300 && dist < 8) handleMiomiTap();
   }, [handleMiomiTap]);
-
-  useEffect(() => {
-    if (!authReady || isGuest || greetingShownRef.current) return;
-    greetingShownRef.current = true;
-    const id = window.setTimeout(() => {
-      const text = home.greeting.pick(uiLang, {
-        streakDays: profile?.streak ?? 0,
-        lastSeenAt: profile?.last_seen_at ?? null,
-        isFirstDay: !profile?.last_seen_at,
-      });
-      showBubble(text, { autoHideMs: 4000 });
-    }, reduceMotion ? 0 : 1200);
-    return () => window.clearTimeout(id);
-  }, [authReady, isGuest, reduceMotion, uiLang, profile?.streak, profile?.last_seen_at, showBubble]);
 
   useEffect(() => {
     if (reduceMotion || sleeping) {
@@ -1127,15 +1161,6 @@ export default function HomePage() {
             <div className="mx-auto flex h-full w-full max-w-[1120px] flex-col px-8 py-6">
               <div className="mb-6">
                 <h1 className="text-[23px] font-medium leading-snug text-ink">{greeting}</h1>
-                <p className="mt-1.5 text-sm text-ink-muted">{HOME_T[lang].greetSub}</p>
-                <Link
-                  href="/talk"
-                  className="mt-3.5 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold text-white shadow-cta"
-                  style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}
-                >
-                  <Sparkles className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  {HOME_T[lang].greetCta}
-                </Link>
               </div>
 
               <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_260px]">
