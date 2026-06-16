@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useState } from "react";
 import { BookOpen, Home, Sparkles, TrendingUp, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUILanguage } from "@/lib/i18n/client";
+import { useUILanguage, setUILanguageCookie, type Language } from "@/lib/i18n/client";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 type NavItem = { href: string; Icon: LucideIcon; labelTh: string; labelEn: string };
@@ -27,6 +27,45 @@ function getRailExpanded(): boolean {
   } catch {
     return false;
   }
+}
+
+function LangToggle({ compact = false }: { compact?: boolean }) {
+  const lang = useUILanguage();
+  const switchTo = (l: Language) => {
+    if (l === lang) return;
+    setUILanguageCookie(l);
+    window.location.reload();
+  };
+  if (compact) {
+    const other: Language = lang === "en" ? "th" : "en";
+    return (
+      <button
+        type="button"
+        onClick={() => switchTo(other)}
+        aria-label="Switch language"
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-[#E5E0D8] bg-white/70 text-[11px] font-semibold uppercase text-[#6B6256] transition hover:bg-white"
+        style={{ fontFamily: "'Quicksand', sans-serif" }}
+      >
+        {lang}
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center rounded-full border border-[#E5E0D8] bg-white/70 p-0.5">
+      {(["th", "en"] as Language[]).map((l) => (
+        <button
+          key={l}
+          type="button"
+          onClick={() => switchTo(l)}
+          aria-pressed={lang === l}
+          className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase transition", lang === l ? "text-white" : "text-[#9A8B73]")}
+          style={{ fontFamily: "'Quicksand', sans-serif", background: lang === l ? "var(--mk-accent)" : "transparent" }}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function Rail() {
@@ -108,11 +147,13 @@ export function Rail() {
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
           <div className="mb-3 h-px bg-[#EFE9E0]" />
           <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#A89C88]" style={{ fontFamily: "'Quicksand', sans-serif" }}>
-            คุยกับมิโอมิล่าสุด
+            {lang === "en" ? "Recent with Miomi" : "คุยกับมิโอมิล่าสุด"}
           </p>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <p className="px-2 text-[12px] leading-relaxed text-[#A89C88]" style={{ fontFamily: "'Kanit', sans-serif" }}>
-              ยังไม่มีบทสนทนา~ เริ่มคุยกับมิโอมิแล้วจะมาอยู่ตรงนี้ค่า
+            <p className="px-2 text-[12px] leading-relaxed text-[#A89C88]" style={{ fontFamily: lang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif" }}>
+              {lang === "en"
+                ? "No chats yet~ start talking with Miomi and they'll appear here"
+                : "ยังไม่มีบทสนทนา~ เริ่มคุยกับมิโอมิแล้วจะมาอยู่ตรงนี้ค่า"}
             </p>
           </div>
         </div>
@@ -120,9 +161,14 @@ export function Rail() {
         <div className="flex-1" />
       )}
 
-      <div className={cn("flex items-center gap-3 pt-3", expanded ? "justify-between px-1" : "flex-col")}>
-        <ThemeToggle expanded={expanded} />
-        <Image src="/miomi/idle.png" alt="Miomi" width={40} height={40} className="h-10 w-10 shrink-0 object-contain" />
+      <div className={cn("pt-3", expanded ? "flex items-center justify-between gap-2 px-1" : "flex flex-col items-center gap-2.5")}>
+        <div className={cn("flex items-center gap-2", expanded ? "" : "flex-col gap-2.5")}>
+          <ThemeToggle expanded={false} />
+          <LangToggle compact={!expanded} />
+        </div>
+        <Link href="/me" aria-label="Me" className="shrink-0">
+          <Image src="/miomi/idle.png" alt="Miomi" width={40} height={40} className="h-10 w-10 shrink-0 object-contain" />
+        </Link>
       </div>
     </aside>
   );
