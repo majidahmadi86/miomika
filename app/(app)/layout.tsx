@@ -218,7 +218,7 @@ function AppLayoutInner({
     <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden md:flex md:h-screen md:max-h-none md:bg-[#F2EEF0] md:overflow-hidden">
       <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-[#EAD0DB] bg-white md:flex">
         <div className="flex flex-col items-center px-4 pb-4 pt-6">
-          <p className="text-base font-medium text-[#34A98F]">Miomika</p>
+          <p className="text-base font-medium text-[#C9A96E]">Miomika</p>
           <div className="miomi-login-float mt-4 flex justify-center">
             <Image
               src="/miomi/idle.png"
