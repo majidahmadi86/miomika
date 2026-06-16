@@ -197,7 +197,7 @@ function AppLayoutInner({
   }
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden md:flex md:h-screen md:max-h-none md:bg-[#F6F3ED] md:overflow-hidden">
+    <div className="h-[100dvh] max-h-[100dvh] w-full overflow-hidden md:flex md:h-screen md:max-h-none md:bg-[#FAFAF6] md:overflow-hidden">
       <aside className="hidden h-screen w-[80px] shrink-0 flex-col items-center border-r border-[#EFE9E0] bg-white py-5 md:flex">
         <Link
           href="/home"
@@ -269,7 +269,7 @@ function AppLayoutInner({
         </div>
       </aside>
 
-      <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[#FEFCF7] md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
+      <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[#FEFCF7] md:bg-transparent md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
         <DesktopHoldBanner />
         <SwipeNavigator pathname={pathname}>
           {children}
