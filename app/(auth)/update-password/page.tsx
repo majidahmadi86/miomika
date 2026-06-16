@@ -24,6 +24,7 @@ export default function UpdatePasswordPage() {
   const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkExpired, setLinkExpired] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -39,7 +40,10 @@ export default function UpdatePasswordPage() {
         submitting: "กำลังบันทึก...",
         mismatch: "รหัสผ่านไม่ตรงกันค่ะ",
         tooShort: "รหัสผ่านสั้นเกินไปค่ะ ใช้อย่างน้อย 6 ตัวอักษร",
-        err: "ตั้งรหัสผ่านไม่สำเร็จค่ะ ลิงก์อาจหมดอายุ",
+        errSamePw: "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิมค่ะ",
+        errWeak: "รหัสผ่านยังไม่ปลอดภัยพอค่ะ ลองใช้รหัสที่ยาวขึ้นหน่อยนะคะ",
+        errExpired: "ตั้งรหัสผ่านไม่สำเร็จค่ะ ลิงก์อาจหมดอายุ",
+        errGeneric: "ตั้งรหัสผ่านไม่สำเร็จค่ะ ลองอีกครั้งนะคะ",
         requestNew: "ขอลิงก์รีเซ็ตใหม่",
         doneTitle: "เปลี่ยนรหัสผ่านเรียบร้อยแล้วค่ะ",
         cont: "ไปต่อเลย",
@@ -55,7 +59,10 @@ export default function UpdatePasswordPage() {
         submitting: "Saving…",
         mismatch: "Passwords don't match.",
         tooShort: "Password is too short — use at least 6 characters.",
-        err: "Couldn't update your password. The link may have expired.",
+        errSamePw: "Your new password must be different from your current one.",
+        errWeak: "That password is too weak — try something a bit longer.",
+        errExpired: "Couldn't update your password. The link may have expired.",
+        errGeneric: "Couldn't update your password. Please try again.",
         requestNew: "Request a new link",
         doneTitle: "Your password has been changed.",
         cont: "Continue",
@@ -64,6 +71,7 @@ export default function UpdatePasswordPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setLinkExpired(false);
     if (password !== confirm) {
       setError(t.mismatch);
       return;
@@ -77,7 +85,29 @@ export default function UpdatePasswordPage() {
       const supabase = createClient();
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) {
-        setError(t.err);
+        const msg = updateError.message.toLowerCase();
+        if (msg.includes("different") || msg.includes("should be different")) {
+          setError(t.errSamePw);
+        } else if (
+          msg.includes("weak") ||
+          msg.includes("at least") ||
+          msg.includes("characters") ||
+          msg.includes("minimum") ||
+          msg.includes("strength")
+        ) {
+          setError(t.errWeak);
+        } else if (
+          msg.includes("session") ||
+          msg.includes("missing") ||
+          msg.includes("not authenticated") ||
+          msg.includes("jwt") ||
+          msg.includes("expired")
+        ) {
+          setError(t.errExpired);
+          setLinkExpired(true);
+        } else {
+          setError(t.errGeneric);
+        }
         return;
       }
       setDone(true);
@@ -118,10 +148,15 @@ export default function UpdatePasswordPage() {
               <p className="mt-2 text-center text-sm leading-relaxed text-ink-muted">{t.body}</p>
 
               <form className="mt-4 flex flex-col gap-2.5" onSubmit={handleSubmit}>
+                {/* hidden username field for accessibility + password managers */}
+                <input type="text" name="username" autoComplete="username" className="hidden" tabIndex={-1} aria-hidden="true" defaultValue="" />
+
                 {error ? (
                   <div className="rounded-lg border border-[#E7C9C4] bg-[#FBECEA] px-3 py-2 text-center text-sm text-[#C4564A]" role="alert">
                     <p>{error}</p>
-                    <Link href="/reset" className="mt-1 inline-block font-medium underline">{t.requestNew}</Link>
+                    {linkExpired ? (
+                      <Link href="/reset" className="mt-1 inline-block font-medium underline">{t.requestNew}</Link>
+                    ) : null}
                   </div>
                 ) : null}
 
