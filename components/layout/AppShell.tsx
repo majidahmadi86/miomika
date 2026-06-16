@@ -7,9 +7,9 @@ type AppShellProps = {
 
 export function AppShell({ children, showNav = true }: AppShellProps) {
   return (
-    <div className="relative flex h-svh max-h-svh flex-col overflow-hidden bg-white md:h-screen md:max-h-screen md:overflow-hidden">
+    <div className="relative flex h-svh max-h-svh flex-col overflow-hidden bg-white md:bg-transparent md:h-screen md:max-h-screen md:overflow-hidden">
       <main className="min-h-0 flex-1 overflow-hidden pb-[12px]">{children}</main>
-      {showNav && <BottomNav />}
+      {showNav && <div className="md:hidden"><BottomNav /></div>}
     </div>
   );
 }

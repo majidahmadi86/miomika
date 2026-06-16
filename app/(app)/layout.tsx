@@ -172,7 +172,7 @@ function SwipeNavigator({
       className="flex-1 min-h-0 overflow-hidden"
       style={{ touchAction: "pan-y" }}
     >
-      <div className="mx-auto h-full w-full max-w-[680px] md:max-w-[960px]">
+      <div className="mx-auto h-full w-full max-w-[680px] md:max-w-none">
         {children}
       </div>
     </div>
@@ -285,7 +285,7 @@ function AppLayoutInner({
         <SwipeNavigator pathname={pathname}>
           {children}
         </SwipeNavigator>
-        <BottomNav />
+        <div className="md:hidden"><BottomNav /></div>
         {pathname !== "/talk" && <InstallPrompt />}
         <AmbientCompanion />
         <GuidanceHost />
