@@ -1,171 +1,227 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  AlertCircle,
   Bell,
   BookOpen,
-  Brain,
-  ChevronLeft,
+  Camera,
   ChevronRight,
+  CreditCard,
   Download,
-  Flame,
+  FileText,
   Globe,
-  Heart,
   HelpCircle,
-  MessageCircle,
-  MessageSquare,
-  Mic,
-  Newspaper,
+  Lock,
+  LogOut,
   Palette,
-  RefreshCcw,
-  Sparkle,
+  Pencil,
+  Shield,
   Sparkles,
   Star,
   User,
   Volume2,
 } from "lucide-react";
 import { useProfile } from "@/lib/auth/use-profile";
-import {
-  storeRedirectTo,
-} from "@/lib/auth/redirect-to";
-import { useUILanguage } from "@/lib/i18n/client";
+import { storeRedirectTo } from "@/lib/auth/redirect-to";
+import { useUILanguage, setUILanguageCookie } from "@/lib/i18n/client";
 import { createClient } from "@/lib/supabase/client";
-import { COLORS, CTA_GRADIENT } from "@/lib/design/colors";
-import { loadTalkConfig, MODE_META } from "@/lib/talk/modes";
+import { getStoredTheme, setTheme, type ThemeId } from "@/lib/theme";
 import { AvatarEditSheet } from "@/components/me/AvatarEditSheet";
 import { NameEditSheet } from "@/components/me/NameEditSheet";
-import { me } from "@/lib/voice/warmth";
 
-const CARD_SHADOW =
-  "0 1px 2px rgba(26, 26, 24, 0.04), 0 4px 16px rgba(26, 26, 24, 0.06), 0 0 0 1px rgba(237, 232, 224, 0.6)";
-const CTA_SHADOW =
-  "0 2px 6px rgba(201, 169, 110, 0.24), 0 8px 20px rgba(201, 169, 110, 0.18)";
-const AVATAR_SHADOW =
-  "0 4px 16px rgba(26, 26, 24, 0.06), 0 0 0 1px rgba(237, 232, 224, 1)";
-const FONT = "'Kanit', 'Quicksand', sans-serif";
-const SOUNDS_KEY = "miomika.sounds_on";
+const DEFAULT_AVATAR = "/characters/miomi/companion/companion-idle.png";
 
-type ProgressData = {
-  wordsMastered: number;
-  wordsLearning: number;
-  conversationCount: number;
-  streakDays: number;
-  cefrLevel: string | null;
+const CEFR: { id: string; pro: boolean }[] = [
+  { id: "A1", pro: false },
+  { id: "A2", pro: false },
+  { id: "B1", pro: true },
+  { id: "B2", pro: true },
+  { id: "C1", pro: true },
+  { id: "C2", pro: true },
+];
+
+const THEMES: { id: ThemeId; key: "warm" | "cool" | "blush"; a: string; b: string }[] = [
+  { id: "warm", key: "warm", a: "#FAFAF6", b: "#34A98F" },
+  { id: "cool", key: "cool", a: "#F2F6FA", b: "#3E8FB0" },
+  { id: "blush", key: "blush", a: "#FBF2F5", b: "#C75C86" },
+];
+
+const COPY = {
+  th: {
+    title: "ฉัน",
+    days: (n: number) => `อยู่ด้วยกัน ${n} วัน`,
+    learningGroup: "การเรียนรู้",
+    imLearning: "ฉันกำลังเรียน",
+    thai: "ภาษาไทย",
+    english: "ภาษาอังกฤษ",
+    myLevel: "ระดับของฉัน",
+    levelProNote: "B1 ขึ้นไปปลดล็อกด้วย Pro",
+    preferences: "การตั้งค่า",
+    appLanguage: "ภาษาแอป",
+    theme: "ธีม",
+    sound: "เสียง",
+    notifications: "การแจ้งเตือน",
+    thingsLearned: "สิ่งที่ฉันเรียนรู้แล้ว",
+    words: "คำ",
+    plan: "แพ็กเกจ",
+    currentPlan: "แพ็กเกจปัจจุบัน",
+    stars: "ดาว Miomi",
+    upgrade: "อัปเกรดเป็น Pro",
+    manageBilling: "จัดการการเรียกเก็บเงิน",
+    account: "บัญชี",
+    email: "อีเมล",
+    help: "ศูนย์ช่วยเหลือ",
+    privacy: "นโยบายความเป็นส่วนตัว",
+    terms: "ข้อกำหนดการให้บริการ",
+    yourData: "ข้อมูลของคุณ",
+    yourDataSub: "ขอเข้าถึงหรือลบข้อมูล",
+    signOut: "ออกจากระบบ",
+    signingOut: "กำลังออก…",
+    free: "ฟรี",
+  },
+  en: {
+    title: "Me",
+    days: (n: number) => `${n} ${n === 1 ? "day" : "days"} together`,
+    learningGroup: "Learning",
+    imLearning: "I'm learning",
+    thai: "Thai",
+    english: "English",
+    myLevel: "My level",
+    levelProNote: "B1 and above unlock with Pro",
+    preferences: "Preferences",
+    appLanguage: "App language",
+    theme: "Theme",
+    sound: "Sound",
+    notifications: "Notifications",
+    thingsLearned: "Things I've learned",
+    words: "words",
+    plan: "Plan",
+    currentPlan: "Current plan",
+    stars: "Miomi stars",
+    upgrade: "Upgrade to Pro",
+    manageBilling: "Manage billing",
+    account: "Account",
+    email: "Email",
+    help: "Help center",
+    privacy: "Privacy Policy",
+    terms: "Terms of Service",
+    yourData: "Your data",
+    yourDataSub: "Request access or deletion",
+    signOut: "Sign out",
+    signingOut: "Signing out…",
+    free: "Free",
+  },
 };
 
-type ExtendedProfile = ReturnType<typeof useProfile>["profile"] & {
-  avatar_url?: string | null;
-  cefr_progress_pct?: number | null;
-  premium_voice_credits?: number | null;
-  miomi_warmth?: "soft" | "balanced" | "playful" | null;
-};
-
-function tierLabel(tier: string): string {
-  if (tier === "pro_max") return "Miomika Pro Max";
-  if (tier === "pro") return "Miomika Pro";
-  return "Miomika Free";
-}
-
-function planSummary(tier: string, lang: "th" | "en"): string {
-  if (tier === "pro_max") return me.plan.promax.summary(lang);
-  if (tier === "pro") return me.plan.pro.summary(lang);
-  return me.plan.free.summary(lang);
-}
-
-function daysTogether(onboardingAt: string | null): number {
-  if (!onboardingAt) return 0;
-  const diff = Date.now() - new Date(onboardingAt).getTime();
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
-}
-
-function readTalkModeLabel(lang: "th" | "en"): string {
-  const config = loadTalkConfig();
-  const meta = MODE_META[config.mode];
-  return lang === "en" ? meta.en : meta.th;
-}
-
-function readWarmthLabel(
-  warmth: ExtendedProfile["miomi_warmth"],
-  lang: "th" | "en",
-): string {
-  if (warmth === "soft") return me.bond.warmthOptions.soft(lang);
-  if (warmth === "playful") return me.bond.warmthOptions.playful(lang);
-  return me.bond.warmthOptions.balanced(lang);
-}
-
-function buildFeedbackMailto(displayName: string, tier: string): string {
-  const subject = encodeURIComponent(`Feedback from /me — ${displayName}`);
-  const body = encodeURIComponent(
-    `Tier: ${tier}\nUser agent: ${typeof navigator !== "undefined" ? navigator.userAgent : "unknown"}\n\n`,
+function Group({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <section className="mb-5">
+      {title ? (
+        <h2 className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-wide text-ink-subtle">{title}</h2>
+      ) : null}
+      <div className="overflow-hidden rounded-card bg-surface shadow-card [&>*+*]:border-t [&>*+*]:border-line">
+        {children}
+      </div>
+    </section>
   );
-  return `mailto:hello@miomika.com?subject=${subject}&body=${body}`;
 }
 
-function buildSupportMailto(): string {
-  return "mailto:hello@miomika.com?subject=" + encodeURIComponent("Support request");
+function Row({
+  icon,
+  label,
+  sub,
+  right,
+  onClick,
+  danger,
+}: {
+  icon?: ReactNode;
+  label: string;
+  sub?: string;
+  right?: ReactNode;
+  onClick?: () => void;
+  danger?: boolean;
+}) {
+  const body = (
+    <div className="flex items-center gap-3 px-4 py-3">
+      {icon ? <span className={danger ? "text-[#C4564A]" : "text-accent"}>{icon}</span> : null}
+      <div className="min-w-0 flex-1">
+        <div className={"text-[14px] font-medium " + (danger ? "text-[#C4564A]" : "text-ink")}>{label}</div>
+        {sub ? <div className="truncate text-[12px] text-ink-subtle">{sub}</div> : null}
+      </div>
+      {right}
+    </div>
+  );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="block w-full text-left transition hover:bg-surface-2">
+        {body}
+      </button>
+    );
+  }
+  return body;
+}
+
+function Segmented({
+  value,
+  options,
+  onChange,
+}: {
+  value: string | null;
+  options: { id: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-tile bg-surface-2 p-0.5">
+      {options.map((o) => {
+        const active = o.id === value;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            className={
+              "rounded-[10px] px-3 py-1.5 text-[13px] font-semibold transition " +
+              (active ? "bg-accent text-white shadow-cta" : "text-ink-muted hover:text-ink")
+            }
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => onChange(!on)}
+      className={"relative h-6 w-11 shrink-0 rounded-full transition " + (on ? "bg-accent" : "bg-surface-2")}
+    >
+      <span
+        className={
+          "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all " + (on ? "left-[22px]" : "left-0.5")
+        }
+      />
+    </button>
+  );
 }
 
 export default function MePage() {
   const router = useRouter();
-  const uiLang = useUILanguage();
-  const { profile: rawProfile, authReady } = useProfile();
-  const profile = rawProfile as ExtendedProfile | null;
+  const supabase = useMemo(() => createClient(), []);
+  const { profile, authReady } = useProfile();
+  const lang = useUILanguage();
+  const t = COPY[lang === "th" ? "th" : "en"];
 
-  const [canGoBack] = useState(
-    () => typeof window !== "undefined" && window.history.length > 1,
-  );
-  const [soundsOn, setSoundsOn] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(SOUNDS_KEY) === "1";
-  });
-  const [notificationsOn, setNotificationsOn] = useState(false);
-  const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
-  const [nameSheetOpen, setNameSheetOpen] = useState(false);
-  const [progress, setProgress] = useState<ProgressData | null>(null);
+  const profileId = profile?.id ?? null;
 
-  const displayName =
-    profile?.display_name ??
-    profile?.email?.split("@")[0] ??
-    (uiLang === "en" ? "Friend" : "เพื่อน");
-  const tier = profile?.tier ?? "free";
-  const isFree = tier === "free" || tier === "guest";
-  const showProBadge = tier === "pro" || tier === "pro_max";
-  const days = daysTogether(profile?.onboarding_completed_at ?? null);
-  const memoryCount = 0;
-
-  const hasVoiceCreditsField = profile != null && "premium_voice_credits" in profile;
-
-  const wordsValue = progress?.wordsMastered ?? 0;
-  const streakValue = progress?.streakDays ?? 0;
-  const convosValue = progress?.conversationCount ?? 0;
-  const cefrLevel = progress?.cefrLevel ?? null;
-  const hasCefr = cefrLevel != null && cefrLevel.length > 0;
-  const voiceCredits = hasVoiceCreditsField ? (profile?.premium_voice_credits ?? 0) : 0;
-  const starsBalance = profile?.miomi_stars ?? 0;
-  const uiLangLabel = profile?.ui_language === "en" ? "English" : "ไทย";
-  const talkModeLabel = readTalkModeLabel(uiLang);
-  const warmthLabel = readWarmthLabel(profile?.miomi_warmth ?? null, uiLang);
-  const voiceLabel =
-    voiceCredits > 0 ? me.bond.voicePremium(uiLang) : me.bond.voiceFree(uiLang);
-
-  const copy = useMemo(
-    () => ({
-      progressTitle: me.progress.title(uiLang),
-      planTitle: me.plan.title(uiLang),
-      bondTitle: me.bond.title(uiLang),
-      appTitle: me.app.title(uiLang),
-      privacyTitle: me.privacy.title(uiLang),
-      helpTitle: me.help.title(uiLang),
-      legalTitle: me.legal.title(uiLang),
-      logoutLabel: me.logout(uiLang),
-    }),
-    [uiLang],
-  );
-
+  // ---- auth gate (preserved) ----
   useEffect(() => {
     if (!authReady) return;
     if (!profile) {
@@ -174,994 +230,412 @@ export default function MePage() {
     }
   }, [authReady, profile, router]);
 
+  // ---- avatar (fetched directly so we don't depend on the Profile type) ----
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const refreshAvatar = useCallback(async () => {
+    if (!profileId) return;
+    try {
+      const { data } = await supabase.from("profiles").select("avatar_url").eq("id", profileId).single();
+      setAvatarUrl((data as { avatar_url?: string | null } | null)?.avatar_url ?? null);
+    } catch {
+      /* ignore */
+    }
+  }, [profileId, supabase]);
   useEffect(() => {
-    if (!profile) return;
+    refreshAvatar();
+  }, [refreshAvatar]);
+  useEffect(() => {
+    const h = () => refreshAvatar();
+    window.addEventListener("miomika:profile-refresh", h);
+    return () => window.removeEventListener("miomika:profile-refresh", h);
+  }, [refreshAvatar]);
+
+  // ---- words mastered ----
+  const [wordsMastered, setWordsMastered] = useState<number | null>(null);
+  useEffect(() => {
     let cancelled = false;
-    void fetch("/api/profile/progress")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: ProgressData | null) => {
-        if (cancelled || !data) return;
-        setProgress(data);
+    fetch("/api/profile/progress")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d) setWordsMastered(typeof d.wordsMastered === "number" ? d.wordsMastered : 0);
       })
-      .catch(() => {
-        /* warm empty states remain at zero */
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // ---- local prefs ----
+  const [soundsOn, setSoundsOn] = useState(true);
+  const [notifyOn, setNotifyOn] = useState(false);
+  const [theme, setThemeState] = useState<ThemeId>("warm");
+  useEffect(() => {
+    try {
+      setSoundsOn(localStorage.getItem("miomika.sounds_on") !== "false");
+      setNotifyOn(localStorage.getItem("miomika.notifications_on") === "true");
+      setThemeState(getStoredTheme());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // ---- optimistic mirrors of server-backed fields ----
+  const [learningTarget, setLearningTarget] = useState<string | null>(null);
+  const [cefr, setCefr] = useState<string | null>(null);
+  useEffect(() => {
+    if (profile) {
+      setLearningTarget(profile.learning_target_language ?? null);
+      setCefr(profile.cefr_level ?? null);
+    }
   }, [profile]);
 
-  const handleLogout = async () => {
-    const supabase = createClient();
-    Object.keys(localStorage).forEach((k) => {
-      if (k.startsWith("sb-") || k.startsWith("supabase")) localStorage.removeItem(k);
-    });
-    sessionStorage.clear();
-    await supabase.auth.signOut({ scope: "global" });
+  const [levelOpen, setLevelOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [nameOpen, setNameOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const isFree = profile?.tier === "free";
+  const isPro = !!profile && profile.tier !== "free";
+
+  // ---- handlers ----
+  const handleTheme = (id: ThemeId) => {
+    setTheme(id);
+    setThemeState(id);
+  };
+
+  const handleSound = (on: boolean) => {
+    setSoundsOn(on);
+    try {
+      localStorage.setItem("miomika.sounds_on", on ? "true" : "false");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleNotify = async (on: boolean) => {
+    if (on && typeof Notification !== "undefined") {
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") {
+          setNotifyOn(false);
+          try {
+            localStorage.setItem("miomika.notifications_on", "false");
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    setNotifyOn(on);
+    try {
+      localStorage.setItem("miomika.notifications_on", on ? "true" : "false");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleUiLanguage = async (next: string) => {
+    if (next === lang || (next !== "th" && next !== "en")) return;
+    if (profileId) {
+      try {
+        await supabase.from("profiles").update({ ui_language: next }).eq("id", profileId);
+      } catch {
+        /* ignore */
+      }
+    }
+    setUILanguageCookie(next as "th" | "en");
+    window.location.reload();
+  };
+
+  const handleLearningTarget = async (next: string) => {
+    if (!profileId || next === learningTarget) return;
+    setLearningTarget(next);
+    try {
+      await supabase.from("profiles").update({ learning_target_language: next }).eq("id", profileId);
+      window.dispatchEvent(new Event("miomika:profile-refresh"));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleCefr = async (lvl: string) => {
+    if (!profileId) return;
+    const locked = ["B1", "B2", "C1", "C2"].includes(lvl) && !isPro;
+    if (locked) {
+      router.push("/marketplace");
+      return;
+    }
+    setCefr(lvl);
+    try {
+      await supabase.from("profiles").update({ cefr_level: lvl }).eq("id", profileId);
+      window.dispatchEvent(new Event("miomika:profile-refresh"));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await supabase.auth.signOut({ scope: "global" });
+    } catch {
+      /* ignore */
+    }
     router.push("/");
   };
 
+  const daysTogether = useMemo(() => {
+    if (!profile?.onboarding_completed_at) return null;
+    const start = new Date(profile.onboarding_completed_at).getTime();
+    if (Number.isNaN(start)) return null;
+    return Math.max(1, Math.floor((Date.now() - start) / 86_400_000) + 1);
+  }, [profile?.onboarding_completed_at]);
+
   if (!authReady || !profile) {
     return (
-      <div
-        style={{
-          height: "100%",
-          minHeight: "100svh",
-          background: "linear-gradient(180deg, #FEFCF7 0%, #FDFAF2 100%)",
-        }}
-        aria-hidden="true"
-      />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-[var(--mk-accent)]" />
+      </div>
     );
   }
 
+  const displayName = profile.display_name?.trim() || (lang === "th" ? "เพื่อน" : "friend");
+  const tierLabel = profile.tier === "pro_max" ? "Pro Max" : profile.tier === "pro" ? "Pro" : t.free;
+  const stars = profile.miomi_stars ?? 0;
+  const avatarSrc = avatarUrl || DEFAULT_AVATAR;
+
   return (
-    <div
-      style={{
-        height: "100%",
-        minHeight: "100svh",
-        overflowY: "auto",
-        overflowX: "hidden",
-        background: "linear-gradient(180deg, #FEFCF7 0%, #FDFAF2 100%)",
-        padding: "16px 24px 96px",
-        width: "100%",
-        WebkitOverflowScrolling: "touch",
-      }}
-    >
-      {/* Transparent top bar */}
-      <div
-        style={{
-          height: "48px",
-          display: "flex",
-          alignItems: "center",
-          paddingTop: "env(safe-area-inset-top, 0px)",
-          background: "transparent",
-        }}
-      >
-        {canGoBack && (
+    <div className="mx-auto w-full max-w-[680px] px-4 py-6 md:px-6 md:py-10">
+      <h1 className="sr-only">{t.title}</h1>
+
+      {/* Header */}
+      <section className="mb-6 flex flex-col items-center rounded-card bg-surface px-6 py-7 text-center shadow-card md:flex-row md:gap-5 md:text-left">
+        <button type="button" onClick={() => setAvatarOpen(true)} className="relative shrink-0">
+          <span className="block h-[88px] w-[88px] overflow-hidden rounded-full border border-line bg-surface-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+          </span>
+          <span className="absolute -bottom-0.5 -right-0.5 grid h-7 w-7 place-items-center rounded-full bg-accent text-white shadow-cta">
+            <Camera className="h-3.5 w-3.5" />
+          </span>
+        </button>
+        <div className="mt-3 md:mt-0">
           <button
             type="button"
-            onClick={() => router.back()}
-            aria-label="Back"
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-            }}
+            onClick={() => setNameOpen(true)}
+            className="inline-flex items-center gap-1.5 text-[20px] font-semibold text-ink transition hover:text-accent"
           >
-            <ChevronLeft size={24} color={COLORS.textMuted} strokeWidth={1.75} />
+            {displayName}
+            <Pencil className="h-3.5 w-3.5 text-ink-subtle" />
           </button>
-        )}
-      </div>
-
-      {/* Hero */}
-      <section
-        style={{
-          marginTop: "24px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setAvatarSheetOpen(true)}
-          aria-label={me.avatar.title(uiLang)}
-          style={{
-            width: "80px",
-            height: "80px",
-            borderRadius: "999px",
-            overflow: "hidden",
-            boxShadow: AVATAR_SHADOW,
-            padding: 0,
-            border: "none",
-            cursor: "pointer",
-            background: "transparent",
-          }}
-        >
-          <Image
-            src={
-              profile.avatar_url ??
-              "/characters/miomi/companion/companion-idle.png"
-            }
-            alt=""
-            width={80}
-            height={80}
-            style={{ objectFit: "cover", width: "80px", height: "80px" }}
-            priority
-          />
-        </button>
-
-        <h1
-          style={{
-            fontFamily: FONT,
-            fontSize: "24px",
-            lineHeight: "32px",
-            fontWeight: 600,
-            color: COLORS.textPrimary,
-            margin: "16px 0 0",
-            textAlign: "center",
-          }}
-        >
-          {displayName}
-        </h1>
-
-        {showProBadge ? (
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "4px",
-              height: "24px",
-              padding: "0 10px",
-              marginTop: "8px",
-              borderRadius: "999px",
-              background: CTA_GRADIENT,
-              color: COLORS.ctaTextColor,
-              fontFamily: FONT,
-              fontSize: "12px",
-              fontWeight: 600,
-            }}
-          >
-            <Sparkles size={14} strokeWidth={2} color="#FFFFFF" />
-            {tierLabel(tier)}
-          </span>
-        ) : (
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              height: "24px",
-              padding: "0 10px",
-              marginTop: "8px",
-              borderRadius: "999px",
-              background: "rgba(255, 255, 255, 0.7)",
-              border: `1px solid ${COLORS.borderLight}`,
-              fontFamily: "'Quicksand', sans-serif",
-              fontSize: "12px",
-              fontWeight: 600,
-              color: COLORS.textMuted,
-            }}
-          >
-            {tierLabel(tier)}
-          </span>
-        )}
+          <div className="mt-1.5 flex items-center justify-center gap-2 md:justify-start">
+            <span className="rounded-full bg-earned-soft px-2.5 py-0.5 text-[12px] font-semibold text-earned-strong">
+              {tierLabel}
+            </span>
+            {daysTogether ? <span className="text-[12px] text-ink-muted">{t.days(daysTogether)}</span> : null}
+          </div>
+        </div>
       </section>
 
-      {/* Card 1 — Progress */}
-      <div style={{ marginTop: "32px" }}>
-        <SectionHeader label={copy.progressTitle} />
-        <GlassCard style={{ marginTop: "8px" }}>
-          <p
-            style={{
-              fontFamily: "'Quicksand', sans-serif",
-              fontSize: "13px",
-              lineHeight: "18px",
-              fontWeight: 600,
-              color: COLORS.textMuted,
-              margin: 0,
-            }}
-          >
-            {me.progress.cefrLabel(uiLang)}
-          </p>
-          {hasCefr ? (
-            <>
-              <p
-                style={{
-                  fontFamily: FONT,
-                  fontSize: "24px",
-                  lineHeight: "32px",
-                  fontWeight: 600,
-                  color: COLORS.textPrimary,
-                  margin: "8px 0 0",
-                }}
-              >
-                {cefrLevel}
-              </p>
-              <div
-                style={{
-                  marginTop: "8px",
-                  height: "4px",
-                  borderRadius: "999px",
-                  background: COLORS.borderLight,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${profile.cefr_progress_pct ?? 0}%`,
-                    background: COLORS.ctaSolid,
-                    borderRadius: "999px",
-                  }}
-                />
-              </div>
-            </>
-          ) : (
-            <p
-              style={{
-                fontFamily: FONT,
-                fontSize: "24px",
-                lineHeight: "32px",
-                fontWeight: 600,
-                color: COLORS.textPrimary,
-                margin: "8px 0 0",
-              }}
-            >
-              {me.progress.cefrEmpty(uiLang)}
-            </p>
-          )}
-
-          {days >= 2 && (
-            <p
-              style={{
-                marginTop: "16px",
-                fontFamily: "'Quicksand', sans-serif",
-                fontSize: "14px",
-                lineHeight: "20px",
-                fontWeight: 500,
-                color: COLORS.textMuted,
-              }}
-            >
-              {me.progress.daysTogether(days, uiLang)}
-            </p>
-          )}
-
-          <div
-            style={{
-              marginTop: "16px",
-              display: "flex",
-              gap: "12px",
-            }}
-          >
-            <StatColumn
-              value={wordsValue}
-              icon={BookOpen}
-              labelDefault={me.progress.statWords(uiLang)}
-              labelEmpty={me.progress.statWordsEmpty(uiLang)}
+      {/* Learning */}
+      <Group title={t.learningGroup}>
+        <Row
+          icon={<Globe className="h-[18px] w-[18px]" />}
+          label={t.imLearning}
+          right={
+            <Segmented
+              value={learningTarget}
+              onChange={handleLearningTarget}
+              options={[
+                { id: "th", label: t.thai },
+                { id: "en", label: t.english },
+              ]}
             />
-            <StatColumn
-              value={streakValue}
-              icon={Flame}
-              labelDefault={me.progress.statStreak(uiLang)}
-              labelEmpty={me.progress.statStreakEmpty(uiLang)}
-            />
-            <StatColumn
-              value={convosValue}
-              icon={MessageCircle}
-              labelDefault={me.progress.statConvos(uiLang)}
-              labelEmpty={me.progress.statConvosEmpty(uiLang)}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              height: "44px",
-              width: "100%",
-              marginTop: "16px",
-              borderRadius: "999px",
-              background: "rgba(255, 255, 255, 0.6)",
-              border: `1px solid ${COLORS.borderMedium}`,
-              color: COLORS.textPrimary,
-              fontFamily: FONT,
-              fontSize: "15px",
-              fontWeight: 600,
-              cursor: "pointer",
-              backdropFilter: "blur(10px)",
-            }}
-          >
-            {me.progress.cta(uiLang)}
-            <ChevronRight size={18} color={COLORS.textSubtle} strokeWidth={1.75} />
-          </button>
-        </GlassCard>
-      </div>
-
-      {/* Card 2 — Plan & credits */}
-      <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.planTitle} />
-        <GlassCard style={{ marginTop: "8px" }}>
-          <p
-            style={{
-              fontFamily: FONT,
-              fontSize: "17px",
-              lineHeight: "24px",
-              fontWeight: 600,
-              color: COLORS.textPrimary,
-              margin: 0,
-            }}
-          >
-            {tierLabel(tier)}
-          </p>
-          <p
-            style={{
-              fontFamily: "'Quicksand', sans-serif",
-              fontSize: "13px",
-              lineHeight: "18px",
-              fontWeight: 500,
-              color: COLORS.textMuted,
-              margin: "8px 0 0",
-            }}
-          >
-            {planSummary(tier, uiLang)}
-          </p>
-
-          <div style={{ height: "1px", background: COLORS.borderLight, margin: "12px 0" }} />
-
-          <PlanRow
-            icon={<Star size={20} color={COLORS.ctaSolid} strokeWidth={1.75} />}
-            label={me.plan.stars(uiLang)}
-            value={String(starsBalance)}
-            pillLabel={me.plan.topup(uiLang)}
-            onPill={() => router.push("/marketplace")}
-          />
-          <RowDivider />
-          <PlanRow
-            icon={<Mic size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.plan.voice(uiLang)}
-            value={String(voiceCredits)}
-            pillLabel={me.plan.topup(uiLang)}
-            onPill={() => router.push("/marketplace")}
-          />
-
-          <div style={{ marginTop: "16px" }}>
-            {isFree ? (
-              <button
-                type="button"
-                onClick={() => router.push("/marketplace")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  height: "52px",
-                  width: "100%",
-                  borderRadius: "999px",
-                  background: CTA_GRADIENT,
-                  color: COLORS.ctaTextColor,
-                  fontFamily: FONT,
-                  fontSize: "16px",
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  boxShadow: CTA_SHADOW,
-                }}
-              >
-                <Sparkles size={18} strokeWidth={1.75} />
-                {me.plan.cta.upgrade(uiLang)}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => router.push("/me/billing")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "44px",
-                  width: "100%",
-                  borderRadius: "999px",
-                  background: "rgba(255, 255, 255, 0.6)",
-                  border: `1px solid ${COLORS.borderMedium}`,
-                  color: COLORS.textPrimary,
-                  fontFamily: FONT,
-                  fontSize: "15px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  backdropFilter: "blur(10px)",
-                }}
-              >
-                {me.plan.cta.manage(uiLang)}
-              </button>
-            )}
-          </div>
-        </GlassCard>
-      </div>
-
-      {/* Card 3a — Relationship with Miomi */}
-      <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.bondTitle} />
-        <GlassCard style={{ marginTop: "8px" }}>
-          <ChevronRow
-            icon={<Heart size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.bond.name(uiLang)}
-            value="Miomi"
-            onClick={() => {
-              /* stub: Miomi name picker — Phase 3B */
-            }}
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<Mic size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.bond.voice(uiLang)}
-            value={voiceLabel}
-            onClick={() => {
-              /* stub: voice picker */
-            }}
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<MessageCircle size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.bond.style(uiLang)}
-            value={talkModeLabel}
-            onClick={() => {
-              /* stub: talk mode picker */
-            }}
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<Sparkle size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.bond.warmth(uiLang)}
-            value={warmthLabel}
-            onClick={() => {
-              /* stub: warmth picker */
-            }}
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<User size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.bond.callYou(uiLang)}
-            value={displayName}
-            onClick={() => setNameSheetOpen(true)}
-          />
-        </GlassCard>
-      </div>
-
-      {/* Card 3b — App preferences */}
-      <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.appTitle} />
-        <GlassCard style={{ marginTop: "8px" }}>
-          <ChevronRow
-            icon={<Palette size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.app.theme(uiLang)}
-            value={me.app.themeOptions.light(uiLang)}
-            onClick={() => {
-              /* stub: theme picker */
-            }}
-          />
-          <RowDivider />
-          <ToggleRow
-            icon={Volume2}
-            label={me.app.sounds(uiLang)}
-            checked={soundsOn}
-            onChange={(v) => {
-              setSoundsOn(v);
-              window.localStorage.setItem(SOUNDS_KEY, v ? "1" : "0");
-            }}
-          />
-          <RowDivider />
-          <ToggleRow
-            icon={Bell}
-            label={me.app.notifications(uiLang)}
-            checked={notificationsOn}
-            onChange={setNotificationsOn}
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<BookOpen size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={uiLang === "th" ? "ระดับของคุณ" : "Your level"}
-            value={
-              profile?.cefr_level
-                ? uiLang === "th"
-                  ? { A1: "เพิ่งเริ่ม", A2: "รู้บ้าง", B1: "พอคล่อง", B2: "คล่องแล้ว", C1: "คล่องแล้ว", C2: "คล่องแล้ว" }[profile.cefr_level]
-                  : { A1: "Just starting", A2: "Know some", B1: "Comfortable", B2: "Fluent", C1: "Fluent", C2: "Fluent" }[profile.cefr_level]
-                : uiLang === "th"
-                  ? "ยังไม่ได้ตั้ง"
-                  : "Not set"
-            }
-            onClick={() => router.push("/me/level")}
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<Globe size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.app.uiLang(uiLang)}
-            value={uiLangLabel}
-            onClick={() => {
-              /* stub: language picker */
-            }}
-          />
-        </GlassCard>
-      </div>
-
-      {/* Card 4 — Privacy */}
-      {/* Phase 3B: wire memory editor backend. Phase 6: wire data export + account reset. */}
-      <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.privacyTitle} />
-        <GlassCard style={{ marginTop: "8px" }}>
-          <ChevronRow
-            icon={<Brain size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.privacy.learned(memoryCount, uiLang)}
-            onClick={() => {
-              /* stub: memory list */
-            }}
-          />
-          {memoryCount === 0 && (
-            <p
-              style={{
-                margin: 0,
-                paddingLeft: "32px",
-                fontFamily: "'Quicksand', sans-serif",
-                fontSize: "12px",
-                lineHeight: "16px",
-                color: COLORS.textSubtle,
-              }}
-            >
-              {me.privacy.learnedEmpty(uiLang)}
-            </p>
-          )}
-          <RowDivider />
-          <ChevronRow
-            icon={<Download size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.privacy.download(uiLang)}
-            onClick={() => {
-              /* stub: data export — Phase 6 */
-            }}
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<RefreshCcw size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.privacy.forget(uiLang)}
-            onClick={() => {
-              /* stub: account reset — Phase 6 */
-            }}
-          />
-        </GlassCard>
-      </div>
-
-      {/* Card 5 — Help & feedback */}
-      <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.helpTitle} />
-        <GlassCard style={{ marginTop: "8px" }}>
-          <ChevronRow
-            icon={<AlertCircle size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.help.problem(uiLang)}
-            href={buildFeedbackMailto(displayName, tier)}
-            external
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<HelpCircle size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.help.center(uiLang)}
-            onClick={() => router.push("/help")}
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<MessageSquare size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.help.contact(uiLang)}
-            href={buildSupportMailto()}
-            external
-          />
-          <RowDivider />
-          <ChevronRow
-            icon={<Newspaper size={20} color={COLORS.textMuted} strokeWidth={1.75} />}
-            label={me.help.changelog(uiLang)}
-            href={buildSupportMailto()}
-            external
-          />
-        </GlassCard>
-      </div>
-
-      {/* Card 6 — Legal */}
-      <div style={{ marginTop: "24px" }}>
-        <SectionHeader label={copy.legalTitle} />
-        <GlassCard tight style={{ marginTop: "8px" }}>
-          <ChevronRow label={me.legal.privacy(uiLang)} onClick={() => router.push("/legal/privacy")} />
-          <RowDivider />
-          <ChevronRow label={me.legal.terms(uiLang)} onClick={() => router.push("/legal/terms")} />
-          <RowDivider />
-          <ChevronRow label={me.legal.about(uiLang)} onClick={() => router.push("/legal/about")} />
-        </GlassCard>
-      </div>
-
-      <AvatarEditSheet
-        open={avatarSheetOpen}
-        userId={profile.id}
-        onClose={() => setAvatarSheetOpen(false)}
-      />
-      <NameEditSheet
-        key={nameSheetOpen ? displayName : "closed"}
-        open={nameSheetOpen}
-        userId={profile.id}
-        currentName={displayName}
-        onClose={() => setNameSheetOpen(false)}
-      />
-
-      {/* Logout */}
-      <button
-        type="button"
-        onClick={() => void handleLogout()}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "100%",
-          minHeight: "44px",
-          margin: "48px 0 24px",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          fontFamily: "'Quicksand', sans-serif",
-          fontSize: "15px",
-          lineHeight: "24px",
-          fontWeight: 500,
-          color: COLORS.textMuted,
-        }}
-      >
-        {copy.logoutLabel}
-      </button>
-    </div>
-  );
-}
-
-function SectionHeader({ label }: { label: string }) {
-  return (
-    <h2
-      style={{
-        margin: 0,
-        fontFamily: FONT,
-        fontSize: "20px",
-        lineHeight: "28px",
-        fontWeight: 600,
-        color: COLORS.textPrimary,
-      }}
-    >
-      {label}
-    </h2>
-  );
-}
-
-function GlassCard({
-  children,
-  tight,
-  style,
-}: {
-  children: React.ReactNode;
-  tight?: boolean;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <div
-      style={{
-        background: "rgba(255, 255, 255, 0.7)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        borderRadius: "12px",
-        border: "1px solid rgba(237, 232, 224, 0.6)",
-        padding: tight ? "12px" : "16px",
-        boxShadow: CARD_SHADOW,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function RowDivider() {
-  return <div style={{ height: "1px", background: COLORS.borderLight }} />;
-}
-
-function StatColumn({
-  value,
-  icon: Icon,
-  labelDefault,
-  labelEmpty,
-}: {
-  value: number;
-  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
-  labelDefault: string;
-  labelEmpty: string;
-}) {
-  const populated = value > 0;
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        textAlign: "center",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "52px",
-        }}
-      >
-        {populated ? (
-          <span
-            style={{
-              fontFamily: "'Quicksand', sans-serif",
-              fontSize: "20px",
-              fontWeight: 600,
-              color: COLORS.textPrimary,
-              lineHeight: "28px",
-            }}
-          >
-            {value}
-          </span>
-        ) : (
-          <Icon size={24} strokeWidth={1.75} color={COLORS.textSubtle} />
-        )}
-      </div>
-      <span
-        style={{
-          fontFamily: "'Quicksand', sans-serif",
-          fontSize: "12px",
-          fontWeight: 500,
-          color: COLORS.textMuted,
-          lineHeight: "16px",
-          marginTop: "4px",
-        }}
-      >
-        {populated ? labelDefault : labelEmpty}
-      </span>
-    </div>
-  );
-}
-
-function ValueChip({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      style={{
-        fontFamily: "'Quicksand', sans-serif",
-        fontSize: "13px",
-        fontWeight: 600,
-        color: COLORS.textMuted,
-        padding: "4px 10px",
-        borderRadius: "999px",
-        background: "rgba(255, 255, 255, 0.7)",
-        border: `1px solid ${COLORS.borderLight}`,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function TopUpPill({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        height: "28px",
-        padding: "0 12px",
-        borderRadius: "999px",
-        background: "rgba(255, 255, 255, 0.6)",
-        border: `1px solid ${COLORS.borderMedium}`,
-        color: COLORS.textPrimary,
-        fontFamily: FONT,
-        fontSize: "13px",
-        fontWeight: 600,
-        cursor: "pointer",
-        backdropFilter: "blur(10px)",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-function PlanRow({
-  icon,
-  label,
-  value,
-  pillLabel,
-  onPill,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  pillLabel: string;
-  onPill: () => void;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "12px 0",
-        minHeight: "44px",
-      }}
-    >
-      {icon}
-      <span
-        style={{
-          flex: 1,
-          fontFamily: FONT,
-          fontSize: "16px",
-          color: COLORS.textPrimary,
-        }}
-      >
-        {label}
-      </span>
-      <span
-        style={{
-          fontFamily: "'Quicksand', sans-serif",
-          fontSize: "16px",
-          lineHeight: "24px",
-          fontWeight: 600,
-          color: COLORS.textPrimary,
-          marginRight: "8px",
-        }}
-      >
-        {value}
-      </span>
-      <TopUpPill label={pillLabel} onClick={onPill} />
-    </div>
-  );
-}
-
-function ChevronRow({
-  icon,
-  label,
-  value,
-  onClick,
-  href,
-  external,
-}: {
-  icon?: React.ReactNode;
-  label: string;
-  value?: string;
-  onClick?: () => void;
-  href?: string;
-  external?: boolean;
-}) {
-  const inner = (
-    <>
-      {icon}
-      <span
-        style={{
-          flex: 1,
-          fontFamily: FONT,
-          fontSize: "16px",
-          color: COLORS.textPrimary,
-        }}
-      >
-        {label}
-      </span>
-      {value ? <ValueChip>{value}</ValueChip> : null}
-      <ChevronRight size={18} color={COLORS.textSubtle} strokeWidth={1.75} />
-    </>
-  );
-
-  const rowStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 0",
-    minHeight: "44px",
-    width: "100%",
-    background: "transparent",
-    border: "none",
-    cursor: onClick || href ? "pointer" : "default",
-    textAlign: "left",
-    textDecoration: "none",
-    color: "inherit",
-  };
-
-  if (href) {
-    if (external) {
-      return (
-        <a href={href} style={rowStyle}>
-          {inner}
-        </a>
-      );
-    }
-    return (
-      <Link href={href} style={rowStyle}>
-        {inner}
-      </Link>
-    );
-  }
-
-  return (
-    <button type="button" onClick={onClick} style={rowStyle}>
-      {inner}
-    </button>
-  );
-}
-
-function ToggleRow({
-  icon: Icon = Volume2,
-  label,
-  checked,
-  onChange,
-}: {
-  icon?: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "12px 0",
-        minHeight: "44px",
-      }}
-    >
-      <Icon size={20} color={COLORS.textMuted} strokeWidth={1.75} />
-      <span
-        style={{
-          flex: 1,
-          fontFamily: FONT,
-          fontSize: "16px",
-          color: COLORS.textPrimary,
-        }}
-      >
-        {label}
-      </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        style={{
-          width: "44px",
-          height: "26px",
-          borderRadius: "999px",
-          background: checked ? COLORS.ctaSolid : COLORS.borderMedium,
-          border: "none",
-          position: "relative",
-          cursor: "pointer",
-          flexShrink: 0,
-          transition: "background 180ms cubic-bezier(0.4, 0, 0.2, 1)",
-          boxShadow: "0 2px 4px rgba(26, 26, 24, 0.08)",
-        }}
-      >
-        <span
-          style={{
-            position: "absolute",
-            top: "2px",
-            left: checked ? "20px" : "2px",
-            width: "22px",
-            height: "22px",
-            borderRadius: "999px",
-            background: "#FFFFFF",
-            boxShadow: "0 2px 4px rgba(26, 26, 24, 0.12)",
-            transition: "left 180ms cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
+          }
         />
-      </button>
+        <Row
+          icon={<BookOpen className="h-[18px] w-[18px]" />}
+          label={t.myLevel}
+          onClick={() => setLevelOpen((v) => !v)}
+          right={
+            <span className="flex items-center gap-1 text-[13px] font-semibold text-ink-muted">
+              {cefr ?? "A1"}
+              <ChevronRight className={"h-4 w-4 transition " + (levelOpen ? "rotate-90" : "")} />
+            </span>
+          }
+        />
+        {levelOpen ? (
+          <div className="px-4 pb-3 pt-1">
+            <div className="flex flex-wrap gap-2">
+              {CEFR.map(({ id, pro }) => {
+                const active = id === cefr;
+                const locked = pro && !isPro;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => handleCefr(id)}
+                    className={
+                      "inline-flex items-center rounded-tile px-3 py-1.5 text-[13px] font-semibold transition " +
+                      (active
+                        ? "bg-accent text-white"
+                        : locked
+                          ? "bg-surface-2 text-ink-subtle"
+                          : "bg-surface-2 text-ink hover:bg-accent-soft")
+                    }
+                  >
+                    {id}
+                    {locked ? <Lock className="ml-1 h-3 w-3" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+            {!isPro ? <p className="mt-2 text-[12px] text-ink-subtle">{t.levelProNote}</p> : null}
+          </div>
+        ) : null}
+      </Group>
+
+      {/* Preferences */}
+      <Group title={t.preferences}>
+        <Row
+          icon={<Globe className="h-[18px] w-[18px]" />}
+          label={t.appLanguage}
+          right={
+            <Segmented
+              value={lang}
+              onChange={handleUiLanguage}
+              options={[
+                { id: "th", label: "ไทย" },
+                { id: "en", label: "English" },
+              ]}
+            />
+          }
+        />
+        <Row
+          icon={<Palette className="h-[18px] w-[18px]" />}
+          label={t.theme}
+          right={
+            <div className="flex items-center gap-2">
+              {THEMES.map((th) => {
+                const active = th.id === theme;
+                return (
+                  <button
+                    key={th.id}
+                    type="button"
+                    aria-label={th.key}
+                    onClick={() => handleTheme(th.id)}
+                    className={
+                      "h-7 w-7 rounded-full border-2 transition " +
+                      (active ? "scale-110 border-[var(--mk-accent)]" : "border-line")
+                    }
+                    style={{ background: `linear-gradient(135deg, ${th.a} 50%, ${th.b} 50%)` }}
+                  />
+                );
+              })}
+            </div>
+          }
+        />
+        <Row
+          icon={<Volume2 className="h-[18px] w-[18px]" />}
+          label={t.sound}
+          right={<Switch on={soundsOn} onChange={handleSound} label={t.sound} />}
+        />
+        <Row
+          icon={<Bell className="h-[18px] w-[18px]" />}
+          label={t.notifications}
+          right={<Switch on={notifyOn} onChange={handleNotify} label={t.notifications} />}
+        />
+      </Group>
+
+      {/* Things learned */}
+      <Group>
+        <Row
+          icon={<Sparkles className="h-[18px] w-[18px]" />}
+          label={t.thingsLearned}
+          onClick={() => router.push("/dashboard")}
+          right={
+            <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-muted">
+              <span className="text-[15px] font-bold text-earned-strong">{wordsMastered ?? "—"}</span>
+              {t.words}
+              <ChevronRight className="h-4 w-4" />
+            </span>
+          }
+        />
+      </Group>
+
+      {/* Plan */}
+      <Group title={t.plan}>
+        <Row
+          icon={<Star className="h-[18px] w-[18px]" />}
+          label={t.currentPlan}
+          right={<span className="text-[13px] font-semibold text-ink">{tierLabel}</span>}
+        />
+        <Row
+          icon={<Sparkles className="h-[18px] w-[18px]" />}
+          label={t.stars}
+          right={<span className="text-[13px] font-bold text-earned-strong">{stars}</span>}
+        />
+        {isFree ? (
+          <Row
+            icon={<Sparkles className="h-[18px] w-[18px]" />}
+            label={t.upgrade}
+            onClick={() => router.push("/marketplace")}
+            right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+          />
+        ) : (
+          <Row
+            icon={<CreditCard className="h-[18px] w-[18px]" />}
+            label={t.manageBilling}
+            onClick={() => router.push("/me/billing")}
+            right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+          />
+        )}
+      </Group>
+
+      {/* Account */}
+      <Group title={t.account}>
+        <Row icon={<User className="h-[18px] w-[18px]" />} label={t.email} sub={profile.email ?? undefined} />
+        <Row
+          icon={<CreditCard className="h-[18px] w-[18px]" />}
+          label={t.manageBilling}
+          onClick={() => router.push("/me/billing")}
+          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+        />
+        <Row
+          icon={<HelpCircle className="h-[18px] w-[18px]" />}
+          label={t.help}
+          onClick={() => router.push("/help")}
+          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+        />
+        <Row
+          icon={<Shield className="h-[18px] w-[18px]" />}
+          label={t.privacy}
+          onClick={() => router.push("/legal/privacy")}
+          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+        />
+        <Row
+          icon={<FileText className="h-[18px] w-[18px]" />}
+          label={t.terms}
+          onClick={() => router.push("/legal/terms")}
+          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+        />
+        <Row
+          icon={<Download className="h-[18px] w-[18px]" />}
+          label={t.yourData}
+          sub={t.yourDataSub}
+          onClick={() => {
+            window.location.href = "mailto:privacy@miomika.com?subject=Data%20request";
+          }}
+          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+        />
+        <Row danger icon={<LogOut className="h-[18px] w-[18px]" />} label={signingOut ? t.signingOut : t.signOut} onClick={handleSignOut} />
+      </Group>
+
+      <AvatarEditSheet open={avatarOpen} userId={profile.id} onClose={() => setAvatarOpen(false)} />
+      <NameEditSheet open={nameOpen} userId={profile.id} currentName={profile.display_name ?? ""} onClose={() => setNameOpen(false)} />
     </div>
   );
 }
