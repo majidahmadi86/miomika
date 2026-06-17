@@ -142,7 +142,7 @@ export default function OnboardingPage() {
 
   if (error) {
     return (
-      <main className="flex h-[100dvh] w-full flex-col items-center justify-center bg-white px-6">
+      <main className="flex h-[100dvh] w-full flex-col items-center justify-center bg-canvas px-6">
         <div className="miomi-login-float w-[140px] shrink-0">
           <Image
             src="/miomi/idle.png"
@@ -153,10 +153,10 @@ export default function OnboardingPage() {
             priority
           />
         </div>
-        <p className="mt-6 text-center text-base font-semibold text-neutral-900">
+        <p className="mt-6 text-center text-base font-semibold text-ink">
           อุ๊ปส์~ ลองอีกครั้งนะคะ
         </p>
-        <p className="mt-1 text-center text-sm text-neutral-500">
+        <p className="mt-1 text-center text-sm text-ink-muted">
           Something went wrong. Let&apos;s try again.
         </p>
         <button
@@ -175,7 +175,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="flex h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-white px-6">
+    <main className="flex h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-canvas px-6">
       {/* Sparkles */}
       <div className="pointer-events-none absolute inset-0">
         <AnimatePresence>
@@ -227,7 +227,7 @@ export default function OnboardingPage() {
         initial={{ y: 12, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.3 }}
-        className="mt-6 text-center text-2xl font-semibold text-neutral-900"
+        className="mt-6 text-center text-2xl font-semibold text-ink"
       >
         ยินดีต้อนรับค่า {displayName ? displayName : ""}~ ✨
       </motion.h1>
@@ -235,7 +235,7 @@ export default function OnboardingPage() {
         initial={{ y: 12, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.5 }}
-        className="mt-2 text-center text-sm text-neutral-500"
+        className="mt-2 text-center text-sm text-ink-muted"
       >
         Welcome {displayName ? displayName : "friend"}! So happy you&apos;re
         here!
