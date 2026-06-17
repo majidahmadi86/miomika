@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Download,
   FileText,
+  Gift,
   Globe,
   HelpCircle,
   Lock,
@@ -68,6 +69,7 @@ const COPY = {
     stars: "ดาว Miomi",
     upgrade: "อัปเกรดเป็น Pro",
     manageBilling: "จัดการการเรียกเก็บเงิน",
+    inviteFriend: "ชวนเพื่อน",
     account: "บัญชี",
     email: "อีเมล",
     help: "ศูนย์ช่วยเหลือ",
@@ -100,6 +102,7 @@ const COPY = {
     stars: "Miomi stars",
     upgrade: "Upgrade to Pro",
     manageBilling: "Manage billing",
+    inviteFriend: "Invite friends",
     account: "Account",
     email: "Email",
     help: "Help center",
@@ -597,6 +600,12 @@ export default function MePage() {
             right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
           />
         ) : null}
+        <Row
+          icon={<Gift className="h-[18px] w-[18px]" />}
+          label={t.inviteFriend}
+          onClick={() => router.push("/invite")}
+          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+        />
       </Group>
 
       {/* Account */}

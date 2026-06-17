@@ -139,7 +139,7 @@ export default function DashboardPage() {
           achievements: "Achievements",
           share: "Share your progress",
           shareRef: "Invite a friend — you both get ฿30",
-          shareBtn: "Create a progress card",
+          shareBtn: "Invite a friend",
           firstChat: "First chat",
           wordsBadge: (n: number) => `${n} words`,
           streakBadge: (n: number) => `${n}-day streak`,
@@ -172,7 +172,7 @@ export default function DashboardPage() {
           achievements: "ความสำเร็จ",
           share: "แชร์ความก้าวหน้า",
           shareRef: "ชวนเพื่อน — รับคนละ ฿30",
-          shareBtn: "สร้างบัตรความก้าวหน้า",
+          shareBtn: "ชวนเพื่อน",
           firstChat: "คุยครั้งแรก",
           wordsBadge: (n: number) => `${n} คำ`,
           streakBadge: (n: number) => `สตรีค ${n} วัน`,
@@ -370,7 +370,7 @@ export default function DashboardPage() {
                 {t.share}
               </div>
               <p className="mt-1 text-[11px] text-ink-subtle">{t.shareRef}</p>
-              <button type="button" className="mt-3 rounded-full border border-line bg-white px-4 py-2 text-[12px] font-semibold text-ink-muted">{t.shareBtn}</button>
+              <Link href="/invite" className="mt-3 inline-block rounded-full border border-line bg-white px-4 py-2 text-[12px] font-semibold text-ink-muted">{t.shareBtn}</Link>
             </div>
           </div>
         </div>
