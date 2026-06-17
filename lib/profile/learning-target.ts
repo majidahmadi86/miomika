@@ -19,7 +19,9 @@ export function resolveLearningTarget(
   stored: string | null | undefined,
   ui: string | null | undefined,
 ): LearningLang {
-  const uiLang: LearningLang = ui === "en" ? "en" : "th";
-  const cross: LearningLang = uiLang === "en" ? "th" : "en";
-  return (stored === "th" || stored === "en") && stored !== uiLang ? stored : cross;
+  // Respect an explicit, valid choice — INCLUDING improving the same language as
+  // the UI (e.g. a confident English speaker polishing slang / native fluency).
+  // We only PREDICT (the cross of the UI language) when nothing has been chosen.
+  if (stored === "th" || stored === "en") return stored;
+  return crossLanguage(ui);
 }

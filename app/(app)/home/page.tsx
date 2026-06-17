@@ -296,14 +296,18 @@ export default function HomePage() {
   const lang = useUILanguage();
   const [greetHour] = useState(() => new Date().getHours());
   const targetLang = profile?.learning_target_language ?? null;
-  // Only name a learning target when it differs from the UI language. Naming the UI
-  // language as the target ("practice English" to an English speaker) is nonsensical,
-  // so those — and unknown — cases fall through to a neutral, language-agnostic greeting.
+  // Name whatever the user is learning, localized to the UI language. The target is
+  // cross-resolved upstream, so a target matching the UI language only happens by
+  // explicit choice (e.g. improving one's own English) — and naming it is correct.
   const targetName =
-    targetLang === "th" && lang === "en"
-      ? "Thai"
-      : targetLang === "en" && lang === "th"
+    targetLang === "en"
+      ? lang === "th"
         ? "ภาษาอังกฤษ"
+        : "English"
+      : targetLang === "th"
+        ? lang === "en"
+          ? "Thai"
+          : "ภาษาไทย"
         : null;
   const greeting = buildHomeGreeting(lang, targetName, profile?.streak ?? 0, greetHour);
 
