@@ -24,10 +24,6 @@ import { home } from "@/lib/voice/warmth";
 import { detectLang, speak } from "@/lib/voice/tts";
 import type { Language } from "@/lib/i18n/server";
 import { useUILanguage } from "@/lib/i18n/client";
-const WELCOME_BUBBLE = {
-  th: "สวัสดีค่า~ วันนี้อยากฝึกพูดด้วยกันไหมคะ?",
-  en: "Hi! Ready to practice with me today?",
-};
 const HOME_T = {
   th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ~", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ~", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
   en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
@@ -39,12 +35,11 @@ function buildHomeGreeting(
   streak: number,
   hour: number,
 ): string {
-  if (!targetName) return WELCOME_BUBBLE[lang];
   const tod =
     hour < 5 ? "night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 22 ? "evening" : "night";
   const i = streak > 0 ? 1 : 0;
   if (lang === "en") {
-    const en: Record<string, [string, string]> = {
+    const named: Record<string, [string, string]> = {
       morning: [
         `Good morning! Ready to start your ${targetName}?`,
         `Good morning! Day ${streak} — let's keep your ${targetName} going.`,
@@ -62,9 +57,27 @@ function buildHomeGreeting(
         `Late night, day ${streak} — a bit of ${targetName}?`,
       ],
     };
-    return en[tod][i];
+    const neutral: Record<string, [string, string]> = {
+      morning: [
+        "Good morning! Ready for a little practice?",
+        `Good morning! Day ${streak} — let's keep it going.`,
+      ],
+      afternoon: [
+        "Good afternoon! Up for a little practice?",
+        `Afternoon! ${streak} days strong — let's keep it up.`,
+      ],
+      evening: [
+        "Good evening! Ready to practice?",
+        `Evening! Keep your ${streak}-day streak alive.`,
+      ],
+      night: [
+        "Up late? A little practice before bed?",
+        `Late night, day ${streak} — a little practice?`,
+      ],
+    };
+    return (targetName ? named : neutral)[tod][i];
   }
-  const th: Record<string, [string, string]> = {
+  const named: Record<string, [string, string]> = {
     morning: [
       `อรุณสวัสดิ์ค่ะ มาเริ่มฝึก${targetName}กันไหมคะ?`,
       `อรุณสวัสดิ์ค่ะ วันที่ ${streak} แล้ว มาฝึก${targetName}ต่อกันค่ะ`,
@@ -82,7 +95,25 @@ function buildHomeGreeting(
       `ดึกแล้วค่ะ วันที่ ${streak} เลยนะคะ มาฝึก${targetName}กันไหมคะ`,
     ],
   };
-  return th[tod][i];
+  const neutral: Record<string, [string, string]> = {
+    morning: [
+      "อรุณสวัสดิ์ค่ะ พร้อมฝึกสักนิดไหมคะ?",
+      `อรุณสวัสดิ์ค่ะ วันที่ ${streak} แล้ว มาฝึกต่อกันค่ะ`,
+    ],
+    afternoon: [
+      "สวัสดีตอนบ่ายค่ะ มาฝึกสักนิดไหมคะ?",
+      `บ่ายแล้วค่ะ ${streak} วันติดแล้ว มาฝึกกันต่อค่ะ`,
+    ],
+    evening: [
+      "สวัสดีตอนเย็นค่ะ พร้อมฝึกไหมคะ?",
+      `เย็นแล้วค่ะ รักษาสตรีค ${streak} วันไว้นะคะ`,
+    ],
+    night: [
+      "ดึกแล้วนะคะ อยากฝึกสักหน่อยไหมคะ?",
+      `ดึกแล้วค่ะ วันที่ ${streak} เลยนะคะ มาฝึกกันไหมคะ`,
+    ],
+  };
+  return (targetName ? named : neutral)[tod][i];
 }
 
 const tapFeedback =
@@ -265,8 +296,15 @@ export default function HomePage() {
   const lang = useUILanguage();
   const [greetHour] = useState(() => new Date().getHours());
   const targetLang = profile?.learning_target_language ?? null;
+  // Only name a learning target when it differs from the UI language. Naming the UI
+  // language as the target ("practice English" to an English speaker) is nonsensical,
+  // so those — and unknown — cases fall through to a neutral, language-agnostic greeting.
   const targetName =
-    targetLang === "th" ? (lang === "en" ? "Thai" : "ภาษาไทย") : targetLang === "en" ? "English" : null;
+    targetLang === "th" && lang === "en"
+      ? "Thai"
+      : targetLang === "en" && lang === "th"
+        ? "ภาษาอังกฤษ"
+        : null;
   const greeting = buildHomeGreeting(lang, targetName, profile?.streak ?? 0, greetHour);
 
   const posX = useMotionValue(0);
