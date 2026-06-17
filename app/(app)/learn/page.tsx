@@ -398,14 +398,14 @@ export default function LearnPage() {
           target: planTarget === "auto" ? undefined : planTarget,
         }),
       });
-      const j = (await r.json()) as { ok?: boolean };
+      const j = (await r.json()) as { ok?: boolean; reason?: string };
       if (j.ok) {
         setCreateMsg(null);
         setTopic("");
         setAskOpen(false);
         await refresh(viewLevel ?? undefined);
       } else {
-        setCreateMsg("Miomi could not finish planning that one — try once more, or a different topic.");
+        setCreateMsg(`Miomi could not finish planning that one (reason: ${j.reason ?? "unknown"}) — try once more, or a different topic.`);
       }
     } catch {
       setCreateMsg("Something slipped — try once more.");
