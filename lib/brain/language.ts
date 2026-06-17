@@ -156,7 +156,10 @@ export function sanitizeTargetLanguage(
   uiLanguage: "th" | "en",
   targetLanguage: "th" | "en" | null,
 ): "th" | "en" {
-  if (targetLanguage && targetLanguage !== uiLanguage) return targetLanguage;
+  // PREDICT, NEVER FORCE: respect an explicit valid choice — INCLUDING the same
+  // language as the UI (a confident speaker polishing). Predict the cross of the
+  // UI language ONLY when nothing has been chosen (null/invalid).
+  if (targetLanguage === "th" || targetLanguage === "en") return targetLanguage;
   return oppositeLanguage(uiLanguage);
 }
 

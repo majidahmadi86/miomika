@@ -199,7 +199,7 @@ const memberEnEn = resolveSessionLanguages({
   profileTarget: "en",
   browserUiLang: "th",
 });
-assert(memberEnEn.targetLanguage === "th", "member UI=en + profile target=en → teaches th (never own language)");
+assert(memberEnEn.targetLanguage === "en", "member UI=en + profile target=en → honors explicit same-language target");
 
 const stableTargetEnUi = resolveTargetLanguage({
   profileTarget: "th",
@@ -227,8 +227,8 @@ for (const phrase of teachPhraseInputs) {
 }
 
 assert(
-  sanitizeTargetLanguage("en", "en") === "th",
-  "sanitize never returns UI language as target",
+  sanitizeTargetLanguage("en", "en") === "en",
+  "sanitize honors explicit same-language target",
 );
 assert(
   sanitizeTargetLanguage("th", null) === "en",
