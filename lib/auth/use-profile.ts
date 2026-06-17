@@ -17,6 +17,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { setUILanguageCookie } from "@/lib/i18n/client";
+import { resolveLearningTarget } from "@/lib/profile/learning-target";
 
 export type Tier = "guest" | "free" | "pro" | "pro_max";
 export type JourneyStage =
@@ -133,8 +134,10 @@ export function useProfile(): ProfileState {
           welcome_shown_at: (row.welcome_shown_at as string | null) ?? null,
           onboarding_completed_at: (row.onboarding_completed_at as string | null) ?? null,
           ui_language: (row.ui_language as "th" | "en" | null) ?? null,
-          learning_target_language:
-            (row.learning_target_language as "th" | "en" | null) ?? null,
+          learning_target_language: resolveLearningTarget(
+            row.learning_target_language as "th" | "en" | null,
+            row.ui_language as "th" | "en" | null,
+          ),
           cefr_level:
             (row.cefr_level as "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null) ?? null,
           active_character_id: (row.active_character_id as string | null) ?? "miomi",

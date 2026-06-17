@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { resolveLearningTarget } from "@/lib/profile/learning-target";
 
 export type Tier = "guest" | "free" | "pro" | "pro_max";
 export type JourneyStage =
@@ -66,8 +67,10 @@ export async function getServerProfile(): Promise<ServerProfile | null> {
     gender: (data.gender as "masculine" | "feminine" | "neutral" | null) ?? null,
     ui_language: ((data.ui_language as "th" | "en") ?? "th"),
     primary_language: (data.primary_language as string | null) ?? "th",
-    learning_target_language:
-      (data.learning_target_language as string | null) ?? "en",
+    learning_target_language: resolveLearningTarget(
+      data.learning_target_language as string | null,
+      data.ui_language as string | null,
+    ),
     cefr_level:
       (data.cefr_level as "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null) ?? null,
     miomi_stars: (data.miomi_stars as number | null) ?? 0,
