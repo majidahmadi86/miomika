@@ -7,7 +7,6 @@ import {
   BookOpen,
   Camera,
   ChevronRight,
-  CreditCard,
   Download,
   FileText,
   Globe,
@@ -597,25 +596,12 @@ export default function MePage() {
             onClick={() => router.push("/marketplace")}
             right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
           />
-        ) : (
-          <Row
-            icon={<CreditCard className="h-[18px] w-[18px]" />}
-            label={t.manageBilling}
-            onClick={() => router.push("/me/billing")}
-            right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
-          />
-        )}
+        ) : null}
       </Group>
 
       {/* Account */}
       <Group title={t.account}>
         <Row icon={<User className="h-[18px] w-[18px]" />} label={t.email} sub={profile.email ?? undefined} />
-        <Row
-          icon={<CreditCard className="h-[18px] w-[18px]" />}
-          label={t.manageBilling}
-          onClick={() => router.push("/me/billing")}
-          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
-        />
         <Row
           icon={<HelpCircle className="h-[18px] w-[18px]" />}
           label={t.help}
