@@ -6,6 +6,7 @@
 import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
 import { createServiceClient } from "@/lib/supabase/service";
+import { recordUsage } from "@/lib/usage/ledger";
 import { isVocabularySlug } from "@/lib/talk/teach-word-card";
 
 export type ResolvedWordSource = "bank" | "generated";
@@ -58,8 +59,10 @@ export async function callGroqJson(system: string, user: string, maxTokens: numb
   const groq = getGroq();
   if (!groq) {
     console.error("[brain] groq unavailable: GROQ_API_KEY missing");
+    recordUsage({ provider: "groq", model: "llama-3.3-70b-versatile", ok: false, meta: { reason: "key_missing" } });
     return null;
   }
+  const started = Date.now();
   try {
     const r = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
@@ -75,40 +78,35 @@ export async function callGroqJson(system: string, user: string, maxTokens: numb
     if (finish && finish !== "stop") {
       console.error(`[brain] groq finish_reason=${finish} (likely truncated at max_tokens=${maxTokens})`);
     }
+    recordUsage({ provider: "groq", model: "llama-3.3-70b-versatile", promptTokens: r.usage?.prompt_tokens ?? 0, completionTokens: r.usage?.completion_tokens ?? 0, latencyMs: Date.now() - started, ok: true, meta: finish && finish !== "stop" ? { finish } : undefined });
     return r.choices[0]?.message?.content ?? null;
   } catch (err) {
+    recordUsage({ provider: "groq", model: "llama-3.3-70b-versatile", latencyMs: Date.now() - started, ok: false, meta: { error: String(err).slice(0, 200) } });
     console.error("[brain] groq call failed:", String(err));
     return null;
   }
 }
 
 export async function callGeminiJson(system: string, user: string, maxTokens: number = 800): Promise<string | null> {
-  // Gemini OFF by default (wallet protection); callers fall back to Groq.
   if (process.env.ENABLE_GEMINI_FALLBACK !== "true") return null;
   const gemini = getGemini();
   if (!gemini) {
     console.error("[brain] gemini unavailable: GEMINI_API_KEY missing");
+    recordUsage({ provider: "gemini", model: "gemini-2.5-flash", ok: false, meta: { reason: "key_missing" } });
     return null;
   }
+  const started = Date.now();
   try {
     const chat = gemini.chats.create({
       model: "gemini-2.5-flash",
-      config: {
-        systemInstruction: system,
-        // gemini-2.5-flash thinks by default; without thinkingBudget: 0 the thinking
-        // silently eats maxOutputTokens and r.text returns empty → "bank drew a blank".
-        thinkingConfig: { thinkingBudget: 0 },
-        maxOutputTokens: maxTokens,
-        temperature: 0.3,
-        responseMimeType: "application/json",
-      },
+      config: { systemInstruction: system, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: maxTokens, temperature: 0.3, responseMimeType: "application/json" },
     });
     const r = await chat.sendMessage({ message: user });
-    if (!r.text) {
-      console.error("[brain] gemini returned empty text (possible truncation or block)");
-    }
+    if (!r.text) console.error("[brain] gemini returned empty text (possible truncation or block)");
+    recordUsage({ provider: "gemini", model: "gemini-2.5-flash", promptTokens: r.usageMetadata?.promptTokenCount ?? 0, completionTokens: r.usageMetadata?.candidatesTokenCount ?? 0, latencyMs: Date.now() - started, ok: !!r.text });
     return r.text ?? null;
   } catch (err) {
+    recordUsage({ provider: "gemini", model: "gemini-2.5-flash", latencyMs: Date.now() - started, ok: false, meta: { error: String(err).slice(0, 200) } });
     console.error("[brain] gemini call failed:", String(err));
     return null;
   }

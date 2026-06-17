@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildLesson } from "@/lib/brain/lesson-builder";
+import { withUsage } from "@/lib/usage/ledger";
 import { loadCefrLevel } from "@/lib/vocab/user-state-read";
 import {
   normalizeLearningTarget,
@@ -127,13 +128,15 @@ export async function POST(req: NextRequest) {
     } catch {
       knownWords = [];
     }
-    const result = await buildLesson({
-      userId: profile.id,
-      topicAsk,
-      cefrLevel: level,
-      learningTarget: targetAsk ?? learningTarget,
-      knownWords,
-    });
+    const result = await withUsage("lessons.create", profile.id, () =>
+      buildLesson({
+        userId: profile.id,
+        topicAsk,
+        cefrLevel: level,
+        learningTarget: targetAsk ?? learningTarget,
+        knownWords,
+      }),
+    );
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
     console.error("[api/lessons] generate failed:", err);
