@@ -604,7 +604,12 @@ export default function MePage() {
           icon={<Gift className="h-[18px] w-[18px]" />}
           label={t.inviteFriend}
           onClick={() => router.push("/invite")}
-          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+          right={
+            <span className="flex items-center gap-1.5">
+              <span className="text-[12px] font-bold text-earned-strong">+฿30</span>
+              <ChevronRight className="h-4 w-4 text-ink-subtle" />
+            </span>
+          }
         />
       </Group>
 
