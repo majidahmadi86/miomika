@@ -36,6 +36,7 @@ import {
 } from "@/lib/brain/teaching";
 import type { PronunciationLesson } from "@/lib/brain/pronunciation";
 import { log } from "@/lib/debug/log";
+import { withUsage } from "@/lib/usage/ledger";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
     // SERVER reads user identity from cookies. Client cannot lie about tier.
     const profile = await getServerProfile();
     const serverUserId = profile?.id ?? null;
+    return await withUsage("talk.miomi", serverUserId, async () => {
     const serverIsGuest = !profile;
     // Phase 4 will read profile.tier here for cost-cap enforcement.
 
@@ -518,6 +520,7 @@ export async function POST(req: NextRequest) {
       guestHandoff: isLastFreeGuestTurn,
     } satisfies MiomiResponse);
 
+    });
   } catch (error: unknown) {
     const err = error as { message?: string; stack?: string };
     log("miomi", "error", { error: err.message, stack: err.stack?.slice(0, 300) });
@@ -526,7 +529,7 @@ export async function POST(req: NextRequest) {
     const failoverContent = `${failover.th}\n\n${failover.en}`;
     const failoverReplyLang = detectReplyLanguageFromContent(
       failoverContent,
-      brainState?.uiLanguage ?? "en",
+      (brainState as BrainState | null)?.uiLanguage ?? "en",
     );
     return NextResponse.json(
       {

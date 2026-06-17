@@ -4,6 +4,7 @@
 import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
 import { log } from "@/lib/debug/log";
+import { recordUsage } from "@/lib/usage/ledger";
 import { getFailoverResponse } from "./session";
 // Lazy clients — constructing at module load fails Next 16's page-data
 // collection step when env vars are absent (build-time).
@@ -116,6 +117,7 @@ async function callGroq(
 ): Promise<string> {
   const groq = getGroq();
   if (!groq) throw new Error("GROQ_API_KEY missing — Groq disabled");
+  const started = Date.now();
   const response = await groq.chat.completions.create({
     model: GROQ_MODEL,
     max_tokens: MAX_REPLY_TOKENS,
@@ -128,6 +130,7 @@ async function callGroq(
       })),
     ],
   });
+  recordUsage({ provider: "groq", model: GROQ_MODEL, promptTokens: response.usage?.prompt_tokens ?? 0, completionTokens: response.usage?.completion_tokens ?? 0, latencyMs: Date.now() - started, ok: true, meta: { path: "reply" } });
   const text = response.choices[0]?.message?.content ?? "";
   if (!text.trim()) throw new Error("Empty Groq response");
   return stripMarkdown(text);
@@ -194,6 +197,7 @@ async function callGeminiWithModel(
   const response = await chat.sendMessage({
     message: lastMessage?.content ?? "",
   });
+  recordUsage({ provider: "gemini", model, promptTokens: response.usageMetadata?.promptTokenCount ?? 0, completionTokens: response.usageMetadata?.candidatesTokenCount ?? 0, ok: true, meta: { path: "reply" } });
   const text = response.text ?? "";
   if (!text.trim()) throw new Error("Empty Gemini response");
   return stripMarkdown(text);
