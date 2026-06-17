@@ -53,6 +53,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const t = isThai
@@ -77,6 +78,11 @@ export default function SignupPage() {
         successWarm: "พอกดลิงก์แล้ว เจอกันต่อนะคะ มีโอมิรออยู่เลย",
         spam: "ไม่เจออีเมล? เช็คโฟลเดอร์ spam ด้วยนะคะ",
         backToLogin: "กลับไปหน้าเข้าสู่ระบบค่ะ",
+        agreePre: "ฉันยอมรับ",
+        terms: "ข้อกำหนด",
+        agreeAnd: " และ ",
+        privacy: "นโยบายความเป็นส่วนตัว",
+        agreeError: "กรุณายอมรับข้อกำหนดและนโยบายความเป็นส่วนตัวก่อนนะคะ",
       }
     : {
         back: "Back",
@@ -99,10 +105,19 @@ export default function SignupPage() {
         successWarm: "Once you click it, Miomi will be waiting for you.",
         spam: "Don't see it? Check your spam folder.",
         backToLogin: "Back to log in",
+        agreePre: "I agree to the ",
+        terms: "Terms",
+        agreeAnd: " & ",
+        privacy: "Privacy Policy",
+        agreeError: "Please agree to the Terms & Privacy Policy to continue.",
       };
 
   async function handleGoogle() {
     setError(null);
+    if (!agreed) {
+      setError(t.agreeError);
+      return;
+    }
     setGoogleLoading(true);
     try {
       const supabase = createClient();
@@ -127,6 +142,10 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    if (!agreed) {
+      setError(t.agreeError);
+      return;
+    }
     if (password !== confirmPassword) {
       setError(t.mismatch);
       return;
@@ -205,11 +224,26 @@ export default function SignupPage() {
 
           <h1 className="mt-3 text-center text-xl font-semibold text-ink">{t.title}</h1>
 
+          <label className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-ink-muted">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(ev) => setAgreed(ev.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-[#34A98F]"
+            />
+            <span>
+              {t.agreePre}
+              <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline underline-offset-2">{t.terms}</Link>
+              {t.agreeAnd}
+              <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline underline-offset-2">{t.privacy}</Link>
+            </span>
+          </label>
+
           <button
             type="button"
             onClick={() => void handleGoogle()}
-            disabled={googleLoading || loading}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3 text-sm font-medium text-ink shadow-card transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={googleLoading || loading || !agreed}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3 text-sm font-medium text-ink shadow-card transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.75h3.57c2.08-1.92 3.28-4.74 3.28-8.07z"/>
@@ -272,7 +306,7 @@ export default function SignupPage() {
             </label>
 
             <button
-              type="submit" disabled={loading}
+              type="submit" disabled={loading || !agreed}
               className="mt-1 w-full rounded-full bg-accent py-3 text-sm font-semibold text-white shadow-cta transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? t.submitting : t.submit}
