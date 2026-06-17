@@ -29,7 +29,7 @@ export default function AppLayout({
   );
 }
 
-const SCREENS = ["/home", "/lessons", "/dashboard", "/create", "/me"];
+const SCREENS = ["/home", "/learn", "/talk", "/dashboard", "/me"];
 
 function SwipeNavigator({
   children,
