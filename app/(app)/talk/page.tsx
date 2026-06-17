@@ -1888,9 +1888,15 @@ export default function TalkPage() {
           touchAction: "manipulation",
         }}
       >
-        <Link href="/home" aria-label="Back" style={{ width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3D352B", textDecoration: "none" }}>
-          <ArrowLeft size={22} strokeWidth={2} />
-        </Link>
+        {roomSession ? (
+          <button onClick={() => void endRoomSession()} aria-label="Back" disabled={roomEnding} style={{ width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3D352B", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+            <ArrowLeft size={22} strokeWidth={2} />
+          </button>
+        ) : (
+          <Link href="/home" aria-label="Back" style={{ width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3D352B", textDecoration: "none" }}>
+            <ArrowLeft size={22} strokeWidth={2} />
+          </Link>
+        )}
 
         <div
           style={{
