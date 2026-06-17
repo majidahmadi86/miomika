@@ -473,7 +473,6 @@ export default function LearnPage() {
       setSpeakMsg("Your browser blocked the room key — try once more.");
       return false;
     }
-    console.log("[cs-trace] doWalkIn → /talk?room=1, session:", handoff.sessionId);
     window.location.href = "/talk?room=1";
     return true;
   }, []);
@@ -527,7 +526,6 @@ export default function LearnPage() {
           setSpeakMsg("Almost ready — Miomi is trying once more~");
         }
       }
-      console.log("[cs-trace] POST result:", { ok: j.ok, reason: j.reason, sessionId: j.sessionId, hasPlan: !!j.plan, showDoor: args.showDoor });
       if (j.ok && j.sessionId && j.plan) {
         const handoff: RoomHandoff = {
           sessionId: j.sessionId,
@@ -547,8 +545,7 @@ export default function LearnPage() {
       } else if (j.reason === "pro_required") {
         setSpeakMsg("Sessions beyond the first of each course are Pro — your free room is session one~");
       } else {
-        setSpeakMsg(`TRACE: reason=${j.reason ?? "unknown"} ok=${String(j.ok)} sid=${j.sessionId ? "yes" : "no"} plan=${j.plan ? "yes" : "no"}`);
-        console.log("[cs-trace] failed response:", j);
+        setSpeakMsg("Miomi could not prepare the room — try once more.");
       }
     } catch {
       setSpeakMsg("Something slipped — try once more.");
