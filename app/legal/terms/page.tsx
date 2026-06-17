@@ -24,7 +24,7 @@ function TermsEN() {
         <LI>{`Payment. Payments are processed by our payment providers (Stripe and Omise). We do not store your full card details.`}</LI>
         <LI>{`Auto-renewal. Subscriptions renew automatically each month until you cancel. We will charge the payment method on file at each renewal.`}</LI>
         <LI>{`Cancellation. You can cancel anytime. Cancellation takes effect at the end of your current paid period; you keep access until then.`}</LI>
-        <LI>{`Refunds (beta policy). Because Miomika is in beta, if you are unhappy you may request a refund within 14 days of a charge by emailing support@miomika.com, and we will refund that charge. Prepaid hour packs are refundable in proportion to unused time within the same 14-day window.`}</LI>
+        <LI>{`Refunds. Except where required by Thai law, fees are non-refundable. Because we offer a free guest mode and a one-time 10-minute voice trial so you can try Miomika before paying, we do not refund trial periods or voice time already used. We will, of course, refund genuine billing errors — duplicate charges, unauthorized charges, or amounts charged in error. To stop future renewals, see Cancellation above.`}</LI>
       </ul>
       <H2>6. Acceptable use</H2>
       <P>{`You agree not to: use the Service unlawfully or to harm others; harass, abuse, or send unlawful content to Miomi or other people; attempt to reverse-engineer, extract, copy, or misuse the underlying models, prompts, or curriculum; resell or commercially exploit the Service; or interfere with its security or operation. We may suspend accounts that break these rules.`}</P>
@@ -73,7 +73,7 @@ function TermsTH() {
         <LI>{`การชำระเงิน: ดำเนินการโดยผู้ให้บริการชำระเงินของเรา (Stripe และ Omise) เราไม่จัดเก็บข้อมูลบัตรของคุณแบบเต็ม`}</LI>
         <LI>{`การต่ออายุอัตโนมัติ: การสมัครสมาชิกจะต่ออายุโดยอัตโนมัติทุกเดือนจนกว่าคุณจะยกเลิก เราจะเรียกเก็บเงินจากวิธีการชำระเงินที่บันทึกไว้ในแต่ละรอบการต่ออายุ`}</LI>
         <LI>{`การยกเลิก: คุณสามารถยกเลิกได้ตลอดเวลา การยกเลิกจะมีผลเมื่อสิ้นสุดรอบที่ชำระเงินไว้แล้วในปัจจุบัน โดยคุณยังคงใช้งานได้จนถึงเวลานั้น`}</LI>
-        <LI>{`การคืนเงิน (นโยบายช่วงเบต้า): เนื่องจาก Miomika อยู่ในช่วงเบต้า หากคุณไม่พอใจ คุณสามารถขอคืนเงินภายใน 14 วัน นับจากการเรียกเก็บเงินได้ โดยส่งอีเมลถึง support@miomika.com และเราจะคืนเงินรายการนั้น แพ็กชั่วโมงแบบจ่ายล่วงหน้าสามารถขอคืนเงินตามสัดส่วนของเวลาที่ยังไม่ได้ใช้ภายในกรอบเวลา 14 วันเดียวกัน`}</LI>
+        <LI>{`การคืนเงิน: ยกเว้นกรณีที่กฎหมายไทยกำหนด ค่าบริการไม่สามารถขอคืนได้ เนื่องจากเรามีโหมดผู้เยี่ยมชมแบบฟรีและสิทธิ์ทดลองสนทนาด้วยเสียง 10 นาทีแบบครั้งเดียว ให้คุณได้ลองใช้ Miomika ก่อนชำระเงิน เราจึงไม่คืนเงินสำหรับช่วงทดลองใช้หรือเวลาสนทนาด้วยเสียงที่ใช้ไปแล้ว ทั้งนี้ เราจะคืนเงินให้ในกรณีที่เกิดข้อผิดพลาดในการเรียกเก็บเงินจริง เช่น การเรียกเก็บซ้ำ การเรียกเก็บที่ไม่ได้รับอนุญาต หรือจำนวนเงินที่เรียกเก็บผิดพลาด หากต้องการหยุดการต่ออายุในอนาคต โปรดดูหัวข้อการยกเลิกด้านบน`}</LI>
       </ul>
       <H2>6. การใช้งานที่ยอมรับได้</H2>
       <P>{`คุณตกลงว่าจะไม่ใช้บริการโดยผิดกฎหมายหรือเพื่อทำร้ายผู้อื่น ไม่คุกคาม ทำร้าย หรือส่งเนื้อหาที่ผิดกฎหมายไปยัง Miomi หรือบุคคลอื่น ไม่พยายามทำวิศวกรรมย้อนกลับ ดึงข้อมูล ทำซ้ำ หรือใช้โมเดล พรอมต์ หรือหลักสูตรเบื้องหลังในทางที่ผิด ไม่ขายต่อหรือแสวงหาประโยชน์เชิงพาณิชย์จากบริการ และไม่รบกวนความปลอดภัยหรือการทำงานของบริการ เราอาจระงับบัญชีที่ฝ่าฝืนกฎเหล่านี้`}</P>
