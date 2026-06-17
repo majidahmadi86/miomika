@@ -217,27 +217,12 @@ export default function SignupPage() {
           <p className="text-center text-2xl font-bold text-[#B8860B]">Miomika</p>
 
           <div className="mt-3 flex justify-center">
-            <div className="miomi-login-float w-[64px] shrink-0 md:w-[80px]">
+            <div className="miomi-login-float w-[56px] shrink-0 md:w-[64px]">
               <Image src="/miomi/idle.png" alt="Miomi" width={80} height={80} className="h-auto w-full object-contain" priority />
             </div>
           </div>
 
-          <h1 className="mt-3 text-center text-xl font-semibold text-ink">{t.title}</h1>
-
-          <label className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-ink-muted">
-            <input
-              type="checkbox"
-              checked={agreed}
-              onChange={(ev) => setAgreed(ev.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-[#34A98F]"
-            />
-            <span>
-              {t.agreePre}
-              <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline underline-offset-2">{t.terms}</Link>
-              {t.agreeAnd}
-              <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline underline-offset-2">{t.privacy}</Link>
-            </span>
-          </label>
+          <h1 className="mt-2 text-center text-xl font-semibold text-ink">{t.title}</h1>
 
           <button
             type="button"
@@ -254,13 +239,13 @@ export default function SignupPage() {
             <span>{googleLoading ? t.connecting : t.google}</span>
           </button>
 
-          <div className="my-3 flex items-center gap-3">
+          <div className="my-2 flex items-center gap-3">
             <div className="h-px flex-1 bg-line" />
             <span className="text-[10px] font-medium uppercase tracking-wider text-ink-subtle">{t.orEmail}</span>
             <div className="h-px flex-1 bg-line" />
           </div>
 
-          <form className="flex flex-col gap-2.5" onSubmit={handleSubmit}>
+          <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
             {error ? (
               <p className="rounded-lg border border-[#E7C9C4] bg-[#FBECEA] px-3 py-2 text-center text-sm text-[#C4564A]" role="alert">
                 {error}
@@ -303,6 +288,21 @@ export default function SignupPage() {
                 className="rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/25"
                 placeholder="••••••••"
               />
+            </label>
+
+            <label className="flex items-start gap-2 text-xs leading-relaxed text-ink-muted">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(ev) => setAgreed(ev.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-[#34A98F]"
+              />
+              <span>
+                {t.agreePre}
+                <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline underline-offset-2">{t.terms}</Link>
+                {t.agreeAnd}
+                <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline underline-offset-2">{t.privacy}</Link>
+              </span>
             </label>
 
             <button
