@@ -79,24 +79,14 @@ export async function GET() {
   try {
     const supabase = await createServiceClient();
 
-    let cefrLevel: string | null = null;
-    let learningTargetLanguage: "th" | "en" | null = null;
-    try {
-      const { data: profileRow, error: cefrErr } = await supabase
-        .from("profiles")
-        .select("cefr_level, learning_target_language")
-        .eq("id", profile.id)
-        .maybeSingle();
-      if (!cefrErr && profileRow) {
-        if ("cefr_level" in profileRow) {
-          cefrLevel = (profileRow.cefr_level as string | null) ?? null;
-        }
-        const rawTarget = profileRow.learning_target_language as string | null | undefined;
-        learningTargetLanguage = rawTarget === "th" || rawTarget === "en" ? rawTarget : null;
-      }
-    } catch (err) {
-      logError("progress.cefr", "profile query failed", err);
-    }
+    // cefr_level and the (already cross-resolved) learning target both live on
+    // the profile from getServerProfile — no need to re-query. Using the resolved
+    // value keeps the Dashboard consistent with Home, Talk, and Learn.
+    const cefrLevel: string | null = profile.cefr_level;
+    const learningTargetLanguage: "th" | "en" | null =
+      profile.learning_target_language === "th" || profile.learning_target_language === "en"
+        ? profile.learning_target_language
+        : null;
 
     const { count: wordsMastered, error: masteredErr } = await supabase
       .from("vocabulary_user_state")
