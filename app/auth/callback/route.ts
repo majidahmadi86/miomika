@@ -5,6 +5,7 @@ import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { pickLanguageFromAcceptLanguage } from "@/lib/i18n/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { isValidAppRedirect } from "@/lib/auth/redirect-to";
+import { recordReferralAttribution } from "@/lib/referral/record-attribution";
 import { log, logError } from "@/lib/debug/log";
 
 /**
@@ -85,6 +86,14 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // Referral attribution — no-ops unless a brand-new account arrived via an invite link.
+  if (data.user?.id) {
+    await recordReferralAttribution(
+      data.user.id,
+      request.cookies.get("mk_ref")?.value,
+    );
+  }
+
   // Resolve profile inline. Cookies just written are visible.
   const profile = await getServerProfile();
   log("auth.callback", "profile", {
@@ -110,5 +119,6 @@ export async function GET(request: NextRequest) {
   for (const cookie of response.cookies.getAll()) {
     finalResponse.cookies.set(cookie);
   }
+  finalResponse.cookies.set("mk_ref", "", { maxAge: 0, path: "/" });
   return finalResponse;
 }
