@@ -645,6 +645,7 @@ export default function LearnPage() {
   return (
     <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "transparent" }}>
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
+        <div style={{ maxWidth: 560, margin: "0 auto" }}>
 
         {/* Level rail */}
         <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
@@ -1571,6 +1572,7 @@ export default function LearnPage() {
             </Link>
           </>
         )}
+        </div>
       </div>
       {roomIntro ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(31,30,28,0.55)", padding: 20 }}>
