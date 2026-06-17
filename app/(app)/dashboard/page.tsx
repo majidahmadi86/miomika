@@ -250,21 +250,27 @@ export default function DashboardPage() {
               </div>
               <div className="flex gap-1.5">
                 {week.map((d, i) => (
-                  <div key={i} className="text-center">
-                    <p className="mb-1 text-[9px] font-semibold text-ink-subtle">{d.label}</p>
-                    <span
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-white"
-                      style={
-                        d.done
-                          ? { background: "linear-gradient(135deg, #E3C98B, #B8860B)", boxShadow: d.isToday ? "0 0 0 2px #fff, 0 0 0 4px #B8860B" : undefined }
-                          : { border: "1.5px solid #E7D7B8", boxShadow: d.isToday ? "0 0 0 2px #fff, 0 0 0 4px #B8860B" : undefined }
-                      }
-                    >
-                      {d.done ? (
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                      ) : null}
-                    </span>
-                  </div>
+                  <span
+                    key={i}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold leading-none"
+                    style={
+                      d.done
+                        ? {
+                            fontFamily: "'Quicksand', sans-serif",
+                            background: "linear-gradient(135deg, #E3C98B, #B8860B)",
+                            color: "#fff",
+                            boxShadow: d.isToday ? "0 0 0 2px #fff, 0 0 0 4px #B8860B" : undefined,
+                          }
+                        : {
+                            fontFamily: "'Quicksand', sans-serif",
+                            border: "1.5px solid #E7D7B8",
+                            color: "#B89F6A",
+                            boxShadow: d.isToday ? "0 0 0 2px #fff, 0 0 0 4px #B8860B" : undefined,
+                          }
+                    }
+                  >
+                    {d.label}
+                  </span>
                 ))}
               </div>
             </div>
