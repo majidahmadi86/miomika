@@ -116,7 +116,6 @@ export async function GET(req: NextRequest) {
           topic, cefr_level: level,
           status: "active", verified_at: new Date().toISOString(),
           teach_thai_to_english: true, teach_english_to_thai: true,
-          frequency_score: 0, difficulty_score: 0,
         });
         if (error) errors.push(`${card.word_en}: ${error.message}`);
         else added++;
