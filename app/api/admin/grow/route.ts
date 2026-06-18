@@ -62,7 +62,11 @@ export async function GET(req: NextRequest) {
       cards.push({ level: seed.level, word_en: card.word_en, word_th: card.word_th, romanization: rom, en_ipa: ipa, def_en: defEn, def_th: defTh, example_th: exTh });
       const base: Record<string, unknown> = { ...template };
       for (const k of Object.keys(base)) if (["id","created_at","updated_at"].includes(k) || /vector|tsv|fts|search/i.test(k)) delete base[k];
-      for (const k of NOTE_BLANK) if (k in base) base[k] = Array.isArray(base[k]) ? [] : "";
+      for (const k of NOTE_BLANK) {
+        if (!(k in base)) continue;
+        if (k === "use_when") base[k] = "";   // NOT NULL column → blank but keep non-null
+        else delete base[k];                   // nullable → omit, let DB default/null apply (avoids "malformed array literal" on list-type columns)
+      }
       const { error } = await supabase.from("vocabulary_bank").insert({
         ...base,
         word_en: card.word_en, word_th: card.word_th,
