@@ -474,7 +474,14 @@ export default function TalkPage() {
             await startContinuousMic();
             setLiveUiState("listening");
           },
-          onStopMic: stopContinuousMic,
+          onStopMic: () => {
+            stopContinuousMic();
+            // Symmetric with onStartMic: clear the "listening" status the instant the
+            // mic stops, so the "I'm listening..." label can't linger. Guarded so a
+            // reply already in "thinking"/"speaking" is never stomped — if a turn is
+            // being processed, onStatus("thinking") drives the label instead.
+            setLiveUiState((prev) => (prev === "listening" ? "idle" : prev));
+          },
           getLessonNudgeHints,
           getMode: () => loadTalkConfig().mode,
         },
