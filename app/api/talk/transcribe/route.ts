@@ -16,11 +16,12 @@ const PROJECT_ID = "miomika";
 const CHIRP2_LOCATION = "asia-southeast1";
 const CHIRP2_MODEL = "chirp_2";
 /**
- * Chirp 2 has language-agnostic `["auto"]` but NOT Chirp 3's constrained
- * multi-locale auto-detect (`["th-TH","en-US"]`). Default th-TH — dominant
- * input + hardest script.
+ * Chirp 2 fallback. Use language-agnostic `["auto"]` so the fallback path
+ * (hit when Groq is rate-limited) doesn't clip the English half of
+ * code-switched Thai/English speech. Chirp 3's constrained multi-locale
+ * (`["th-TH","en-US"]`) isn't available on Chirp 2.
  */
-const CHIRP2_LANGUAGE_CODES = ["th-TH"] as const;
+const CHIRP2_LANGUAGE_CODES = ["auto"] as const;
 
 // Lazy clients — constructing at module load fails Next 16's page-data
 // collection step when env vars are absent (build-time).
