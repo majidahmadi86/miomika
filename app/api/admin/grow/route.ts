@@ -66,6 +66,7 @@ export async function GET(req: NextRequest) {
   const email = profile?.email?.toLowerCase() ?? null;
   if (!email || !admins.includes(email)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
+  const started = Date.now();
   const sp = req.nextUrl.searchParams;
   const level = (sp.get("level") || "C1").toUpperCase();
   const n = Math.min(Math.max(Number(sp.get("n") || "5"), 1), 8);
@@ -88,6 +89,7 @@ export async function GET(req: NextRequest) {
   const NOTE_FIELDS = ["emoji", "miomi_note_th", "miomi_note_en", "pronunciation_tip", "cultural_warning", "use_when", "do_not_use_when", "usage_note", "note"];
 
   for (const topic of topics) {
+    if (Date.now() - started > 45000) break; // return before platform timeout; re-hit to continue (dedup-safe)
     const words = await propose(level, topic, n);
     for (let i = 0; i < words.length; i += 4) {
       await Promise.all(words.slice(i, i + 4).map(async (w) => {
@@ -122,5 +124,5 @@ export async function GET(req: NextRequest) {
       }));
     }
   }
-  return NextResponse.json({ level, dry, topics, added, withheld, rejected, dup, errors, cards });
+  return NextResponse.json({ level, dry, topics, added, withheld, rejected, dup, errors, columns: Object.keys(template), cards });
 }
