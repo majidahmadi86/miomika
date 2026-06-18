@@ -321,6 +321,7 @@ export async function pickWordToIntroduce(args: {
       .select("word_en, word_th, cefr_level, emoji, created_at")
       .eq("status", "active")
       .eq("cefr_level", cefr)
+      .not("verified_at", "is", null)
       .order("created_at", { ascending: false })
       .limit(40);
 

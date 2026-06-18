@@ -307,6 +307,7 @@ export async function buildLessonPlan(args: {
       .eq("status", "active")
       .eq("cefr_level", cefr)
       .eq(teachFlag, true)
+      .not("verified_at", "is", null)
       .order("difficulty_score", { ascending: true })
       .order("frequency_score", { ascending: false })
       .order("created_at", { ascending: true })

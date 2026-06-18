@@ -1,7 +1,8 @@
 // SERVER ONLY — word/phrase content engine.
 // The MODEL chooses which item to teach; this resolves it to a real card:
-//   bank hit  → curated card.
-//   bank miss → generate + validate + persist (the bank grows itself), best-effort.
+//   bank hit, verified → curated card, served directly (no LLM).
+//   anything else      → WITHHELD (null). The live path NEVER invents a word as truth.
+//   generate/verify/persist below are retained as OFFLINE bank-growth tools only.
 // Pair-agnostic interface; content generation is Thai<->English today (the only cardable pair).
 import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
@@ -177,7 +178,7 @@ async function lookupBankWord(word: string): Promise<ResolvedWord | null> {
 }
 
 /** Fire-and-forget: stamp a bank row verified (and drop a flawed example) so future serves skip the verify LLM call. */
-function markBankVerified(card: ResolvedWord, exampleOk: boolean): void {
+export function markBankVerified(card: ResolvedWord, exampleOk: boolean): void {
   void (async () => {
     try {
       const supabase = await createServiceClient();
@@ -198,7 +199,7 @@ function markBankVerified(card: ResolvedWord, exampleOk: boolean): void {
     }
   })();
 }
-function persistGeneratedWord(card: ResolvedWord): void {
+export function persistGeneratedWord(card: ResolvedWord): void {
   void (async () => {
     try {
       const supabase = await createServiceClient();
@@ -277,7 +278,7 @@ export async function verifyCard(args: {
   }
 }
 
-async function generateWordCard(
+export async function generateWordCard(
   word: string,
   target: "th" | "en",
   cefr: string,
@@ -319,9 +320,11 @@ async function generateWordCard(
 }
 
 /**
- * Resolve a learner-facing item the MODEL chose.
- * Bank hit → curated card; bank miss → generate + persist (best-effort) → card.
- * Returns null only when generation itself fails validation (the model then offers a close one).
+ * Resolve a learner-facing item the MODEL chose to a card.
+ * VERIFIED bank hit → served directly (no LLM, instant). Everything else — an
+ * unverified row or a bank miss — is WITHHELD (null) and logged, so the live path
+ * can never teach an unverified or invented word. Callers fall back to another word
+ * or skip; the WITHHELD log feeds deliberate offline bank growth.
  */
 export async function resolveOrGenerateWord(args: {
   word: string;
@@ -330,29 +333,8 @@ export async function resolveOrGenerateWord(args: {
 }): Promise<ResolvedWord | null> {
   const word = args.word.trim();
   if (!word) return null;
-  const cefr = args.cefrLevel?.trim() || "A1";
-  // Bank hit: even curated rows are verified before serving (the bank is NOT assumed
-  // clean). Drop a flawed example; if the curated headword itself fails, fall through
-  // and generate a verified replacement rather than serve something wrong.
   const hit = await lookupBankWord(word);
-  if (hit) {
-    // Verified once already — trust it, skip the LLM round-trip (instant serve).
-    if (hit.verified_at) return hit;
-    const check = await verifyCard({
-      word_en: hit.word_en,
-      word_th: hit.word_th,
-      example_th: hit.example_th,
-      example_en: hit.example_en,
-    });
-    if (check.headwordOk) {
-      const clean = check.exampleOk ? hit : { ...hit, example_th: null, example_en: null };
-      // Stamp verified (and drop a flawed example for good) so the next serve is instant.
-      markBankVerified(clean, check.exampleOk);
-      return clean;
-    }
-  }
-  const generated = await generateWordCard(word, args.learningTarget, cefr);
-  if (!generated) return null;
-  persistGeneratedWord(generated);
-  return generated;
+  if (hit?.verified_at) return hit;
+  console.warn(`[brain] WITHHELD word="${word}" reason=${hit ? "unverified" : "miss"}`);
+  return null;
 }
