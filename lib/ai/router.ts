@@ -95,36 +95,29 @@ export async function getAIResponse(
   });
   // Only the most recent turns are needed — keeps per-call token cost bounded.
   const recent = messages.slice(-MAX_HISTORY_MESSAGES);
-  // Try Groq first — fast, reliable
-  try {
-    const content = await withTimeout(
-      callGroq(recent, systemPrompt),
-      GROQ_TIMEOUT_MS,
-      "groq",
-    );
-    if (content) return { content, engine: "groq", wasFailover: false };
-  } catch (error) {
-    const { message, status } = aiErrorFields(error);
-    log("ai.router", "groq failed", { message, status });
-  }
-  // Gemini fallback is OFF by default — Groq free-tier throttling was silently
-  // failing over to Gemini, which bills the AI Studio wallet. Re-enable ONLY by
-  // setting ENABLE_GEMINI_FALLBACK=true (e.g. once on a paid Groq plan).
-  if (process.env.ENABLE_GEMINI_FALLBACK === "true") {
+  const geminiEnabled = process.env.ENABLE_GEMINI_FALLBACK === "true";
+  // LANGUAGE-AWARE ROUTING. Groq is fast but weak at Thai; Gemini (Vertex) is the
+  // accurate-Thai model. For THAI replies, lead with Gemini (quality where Groq is
+  // the problem), Groq as fast fallback. For ENGLISH replies, keep Groq primary —
+  // fast and good enough — so English turns do NOT get slower.
+  const order: Array<"groq" | "gemini"> =
+    uiLanguage === "th" && geminiEnabled ? ["gemini", "groq"] : ["groq", "gemini"];
+
+  for (const engine of order) {
+    if (engine === "gemini" && !geminiEnabled) continue;
     try {
-      const content = await withTimeout(
-        callGemini(recent, systemPrompt),
-        GEMINI_TIMEOUT_MS,
-        "gemini",
-      );
-      if (content) return { content, engine: "gemini", wasFailover: false };
+      const content =
+        engine === "groq"
+          ? await withTimeout(callGroq(recent, systemPrompt), GROQ_TIMEOUT_MS, "groq")
+          : await withTimeout(callGemini(recent, systemPrompt), GEMINI_TIMEOUT_MS, "gemini");
+      if (content) return { content, engine, wasFailover: false };
     } catch (error) {
       const { message, status } = aiErrorFields(error);
-      log("ai.router", "gemini failed", { message, status });
+      log("ai.router", `${engine} failed`, { message, status });
     }
   }
-  // Both failed — library failover. Serve ONE language (the user's conversation
-  // language) — never the Thai+English blob that reads as a double reply.
+
+  // Both failed — library failover. ONE language only (never the th+en blob).
   const failover = getFailoverResponse();
   return {
     content: uiLanguage === "th" ? failover.th : failover.en,
