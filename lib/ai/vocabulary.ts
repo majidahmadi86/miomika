@@ -110,9 +110,12 @@ export async function getWordForSession(
       )
       .in("cefr_level", cefrLevels)
       .eq("status", "active")
-      .eq("teach_thai_to_english", true)
-      // Prefer informal register — feels natural in conversation
-      .in("register", ["informal", "formal"])
+      // Eligible if teachable in EITHER direction — the card is the same bilingual pair
+      // for both tracks; display direction is decided later by cardDirectionForTarget.
+      .or("teach_thai_to_english.eq.true,teach_english_to_thai.eq.true")
+      // register is NOT hard-filtered: neutral/casual/slang/formal are all valid. The old
+      // ["informal","formal"] filter matched almost nothing generation produces and silently
+      // dropped most of the bank.
       .order("frequency_score", { ascending: false })
       .limit(50); // Fetch pool, then filter client-side to avoid words already introduced
 
@@ -169,7 +172,7 @@ export async function getWordsByTopic(
       .eq("topic", topic)
       .in("cefr_level", cefrLevels)
       .eq("status", "active")
-      .eq("teach_thai_to_english", true)
+      .or("teach_thai_to_english.eq.true,teach_english_to_thai.eq.true")
       .order("frequency_score", { ascending: false })
       .limit(limit);
 
