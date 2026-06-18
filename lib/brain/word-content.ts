@@ -1,8 +1,8 @@
 // SERVER ONLY — word/phrase content engine.
 // The MODEL chooses which item to teach; this resolves it to a real card:
-//   bank hit, verified → curated card, served directly (no LLM).
-//   anything else      → WITHHELD (null). The live path NEVER invents a word as truth.
-//   generate/verify/persist below are retained as OFFLINE bank-growth tools only.
+//   verified bank hit → curated card, served directly (no LLM).
+//   unverified / miss → validate or generate → serve NOW + persist verified (lib grows).
+//   withhold (null) only when generation can't pass validation — never serve a wrong word.
 // Pair-agnostic interface; content generation is Thai<->English today (the only cardable pair).
 import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
@@ -333,8 +333,27 @@ export async function resolveOrGenerateWord(args: {
 }): Promise<ResolvedWord | null> {
   const word = args.word.trim();
   if (!word) return null;
+  const cefr = args.cefrLevel?.trim() || "A1";
   const hit = await lookupBankWord(word);
-  if (hit?.verified_at) return hit;
-  console.warn(`[brain] WITHHELD word="${word}" reason=${hit ? "unverified" : "miss"}`);
+  if (hit) {
+    if (hit.verified_at) return hit;
+    const check = await verifyCard({
+      word_en: hit.word_en,
+      word_th: hit.word_th,
+      example_th: hit.example_th,
+      example_en: hit.example_en,
+    });
+    if (check.headwordOk) {
+      const clean = check.exampleOk ? hit : { ...hit, example_th: null, example_en: null };
+      markBankVerified(clean, check.exampleOk);
+      return clean;
+    }
+  }
+  const generated = await generateWordCard(word, args.learningTarget, cefr);
+  if (generated) {
+    persistGeneratedWord(generated);
+    return generated;
+  }
+  console.warn(`[brain] WITHHELD word="${word}" reason=generation_failed`);
   return null;
 }
