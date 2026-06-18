@@ -14,6 +14,7 @@
     "prewarm:tts": "tsx scripts/prewarm-tts.mjs",
     "audit:banks": "tsx scripts/audit-banks.ts",
     "fill:ipa": "tsx scripts/fill-ipa.ts",
+    "promote:clean": "tsx scripts/promote-clean.ts",
     "predeploy": "tsc --noEmit && npm run lint && npm run check:drift && npm run check:phonetics"
   },
   "dependencies": {
