@@ -18,7 +18,7 @@ type Vocab = {
 };
 type Phrase = {
   phrase_en: string | null; phrase_th: string | null;
-  th_romanization: string | null; verified_at: string | null;
+  th_romanization: string | null;
 };
 
 function section(title: string, lines: string[]): void {
@@ -93,12 +93,11 @@ async function main(): Promise<void> {
 
   const { data: pData, error: pErr } = await supabase
     .from("phrases_bank")
-    .select("phrase_en,phrase_th,th_romanization,verified_at")
+    .select("phrase_en,phrase_th,th_romanization")
     .limit(5000);
   if (pErr) { console.error("\nphrases_bank query failed:", pErr.message); process.exit(1); }
   const phrases = (pData ?? []) as Phrase[];
   console.log(`\n════════ phrases_bank — ${phrases.length} rows ════════`);
-  console.log(`verified_at set:        ${phrases.filter((p) => p.verified_at).length}`);
   console.log(`missing th_romanization:${phrases.filter((p) => isBlank(p.th_romanization)).length}`);
   console.log(`note: ZERO app readers today — taught phrases are 100% LLM.\n`);
 }
