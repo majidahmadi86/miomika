@@ -74,7 +74,6 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createServiceClient();
   const dict = await loadCmudict();
-
   const { data: tmplRows } = await supabase.from("vocabulary_bank").select("*").eq("status", "active").not("politeness_level", "is", null).limit(1);
   const template = (tmplRows?.[0] ?? {}) as Record<string, unknown>;
 
@@ -86,6 +85,7 @@ export async function GET(req: NextRequest) {
   const rejected: string[] = [];
   const errors: string[] = [];
   const cards: unknown[] = [];
+  const NOTE_FIELDS = ["emoji", "miomi_note_th", "miomi_note_en", "pronunciation_tip", "cultural_warning", "use_when", "do_not_use_when", "usage_note", "note"];
 
   for (const topic of topics) {
     const words = await propose(level, topic, n);
@@ -107,14 +107,13 @@ export async function GET(req: NextRequest) {
         for (const k of Object.keys(base)) {
           if (["id", "created_at", "updated_at"].includes(k) || /vector|tsv|fts|search/i.test(k)) delete base[k];
         }
+        for (const k of NOTE_FIELDS) { if (k in base) base[k] = ""; } // blank ONLY columns that exist
         const { error } = await supabase.from("vocabulary_bank").insert({
           ...base,
           word_en: card.word_en, word_th: card.word_th,
           example_en: exTh ? card.example_en : "", example_th: exTh ?? "",
           th_romanization: rom, en_ipa: ipa,
           topic, cefr_level: level,
-          emoji: "", miomi_note_th: "", miomi_note_en: "",
-          pronunciation_tip: "", cultural_warning: "", use_when: "", do_not_use_when: "",
           status: "active", verified_at: new Date().toISOString(),
           teach_thai_to_english: true, teach_english_to_thai: true,
           frequency_score: 0, difficulty_score: 0,
