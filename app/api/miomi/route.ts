@@ -417,7 +417,7 @@ export async function POST(req: NextRequest) {
       );
 
       log("miomi", "ai-call", { engine: "router", promptLen: adaptivePrompt.length });
-      const result = await getAIResponse(formattedMessages, adaptivePrompt);
+      const result = await getAIResponse(formattedMessages, adaptivePrompt, brainState.uiLanguage);
       content = result.content;
       servedVia = `ai_${result.engine}__${mode ?? "auto"}`;
       wasFailover = result.wasFailover;
@@ -526,11 +526,8 @@ export async function POST(req: NextRequest) {
     log("miomi", "error", { error: err.message, stack: err.stack?.slice(0, 300) });
     console.error("Route error:", err?.message);
     const failover = getFailoverResponse();
-    const failoverContent = `${failover.th}\n\n${failover.en}`;
-    const failoverReplyLang = detectReplyLanguageFromContent(
-      failoverContent,
-      (brainState as BrainState | null)?.uiLanguage ?? "en",
-    );
+    const failoverReplyLang = (brainState as BrainState | null)?.uiLanguage ?? "en";
+    const failoverContent = failoverReplyLang === "th" ? failover.th : failover.en;
     return NextResponse.json(
       {
         content: failoverContent,

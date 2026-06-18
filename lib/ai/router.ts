@@ -66,7 +66,8 @@ function aiErrorFields(error: unknown): { message: string; status?: number } {
 }
 export async function getAIResponse(
   messages: Message[],
-  systemPrompt: string
+  systemPrompt: string,
+  uiLanguage: "th" | "en" = "en",
 ): Promise<{ content: string; engine: string; wasFailover: boolean }> {
   log("ai.router", "env keys", {
     GROQ_API_KEY: Boolean(process.env.GROQ_API_KEY),
@@ -102,10 +103,11 @@ export async function getAIResponse(
       log("ai.router", "gemini failed", { message, status });
     }
   }
-  // Both failed — library failover, always works
+  // Both failed — library failover. Serve ONE language (the user's conversation
+  // language) — never the Thai+English blob that reads as a double reply.
   const failover = getFailoverResponse();
   return {
-    content: `${failover.th}\n\n${failover.en}`,
+    content: uiLanguage === "th" ? failover.th : failover.en,
     engine: "library",
     wasFailover: true,
   };
