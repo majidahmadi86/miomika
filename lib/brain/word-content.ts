@@ -307,9 +307,9 @@ export async function generateWordCard(
   // skip the candidate (and ultimately withhold). Prefer a candidate whose example
   // also verifies; otherwise keep a headword-only card with the example dropped.
   let fallback: ResolvedWord | null = null;
-  // 3 attempts: Groq once, then Gemini twice — survives a missing GROQ_API_KEY or one flaky call.
+  // 3 attempts: Gemini (Vertex) first — accurate Thai — then Groq as a last-resort fallback.
   for (let attempt = 0; attempt < 3; attempt++) {
-    const raw = attempt === 0 ? await callGroqJson(system, user) : await callGeminiJson(system, user);
+    const raw = attempt < 2 ? await callGeminiJson(system, user) : await callGroqJson(system, user);
     const parsed = parseCard(raw);
     if (!isValidCard(parsed)) continue;
     const word_en = (parsed.word_en ?? "").trim();
