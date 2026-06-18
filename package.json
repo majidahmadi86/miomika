@@ -10,8 +10,9 @@
     "lint": "eslint",
     "check:drift": "tsx scripts/check-drift.ts",
     "check:talk": "tsx scripts/talk-self-check.ts",
+    "check:phonetics": "tsx scripts/check-phonetics.ts",
     "prewarm:tts": "tsx scripts/prewarm-tts.mjs",
-    "predeploy": "tsc --noEmit && npm run lint && npm run check:drift"
+    "predeploy": "tsc --noEmit && npm run lint && npm run check:drift && npm run check:phonetics"
   },
   "dependencies": {
     "@google-cloud/speech": "^7.3.1",
