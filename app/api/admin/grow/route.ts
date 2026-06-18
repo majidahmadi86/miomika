@@ -1,69 +1,110 @@
-// app/api/admin/grow/route.ts — admin-only: generate+enrich+persist UNVERIFIED bank rows.
-// ?apply=1 writes; default previews. New rows are status='generated', verified_at=null —
-// they do NOT serve until promote:clean verifies them. en_ipa is filled later by fill:ipa.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callGeminiJson, generateWordCard } from "@/lib/brain/word-content";
 import { resolvePhonetics } from "@/lib/brain/phonetics";
 
+const CMUDICT_URL = "https://raw.githubusercontent.com/cmusphinx/cmudict/master/cmudict.dict";
+const ARPA_IPA: Record<string, string> = {
+  AA:"ɑ",AE:"æ",AH:"ʌ",AO:"ɔ",AW:"aʊ",AY:"aɪ",B:"b",CH:"tʃ",D:"d",DH:"ð",EH:"ɛ",ER:"ɝ",
+  EY:"eɪ",F:"f",G:"ɡ",HH:"h",IH:"ɪ",IY:"i",JH:"dʒ",K:"k",L:"l",M:"m",N:"n",NG:"ŋ",OW:"oʊ",
+  OY:"ɔɪ",P:"p",R:"ɹ",S:"s",SH:"ʃ",T:"t",TH:"θ",UH:"ʊ",UW:"u",V:"v",W:"w",Y:"j",Z:"z",ZH:"ʒ",
+};
+function arpaToIpa(phones: string[]): string {
+  const vowels = phones.filter((p) => /\d$/.test(p)).length;
+  let pri = -1, sec = -1;
+  const out = phones.map((p, i) => {
+    const st = p.match(/(\d)$/)?.[1]; const b = p.replace(/\d$/, "");
+    if (st === "1") pri = i; else if (st === "2") sec = i;
+    if (b === "AH" && st === "0") return "ə";
+    if (b === "ER" && st === "0") return "ɚ";
+    return ARPA_IPA[b] ?? "";
+  });
+  if (vowels > 1) { if (pri >= 0) out[pri] = "ˈ" + out[pri]; if (sec >= 0) out[sec] = "ˌ" + out[sec]; }
+  return out.join("");
+}
+async function loadCmudict(): Promise<Map<string, string[]>> {
+  const res = await fetch(CMUDICT_URL); const text = await res.text();
+  const m = new Map<string, string[]>();
+  for (const line of text.split("\n")) {
+    if (!line || line.startsWith(";;;")) continue;
+    const nc = line.split("#")[0].trim(); if (!nc) continue;
+    const parts = nc.split(/\s+/); const w = parts[0].replace(/\(\d+\)$/, "").toLowerCase();
+    if (!m.has(w)) m.set(w, parts.slice(1));
+  }
+  return m;
+}
+function lookupIpa(wordEn: string, dict: Map<string, string[]>): string | null {
+  const toks = wordEn.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (!toks.length) return null;
+  const parts: string[] = [];
+  for (const t of toks) { const ph = dict.get(t.replace(/[^a-z']/g, "")); if (!ph) return null; parts.push(arpaToIpa(ph)); }
+  return `/${parts.join(" ")}/`;
+}
+const TOPICS: Record<string, string[]> = {
+  C1: ["business", "technology", "health", "travel", "education", "emotions"],
+  C2: ["business", "academic life", "politics", "science", "arts and culture", "economics"],
+  B2: ["work", "daily life", "food", "shopping", "health", "travel"],
+};
+async function propose(level: string, topic: string, n: number): Promise<string[]> {
+  const sys = `You are a Thai-English curriculum designer. List exactly ${n} useful ENGLISH words or short phrases for a CEFR ${level} learner studying "${topic}". Real, natural, commonly taught — no rare jargon, no duplicates. STRICT JSON ONLY: {"words":["..."]}. No prose, no fences.`;
+  const raw = await callGeminiJson(sys, `topic=${topic} level=${level}`);
+  try { return (JSON.parse((raw || "{}").replace(/```json|```/g, "").trim()).words ?? []).map((w: string) => String(w).trim()).filter(Boolean).slice(0, n); }
+  catch { return []; }
+}
+
 export async function GET(req: NextRequest) {
   const profile = await getServerProfile();
-  const admins = (process.env.ADMIN_EMAILS || "")
-    .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const admins = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   const email = profile?.email?.toLowerCase() ?? null;
   if (!email || !admins.includes(email)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const sp = req.nextUrl.searchParams;
-  const level = sp.get("level") || "C1";
-  const topic = sp.get("topic") || "business";
+  const level = (sp.get("level") || "C1").toUpperCase();
   const n = Math.min(Math.max(Number(sp.get("n") || "5"), 1), 8);
-  const apply = sp.get("apply") === "1";
+  const dry = sp.get("dry") === "1";
+  const topics = TOPICS[level] ?? ["general", "daily life", "work"];
 
   const supabase = await createServiceClient();
+  const dict = await loadCmudict();
   const { data: existing } = await supabase.from("vocabulary_bank").select("word_en, word_th").limit(5000);
   const haveEn = new Set((existing ?? []).map((r) => (r.word_en ?? "").trim().toLowerCase()).filter(Boolean));
   const haveTh = new Set((existing ?? []).map((r) => (r.word_th ?? "").trim()).filter(Boolean));
 
-  const sys = `You are a Thai-English curriculum designer. List exactly ${n} useful ENGLISH words or short phrases for a CEFR ${level} learner studying "${topic}". Real, natural, commonly taught — no rare jargon, no duplicates. STRICT JSON ONLY: {"words":["..."]}. No prose, no fences.`;
-  const raw = await callGeminiJson(sys, `topic=${topic} level=${level}`);
-  let words: string[] = [];
-  try {
-    words = (JSON.parse((raw || "{}").replace(/```json|```/g, "").trim()).words ?? [])
-      .map((w: string) => String(w).trim()).filter(Boolean).slice(0, n);
-  } catch { /* ignore */ }
-  if (!words.length) return NextResponse.json({ level, topic, error: "proposal failed", raw: (raw || "").slice(0, 300) });
-
+  let added = 0, withheld = 0, dup = 0;
+  const errors: string[] = [];
   const cards: unknown[] = [];
-  const skipped: string[] = [];
-  const withheld: string[] = [];
-  for (const w of words) {
-    if (haveEn.has(w.toLowerCase())) { skipped.push(`${w} (dup)`); continue; }
-    const card = await generateWordCard(w, "th", level);
-    if (!card) { withheld.push(w); continue; }
-    if (haveEn.has(card.word_en.toLowerCase()) || haveTh.has(card.word_th)) { skipped.push(`${card.word_en} (dup)`); continue; }
-    const phon = await resolvePhonetics({
-      word_th: card.word_th, word_en: card.word_en,
-      learningTarget: "th", bankRomanization: null, bankIpa: null,
-    });
-    const romanization = phon.th_romanization ?? null;
-    cards.push({ word_en: card.word_en, word_th: card.word_th, romanization, example_th: card.example_th, example_en: card.example_en });
-    if (apply) {
-      const { error } = await supabase.from("vocabulary_bank").upsert({
-        word_en: card.word_en, word_th: card.word_th,
-        example_en: card.example_en, example_th: card.example_th,
-        th_romanization: romanization, en_ipa: null,
-        topic, cefr_level: level, register: card.register ?? "neutral",
-        status: "generated", verified_at: null,
-        teach_thai_to_english: true, teach_english_to_thai: true,
-        frequency_score: 0, difficulty_score: 0, created_at: new Date().toISOString(),
-      }, { onConflict: "word_en", ignoreDuplicates: true });
-      if (error) console.error("[grow] insert failed", card.word_en, error.message);
-      haveEn.add(card.word_en.toLowerCase()); haveTh.add(card.word_th);
+
+  for (const topic of topics) {
+    const words = await propose(level, topic, n);
+    for (let i = 0; i < words.length; i += 4) {
+      await Promise.all(words.slice(i, i + 4).map(async (w) => {
+        if (haveEn.has(w.toLowerCase())) { dup++; return; }
+        const card = await generateWordCard(w, "th", level);
+        if (!card) { withheld++; return; }
+        if (haveEn.has(card.word_en.toLowerCase()) || haveTh.has(card.word_th)) { dup++; return; }
+        haveEn.add(card.word_en.toLowerCase()); haveTh.add(card.word_th);
+        const phon = await resolvePhonetics({ word_th: card.word_th, word_en: card.word_en, learningTarget: "th", bankRomanization: null, bankIpa: null });
+        const rom = phon.th_romanization ?? null;
+        const ipa = lookupIpa(card.word_en, dict);
+        cards.push({ level, topic, word_en: card.word_en, word_th: card.word_th, romanization: rom, en_ipa: ipa, example_th: card.example_th, example_en: card.example_en });
+        if (dry) { added++; return; }
+        const { error } = await supabase.from("vocabulary_bank").insert({
+          word_en: card.word_en, word_th: card.word_th,
+          example_en: card.example_en, example_th: card.example_th,
+          th_romanization: rom, en_ipa: ipa,
+          topic, cefr_level: level, register: card.register ?? "neutral",
+          status: "active", verified_at: new Date().toISOString(),
+          teach_thai_to_english: true, teach_english_to_thai: true,
+          frequency_score: 0, difficulty_score: 0, created_at: new Date().toISOString(),
+        });
+        if (error) errors.push(`${card.word_en}: ${error.message}`);
+        else added++;
+      }));
     }
   }
-  return NextResponse.json({ level, topic, apply, proposed: words, added: cards.length, skipped, withheld, cards });
+  return NextResponse.json({ level, dry, topics, added, withheld, dup, errors, cards });
 }
