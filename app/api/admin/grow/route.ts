@@ -44,6 +44,10 @@ function lookupIpa(wordEn: string, dict: Map<string, string[]>): string | null {
   for (const t of toks) { const ph = dict.get(t.replace(/[^a-z']/g, "")); if (!ph) return null; parts.push(arpaToIpa(ph)); }
   return `/${parts.join(" ")}/`;
 }
+const THAI_PURE = /^[\u0E00-\u0E7F0-9\s.,!?'"()\u2018\u2019\u201C\u201D\-\u2013\u2014:;%฿\u2026]+$/;
+const FOREIGN = /[A-Za-z\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF\u0400-\u04FF]/;
+function isPureThai(t: string): boolean { const s = t.trim(); return THAI_PURE.test(s) && /[\u0E00-\u0E7F]/.test(s); }
+
 const TOPICS: Record<string, string[]> = {
   C1: ["business", "technology", "health", "travel", "education", "emotions"],
   C2: ["business", "academic life", "politics", "science", "arts and culture", "economics"],
@@ -70,11 +74,18 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createServiceClient();
   const dict = await loadCmudict();
+  const { data: tmpl } = await supabase.from("vocabulary_bank")
+    .select("politeness_level, register").eq("status", "active")
+    .not("politeness_level", "is", null).limit(1);
+  const politeness = (tmpl?.[0]?.politeness_level as string) ?? "neutral";
+  const register = (tmpl?.[0]?.register as string) ?? "neutral";
+
   const { data: existing } = await supabase.from("vocabulary_bank").select("word_en, word_th").limit(5000);
   const haveEn = new Set((existing ?? []).map((r) => (r.word_en ?? "").trim().toLowerCase()).filter(Boolean));
   const haveTh = new Set((existing ?? []).map((r) => (r.word_th ?? "").trim()).filter(Boolean));
 
   let added = 0, withheld = 0, dup = 0;
+  const rejected: string[] = [];
   const errors: string[] = [];
   const cards: unknown[] = [];
 
@@ -85,18 +96,20 @@ export async function GET(req: NextRequest) {
         if (haveEn.has(w.toLowerCase())) { dup++; return; }
         const card = await generateWordCard(w, "th", level);
         if (!card) { withheld++; return; }
+        if (!isPureThai(card.word_th) || FOREIGN.test(card.word_en.replace(/[a-zA-Z'\s.-]/g, ""))) { rejected.push(`${card.word_en} → ${card.word_th}`); return; }
         if (haveEn.has(card.word_en.toLowerCase()) || haveTh.has(card.word_th)) { dup++; return; }
         haveEn.add(card.word_en.toLowerCase()); haveTh.add(card.word_th);
+        const exTh = card.example_th && isPureThai(card.example_th) ? card.example_th : null;
         const phon = await resolvePhonetics({ word_th: card.word_th, word_en: card.word_en, learningTarget: "th", bankRomanization: null, bankIpa: null });
         const rom = phon.th_romanization ?? null;
         const ipa = lookupIpa(card.word_en, dict);
-        cards.push({ level, topic, word_en: card.word_en, word_th: card.word_th, romanization: rom, en_ipa: ipa, example_th: card.example_th, example_en: card.example_en });
+        cards.push({ level, topic, word_en: card.word_en, word_th: card.word_th, romanization: rom, en_ipa: ipa, example_th: exTh, example_en: exTh ? card.example_en : null });
         if (dry) { added++; return; }
         const { error } = await supabase.from("vocabulary_bank").insert({
           word_en: card.word_en, word_th: card.word_th,
-          example_en: card.example_en, example_th: card.example_th,
+          example_en: exTh ? card.example_en : null, example_th: exTh,
           th_romanization: rom, en_ipa: ipa,
-          topic, cefr_level: level, register: card.register ?? "neutral",
+          topic, cefr_level: level, register, politeness_level: politeness,
           status: "active", verified_at: new Date().toISOString(),
           teach_thai_to_english: true, teach_english_to_thai: true,
           frequency_score: 0, difficulty_score: 0, created_at: new Date().toISOString(),
@@ -106,5 +119,5 @@ export async function GET(req: NextRequest) {
       }));
     }
   }
-  return NextResponse.json({ level, dry, topics, added, withheld, dup, errors, cards });
+  return NextResponse.json({ level, dry, topics, added, withheld, rejected, dup, errors, cards });
 }
