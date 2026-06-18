@@ -19,10 +19,30 @@ function getGroq(): Groq | null {
 }
 function getGemini(): GoogleGenAI | null {
   if (_gemini) return _gemini;
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
-  _gemini = new GoogleGenAI({ apiKey: key });
-  return _gemini;
+  // Vertex AI (billed to the GCP credit) — NOT the AI-Studio apiKey path (cash wallet).
+  // Mirrors lib/brain/word-content.ts so chat replies use the same accurate-Thai model.
+  const raw = process.env.GCP_SERVICE_ACCOUNT_JSON;
+  const project = process.env.GCP_PROJECT_ID;
+  if (!raw || !project) return null;
+  try {
+    const sa = JSON.parse(raw) as { client_email?: string; private_key?: string };
+    if (!sa.client_email || !sa.private_key) {
+      console.error("[ai.router] GCP_SERVICE_ACCOUNT_JSON missing client_email/private_key");
+      return null;
+    }
+    _gemini = new GoogleGenAI({
+      vertexai: true,
+      project,
+      location: process.env.GCP_LOCATION || "us-central1",
+      googleAuthOptions: {
+        credentials: { client_email: sa.client_email, private_key: sa.private_key },
+      },
+    });
+    return _gemini;
+  } catch (err) {
+    console.error("[ai.router] gemini (vertex) init failed:", String(err));
+    return null;
+  }
 }
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GEMINI_MODEL = "gemini-2.5-flash";
@@ -71,7 +91,7 @@ export async function getAIResponse(
 ): Promise<{ content: string; engine: string; wasFailover: boolean }> {
   log("ai.router", "env keys", {
     GROQ_API_KEY: Boolean(process.env.GROQ_API_KEY),
-    GEMINI_API_KEY: Boolean(process.env.GEMINI_API_KEY),
+    GCP_VERTEX: Boolean(process.env.GCP_SERVICE_ACCOUNT_JSON && process.env.GCP_PROJECT_ID),
   });
   // Only the most recent turns are needed — keeps per-call token cost bounded.
   const recent = messages.slice(-MAX_HISTORY_MESSAGES);
@@ -209,7 +229,7 @@ async function callGemini(
   systemPrompt: string
 ): Promise<string> {
   const gemini = getGemini();
-  if (!gemini) throw new Error("GEMINI_API_KEY missing — Gemini disabled");
+  if (!gemini) throw new Error("Gemini (Vertex) unavailable — GCP_SERVICE_ACCOUNT_JSON / GCP_PROJECT_ID missing");
   try {
     const content = await callGeminiWithModel(
       gemini,
