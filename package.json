@@ -12,6 +12,7 @@
     "check:talk": "tsx scripts/talk-self-check.ts",
     "check:phonetics": "tsx scripts/check-phonetics.ts",
     "prewarm:tts": "tsx scripts/prewarm-tts.mjs",
+    "audit:banks": "tsx scripts/audit-banks.ts",
     "predeploy": "tsc --noEmit && npm run lint && npm run check:drift && npm run check:phonetics"
   },
   "dependencies": {
