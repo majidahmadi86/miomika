@@ -1858,7 +1858,6 @@ export default function TalkPage() {
     <TalkErrorBoundary>
     <div
       onPointerDown={handlePointerDown}
-      className="md:mx-auto md:w-full md:max-w-[860px]"
       style={{
         position: "relative",
         zIndex: 0,
