@@ -2,6 +2,7 @@
 
 import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
+import { isAcceptableBankRomanization, isAcceptableGeneratedRomanization } from "./romanization-guard";
 
 export type PhoneticsSource = "bank" | "generated";
 
@@ -77,7 +78,7 @@ async function callGeminiPhonetics(system: string, user: string): Promise<string
 
 async function generateThaiRomanization(word_th: string): Promise<string> {
   const system =
-    "You romanize Thai words for language learners using a simple readable Latin alphabet (like sawatdee, khop khun). Reply with ONLY the romanization — no Thai script, no explanation, no punctuation.";
+    "You romanize Thai words into simple, readable Latin syllables for beginners. RULES: separate EVERY syllable with a hyphen; plain letters only (no IPA, no Thai script, no tone marks); reply with ONLY the romanization. Examples:\nสวัสดี → sa-wat-dee\nขอบคุณ → khop-khun\nอาหาร → a-han\nเพิ่มเติม → perm-derm\nกิน → kin";
   const user = `Romanize: ${word_th}`;
   const groq = await callGroqPhonetics(system, user);
   if (groq) return groq;
@@ -122,8 +123,15 @@ export async function resolvePhonetics(args: {
 
   if (args.bankRomanization?.trim()) {
     const roman = args.bankRomanization.trim();
-    return { th_romanization: roman, phonetics: roman, phonetics_source: "bank" };
+    if (isAcceptableBankRomanization(roman, args.word_th)) {
+      return { th_romanization: roman, phonetics: roman, phonetics_source: "bank" };
+    }
+    // bad bank row → fall through and regenerate
   }
   const roman = await generateThaiRomanization(args.word_th);
-  return { th_romanization: roman, phonetics: roman, phonetics_source: "generated" };
+  if (isAcceptableGeneratedRomanization(roman, args.word_th)) {
+    return { th_romanization: roman, phonetics: roman, phonetics_source: "generated" };
+  }
+  // Garbage romanization → withhold. Real syllables or nothing.
+  return { phonetics: "", phonetics_source: "generated" };
 }

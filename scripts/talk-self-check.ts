@@ -122,6 +122,10 @@ import {
   TRANSCRIPT_GEMINI_ORDER,
   TRANSCRIPT_USER_ORDER,
 } from "../lib/live/transcript-order";
+import {
+  isAcceptableGeneratedRomanization,
+  isSyllabicPhrase,
+} from "@/lib/brain/romanization-guard";
 
 const ROOT = process.cwd();
 let passed = 0;
@@ -140,6 +144,27 @@ function assert(condition: boolean, label: string): void {
 function section(title: string): void {
   console.log(`\n[check:talk] ${title}`);
 }
+
+section("Romanization guard (behavioral)");
+
+assert(
+  !isAcceptableGeneratedRomanization("phetmetmore", "เพิ่มเติม"),
+  "REGRESSION: run-on romanization for multi-syllable Thai must be rejected",
+);
+assert(
+  isAcceptableGeneratedRomanization("perm-derm", "เพิ่มเติม"),
+  "hyphen-segmented romanization must pass",
+);
+assert(
+  isAcceptableGeneratedRomanization("thai", "ไทย"),
+  "valid single-syllable romanization must pass",
+);
+assert(
+  !isAcceptableGeneratedRomanization("เพิ่มเติม", "เพิ่มเติม"),
+  "raw Thai fallback must be rejected",
+);
+assert(isSyllabicPhrase("khun chuay phom"), "real syllabic phrase must pass");
+assert(!isSyllabicPhrase("a b c d e"), "letter-by-letter phrase must be rejected");
 
 // --- A. Language resolution -------------------------------------------------
 
@@ -1886,8 +1911,14 @@ assert(
   "lesson rows show progress state on the learn surface",
 );
 assert(
-  lessonBuilderSrc.includes("makeExample") && lessonBuilderSrc.includes("looksSyllabic"),
-  "every word gets a verified example and phonetics are syllabic or withheld",
+  lessonBuilderSrc.includes("makeExample") && lessonBuilderSrc.includes("isSyllabicPhrase"),
+  "phrase romanization uses shared isSyllabicPhrase; word cards withhold via resolvePhonetics guard",
+);
+const phoneticsSrc = readFileSync(join(ROOT, "lib/brain/phonetics.ts"), "utf8");
+assert(
+  phoneticsSrc.includes("isAcceptableGeneratedRomanization") &&
+    phoneticsSrc.includes('phonetics: ""'),
+  "resolvePhonetics withholds garbage romanization (empty phonetics)",
 );
 assert(
   playerPageSrc.includes("function MatchGame({ words, target, say") && playerPageSrc.includes("function FillGame({ words, target, say"),

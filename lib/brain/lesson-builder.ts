@@ -11,6 +11,7 @@ import {
   verifyCard,
 } from "@/lib/brain/word-content";
 import { resolvePhonetics } from "@/lib/brain/phonetics";
+import { isSyllabicPhrase } from "@/lib/brain/romanization-guard";
 
 export type LessonCando = { label: string; cefr: string; skill: string };
 export type LessonWordItem = {
@@ -209,20 +210,11 @@ async function buildPhraseItem(
       bankRomanization: null,
       bankIpa: null,
     });
-    // PHONETICS ARE FIRST-CLASS: real syllables ("khun chuay phom") or nothing —
-    // never letter-by-letter spacing, never one unbroken run. Withhold over garbage.
-    const looksSyllabic = (txt: string): boolean => {
-      const t = txt.trim();
-      if (!t || !/^[a-z' \-]+$/.test(t)) return false;
-      const tokens = t.split(/[\s\-]+/).filter(Boolean);
-      if (tokens.length < 2 || tokens.length > 16) return false;
-      const singles = tokens.filter((x) => x.length === 1).length;
-      return singles / tokens.length <= 0.34;
-    };
+    // PHONETICS ARE FIRST-CLASS — shared rule (single owner): lib/brain/romanization-guard.ts
     const resolvedRom = (phonetics.th_romanization ?? "").trim().toLowerCase();
-    const romanization = looksSyllabic(resolvedRom)
+    const romanization = isSyllabicPhrase(resolvedRom)
       ? resolvedRom
-      : looksSyllabic(promptRom)
+      : isSyllabicPhrase(promptRom)
         ? promptRom
         : null;
     return { en, th, romanization };
