@@ -50,10 +50,28 @@ function getGroq(): Groq | null {
 }
 function getGemini(): GoogleGenAI | null {
   if (_gemini) return _gemini;
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
-  _gemini = new GoogleGenAI({ apiKey: key });
-  return _gemini;
+  const raw = process.env.GCP_SERVICE_ACCOUNT_JSON;
+  const project = process.env.GCP_PROJECT_ID;
+  if (!raw || !project) return null;
+  try {
+    const sa = JSON.parse(raw) as { client_email?: string; private_key?: string };
+    if (!sa.client_email || !sa.private_key) {
+      console.error("[brain] GCP_SERVICE_ACCOUNT_JSON missing client_email/private_key");
+      return null;
+    }
+    _gemini = new GoogleGenAI({
+      vertexai: true,
+      project,
+      location: process.env.GCP_LOCATION || "us-central1",
+      googleAuthOptions: {
+        credentials: { client_email: sa.client_email, private_key: sa.private_key },
+      },
+    });
+    return _gemini;
+  } catch (err) {
+    console.error("[brain] gemini (vertex) init failed:", String(err));
+    return null;
+  }
 }
 
 export async function callGroqJson(system: string, user: string, maxTokens: number = 600): Promise<string | null> {
