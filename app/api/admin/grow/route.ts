@@ -18,12 +18,12 @@ function isPureThai(t: string): boolean { const s=t.trim(); return THAI_PURE.tes
 const NOTE_BLANK = ["use_when","do_not_use_when","cultural_warning","miomi_pronunciation_tip","example_context","emoji","subtopic","th_tone_pattern","audio_key_th","audio_key_en","gender_marker","age_group","image_category","prerequisite_words","related_words"];
 
 export async function GET(req: NextRequest) {
-  const sp = req.nextUrl.searchParams;
-  const token = sp.get("token");
-  const okToken = process.env.GROW_TOKEN && token === process.env.GROW_TOKEN;
-  if (!okToken) {
+  const provided = req.headers.get("x-grow-key");
+  const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
+  const okKey = !!provided && ((svcKey && provided === svcKey) || (process.env.GROW_TOKEN && provided === process.env.GROW_TOKEN));
+  if (!okKey) {
     const profile = await getServerProfile();
-    const admins = (process.env.ADMIN_EMAILS||"").split(",").map(s=>s.trim().toLowerCase()).filter(Boolean);
+    const admins = (process.env.ADMIN_EMAILS || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
     const email = profile?.email?.toLowerCase() ?? null;
     if (!email || !admins.includes(email)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }

@@ -1,7 +1,7 @@
 // scripts/fill-bank.ts
-// Loops the deployed grow route until the wordlist is fully saved.
-// Reads GROW_TOKEN (+ optional GROW_URL) from .env.local itself — no dotenv dependency,
-// no Vertex/Supabase env needed. Run: npm run fill:bank
+// Fills the bank by looping the deployed grow route until done.
+// Auth = the Supabase service key already in .env.local (same key Vercel already has).
+// No env to set up. Run: npm run fill:bank
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -22,24 +22,21 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const URL_BASE = process.env.GROW_URL || "https://miomika.com/api/admin/grow";
-const TOKEN = process.env.GROW_TOKEN;
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
 async function main() {
-  if (!TOKEN) {
-    console.error("GROW_TOKEN not found. Add a line to .env.local:  GROW_TOKEN=your-long-random-string");
-    console.error("(and set the SAME value in Vercel env, then redeploy, so the route accepts it.)");
+  if (!KEY) {
+    console.error("No Supabase service key found in .env.local (expected SUPABASE_SERVICE_ROLE_KEY).");
+    console.error("Supabase keys present:", Object.keys(process.env).filter(k => k.includes("SUPABASE")).join(", ") || "(none)");
     process.exit(1);
   }
   let total = 0;
   for (let i = 0; i < 100; i++) {
-    const res = await fetch(`${URL_BASE}?token=${encodeURIComponent(TOKEN)}`);
-    const j = (await res.json().catch(() => ({}))) as {
-      added?: number; remaining?: number; withheld?: number; dup?: number;
-      errors?: string[]; error?: unknown;
-    };
+    const res = await fetch(URL_BASE, { headers: { "x-grow-key": KEY } });
+    const j = (await res.json().catch(() => ({}))) as { added?: number; remaining?: number; withheld?: number; dup?: number; errors?: string[]; error?: string };
     if (!res.ok || j?.error) {
       console.error(`Route returned ${res.status}:`, j?.error ?? j);
-      console.error("→ Is GROW_TOKEN set in Vercel AND redeployed, matching .env.local exactly?");
+      console.error("→ If this is right after a push, give Vercel ~1 min to deploy, then rerun.");
       process.exit(1);
     }
     total += j.added ?? 0;
