@@ -314,20 +314,35 @@ export class MiomiTurnClient {
 
   // ---- kickoff / greeting -------------------------------------------------
 
-  sendKickoff(lang: "th" | "en", _audience: "first_time" | "returning" = "first_time"): void {
+  sendKickoff(lang: "th" | "en", audience: "first_time" | "returning" = "first_time"): void {
     this.uiLanguage = lang ?? this.uiLanguage;
-    const vibes = [
+
+    // First-ever meeting: a quick, charming hello WITH her name.
+    const firstTime = [
       "Oh! Hi hi~ I'm Miomi. So… what are we getting into today?",
-      "Hi~ it's Miomi! I have a feeling today's a good one — what's up?",
-      "Eee, you're here~ I'm Miomi. What kind of mood are we in today?",
-      "Oh hello~ Miomi here. Tell me one little thing that's on your mind~",
-      "Hihi~ I'm Miomi! Shall we get into something fun, or just chat?",
-      "Yay, a visitor~ I'm Miomi. Where are we wandering today?",
-      "Mmm hello~ it's Miomi. What's the first thing you want to say?",
+      "Hi~ I'm Miomi! So glad you're here — what shall we talk about?",
+      "Eee, a new friend~ I'm Miomi! What's on your mind?",
+      "Hihi~ I'm Miomi. Tell me one little thing about your day~",
     ];
-    const vibe = vibes[Math.floor(Math.random() * vibes.length)];
+    // Already acquainted: NO introduction, NO name — just familiar warmth.
+    const returning = [
+      "Oh, you're back~ what's up today?",
+      "Hihi, there you are~ what are we getting into?",
+      "Mmm hello again~ what's on your mind today?",
+      "Yay, you came to chat~ how's your day going?",
+      "Oh hi~ what shall we get up to today?",
+      "There you are~ tell me one good thing happening today.",
+    ];
+
+    const pool = audience === "returning" ? returning : firstTime;
+    const vibe = pool[Math.floor(Math.random() * pool.length)];
+    const introRule =
+      audience === "returning"
+        ? "They ALREADY KNOW you — do NOT introduce yourself, do NOT say your name, no 'I'm Miomi'. Greet like a friend picking back up warmly."
+        : "This is your first-ever meeting — a quick, charming hello with your name is welcome.";
+
     void this.runHidden(
-      `[kickoff] Greet like a cheeky, delighted little cat — playful and SHORT, in the user's language. Riff in THIS spirit but make it your OWN and fresh — do NOT copy it word-for-word: "${vibe}". Keep it to ONE short, breezy line. Do NOT be formal — never 'lovely to see you', 'thrilled', or 'have a wonderful time'. Warm, fun, a touch cheeky. No emojis.`,
+      `[kickoff] Greet like a cheeky, delighted little cat — playful and SHORT, in the user's language. ${introRule} Riff in THIS spirit but make it your OWN and fresh — do NOT copy it word-for-word: "${vibe}". Keep it to ONE short, breezy line. Do NOT be formal — never 'lovely to see you', 'thrilled', or 'have a wonderful time'. No emojis.`,
       { isKickoff: true },
     );
   }

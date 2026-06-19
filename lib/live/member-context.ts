@@ -110,7 +110,12 @@ export function resolveKickoffAudience(
   bundle: MemberContextBundle | null | undefined,
 ): KickoffAudience {
   if (isGuest || !bundle) return "first_time";
-  return bundle.isReturning ? "returning" : "first_time";
+  // "first_time" must mean a GENUINE first-ever meeting — only then does Miomi introduce
+  // herself by name. Anyone with any prior footprint (seen before, learned a word, or the
+  // gap-based returning signal) is already acquainted, so no re-introduction.
+  const hasMetBefore =
+    bundle.isReturning || bundle.lastSeenAt != null || bundle.wordsIntroducedCount > 0;
+  return hasMetBefore ? "returning" : "first_time";
 }
 
 function formatVisitGap(bundle: MemberContextBundle, ui: "th" | "en"): string {
