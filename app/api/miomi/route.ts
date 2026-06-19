@@ -24,6 +24,7 @@ import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 import { saveExchange } from "@/lib/brain/memory";
 import { readBrainState, type BrainState } from "@/lib/brain/state";
 import { buildBrainPrompt } from "@/lib/brain/prompt";
+import { buildMemoryContext } from "@/lib/ai/memory-context";
 import { detectExplicitUiLanguageRequest } from "@/lib/brain/language";
 import { resolveOrGenerateWord } from "@/lib/brain/word-content";
 import { resolvePhonetics } from "@/lib/brain/phonetics";
@@ -143,6 +144,7 @@ export async function POST(req: NextRequest) {
 
       adaptivePrompt = buildBrainPrompt({ state: brainState, userInput, mode });
       adaptivePrompt += `\n\nNAME: Your name is Miomi. Never spell it out, never count its syllables, never write it in Thai script when speaking English. Just say "Miomi" naturally.`;
+      adaptivePrompt += buildMemoryContext(profile);
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
       }
