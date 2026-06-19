@@ -45,6 +45,7 @@ export interface Profile {
   cefr_level: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null;
   active_character_id: string | null;
   miomi_stars: number | null;
+  bond_points: number | null;
 }
 
 interface ProfileState {
@@ -81,7 +82,7 @@ export function useProfile(): ProfileState {
       const { data: row, error } = await supabase
         .from("profiles")
         .select(
-          "id, email, display_name, tier, journey_stage, gender, level, streak, last_seen_at, welcome_shown_at, onboarding_completed_at, ui_language, learning_target_language, cefr_level, active_character_id, miomi_stars",
+          "id, email, display_name, tier, journey_stage, gender, level, streak, last_seen_at, welcome_shown_at, onboarding_completed_at, ui_language, learning_target_language, cefr_level, active_character_id, miomi_stars, bond_points",
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -106,6 +107,7 @@ export function useProfile(): ProfileState {
             cefr_level: null,
             active_character_id: "miomi",
             miomi_stars: 0,
+            bond_points: 0,
           },
           loading: false,
           authReady: true,
@@ -135,6 +137,7 @@ export function useProfile(): ProfileState {
             (row.cefr_level as "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null) ?? null,
           active_character_id: (row.active_character_id as string | null) ?? "miomi",
           miomi_stars: (row.miomi_stars as number | null) ?? 0,
+          bond_points: (row.bond_points as number | null) ?? 0,
         },
         loading: false,
         authReady: true,

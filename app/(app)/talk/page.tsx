@@ -10,7 +10,8 @@ import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
-import { FuelPill } from "@/components/talk/FuelPill";
+import { BondPill } from "@/components/talk/BondPill";
+import { awardDailyBond } from "@/lib/companion/bond";
 import { type OrbState } from "@/components/talk/VoiceOrb";
 import { MiomiTurnClient } from "@/lib/live/miomi-turn-client";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
@@ -1516,6 +1517,12 @@ export default function TalkPage() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
+    if (isGuest) return;
+    if (!profileAuthReady || !profile) return;
+    void awardDailyBond();
+  }, [isGuest, profileAuthReady, profile]);
+
+  useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
     requestAnimationFrame(() => {
@@ -1827,10 +1834,6 @@ export default function TalkPage() {
     return "idle";
   })();
 
-  const fuelHeart = ((profile as { mood?: number } | null)?.mood ?? 0.82) * 100;
-  const fuelZap = 64;
-  const fuelBrain = 45;
-
   const guestSignupPrompt = useMemo(
     () => pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang: uiLang }),
     [uiLang],
@@ -1922,7 +1925,7 @@ export default function TalkPage() {
                 : `เหลืออีก ${Math.max(0, GUEST_EXCHANGE_LIMIT - guestExchanges)} ครั้ง`}
             </span>
           ) : (
-            <FuelPill heart={fuelHeart} zap={fuelZap} brain={fuelBrain} />
+            <BondPill points={profile?.bond_points ?? 0} uiLang={uiLang} />
           )}
         </div>
 
