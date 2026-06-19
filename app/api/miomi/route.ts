@@ -358,9 +358,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (isLastFreeGuestTurn) {
-      // LOCKED 2026-06-04 — paired with completeGuestLimitTurn (talk/page.tsx), verified in prod.
-      // Reply must NOT mention signup; the invitation is a separate spoken cue. Do not re-add invite text.
-      adaptivePrompt += `\n\nLAST-TURN HAND-OFF: This is the guest's final free turn. DO NOT mention signing up, accounts, remembering, limits, quota, trial, or goodbye anywhere in your reply. Your job in one or two short sentences: (a) warmly and fully answer what they just asked, and (b) open a small curiosity gap — tease one exciting thing just ahead (a next word, a little trick, a surprise) and stop right at the edge, as if you're about to share it next. Make continuing feel natural. The sign-up invitation is handled elsewhere.`;
+      // Guest's final free turn. DELIVER value (Mike's "B", 2026-06-19) — do NOT tease-and-withhold.
+      // Reply must NOT mention signup; the invitation is a separate spoken cue handled elsewhere.
+      adaptivePrompt += `\n\nLAST-TURN HAND-OFF: This is the guest's final free turn. DO NOT mention signing up, accounts, remembering, limits, quota, trial, or goodbye anywhere in your reply. Fully and warmly ANSWER what they just asked and actually DELIVER it — if they asked to learn something, teach it for real (the word, what it means, a quick example of using it); if they asked a question, answer it completely. Give them a satisfying, complete payoff. Do NOT tease something and stop at the edge. The sign-up invitation is handled separately, after your reply.`;
     }
 
     // ── STAGE 7: Check library with brain-enriched context ───────────────────
