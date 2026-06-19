@@ -219,7 +219,7 @@ export function WordCardV3({
               ) : (
                 <motion.button type="button" onClick={onSaveTap} whileTap={{ scale: 0.98 }} style={{ width: "100%", height: "38px", borderRadius: "11px", background: "#FFFFFF", border: `1.5px solid ${GOLD}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
                   <BookmarkCheck style={{ width: "15px", height: "15px", color: GOLD }} strokeWidth={2} />
-                  <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: GOLD }}>{isThaiLearner ? "สมัครเพื่อบันทึกคำศัพท์" : "Sign up to save your words"}</span>
+                  <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: GOLD }}>{isThaiLearner ? "สมัครไว้ หนูจะเก็บคำให้นะคะ~" : "Sign up — I'll keep your words~"}</span>
                 </motion.button>
               ))}
             {onPronunciationCheck && (

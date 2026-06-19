@@ -399,8 +399,9 @@ Each session = one Cursor master-prompt = one tested feature = one commit. No sk
 
 | Stage | Provider | Tier | Notes |
 |---|---|---|---|
-| **Now (shipped)** | Browser `speechSynthesis` | Free / all tiers | `lib/voice/tts.ts` — single `speak()` seam |
-| **Pre-launch** | **Google Cloud Neural2** | Default for Pro | Best balance of Thai quality + cost; daily char budgets |
+| **Now (shipped)** | **Google Chirp3-HD** via `/api/talk/speak` | All tiers (banked) | Card replay, invitation cue, warmth — `tts_cache`; browser `speechSynthesis` fallback only when server TTS unavailable |
+| **Live replies** | **Gemini Live** (Leda voice) | Metered | `/talk` + Speaking Room — NOT Chirp, NOT browser TTS |
+| **Pre-launch** | **Google Cloud Neural2** | Default for Pro | Alternate if Chirp cost spikes; daily char budgets |
 | **Post-launch add-on** | **ElevenLabs** / Wavenet | Premium Voice packs | Human-quality; essential for pronunciation practice |
 
 **TTS provider comparison matrix:**
@@ -476,14 +477,41 @@ speak(text, lang)
 
 Reduces repeat cost for common warmth phrases, ice-breakers, and library responses.
 
-### 3.8 Voice INPUT architecture (locked — Session 2)
+### 3.8 Voice stack architecture (LOCKED 2026-06-13)
 
-- **STT:** `/api/talk/transcribe` — Groq `whisper-large-v3-turbo`, pinned sin1/hnd1, max 15s, 1MB cap.
-- **VAD:** `@ricky0123/vad-web` in `components/talk/MicButton.tsx`.
-- **`userIntentRef`:** single source of truth for mic state — no auto-restart on re-render; `locked` prop kills active session.
-- **Warm VAD lifecycle:** `pause()` on stop, `start()` on next tap; `killVAD()` only on guest lock + unmount.
-- **Samsung Internet:** no Web Speech API — `lib/talk/speech-support.ts` detects UA `samsungbrowser`; disabled mic + "Open in Chrome".
-- **Android Chrome:** MediaRecorder + silence detection 900ms / threshold 0.025; credentials include on transcribe fetch.
+**Immutable law:** `/talk` and Speaking Room use **one continuous Gemini Live stream** for speech-in + voice-out. No separate STT on the live path. No second-pass re-interpretation. Memory, curriculum, and card content are **text calls**, never per-turn Live.
+
+```
+User speaks → mic PCM 16 kHz → Gemini Live (gemini-3.1-flash-live-preview)
+  ├─ Live does BOTH speech understanding AND voice reply (one model, one stream) — METERED, continuous
+  ├─ inputAudioTranscription (side-output, no extra call)
+  └─ on teach: tool call → get_word_to_teach → word-content.ts → Groq/Gemini text (cheap, per-word)
+
+Phrase sound-buttons / replay → /api/talk/speak → Chirp3-HD TTS → tts_cache (Postgres) [cheap once, then free]
+
+Room plan (once at session start) → /api/speaking/session → Groq/Gemini text generation
+```
+
+| Path | Entry | Cost class | Key files |
+|---|---|---|---|
+| **Live conversation** | `/api/live-token` ephemeral mint → `MiomiLiveClient` | **Metered** (`voice_usage` ledger) | `lib/live/live-config.ts`, `lib/live/miomi-client.ts`, `lib/live/media-handler.ts`, `public/pcm-processor.js` |
+| **User transcript display** | `inputAudioTranscription` on Live stream | Free (bundled in Live) | `lib/live/transcript.ts` |
+| **Word cards on teach** | Live tool `get_word_to_teach` → `/api/teach-word` | Cheap text (per word) | `lib/brain/word-content.ts`, `lib/talk/lesson-plan.ts` |
+| **Pronunciation replay** | Card speaker → `lib/talk/word-replay.ts` → `/api/talk/speak` | Cheap once, **free after cache** | `tts_cache`, Chirp3-HD Leda |
+| **Speaking Room plan** | Once at room open → `/api/speaking/session` | Cheap text (once) | `buildSessionLiveConfig` in `live-config.ts` |
+| **Member memory at connect** | `/api/live-token` bundles `memberContext` | Cheap text (once per session) | `lib/live/member-context.ts` |
+
+**Live path details:**
+- Input: continuous PCM uplink `audio/pcm;rate=16000` (`miomi-client.sendAudio`).
+- Output: gapless 24 kHz playback via AudioWorklet (`pcm-playback-processor.js`); persona voice **Leda** (`LIVE_VOICE`).
+- Teach mode only: `get_word_to_teach` / `get_word_to_review` tools. Chat/translate modes: no teaching tools.
+- Speaking Room: `report_stage` tool only; same Live transport, different system instruction.
+
+**Banked voice (NOT metered):** invitation cue, guest handoff, card replay, warmth phrases — anything via `/api/talk/speak` + `tts_cache`. Never written to `voice_usage`.
+
+**Forbidden on live paths:** `/api/talk/transcribe`, `/api/miomi` text loop, browser `speechSynthesis` for Miomi replies, any second-pass STT→LLM→TTS chain.
+
+**Legacy (orphaned, do not re-wire to `/talk`):** `components/talk/MicButton.tsx` + `/api/talk/transcribe` (Chirp 2 / Groq Whisper) — pre–Gemini Live pipeline; file retained only for reference. Search `LOCKED 2026-06-05` and `LOCKED 2026-06-13` before edits.
 
 ### 3.9 `/talk` UI architecture (sealed Session 3.5)
 
@@ -1514,6 +1542,10 @@ Nightly promotion cron, weekly degradation cron, Mike-only admin UI. Trigger: Ph
 
 | Date | Session | Phase | Shipped | Broken | Next |
 |------|---------|-------|---------|--------|------|
+| 2026-06-19 | Cursor Composer — Memory Moments Phase 2 | Memory / Bond | **Pushed `e05eaa3`** — `bond-core.ts` (server-safe bond math); `bond.ts` re-exports core + client award fns; `memory-context.ts` Phase 2 (closeness stage + recalled facts); `memory-store.ts` fetch + parallel extract/store; `get-server-profile` exposes `bond_points`; `/api/miomi` wires recall + inject + `Promise.all` extraction. `npm run predeploy` PASS. Voice/live-config untouched. | `user_memories` table must exist in Supabase with RLS (no migration in repo). | Mike: signed-in /talk text path — share personal fact → later turn Miomi recalls it; closeness stage in prompt when hearts ≥ 1. |
+| 2026-06-13 | Cursor — voice stack architecture lock | Voice | **LOCKED 2026-06-13** — canonical voice stack documented in §3.8: Gemini Live single-stream (PCM 16 kHz in, Leda audio out, `inputAudioTranscription` side-output); teach tool → `word-content.ts` text; replay → Chirp3-HD + `tts_cache`; room plan → `/api/speaking/session` text; no STT/second-pass on live path; banked TTS never metered (`voice_usage` Live only). Codebase already aligned — `LOCKED 2026-06-05` `/talk` freeze intact. | §3.8 previously still described pre-Live transcribe pipeline. | Mike: confirm §3.8 matches intent; any future voice work must not add STT or text-loop on `/talk`. |
+| 2026-06-16 | Cursor Composer — `/home` mobile ambient + neutral welcome | Home / UI | **Pushed `818b992`** — restored mobile ambient on Home by removing the white cover (`bg-white md:hidden` → transparent); neutralized welcome fallback by making `WELCOME_BUBBLE` language-non-assuming (no forced “better English” when target language is missing). check: `npm run predeploy` (tsc + eslint + drift) PASS. | — | Mike: mobile home ambient should remain visible; logged-in/out greeting should use practice-first wording when learning target is unknown. |
+| 2026-06-09 | Cursor — Chat vs Teach brain split | Voice / 3B | **`bb8bec6` Chat vs Teach modes** — `DEFAULT_TALK_CONFIG.mode=chat`; `PERSONA_CHAT` companion persona (no teaching contract/tools); `buildLiveConfig` gates `get_word_to_*` to teach only; mode threaded through `MiomiLiveClient.connect`, turn-runtime `getMode`, phase nudges teach-only. check:talk **340** + tsc + lint PASS. Vercel Ready — `buildId=bb8bec6efeb8` (`dpl_EXRcBtBs5Di3ruvBgcWLrDZVRHkd`). | — | Mike: hard-refresh /talk — default Just chat (no cards/drills); switch to Teach → word cards + nudges return. |
 | 2026-06-08 | Cursor Composer — lifecycle clean fix (A–D) | Voice / 3B | **Four commits + harness** — (A) `24af1d2` guest locked `stateLabel` → `GUIDANCE_GUEST_LIMIT_HIT` (not free-member typing copy); `freeLimitLoggedRef` dedupes limit log. (B) `82c8c77` `interrupted` clears `userExchangeCounted` (one line in turn-controller). (C) `8578cd9` backstop served-words only; one card per `turnSeq` at push + backstop. (D) `47314fa` `sanitizeUserTranscript` preserves non-empty utterances. `bd79016` harness regex fix. check:talk **336** + tsc + lint PASS. Pushed main → Vercel Ready — `buildId=bd79016a5144` on miomika.com. | — | Mike: guest /talk past 5 — signup prompt not typing copy; exchange 5 counts after interrupt; one card/turn; user bubble shows Thai/EN/mixed input. | **Six surgical commits** — (1) `0ca3e80` debug instrumentation (`logEvent` on gemini raw chunks, transcript deltas, `modelTurnActive`/mic-forward, word cards, kickoff, handoff CTA). (2) `b54a46a` mashed text: raw chunk accumulate + `sanitizeModelTranscript` once at `MiniCatRow` render. (3) `99c711a` stuck mic gate: suspended `turn_complete` + replay `endModelTurnWhenDrained` + invitation `clearModelTurnGate` + 1500ms watchdog. (4) `d906126` one card/word: backstop skips when card exists for turnSeq. (5) `211420d` icebreaker ONE warm mic-invite sentence in `live-config`. (6) `f44b2f4` free-limit copy via `TALK_FREE_LIMIT_CONTINUE`. turn-controller reducer untouched. check:talk **327** + tsc + lint PASS. | — | Mike: /talk debug overlay — gate clears every turn; deltas preserve spaces; one card per word; limit message shows typing/voice-to-text path. |
 | 2026-06-07 | Cursor Composer — talk harness locks (CTA, card, greeting, markdown) | Voice / 3B | **Four harness-locked fixes** — (1) CTA@5: `simulateGuestCtaViaTurnRuntime` exercises TurnRuntime `send_speak_exact` + `open_guest_sheet` effect path. (2) One card/word: `planBackstopCardWords` caps backstop to ≤1 card/exchange, skips when `wordPickThisTurn`; กิน+ไก่ regression locked. (3) Single greeting: empty `makeSessionOpenerShell` + `bindKickoffToOpener` + `appendGeminiTranscriptChunk` — one turnSeq-0 bubble matches spoken kickoff. (4) No markdown: `sanitizeModelTranscript` + persona plain-text rule. turn-controller reducer untouched. check:talk 308 + tsc + lint PASS. | — | Mike: guest /talk — one greeting bubble; one card per word; no **bold** in speech; 5th reply → invite + sheet. |
 | 2026-06-07 | Cursor Composer — greeting + guest CTA | Voice / 3B | **Two commits** — (1) Entry icebreaker: warm 1–2 sentence kickoff + canvas opener mandate mic press; kill double-hello / vocab-teacher framing. (2) Guest CTA regression: spurious handoff `turn_complete` set UI listening → mic-stop bumped `sessionGeneration` → `wait_handoff_drain` gen guard dropped CTA; fixed by suppressing mic-stop during handoff tail, phase-keyed drain dispatch, handoff-owned model-turn release in `waitForHandoffReplyDrain`, skip duplicate `endModelTurnWhenDrained` on handoff/invitation turns. turn-controller reducer + `modelTurnActive` cutout untouched. check:talk 290 + tsc + lint PASS. | — | Mike: guest /talk first open — charming mic invite (no "hello hello"); 5th reply → spoken invite + signup sheet ≤2.5s after audio drains. |
