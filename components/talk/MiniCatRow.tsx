@@ -44,7 +44,7 @@ export function MiniCatRow({ textTh, textEn, uiLang, state = "idle" }: MiniCatRo
       </div>
       <div
         style={{
-          flex: 1,
+          maxWidth: "78%",
           background: "#FFFFFF",
           border: "0.5px solid #EDE8E0",
           borderRadius: "4px 18px 18px 18px",
