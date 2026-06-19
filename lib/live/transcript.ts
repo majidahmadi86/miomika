@@ -61,6 +61,7 @@ export function sanitizeModelTranscript(text: string): string {
     .replace(/_{1,2}(.*?)_{1,2}/g, "$1")
     .replace(/#{1,6}\s/g, "")
     .replace(/`(.*?)`/g, "$1")
+    .replace(/~/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }

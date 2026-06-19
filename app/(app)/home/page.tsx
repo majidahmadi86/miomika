@@ -333,7 +333,7 @@ export default function HomePage() {
           ? "Thai"
           : "ภาษาไทย"
         : null;
-  const greeting = buildHomeGreeting(lang, targetName, profile?.streak ?? 0, greetHour, profile?.last_seen_at ?? null);
+  const greeting = buildHomeGreeting(lang, targetName, profile?.streak ?? 0, greetHour, profile?.last_seen_at ?? null).replace(/~/g, "");
 
   const posX = useMotionValue(0);
   const posY = useMotionValue(0);

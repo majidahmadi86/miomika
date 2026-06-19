@@ -1861,7 +1861,7 @@ export default function TalkPage() {
   })();
 
   const guestSignupPrompt = useMemo(
-    () => pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang: uiLang }),
+    () => pickPhrase(GUIDANCE_GUEST_LIMIT_HIT, { lang: uiLang }).replace(/~/g, ""),
     [uiLang],
   );
 
@@ -2241,7 +2241,7 @@ export default function TalkPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && textInput.trim()) handleSendText();
             }}
-            placeholder={uiLang === "en" ? "Message Miomi~" : "พิมพ์ถึงหนู~"}
+            placeholder={uiLang === "en" ? "Message Miomi" : "พิมพ์ถึงหนู"}
             style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "'Kanit', sans-serif", fontSize: "13.5px", color: "#1A1A18", padding: "8px 0" }}
           />
           {textInput.trim() && (
@@ -2289,8 +2289,8 @@ export default function TalkPage() {
                     ? "Sign up to save your words~"
                     : "สมัครเพื่อบันทึกคำศัพท์นะคะ~"
                   : uiLang === "en"
-                    ? "Sign in to talk with Miomi~"
-                    : "สมัครเพื่อพูดคุยกับหนูค่า~"}
+                    ? "Sign in to talk with Miomi"
+                    : "สมัครเพื่อพูดคุยกับหนูค่า"}
               </p>
               <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "14px", color: "#9A8B73", margin: 0, lineHeight: 1.5 }}>
                 {guestSheetReason === "save"
@@ -2307,7 +2307,7 @@ export default function TalkPage() {
                 {uiLang === "en" ? "Stay with me ✦" : "อยู่กับหนูค่า ✦"}
               </Link>
               <button type="button" onClick={() => setShowGuestSheet(false)} style={{ height: "44px", borderRadius: "999px", background: "none", border: "1.5px solid #EDE8E0", fontFamily: "'Quicksand', sans-serif", fontSize: "14px", fontWeight: 600, color: "#9A8B73", cursor: "pointer" }}>
-                {uiLang === "en" ? "Maybe later~" : "ไว้ทีหลังนะคะ~"}
+                {uiLang === "en" ? "Maybe later" : "ไว้ทีหลังนะคะ"}
               </button>
             </div>
           </motion.div>
