@@ -58,12 +58,17 @@ export function ClosenessCard({ points, lang }: { points: number; lang: "th" | "
   useEffect(() => {
     if (!initRef.current) {
       initRef.current = true;
+      let seen = false;
+      let last = 0;
+      let force = false;
       try {
-        prevHeartsRef.current = Number(window.localStorage.getItem(LAST_HEARTS_KEY) ?? "0");
-        demoDoneRef.current = window.localStorage.getItem(DEMO_KEY) === "1";
-      } catch {
-        prevHeartsRef.current = 0;
-      }
+        seen = window.localStorage.getItem(DEMO_KEY) === "1";
+        last = Number(window.localStorage.getItem(LAST_HEARTS_KEY) ?? "0");
+        force = window.location.search.includes("bonddemo");
+      } catch { /* non-fatal */ }
+      prevHeartsRef.current = last;
+      demoDoneRef.current = seen && !force;
+      console.log("[ClosenessCard] mount", { hearts: bond.hearts, restPct, seen, force, lastHearts: last });
     }
     const prev = prevHeartsRef.current ?? 0;
     const timers: number[] = [];
@@ -71,19 +76,24 @@ export function ClosenessCard({ points, lang }: { points: number; lang: "th" | "
 
     if (!demoDoneRef.current) {
       demoDoneRef.current = true;
-      try { window.localStorage.setItem(DEMO_KEY, "1"); } catch { /* non-fatal */ }
+      console.log("[ClosenessCard] playing first-open demo");
       setBarAnim(false); setBarPct(0);
       timers.push(window.setTimeout(() => { setBarAnim(true); setBarPct(100); }, 600));
       timers.push(window.setTimeout(() => { fire(); setCaption(lang === "en" ? "this fills as we spend time~" : "เต็มขึ้นเรื่อยๆ เมื่อเราใช้เวลาด้วยกัน~"); }, 1850));
       timers.push(window.setTimeout(() => setBarPct(restPct), 2750));
-      timers.push(window.setTimeout(() => setCaption(null), 4400));
+      timers.push(window.setTimeout(() => {
+        setCaption(null);
+        try { window.localStorage.setItem(DEMO_KEY, "1"); } catch { /* non-fatal */ }
+      }, 4400));
     } else if (bond.hearts > prev) {
+      console.log("[ClosenessCard] earn animation", { from: prev, to: bond.hearts });
       setBarAnim(false); setBarPct(0);
       timers.push(window.setTimeout(() => { setBarAnim(true); setBarPct(100); }, 300));
       timers.push(window.setTimeout(() => { fire(); setCaption(lang === "en" ? "+1 heart · for showing up~" : "+1 ดวงใจ · ที่แวะมาหากันวันนี้~"); }, 1200));
       timers.push(window.setTimeout(() => setBarPct(restPct), 1850));
       timers.push(window.setTimeout(() => setCaption(null), 3800));
     } else {
+      console.log("[ClosenessCard] settle (no demo, no new heart)");
       setBarAnim(true); setBarPct(restPct);
     }
 
