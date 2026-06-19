@@ -1,11 +1,35 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Heart } from "lucide-react";
 import { deriveBond, BOND_STAGES } from "@/lib/companion/bond";
 
 const DEMO_KEY = "miomika.bond.cardDemoSeen";
 const LAST_HEARTS_KEY = "miomika.bond.lastHearts";
+
+function Sparkles() {
+  const arr = [-30, -18, -6, 6, 18, 30];
+  return (
+    <div aria-hidden="true" style={{ position: "absolute", left: "50%", top: "40px", width: 0, height: 0 }}>
+      {arr.map((dx, i) => (
+        <span
+          key={i}
+          style={{
+            position: "absolute",
+            left: `${dx}px`,
+            bottom: 0,
+            fontSize: `${13 + (i % 3)}px`,
+            color: "#D4537E",
+            animation: "miomiBondSpark 1s ease forwards",
+            animationDelay: `${i * 45}ms`,
+          }}
+        >
+          {"\u2665"}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function ClosenessCard({ points, lang }: { points: number; lang: "th" | "en" }) {
   const bond = deriveBond(points);
@@ -23,56 +47,54 @@ export function ClosenessCard({ points, lang }: { points: number; lang: "th" | "
         ? `next: ${nextLabel} · ${bond.heartsToNext} heart${bond.heartsToNext === 1 ? "" : "s"} to go`
         : `ต่อไป: ${nextLabel} · อีก ${bond.heartsToNext} ดวงใจ`;
 
-  const barRef = useRef<HTMLDivElement | null>(null);
-  const burstRef = useRef<HTMLDivElement | null>(null);
+  const [barPct, setBarPct] = useState(restPct);
+  const [barAnim, setBarAnim] = useState(true);
+  const [sparkKey, setSparkKey] = useState(0);
+  const [caption, setCaption] = useState<string | null>(null);
+  const prevHeartsRef = useRef<number | null>(null);
+  const demoDoneRef = useRef(false);
+  const initRef = useRef(false);
 
   useEffect(() => {
-    const bar = barRef.current;
-    if (!bar) return;
-    const timers: number[] = [];
-    const burst = (n: number) => {
-      const host = burstRef.current;
-      if (!host) return;
-      for (let k = 0; k < n; k++) {
-        const s = document.createElement("span");
-        s.textContent = "\u2665";
-        s.style.cssText = `position:absolute;left:${k * 8}px;bottom:0;font-size:13px;color:#D4537E;pointer-events:none;animation:miomiBondSpark .9s ease forwards;animation-delay:${k * 40}ms;`;
-        host.appendChild(s);
-        timers.push(window.setTimeout(() => s.remove(), 1000 + k * 40));
+    if (!initRef.current) {
+      initRef.current = true;
+      try {
+        prevHeartsRef.current = Number(window.localStorage.getItem(LAST_HEARTS_KEY) ?? "0");
+        demoDoneRef.current = window.localStorage.getItem(DEMO_KEY) === "1";
+      } catch {
+        prevHeartsRef.current = 0;
       }
-    };
-    const settle = () => { bar.style.transition = "width .5s ease"; bar.style.width = `${restPct}%`; };
+    }
+    const prev = prevHeartsRef.current ?? 0;
+    const timers: number[] = [];
+    const fire = () => setSparkKey((k) => k + 1);
 
-    let demoSeen = false;
-    let lastHearts = 0;
-    try {
-      demoSeen = window.localStorage.getItem(DEMO_KEY) === "1";
-      lastHearts = Number(window.localStorage.getItem(LAST_HEARTS_KEY) ?? "0");
-    } catch { /* non-fatal */ }
-
-    if (!demoSeen && bond.hearts === 0) {
-      bar.style.transition = "none"; bar.style.width = "0%";
-      timers.push(window.setTimeout(() => { bar.style.transition = "width 1.2s ease"; bar.style.width = "100%"; }, 700));
-      timers.push(window.setTimeout(() => burst(6), 1950));
-      timers.push(window.setTimeout(settle, 2700));
+    if (!demoDoneRef.current) {
+      demoDoneRef.current = true;
       try { window.localStorage.setItem(DEMO_KEY, "1"); } catch { /* non-fatal */ }
-    } else if (bond.hearts > lastHearts) {
-      bar.style.transition = "none"; bar.style.width = "0%";
-      timers.push(window.setTimeout(() => { bar.style.transition = "width .9s ease"; bar.style.width = "100%"; }, 350));
-      timers.push(window.setTimeout(() => burst(5), 1300));
-      timers.push(window.setTimeout(settle, 1900));
+      setBarAnim(false); setBarPct(0);
+      timers.push(window.setTimeout(() => { setBarAnim(true); setBarPct(100); }, 600));
+      timers.push(window.setTimeout(() => { fire(); setCaption(lang === "en" ? "this fills as we spend time~" : "เต็มขึ้นเรื่อยๆ เมื่อเราใช้เวลาด้วยกัน~"); }, 1850));
+      timers.push(window.setTimeout(() => setBarPct(restPct), 2750));
+      timers.push(window.setTimeout(() => setCaption(null), 4400));
+    } else if (bond.hearts > prev) {
+      setBarAnim(false); setBarPct(0);
+      timers.push(window.setTimeout(() => { setBarAnim(true); setBarPct(100); }, 300));
+      timers.push(window.setTimeout(() => { fire(); setCaption(lang === "en" ? "+1 heart · for showing up~" : "+1 ดวงใจ · ที่แวะมาหากันวันนี้~"); }, 1200));
+      timers.push(window.setTimeout(() => setBarPct(restPct), 1850));
+      timers.push(window.setTimeout(() => setCaption(null), 3800));
     } else {
-      bar.style.transition = "none"; bar.style.width = "0%";
-      timers.push(window.setTimeout(() => { bar.style.transition = "width .7s ease"; bar.style.width = `${restPct}%`; }, 250));
+      setBarAnim(true); setBarPct(restPct);
     }
 
+    prevHeartsRef.current = bond.hearts;
     try { window.localStorage.setItem(LAST_HEARTS_KEY, String(bond.hearts)); } catch { /* non-fatal */ }
     return () => timers.forEach((t) => window.clearTimeout(t));
-  }, [bond.hearts, restPct]);
+  }, [bond.hearts, restPct, lang]);
 
   return (
     <div className="rounded-card border border-line bg-surface p-4 shadow-card" style={{ position: "relative", overflow: "hidden" }}>
-      <style>{`@keyframes miomiBondSpark{0%{opacity:0;transform:translateY(0) scale(.5)}30%{opacity:1}100%{opacity:0;transform:translateY(-22px) scale(1)}}`}</style>
+      <style>{`@keyframes miomiBondSpark{0%{opacity:0;transform:translateY(0) scale(.5)}30%{opacity:1}100%{opacity:0;transform:translateY(-24px) scale(1)}}`}</style>
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5">
           <Heart className="h-4 w-4" style={{ color: "#E06B9A" }} fill="#F9C2DC" strokeWidth={2} />
@@ -84,10 +106,14 @@ export function ClosenessCard({ points, lang }: { points: number; lang: "th" | "
         </span>
       </div>
       <div className="mt-3 h-[7px] overflow-hidden rounded-full" style={{ background: "#F3E6EC" }}>
-        <div ref={barRef} className="h-full rounded-full" style={{ width: `${restPct}%`, background: "#D4537E" }} />
+        <div className="h-full rounded-full" style={{ width: `${barPct}%`, background: "#D4537E", transition: barAnim ? "width .8s ease" : "none" }} />
       </div>
-      <p className="mt-2 text-[11.5px] text-ink-muted">{teaser}</p>
-      <div ref={burstRef} aria-hidden="true" style={{ position: "absolute", right: "18px", top: "34px", width: 0, height: 0 }} />
+      {caption ? (
+        <p className="mt-2 text-[11.5px] font-medium" style={{ color: "#993556" }}>{caption}</p>
+      ) : (
+        <p className="mt-2 text-[11.5px] text-ink-muted">{teaser}</p>
+      )}
+      {sparkKey > 0 && <Sparkles key={sparkKey} />}
     </div>
   );
 }
