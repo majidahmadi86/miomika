@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { RefreshCw, X } from "lucide-react";
+import { RefreshCw, Sparkles, X } from "lucide-react";
 import { useUILanguage } from "@/lib/i18n/client";
 import { tr } from "@/lib/i18n/strings";
 
@@ -139,71 +139,110 @@ export function PwaUpdateManager() {
 
   return (
     <div
-      role="status"
       style={{
         position: "fixed",
-        left: "16px",
-        right: "16px",
-        bottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
+        left: 0,
+        right: 0,
+        bottom: "calc(88px + env(safe-area-inset-bottom, 0px))",
         zIndex: 95,
-        background: "#FFFFFF",
-        border: "1px solid #EDE8E0",
-        borderRadius: "12px",
-        padding: "12px 16px",
         display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        boxShadow: "0 8px 24px rgba(26, 26, 24, 0.08)",
+        justifyContent: "center",
+        padding: "0 16px",
+        pointerEvents: "none",
       }}
     >
-      <p
+      <div
+        role="status"
         style={{
-          margin: 0,
-          flex: 1,
-          fontSize: "13px",
-          fontWeight: 500,
-          color: "#9A8B73",
-          fontFamily: lang === "th" ? "'Kanit', sans-serif" : "'Quicksand', sans-serif",
-        }}
-      >
-        {tr("pwa_update_ready", lang)}
-      </p>
-      <button
-        type="button"
-        onClick={applyUpdate}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "6px",
-          border: "none",
-          borderRadius: "999px",
-          padding: "8px 14px",
-          cursor: "pointer",
-          background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
-          color: "#FFFFFF",
-          fontSize: "13px",
-          fontWeight: 600,
-          fontFamily: lang === "th" ? "'Kanit', sans-serif" : "'Quicksand', sans-serif",
-        }}
-      >
-        <RefreshCw size={14} strokeWidth={1.75} />
-        {tr("pwa_update_reload", lang)}
-      </button>
-      <button
-        type="button"
-        onClick={() => setUpdateReady(false)}
-        aria-label={tr("companion_dismiss", lang)}
-        style={{
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
+          pointerEvents: "auto",
+          width: "100%",
+          maxWidth: "380px",
           display: "flex",
-          padding: "4px",
-          borderRadius: "999px",
+          alignItems: "center",
+          gap: "11px",
+          background: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          border: "0.5px solid #EDE8E0",
+          borderRadius: "20px",
+          padding: "11px 12px 11px 14px",
+          boxShadow: "0 10px 30px rgba(26,26,24,0.12), 0 2px 6px rgba(26,26,24,0.04)",
+          animation: "miomiUpdatePop 0.42s cubic-bezier(0.22,1,0.36,1)",
         }}
       >
-        <X size={16} color="#9A8B73" strokeWidth={1.75} />
-      </button>
+        <span
+          style={{
+            flexShrink: 0,
+            width: "30px",
+            height: "30px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #FFF4E8 0%, #FFE3F0 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Sparkles size={15} color="#F19CC4" strokeWidth={2} />
+        </span>
+        <p
+          style={{
+            margin: 0,
+            flex: 1,
+            fontSize: "12.5px",
+            fontWeight: 500,
+            lineHeight: 1.35,
+            color: "#6B5E4E",
+            fontFamily: lang === "th" ? "'Kanit', sans-serif" : "'Quicksand', sans-serif",
+          }}
+        >
+          {tr("pwa_update_ready", lang)}
+        </p>
+        <button
+          type="button"
+          onClick={applyUpdate}
+          style={{
+            flexShrink: 0,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "5px",
+            border: "none",
+            borderRadius: "999px",
+            padding: "8px 14px",
+            cursor: "pointer",
+            background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)",
+            color: "#FFFFFF",
+            fontSize: "12.5px",
+            fontWeight: 600,
+            boxShadow: "0 2px 8px rgba(52,169,143,0.28)",
+            fontFamily: lang === "th" ? "'Kanit', sans-serif" : "'Quicksand', sans-serif",
+          }}
+        >
+          <RefreshCw size={13} strokeWidth={2} />
+          {tr("pwa_update_reload", lang)}
+        </button>
+        <button
+          type="button"
+          onClick={() => setUpdateReady(false)}
+          aria-label={tr("companion_dismiss", lang)}
+          style={{
+            flexShrink: 0,
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            padding: "3px",
+            borderRadius: "999px",
+          }}
+        >
+          <X size={15} color="#B8AC9C" strokeWidth={2} />
+        </button>
+        <style>{`
+          @keyframes miomiUpdatePop {
+            0% { opacity: 0; transform: translateY(14px) scale(0.97); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+          }
+        `}</style>
+      </div>
     </div>
   );
 }
