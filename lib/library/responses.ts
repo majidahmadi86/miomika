@@ -58,8 +58,8 @@ export const LIBRARY_TEMPLATES: LibraryResponse[] = [
       /ชื่ออะไร/,
     ],
     response: {
-      speech_th: "หนูเป็นแมวน้อยที่ชอบภาษาแล้วก็ชอบหาเพื่อนใหม่ค่า~ อยากเรียน English หรือ Thai ดีคะ?",
-      speech_en: "I'm a little cat who loves languages and making friends~ want to learn English or Thai?",
+      speech_th: "หนูชื่อมิโอมิค่ะ เป็นแมวน้อยที่ชอบภาษาและชอบหาเพื่อนใหม่ อยากเรียน English หรือ Thai ดีคะ?",
+      speech_en: "I'm Miomi — a little cat who loves languages and making friends! Want to learn English or Thai?",
     },
     follow_up: {
       type: "none",
