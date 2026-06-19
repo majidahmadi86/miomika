@@ -26,6 +26,7 @@ import type { Language } from "@/lib/i18n/server";
 import { useUILanguage } from "@/lib/i18n/client";
 import { awardDailyBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
 import { ClosenessCard } from "@/components/home/ClosenessCard";
+import { RemembersCard } from "@/components/home/RemembersCard";
 const HOME_T = {
   th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ~", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ~", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
   en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
@@ -1232,6 +1233,8 @@ export default function HomePage() {
                   <p className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle" style={{ fontFamily: "'Quicksand', sans-serif" }}>{HOME_T[lang].today}</p>
 
                   <ClosenessCard points={profile?.bond_points ?? 0} lang={lang} active={homeRevealReady} />
+
+                  <RemembersCard lang={lang} />
 
                   <div className="rounded-card border border-line bg-surface p-4 shadow-card">
                     <div className="flex items-center justify-between">
