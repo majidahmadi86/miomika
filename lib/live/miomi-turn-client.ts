@@ -355,7 +355,7 @@ export class MiomiTurnClient {
         : "This is your first-ever meeting — a quick, charming hello with your name is welcome.";
 
     void this.runHidden(
-      `[kickoff] Greet like a cheeky, delighted little cat — playful and SHORT, in the user's language. ${introRule} Riff in THIS spirit but make it your OWN and fresh — do NOT copy it word-for-word: "${vibe}". Keep it to ONE short, breezy line. Do NOT be formal — never 'lovely to see you', 'thrilled', or 'have a wonderful time'. No emojis.`,
+      `[kickoff] Greet like a cheeky, delighted little cat — playful and SHORT, in the user's language. Lead with THEM, not yourself. Do NOT introduce yourself or state your name — never say 'I'm Miomi' or 'my name is'. Just open warmly and pull them in. Riff in THIS spirit but make it your OWN and fresh — do NOT copy it word-for-word: "${vibe}". Keep it to ONE short, breezy line. Do NOT be formal — never 'lovely to see you', 'thrilled', or 'have a wonderful time'. Warm, fun, a touch cheeky. No emojis.`,
       { isKickoff: true },
     );
   }
