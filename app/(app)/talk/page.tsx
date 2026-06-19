@@ -2196,7 +2196,7 @@ export default function TalkPage() {
           </p>
         ) : null}
       </div>
-      <div style={{ flexShrink: 0, width: "100%", maxWidth: "560px", margin: "0 auto", padding: "4px 12px 8px", background: "transparent" }}>
+      <div style={{ flexShrink: 0, width: "100%", maxWidth: "720px", margin: "0 auto", padding: "4px 12px 20px", background: "transparent" }}>
         {voiceExhausted ? (
           <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "12px", color: "#9A8B73", textAlign: "center", padding: "0 4px 8px", lineHeight: 1.45 }}>
             {uiLang === "en"
