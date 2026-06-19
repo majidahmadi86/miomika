@@ -137,7 +137,20 @@ const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
 const FEED_BUBBLE = { th: "อิ่มแล้วค่า~", en: "All full now" };
 const PLAY_BUBBLE = { th: "เย้~ สนุกจัง!", en: "Yay, so fun!" };
 const GUEST_SIGNUP_STORAGE_KEY = "miomika-guest-signup-moment-v1";
-const LEVEL_UP_BUBBLE = { th: "เลเวลอัพแล้วค่า~!", en: "You leveled up!" };
+const LEVEL_UP_LINES: { th: string; en: string }[] = [
+  { th: "เลเวล {level} แล้วนะคะ~ หนูรู้เลยว่าคุณเก่งขึ้นเรื่อยๆ", en: "Level {level} together~ I can tell you're getting it." },
+  { th: "ถึงเลเวล {level} แล้ว! ทุกวันที่อยู่ด้วยกัน เราโตขึ้นทีละนิดเลยค่ะ", en: "That's level {level}! Every day with you, we grow a little." },
+  { th: "เลเวล {level} แล้วค่า~ หนูภูมิใจในตัวคุณมากเลยนะคะ", en: "Level {level}~ I'm so proud of how far you've come." },
+  { th: "เราขึ้นเลเวล {level} แล้ว! ขอบคุณที่อยู่เป็นเพื่อนหนูนะคะ~", en: "We hit level {level}! Thanks for keeping me company~" },
+];
+
+function pickLevelUpBubble(level: number): { th: string; en: string } {
+  const v = LEVEL_UP_LINES[Math.floor(Math.random() * LEVEL_UP_LINES.length)];
+  return {
+    th: v.th.replace("{level}", String(level)),
+    en: v.en.replace("{level}", String(level)),
+  };
+}
 
 const PET_STORAGE_KEY = "miomika-home-pet-v1";
 const DECAY_INTERVAL_MS = 10 * 60 * 1000;
@@ -531,10 +544,13 @@ export default function HomePage() {
     scheduleHappyEnd(1200);
   }, [isGuest, uiLang, showBubble, scheduleHappyEnd]);
 
-  const triggerLevelUpCelebration = useCallback(() => {
+  const triggerLevelUpCelebration = useCallback((level: number) => {
     window.setTimeout(() => {
       setLevelUpAnimKey((k) => k + 1);
-      if (!isGuest) showBubble(LEVEL_UP_BUBBLE.th, { th: LEVEL_UP_BUBBLE.th, en: LEVEL_UP_BUBBLE.en });
+      if (!isGuest) {
+        const line = pickLevelUpBubble(level);
+        showBubble(line.th, { th: line.th, en: line.en, autoHideMs: 4600 });
+      }
       setMiomiMood("happy");
       happyUntilRef.current = Date.now() + 3000;
       scheduleHappyEnd(3000);
@@ -554,7 +570,7 @@ export default function HomePage() {
     setPet((prev) => {
       const withHunger = { ...prev, hunger: clampStat(prev.hunger + 15) };
       const { stats, leveledUp } = addXp(withHunger, 10);
-      if (leveledUp) triggerLevelUpCelebration();
+      if (leveledUp) triggerLevelUpCelebration(stats.level);
       return stats;
     });
     setXpTick((t) => t + 1);
@@ -573,7 +589,7 @@ export default function HomePage() {
     setPet((prev) => {
       const withEnergy = { ...prev, energy: clampStat(prev.energy + 15) };
       const { stats, leveledUp } = addXp(withEnergy, 10);
-      if (leveledUp) triggerLevelUpCelebration();
+      if (leveledUp) triggerLevelUpCelebration(stats.level);
       return stats;
     });
     setXpTick((t) => t + 1);
