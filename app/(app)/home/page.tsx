@@ -30,90 +30,96 @@ const HOME_T = {
 } as const;
 
 function buildHomeGreeting(
-  lang: Language,
+  lang: "th" | "en",
   targetName: string | null,
   streak: number,
   hour: number,
+  lastSeenAt: string | null,
 ): string {
   const tod =
     hour < 5 ? "night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 22 ? "evening" : "night";
-  const i = streak > 0 ? 1 : 0;
+
+  const hoursSince =
+    lastSeenAt ? (Date.now() - new Date(lastSeenAt).getTime()) / 3_600_000 : null;
+
+  type Situation = "first" | "today" | "back" | "long_away" | "streak";
+  let situation: Situation;
+  if (!lastSeenAt) situation = "first";
+  else if (streak >= 2) situation = "streak";
+  else if (hoursSince != null && hoursSince >= 24 * 7) situation = "long_away";
+  else if (hoursSince != null && hoursSince >= 24) situation = "back";
+  else situation = "today";
+
+  // Deterministic seed (stable server/client → no hydration flicker) that still
+  // varies day to day and as the streak grows, so it never repeats the same line.
+  const seed = Math.floor(Date.now() / 86_400_000) + streak;
+  const pick = (arr: string[]) => arr[seed % arr.length];
+
   if (lang === "en") {
-    const named: Record<string, [string, string]> = {
-      morning: [
-        `Good morning! Ready to start your ${targetName}?`,
-        `Good morning! Day ${streak} — let's keep your ${targetName} going.`,
+    const topic = targetName ?? "practice";
+    const tw =
+      tod === "morning" ? "Good morning" : tod === "afternoon" ? "Good afternoon" : tod === "evening" ? "Good evening" : "Up late";
+    const bodies: Record<Situation, string[]> = {
+      first: [
+        `Welcome! I'm so happy you're here — want to start with a little ${topic}?`,
+        `Hi, I'm Miomi! Shall we get to know each other over some ${topic}?`,
+        `You made it~ let's take your first step into ${topic} together.`,
       ],
-      afternoon: [
-        `Good afternoon! Up for a little ${targetName}?`,
-        `Afternoon! ${streak} days strong — more ${targetName}?`,
+      today: [
+        `${tw}! Ready for a little ${topic}?`,
+        `${tw}! Got a few minutes for some ${topic}?`,
+        `${tw}! Let's pick up where we left off — ${topic}?`,
       ],
-      evening: [
-        `Good evening! Wind down with some ${targetName}?`,
-        `Evening! Keep your ${streak}-day streak alive with some ${targetName}.`,
+      back: [
+        `${tw}! Good to see you back — more ${topic}?`,
+        `${tw}! It's been a couple of days — shall we get back to ${topic}?`,
+        `${tw}! Missed you~ ready to ease back into ${topic}?`,
       ],
-      night: [
-        `Up late? A little ${targetName} before bed?`,
-        `Late night, day ${streak} — a bit of ${targetName}?`,
+      long_away: [
+        `${tw}! It's been a while — I really missed you. Want to start gently with ${topic}?`,
+        `${tw}! You're back! Let's dust off your ${topic}, no rush~`,
+        `${tw}! So glad you came back — shall we pick ${topic} up again together?`,
       ],
-    };
-    const neutral: Record<string, [string, string]> = {
-      morning: [
-        "Good morning! Ready for a little practice?",
-        `Good morning! Day ${streak} — let's keep it going.`,
-      ],
-      afternoon: [
-        "Good afternoon! Up for a little practice?",
-        `Afternoon! ${streak} days strong — let's keep it up.`,
-      ],
-      evening: [
-        "Good evening! Ready to practice?",
-        `Evening! Keep your ${streak}-day streak alive.`,
-      ],
-      night: [
-        "Up late? A little practice before bed?",
-        `Late night, day ${streak} — a little practice?`,
+      streak: [
+        `${tw}! Day ${streak} — let's keep it going!`,
+        `${tw}! ${streak} days strong~ I'm proud of you. More ${topic}?`,
+        `${tw}! ${streak} days in a row — let's not break it now!`,
       ],
     };
-    return (targetName ? named : neutral)[tod][i];
+    return pick(bodies[situation]);
   }
-  const named: Record<string, [string, string]> = {
-    morning: [
-      `อรุณสวัสดิ์ค่ะ มาเริ่มฝึก${targetName}กันไหมคะ?`,
-      `อรุณสวัสดิ์ค่ะ วันที่ ${streak} แล้ว มาฝึก${targetName}ต่อกันค่ะ`,
+
+  const topic = targetName ?? "ฝึกซ้อม";
+  const tw =
+    tod === "morning" ? "อรุณสวัสดิ์ค่ะ" : tod === "afternoon" ? "สวัสดีตอนบ่ายค่ะ" : tod === "evening" ? "สวัสดีตอนเย็นค่ะ" : "ดึกแล้วนะคะ";
+  const bodies: Record<Situation, string[]> = {
+    first: [
+      `ยินดีต้อนรับค่ะ~ หนูดีใจมากเลยที่คุณมา มาเริ่ม${topic}กันสักนิดไหมคะ?`,
+      `สวัสดีค่ะ หนูชื่อมิโอมิ! มาทำความรู้จักกันผ่าน${topic}ไหมคะ~`,
+      `คุณมาแล้ว~ มาก้าวแรกสู่${topic}ไปด้วยกันนะคะ`,
     ],
-    afternoon: [
-      `สวัสดีตอนบ่ายค่ะ ฝึก${targetName}สักนิดไหมคะ?`,
-      `บ่ายแล้วค่ะ ${streak} วันติดแล้ว มาฝึก${targetName}กันต่อค่ะ`,
+    today: [
+      `${tw} พร้อมฝึก${topic}สักนิดไหมคะ?`,
+      `${tw} มีเวลาสักหน่อยไหมคะ มาฝึก${topic}กัน~`,
+      `${tw} มาฝึก${topic}ต่อจากเมื่อก่อนกันค่ะ`,
     ],
-    evening: [
-      `สวัสดีตอนเย็นค่ะ มาผ่อนคลายกับ${targetName}กันไหมคะ?`,
-      `เย็นแล้วค่ะ รักษาสตรีค ${streak} วันไว้นะคะ มาฝึก${targetName}กันค่ะ`,
+    back: [
+      `${tw} ดีใจที่ได้เจอกันอีกนะคะ มาฝึก${topic}กันต่อไหมคะ?`,
+      `${tw} หายไปสองสามวันเลยนะคะ~ กลับมาฝึก${topic}กันค่ะ`,
+      `${tw} คิดถึงคุณนะคะ~ พร้อมกลับมาฝึก${topic}กันรึยังคะ?`,
     ],
-    night: [
-      `ดึกแล้วนะคะ อยากฝึก${targetName}สักหน่อยไหมคะ?`,
-      `ดึกแล้วค่ะ วันที่ ${streak} เลยนะคะ มาฝึก${targetName}กันไหมคะ`,
+    long_away: [
+      `${tw} หายไปนานเลยนะคะ หนูคิดถึงมากเลย มาเริ่ม${topic}เบาๆ กันก่อนไหมคะ?`,
+      `${tw} คุณกลับมาแล้ว! มาปัดฝุ่น${topic}กันใหม่ ไม่ต้องรีบนะคะ~`,
+      `${tw} ดีใจมากที่คุณกลับมา~ มาเริ่ม${topic}ด้วยกันอีกครั้งนะคะ`,
     ],
-  };
-  const neutral: Record<string, [string, string]> = {
-    morning: [
-      "อรุณสวัสดิ์ค่ะ พร้อมฝึกสักนิดไหมคะ?",
-      `อรุณสวัสดิ์ค่ะ วันที่ ${streak} แล้ว มาฝึกต่อกันค่ะ`,
-    ],
-    afternoon: [
-      "สวัสดีตอนบ่ายค่ะ มาฝึกสักนิดไหมคะ?",
-      `บ่ายแล้วค่ะ ${streak} วันติดแล้ว มาฝึกกันต่อค่ะ`,
-    ],
-    evening: [
-      "สวัสดีตอนเย็นค่ะ พร้อมฝึกไหมคะ?",
-      `เย็นแล้วค่ะ รักษาสตรีค ${streak} วันไว้นะคะ`,
-    ],
-    night: [
-      "ดึกแล้วนะคะ อยากฝึกสักหน่อยไหมคะ?",
-      `ดึกแล้วค่ะ วันที่ ${streak} เลยนะคะ มาฝึกกันไหมคะ`,
+    streak: [
+      `${tw} วันที่ ${streak} แล้ว~ มารักษาสตรีคกันต่อนะคะ!`,
+      `${tw} ${streak} วันติดแล้ว~ หนูภูมิใจในตัวคุณเลยค่ะ ฝึก${topic}ต่อไหมคะ?`,
+      `${tw} ครบ ${streak} วันติดกันแล้วนะคะ อย่าเพิ่งหยุดนะ มาฝึก${topic}กันค่ะ`,
     ],
   };
-  return (targetName ? named : neutral)[tod][i];
+  return pick(bodies[situation]);
 }
 
 const tapFeedback =
@@ -309,7 +315,7 @@ export default function HomePage() {
           ? "Thai"
           : "ภาษาไทย"
         : null;
-  const greeting = buildHomeGreeting(lang, targetName, profile?.streak ?? 0, greetHour);
+  const greeting = buildHomeGreeting(lang, targetName, profile?.streak ?? 0, greetHour, profile?.last_seen_at ?? null);
 
   const posX = useMotionValue(0);
   const posY = useMotionValue(0);
