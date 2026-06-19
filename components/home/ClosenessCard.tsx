@@ -7,21 +7,31 @@ import { deriveBond, BOND_STAGES } from "@/lib/companion/bond";
 const LAST_HEARTS_KEY = "miomika.bond.lastHearts";
 
 function Sparkles() {
-  const arr = [-34, -20, -7, 7, 20, 34];
+  const sparks = [
+    { dx: -40, size: 12, delay: 1000, color: "#E06B9A" },
+    { dx: -28, size: 16, delay: 1080, color: "#D4537E" },
+    { dx: -16, size: 12, delay: 1150, color: "#F0A6C4" },
+    { dx: -5, size: 17, delay: 1030, color: "#D4537E" },
+    { dx: 5, size: 13, delay: 1120, color: "#E06B9A" },
+    { dx: 16, size: 15, delay: 1060, color: "#D4537E" },
+    { dx: 28, size: 12, delay: 1190, color: "#F0A6C4" },
+    { dx: 40, size: 14, delay: 1100, color: "#E06B9A" },
+    { dx: 0, size: 10, delay: 1260, color: "#F0A6C4" },
+  ];
   return (
     <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: "40px", height: 0, pointerEvents: "none" }}>
-      {arr.map((dx, i) => (
+      {sparks.map((s, i) => (
         <span
           key={i}
           style={{
             position: "absolute",
-            left: `calc(50% + ${dx}px)`,
+            left: `calc(50% + ${s.dx}px)`,
             top: 0,
-            fontSize: `${14 + (i % 3)}px`,
-            color: "#D4537E",
+            fontSize: `${s.size}px`,
+            color: s.color,
             opacity: 0,
-            animation: "miomiBondSpark 1.05s ease forwards",
-            animationDelay: `${1050 + i * 55}ms`,
+            animation: "miomiBondSpark 1.1s ease forwards",
+            animationDelay: `${s.delay}ms`,
           }}
         >
           {"\u2665"}
@@ -79,7 +89,6 @@ export function ClosenessCard({ points, lang, active = false }: { points: number
       }
     }
     if (!gateOpen || playedRef.current) {
-      if (!gateOpen) console.log("[ClosenessCard] waiting for home to be visible");
       return;
     }
     playedRef.current = true;
@@ -87,7 +96,6 @@ export function ClosenessCard({ points, lang, active = false }: { points: number
     const prev = prevHeartsRef.current ?? 0;
     const earned = bond.hearts > prev;
     const full = earned || restPct < 10;
-    console.log("[ClosenessCard] reveal", { hearts: bond.hearts, restPct, earned, full });
 
     setAnimName(full ? "miomiBondReveal" : "miomiBondFill");
     setPhase("play");
