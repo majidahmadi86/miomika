@@ -74,7 +74,15 @@ export async function awardBond(amount: number): Promise<BondAward | null> {
 
   const fromStage = deriveBond(from).stageIndex;
   const toStage = deriveBond(to).stageIndex;
-  return { from, to, crossedStage: toStage > fromStage, newStageIndex: toStage };
+  const crossedStage = toStage > fromStage;
+  if (crossedStage && typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(STAGE_UP_KEY, String(toStage));
+    } catch {
+      /* non-fatal */
+    }
+  }
+  return { from, to, crossedStage, newStageIndex: toStage };
 }
 
 const DAILY_BOND = 5;
@@ -97,4 +105,20 @@ export async function awardDailyBond(): Promise<BondAward | null> {
   } catch {
     return null;
   }
+}
+
+export const STAGE_UP_KEY = "miomika.bond.pendingStageUp";
+
+const STAGE_UP_LINES: { th: string; en: string }[] = [
+  { th: "เราสนิทกันมากขึ้นแล้วนะคะ~ ตอนนี้เราเป็น{stage}กันแล้วค่ะ", en: "We've grown closer~ we're {stage} now." },
+  { th: "ดูเราสิคะ~ เป็น{stage}กันแล้ว! หนูดีใจมากเลย", en: "Look at us — {stage} already! I'm so happy." },
+];
+
+export function stageUpLine(stageIndex: number): { th: string; en: string } {
+  const stage = BOND_STAGES[stageIndex] ?? BOND_STAGES[BOND_STAGES.length - 1];
+  const v = STAGE_UP_LINES[Math.floor(Math.random() * STAGE_UP_LINES.length)];
+  return {
+    th: v.th.replace("{stage}", stage.th),
+    en: v.en.replace("{stage}", stage.en),
+  };
 }
