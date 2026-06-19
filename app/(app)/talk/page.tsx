@@ -427,8 +427,24 @@ export default function TalkPage() {
           getClient: () => clientRef.current,
           getMedia: () => mediaRef.current,
           getUiLang: () => sessionUiLangRef.current,
-          getKickoffAudience: () =>
-            resolveKickoffAudience(isGuestRef.current, memberContextRef.current),
+          getKickoffAudience: () => {
+            // The turn-client's getMemberContext() is a null stub, so resolveKickoffAudience would
+            // always fall through to "first_time" and Miomi would re-introduce herself every session.
+            // Resolve "have we met" with the signals we actually have: honour real member-context when
+            // present (live path); otherwise a signed-in user has already met her (onboarding) so never
+            // re-introduce, and a guest is a genuine first meeting — introduced only once per device.
+            if (resolveKickoffAudience(isGuestRef.current, memberContextRef.current) === "returning") {
+              return "returning";
+            }
+            if (!isGuestRef.current) return "returning";
+            try {
+              if (window.localStorage.getItem("miomika.talk.met") === "1") return "returning";
+              window.localStorage.setItem("miomika.talk.met", "1");
+              return "first_time";
+            } catch {
+              return "first_time";
+            }
+          },
           isGuest: () => isGuestRef.current,
           isMounted: () => mountedRef.current,
           onLiveUi: (ui: LiveUiPhase) => setLiveUiState(ui),
