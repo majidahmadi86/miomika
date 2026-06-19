@@ -316,8 +316,18 @@ export class MiomiTurnClient {
 
   sendKickoff(lang: "th" | "en", _audience: "first_time" | "returning" = "first_time"): void {
     this.uiLanguage = lang ?? this.uiLanguage;
+    const vibes = [
+      "Oh! Hi hi~ I'm Miomi. So… what are we getting into today?",
+      "Hi~ it's Miomi! I have a feeling today's a good one — what's up?",
+      "Eee, you're here~ I'm Miomi. What kind of mood are we in today?",
+      "Oh hello~ Miomi here. Tell me one little thing that's on your mind~",
+      "Hihi~ I'm Miomi! Shall we get into something fun, or just chat?",
+      "Yay, a visitor~ I'm Miomi. Where are we wandering today?",
+      "Mmm hello~ it's Miomi. What's the first thing you want to say?",
+    ];
+    const vibe = vibes[Math.floor(Math.random() * vibes.length)];
     void this.runHidden(
-      "[kickoff] Greet like a cheeky, delighted little cat — playful and SHORT, in the user's language. Vibe: 'Oh! Hi hi~ I'm Miomi. So… what are we getting into today?'. Keep it to ONE short, breezy line. Do NOT be formal — never 'lovely to see you', 'thrilled', or 'have a wonderful time'. Warm, fun, a touch cheeky. No emojis.",
+      `[kickoff] Greet like a cheeky, delighted little cat — playful and SHORT, in the user's language. Riff in THIS spirit but make it your OWN and fresh — do NOT copy it word-for-word: "${vibe}". Keep it to ONE short, breezy line. Do NOT be formal — never 'lovely to see you', 'thrilled', or 'have a wonderful time'. Warm, fun, a touch cheeky. No emojis.`,
       { isKickoff: true },
     );
   }
