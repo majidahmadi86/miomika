@@ -129,7 +129,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
 
   const heading =
     lang === "th"
-      ? ["ยินดีต้อนรับนะคะ~", "ดีใจที่ได้เจอกันค่า"]
+      ? ["ยินดีต้อนรับนะคะ", "ดีใจที่ได้เจอกันค่า"]
       : ["Welcome", "so glad you're here"];
 
   return (

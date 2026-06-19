@@ -28,7 +28,7 @@ import { awardDailyBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond"
 import { ClosenessCard } from "@/components/home/ClosenessCard";
 import { RemembersCard } from "@/components/home/RemembersCard";
 const HOME_T = {
-  th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ~", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ~", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
+  th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
   en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
 } as const;
 
@@ -65,8 +65,8 @@ function buildHomeGreeting(
     const bodies: Record<Situation, string[]> = {
       first: [
         `Welcome! I'm so happy you're here — want to start with a little ${topic}?`,
-        `Hi~ shall we get to know each other over some ${topic}?`,
-        `You made it~ let's take your first step into ${topic} together.`,
+        `Hi shall we get to know each other over some ${topic}?`,
+        `You made it let's take your first step into ${topic} together.`,
       ],
       today: [
         `${tw}! Ready for a little ${topic}?`,
@@ -76,16 +76,16 @@ function buildHomeGreeting(
       back: [
         `${tw}! Good to see you back — more ${topic}?`,
         `${tw}! It's been a couple of days — shall we get back to ${topic}?`,
-        `${tw}! Missed you~ ready to ease back into ${topic}?`,
+        `${tw}! Missed you ready to ease back into ${topic}?`,
       ],
       long_away: [
         `${tw}! It's been a while — I really missed you. Want to start gently with ${topic}?`,
-        `${tw}! You're back! Let's dust off your ${topic}, no rush~`,
+        `${tw}! You're back! Let's dust off your ${topic}, no rush`,
         `${tw}! So glad you came back — shall we pick ${topic} up again together?`,
       ],
       streak: [
         `${tw}! Day ${streak} — let's keep it going!`,
-        `${tw}! ${streak} days strong~ I'm proud of you. More ${topic}?`,
+        `${tw}! ${streak} days strong I'm proud of you. More ${topic}?`,
         `${tw}! ${streak} days in a row — let's not break it now!`,
       ],
     };
@@ -97,28 +97,28 @@ function buildHomeGreeting(
     tod === "morning" ? "อรุณสวัสดิ์ค่ะ" : tod === "afternoon" ? "สวัสดีตอนบ่ายค่ะ" : tod === "evening" ? "สวัสดีตอนเย็นค่ะ" : "ดึกแล้วนะคะ";
   const bodies: Record<Situation, string[]> = {
     first: [
-      `ยินดีต้อนรับค่ะ~ หนูดีใจมากเลยที่คุณมา มาเริ่ม${topic}กันสักนิดไหมคะ?`,
-      `สวัสดีค่ะ~ มาทำความรู้จักกันผ่าน${topic}ไหมคะ~`,
-      `คุณมาแล้ว~ มาก้าวแรกสู่${topic}ไปด้วยกันนะคะ`,
+      `ยินดีต้อนรับค่ะ หนูดีใจมากเลยที่คุณมา มาเริ่ม${topic}กันสักนิดไหมคะ?`,
+      `สวัสดีค่ะ มาทำความรู้จักกันผ่าน${topic}ไหมคะ`,
+      `คุณมาแล้ว มาก้าวแรกสู่${topic}ไปด้วยกันนะคะ`,
     ],
     today: [
       `${tw} พร้อมฝึก${topic}สักนิดไหมคะ?`,
-      `${tw} มีเวลาสักหน่อยไหมคะ มาฝึก${topic}กัน~`,
+      `${tw} มีเวลาสักหน่อยไหมคะ มาฝึก${topic}กัน`,
       `${tw} มาฝึก${topic}ต่อจากเมื่อก่อนกันค่ะ`,
     ],
     back: [
       `${tw} ดีใจที่ได้เจอกันอีกนะคะ มาฝึก${topic}กันต่อไหมคะ?`,
-      `${tw} หายไปสองสามวันเลยนะคะ~ กลับมาฝึก${topic}กันค่ะ`,
-      `${tw} คิดถึงคุณนะคะ~ พร้อมกลับมาฝึก${topic}กันรึยังคะ?`,
+      `${tw} หายไปสองสามวันเลยนะคะ กลับมาฝึก${topic}กันค่ะ`,
+      `${tw} คิดถึงคุณนะคะ พร้อมกลับมาฝึก${topic}กันรึยังคะ?`,
     ],
     long_away: [
       `${tw} หายไปนานเลยนะคะ หนูคิดถึงมากเลย มาเริ่ม${topic}เบาๆ กันก่อนไหมคะ?`,
-      `${tw} คุณกลับมาแล้ว! มาปัดฝุ่น${topic}กันใหม่ ไม่ต้องรีบนะคะ~`,
-      `${tw} ดีใจมากที่คุณกลับมา~ มาเริ่ม${topic}ด้วยกันอีกครั้งนะคะ`,
+      `${tw} คุณกลับมาแล้ว! มาปัดฝุ่น${topic}กันใหม่ ไม่ต้องรีบนะคะ`,
+      `${tw} ดีใจมากที่คุณกลับมา มาเริ่ม${topic}ด้วยกันอีกครั้งนะคะ`,
     ],
     streak: [
-      `${tw} วันที่ ${streak} แล้ว~ มารักษาสตรีคกันต่อนะคะ!`,
-      `${tw} ${streak} วันติดแล้ว~ หนูภูมิใจในตัวคุณเลยค่ะ ฝึก${topic}ต่อไหมคะ?`,
+      `${tw} วันที่ ${streak} แล้ว มารักษาสตรีคกันต่อนะคะ!`,
+      `${tw} ${streak} วันติดแล้ว หนูภูมิใจในตัวคุณเลยค่ะ ฝึก${topic}ต่อไหมคะ?`,
       `${tw} ครบ ${streak} วันติดกันแล้วนะคะ อย่าเพิ่งหยุดนะ มาฝึก${topic}กันค่ะ`,
     ],
   };
@@ -137,14 +137,14 @@ const TAP_BUBBLE_CYCLE = [
 ] as const;
 
 const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
-const FEED_BUBBLE = { th: "อิ่มแล้วค่า~", en: "All full now" };
-const PLAY_BUBBLE = { th: "เย้~ สนุกจัง!", en: "Yay, so fun!" };
+const FEED_BUBBLE = { th: "อิ่มแล้วค่า", en: "All full now" };
+const PLAY_BUBBLE = { th: "เย้ สนุกจัง!", en: "Yay, so fun!" };
 const GUEST_SIGNUP_STORAGE_KEY = "miomika-guest-signup-moment-v1";
 const LEVEL_UP_LINES: { th: string; en: string }[] = [
-  { th: "เลเวล {level} แล้วนะคะ~ หนูรู้เลยว่าคุณเก่งขึ้นเรื่อยๆ", en: "Level {level} together~ I can tell you're getting it." },
+  { th: "เลเวล {level} แล้วนะคะ หนูรู้เลยว่าคุณเก่งขึ้นเรื่อยๆ", en: "Level {level} together I can tell you're getting it." },
   { th: "ถึงเลเวล {level} แล้ว! ทุกวันที่อยู่ด้วยกัน เราโตขึ้นทีละนิดเลยค่ะ", en: "That's level {level}! Every day with you, we grow a little." },
-  { th: "เลเวล {level} แล้วค่า~ หนูภูมิใจในตัวคุณมากเลยนะคะ", en: "Level {level}~ I'm so proud of how far you've come." },
-  { th: "เราขึ้นเลเวล {level} แล้ว! ขอบคุณที่อยู่เป็นเพื่อนหนูนะคะ~", en: "We hit level {level}! Thanks for keeping me company~" },
+  { th: "เลเวล {level} แล้วค่า หนูภูมิใจในตัวคุณมากเลยนะคะ", en: "Level {level} I'm so proud of how far you've come." },
+  { th: "เราขึ้นเลเวล {level} แล้ว! ขอบคุณที่อยู่เป็นเพื่อนหนูนะคะ", en: "We hit level {level}! Thanks for keeping me company" },
 ];
 
 function pickLevelUpBubble(level: number): { th: string; en: string } {

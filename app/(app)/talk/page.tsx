@@ -1870,19 +1870,19 @@ export default function TalkPage() {
       return guestSignupPrompt;
     }
     if (!audioUnlocked) {
-      return uiLang === "th" ? "แตะเพื่อเริ่มค่า~" : "tap anywhere to begin~";
+      return uiLang === "th" ? "แตะเพื่อเริ่มค่า" : "tap anywhere to begin";
     }
     if (awaitingContinueTap) {
-      return uiLang === "th" ? "แตะเพื่อเรียนต่อค่า~" : "Tap to continue~";
+      return uiLang === "th" ? "แตะเพื่อเรียนต่อค่า" : "Tap to continue";
     }
     if (awaitingMic && liveUiState !== "speaking" && liveUiState !== "connecting") {
-      return uiLang === "th" ? "กดไมค์เมื่อพร้อมพูดค่า~" : "press the mic when you're ready~";
+      return uiLang === "th" ? "กดไมค์เมื่อพร้อมพูดค่า" : "press the mic when you're ready";
     }
-    if (liveUiState === "thinking") return uiLang === "th" ? "หนูกำลังคิดอยู่ค่ะ~" : "thinking~";
+    if (liveUiState === "thinking") return uiLang === "th" ? "หนูกำลังคิดอยู่ค่ะ" : "thinking";
     if (liveUiState === "connecting") return uiLang === "th" ? "กำลังเชื่อมต่อค่า..." : "connecting...";
     if (liveUiState === "listening") return uiLang === "th" ? "กำลังฟังค่า..." : "I'm listening...";
     if (liveUiState === "speaking") return uiLang === "th" ? "หนูกำลังพูดค่า..." : "Miomi is talking...";
-    if (liveUiState === "error") return uiLang === "th" ? "ลองอีกครั้งนะคะ~" : "tap to try again~";
+    if (liveUiState === "error") return uiLang === "th" ? "ลองอีกครั้งนะคะ" : "tap to try again";
     return "";
   })();
 
@@ -1974,8 +1974,8 @@ export default function TalkPage() {
         <PersistentMiomi
           mood={miomiMood}
           uiLang={uiLang}
-          subtitleTh={items.length <= 1 ? "หนูพร้อมแล้วค่า~" : undefined}
-          subtitleEn={items.length <= 1 ? "I'm ready~" : undefined}
+          subtitleTh={items.length <= 1 ? "หนูพร้อมแล้วค่า" : undefined}
+          subtitleEn={items.length <= 1 ? "I'm ready" : undefined}
         />
       )}
 
@@ -1993,12 +1993,12 @@ export default function TalkPage() {
               <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                 {voiceWarn && !voiceExhausted && !roomTimeUp ? (
                   <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "12px", color: "#9A8B73", textAlign: "center", padding: "4px 0" }}>
-                    {uiLang === "en" ? "About a minute of voice left~ then we can keep going by text" : "เหลือเสียงอีกประมาณหนึ่งนาที~ จากนั้นเราคุยกันต่อด้วยข้อความได้นะ"}
+                    {uiLang === "en" ? "About a minute of voice left then we can keep going by text" : "เหลือเสียงอีกประมาณหนึ่งนาที จากนั้นเราคุยกันต่อด้วยข้อความได้นะ"}
                   </div>
                 ) : null}
                 {roomTimeUp ? (
                   <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: 12, color: "#1F7A68", textAlign: "center", padding: "6px 0", display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
-                    <span>{uiLang === "en" ? "That's our session~ take a moment to read back, then see your results." : "ครบเวลาแล้วน้า~ อ่านทบทวนได้เลย แล้วค่อยกดดูผลลัพธ์"}</span>
+                    <span>{uiLang === "en" ? "That's our session take a moment to read back, then see your results." : "ครบเวลาแล้วน้า อ่านทบทวนได้เลย แล้วค่อยกดดูผลลัพธ์"}</span>
                     <button onClick={() => void endRoomSession()} disabled={roomEnding} style={{
                       fontFamily: "'Quicksand', sans-serif", fontSize: 12, fontWeight: 700, padding: "6px 16px",
                       borderRadius: 99, border: "none", background: "linear-gradient(135deg,#6ECDB8,#34A98F)", color: "#FFFFFF", cursor: "pointer",
@@ -2011,13 +2011,13 @@ export default function TalkPage() {
                   fontFamily: "'Quicksand', sans-serif", fontSize: 10, fontWeight: 700, padding: "4px 11px",
                   borderRadius: 99, border: "1px solid rgba(255,255,255,.45)", background: roomSlow ? "#FFFFFF" : "rgba(255,255,255,.14)", color: roomSlow ? "#1F7A68" : "#FFFFFF", cursor: "pointer",
                 }}>
-                  {roomSlow ? "Slow~" : "Normal"}
+                  {roomSlow ? "Slow" : "Normal"}
                 </button>
                 <button onClick={() => setRoomHintsOpen((v) => !v)} style={{
                   fontFamily: "'Quicksand', sans-serif", fontSize: 10, fontWeight: 700, padding: "4px 11px",
                   borderRadius: 99, border: "1px solid rgba(255,255,255,.45)", background: "rgba(255,255,255,.14)", color: "#FFFFFF", cursor: "pointer",
                 }}>
-                  {roomHintsOpen ? "Hide hints" : "Hints~"}
+                  {roomHintsOpen ? "Hide hints" : "Hints"}
                 </button>
                 <button onClick={() => void endRoomSession()} disabled={roomEnding} style={{
                   fontFamily: "'Quicksand', sans-serif", fontSize: 10, fontWeight: 700, padding: "4px 11px",
@@ -2060,7 +2060,7 @@ export default function TalkPage() {
               })}
               {roomLearned.length ? (
                 <div style={{ borderTop: "1px solid #EDE8E0", paddingTop: 6, marginTop: 6 }}>
-                  <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 9.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C2497E", margin: "0 0 4px" }}>New today~</p>
+                  <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 9.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C2497E", margin: "0 0 4px" }}>New today</p>
                   {roomLearned.map((h, hi) => (
                     <p key={hi} style={{ fontFamily: "'Sarabun', 'Quicksand', sans-serif", fontSize: 12, fontWeight: 600, color: "#3C352B", margin: "0 0 3px", lineHeight: 1.45 }}>{h}</p>
                   ))}
@@ -2073,7 +2073,7 @@ export default function TalkPage() {
               {roomLearned.length ? (
                 <div style={{ borderBottom: "1px solid #EDE8E0", paddingBottom: 6, marginBottom: 6 }}>
                   <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 9.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C2497E", margin: "0 0 4px" }}>
-                    From Miomi just now~
+                    From Miomi just now
                   </p>
                   {roomLearned.map((h, hi) => (
                     <p key={hi} style={{ fontFamily: "'Sarabun', 'Quicksand', sans-serif", fontSize: 12.5, fontWeight: 600, color: "#3C352B", margin: "0 0 4px", lineHeight: 1.45 }}>{h}</p>
@@ -2182,7 +2182,7 @@ export default function TalkPage() {
               opacity: 0.85,
             }}
           >
-            {uiLang === "th" ? "แตะที่ไหนก็ได้เพื่อเริ่มค่า~" : "tap anywhere to begin~"}
+            {uiLang === "th" ? "แตะที่ไหนก็ได้เพื่อเริ่มค่า" : "tap anywhere to begin"}
           </p>
         )}
         <div style={{ pointerEvents: "auto" }}>
@@ -2229,8 +2229,8 @@ export default function TalkPage() {
         {voiceExhausted ? (
           <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "12px", color: "#9A8B73", textAlign: "center", padding: "0 4px 8px", lineHeight: 1.45 }}>
             {uiLang === "en"
-              ? "Voice time for today is all used up~ type here and I'll still be with you"
-              : "เวลาเสียงวันนี้หมดแล้วนะ~ พิมพ์ตรงนี้ได้เลย หนูยังอยู่กับคุณค่ะ"}
+              ? "Voice time for today is all used up type here and I'll still be with you"
+              : "เวลาเสียงวันนี้หมดแล้วนะ พิมพ์ตรงนี้ได้เลย หนูยังอยู่กับคุณค่ะ"}
           </div>
         ) : null}
         <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#FFFFFF", border: "0.5px solid #EDE8E0", borderRadius: "26px", padding: "5px 5px 5px 16px", boxShadow: "0 2px 10px rgba(26,26,24,0.04)" }}>
@@ -2286,8 +2286,8 @@ export default function TalkPage() {
               <p style={{ fontFamily: "'Kanit', sans-serif", fontSize: "22px", fontWeight: 600, color: "#1A1A18", margin: "0 0 8px", lineHeight: 1.3 }}>
                 {guestSheetReason === "save"
                   ? uiLang === "en"
-                    ? "Sign up to save your words~"
-                    : "สมัครเพื่อบันทึกคำศัพท์นะคะ~"
+                    ? "Sign up to save your words"
+                    : "สมัครเพื่อบันทึกคำศัพท์นะคะ"
                   : uiLang === "en"
                     ? "Sign in to talk with Miomi"
                     : "สมัครเพื่อพูดคุยกับหนูค่า"}

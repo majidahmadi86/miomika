@@ -214,18 +214,18 @@ export function WordCardV3({
               (saveState === "saved" ? (
                 <div style={{ width: "100%", height: "38px", borderRadius: "11px", background: "rgba(52,169,143,0.08)", border: "1px solid rgba(52,169,143,0.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
                   <BookmarkCheck style={{ width: "15px", height: "15px", color: GOLD }} strokeWidth={2} />
-                  <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: GOLD }}>{isThaiLearner ? "บันทึกแล้วค่า~" : "Saved"}</span>
+                  <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: GOLD }}>{isThaiLearner ? "บันทึกแล้วค่า" : "Saved"}</span>
                 </div>
               ) : (
                 <motion.button type="button" onClick={onSaveTap} whileTap={{ scale: 0.98 }} style={{ width: "100%", height: "38px", borderRadius: "11px", background: "#FFFFFF", border: `1.5px solid ${GOLD}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
                   <BookmarkCheck style={{ width: "15px", height: "15px", color: GOLD }} strokeWidth={2} />
-                  <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: GOLD }}>{isThaiLearner ? "สมัครไว้ หนูจะเก็บคำให้นะคะ~" : "Sign up — I'll keep your words~"}</span>
+                  <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: GOLD }}>{isThaiLearner ? "สมัครไว้ หนูจะเก็บคำให้นะคะ" : "Sign up — I'll keep your words"}</span>
                 </motion.button>
               ))}
             {onPronunciationCheck && (
               <motion.button type="button" onClick={() => onPronunciationCheck(word)} whileTap={{ scale: 0.98 }} style={{ width: "100%", height: "38px", borderRadius: "11px", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
                 <Mic style={{ width: "15px", height: "15px", color: "#FFFFFF" }} strokeWidth={2} />
-                <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>{isThaiLearner ? "ลองพูดดูค่า~" : "Try saying this"}</span>
+                <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>{isThaiLearner ? "ลองพูดดูค่า" : "Try saying this"}</span>
               </motion.button>
             )}
           </div>
