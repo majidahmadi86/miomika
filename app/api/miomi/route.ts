@@ -25,6 +25,7 @@ import { saveExchange } from "@/lib/brain/memory";
 import { readBrainState, type BrainState } from "@/lib/brain/state";
 import { buildBrainPrompt } from "@/lib/brain/prompt";
 import { buildMemoryContext } from "@/lib/ai/memory-context";
+import { fetchUserMemories, extractAndStoreMemories } from "@/lib/ai/memory-store";
 import { detectExplicitUiLanguageRequest } from "@/lib/brain/language";
 import { resolveOrGenerateWord } from "@/lib/brain/word-content";
 import { resolvePhonetics } from "@/lib/brain/phonetics";
@@ -132,6 +133,7 @@ export async function POST(req: NextRequest) {
 
     // ── BRAIN: read state → build model-owned prompt ─────────────────────────
     let adaptivePrompt: string;
+    let userMemories: string[] = [];
 
     try {
       brainState = await readBrainState({
@@ -144,7 +146,8 @@ export async function POST(req: NextRequest) {
 
       adaptivePrompt = buildBrainPrompt({ state: brainState, userInput, mode });
       adaptivePrompt += `\n\nNAME: Your name is Miomi. Never spell it out, never count its syllables, never write it in Thai script when speaking English. Just say "Miomi" naturally.`;
-      adaptivePrompt += buildMemoryContext(profile);
+      userMemories = serverUserId ? await fetchUserMemories(serverUserId) : [];
+      adaptivePrompt += buildMemoryContext(profile, userMemories);
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
       }
@@ -419,7 +422,17 @@ export async function POST(req: NextRequest) {
       );
 
       log("miomi", "ai-call", { engine: "router", promptLen: adaptivePrompt.length });
-      const result = await getAIResponse(formattedMessages, adaptivePrompt, brainState.uiLanguage);
+      const [result] = await Promise.all([
+        getAIResponse(formattedMessages, adaptivePrompt, brainState.uiLanguage),
+        serverUserId
+          ? extractAndStoreMemories({
+              userId: serverUserId,
+              userInput,
+              existing: userMemories,
+              uiLanguage: brainState.uiLanguage,
+            })
+          : Promise.resolve(),
+      ]);
       content = result.content;
       servedVia = `ai_${result.engine}__${mode ?? "auto"}`;
       wasFailover = result.wasFailover;
