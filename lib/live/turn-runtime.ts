@@ -35,6 +35,7 @@ export type TurnRuntimeDeps = TurnRuntimeCallbacks & {
   getMedia: () => MediaHandler | null;
   getUiLang: () => "th" | "en";
   getKickoffAudience?: () => "first_time" | "returning";
+  getKickoffSeed?: () => string | null;
   getLessonNudgeHints?: () => Pick<
     TurnContext,
     "nextPlannedWord" | "lessonTopic" | "lessonComplete"
@@ -98,7 +99,11 @@ export class TurnRuntime {
         case "send_kickoff":
           logEvent({ kind: "state", level: "info", message: "greeting kickoff emit", data: { lang: effect.lang } });
           this.deps.onKickoffCanvas();
-          client?.sendKickoff(effect.lang, this.deps.getKickoffAudience?.() ?? "first_time");
+          client?.sendKickoff(
+            effect.lang,
+            this.deps.getKickoffAudience?.() ?? "first_time",
+            this.deps.getKickoffSeed?.() ?? null,
+          );
           break;
         case "send_hidden_context":
           media?.deferUntilPlaybackIdle(() => client?.sendHiddenContext(effect.text));

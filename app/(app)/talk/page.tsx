@@ -427,6 +427,16 @@ export default function TalkPage() {
           getClient: () => clientRef.current,
           getMedia: () => mediaRef.current,
           getUiLang: () => sessionUiLangRef.current,
+          getKickoffSeed: () => {
+            // A memory the user tapped on home ("talk about this") — consumed once.
+            try {
+              const s = window.sessionStorage.getItem("miomika.talk.seed");
+              if (s) window.sessionStorage.removeItem("miomika.talk.seed");
+              return s && s.trim() ? s.trim() : null;
+            } catch {
+              return null;
+            }
+          },
           getKickoffAudience: () => {
             // The turn-client's getMemberContext() is a null stub, so resolveKickoffAudience would
             // always fall through to "first_time" and Miomi would re-introduce herself every session.

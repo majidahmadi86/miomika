@@ -502,13 +502,18 @@ export class MiomiLiveClient {
   sendKickoff(
     lang: "th" | "en",
     audience: "first_time" | "returning" = "first_time",
+    seedTopic: string | null = null,
   ): void {
     if (!this.session || !this.connected) return;
+    const text =
+      seedTopic && seedTopic.trim()
+        ? `[kickoff] They just tapped a memory on their home screen because they want to talk about THIS: "${seedTopic.trim()}". Open by warmly, naturally bringing it up — like it's been on your mind too — in ONE short, breezy, curious line in the user's language, a touch cheeky, inviting them to tell you more. Do NOT introduce yourself or say your name. No emojis. Do NOT be formal.`
+        : buildKickoffPrompt(lang, audience, this.memberContext);
     this.session.sendClientContent({
       turns: [
         {
           role: "user",
-          parts: [{ text: buildKickoffPrompt(lang, audience, this.memberContext) }],
+          parts: [{ text }],
         },
       ],
       turnComplete: true,

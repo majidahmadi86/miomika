@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const INTROS: { th: string; en: string }[] = [
@@ -43,6 +44,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export function RemembersCard({ lang }: { lang: "th" | "en" }) {
+  const router = useRouter();
   const [memories, setMemories] = useState<string[]>([]);
   const [idx, setIdx] = useState(0);
   const [introIdx, setIntroIdx] = useState(0);
@@ -94,8 +96,23 @@ export function RemembersCard({ lang }: { lang: "th" | "en" }) {
   const fact = memories[idx] ?? memories[0];
   const intro = INTROS[introIdx] ?? INTROS[0];
 
+  const openChat = () => {
+    try {
+      window.sessionStorage.setItem("miomika.talk.seed", fact);
+    } catch {
+      /* non-fatal */
+    }
+    router.push("/talk");
+  };
+
   return (
-    <div className="rounded-card border border-line bg-surface p-4 shadow-card" style={{ position: "relative", overflow: "hidden" }}>
+    <button
+      type="button"
+      onClick={openChat}
+      aria-label={lang === "th" ? "คุยกับมิโอมิเรื่องนี้" : "Chat with Miomi about this"}
+      className="rounded-card border border-line bg-surface p-4 shadow-card"
+      style={{ position: "relative", overflow: "hidden", width: "100%", display: "block", textAlign: "left", cursor: "pointer", appearance: "none" }}
+    >
       <div className="flex items-start gap-2.5" style={{ opacity: shown ? 1 : 0, transition: "opacity .45s ease" }}>
         <span aria-hidden="true" style={{ marginTop: "1px", display: "inline-flex", flex: "0 0 auto", width: 22, height: 22, alignItems: "center", justifyContent: "center", borderRadius: 9999, background: "#EEEAF7" }}>
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#7C6BA8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -104,11 +121,14 @@ export function RemembersCard({ lang }: { lang: "th" | "en" }) {
             <circle cx="9" cy="20.5" r="0.7" />
           </svg>
         </span>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <p className="text-[11.5px] font-semibold" style={{ fontFamily: "'Quicksand', sans-serif", color: "#7C6BA8" }}>{lang === "th" ? intro.th : intro.en}</p>
           <p className="mt-0.5 text-[13.5px]" style={{ fontFamily: "'Quicksand', sans-serif", color: "#2A2622" }}>{fact}</p>
         </div>
+        <span aria-hidden="true" style={{ marginTop: "2px", flex: "0 0 auto", color: "#C9BEDF" }}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+        </span>
       </div>
-    </div>
+    </button>
   );
 }

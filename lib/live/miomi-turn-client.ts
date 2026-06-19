@@ -314,8 +314,21 @@ export class MiomiTurnClient {
 
   // ---- kickoff / greeting -------------------------------------------------
 
-  sendKickoff(lang: "th" | "en", audience: "first_time" | "returning" = "first_time"): void {
+  sendKickoff(
+    lang: "th" | "en",
+    audience: "first_time" | "returning" = "first_time",
+    seedTopic: string | null = null,
+  ): void {
     this.uiLanguage = lang ?? this.uiLanguage;
+
+    // Memory-as-invitation: they tapped a remembered fact on home to talk about THIS.
+    if (seedTopic && seedTopic.trim()) {
+      void this.runHidden(
+        `[kickoff] They just tapped a memory on their home screen because they want to talk about THIS: "${seedTopic.trim()}". Open by warmly, naturally bringing it up — like it's been on your mind too — in ONE short, breezy, curious line in the user's language, a touch cheeky, inviting them to tell you more. Do NOT introduce yourself or say your name. No emojis. Do NOT be formal.`,
+        { isKickoff: true },
+      );
+      return;
+    }
 
     // First-ever meeting: a quick, charming hello WITH her name.
     const firstTime = [
