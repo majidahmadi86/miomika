@@ -58,8 +58,8 @@ export const LIBRARY_TEMPLATES: LibraryResponse[] = [
       /ชื่ออะไร/,
     ],
     response: {
-      speech_th: "หนูชื่อมิโอมิค่า~ เป็นแมวที่จะช่วยสอนภาษาให้คุณค่า อยากเรียน English หรือ Thai ดีคะ?",
-      speech_en: "I'm Miomi~ a cat who teaches you language! Want to learn English or Thai?",
+      speech_th: "หนูเป็นแมวน้อยที่ชอบภาษาแล้วก็ชอบหาเพื่อนใหม่ค่า~ อยากเรียน English หรือ Thai ดีคะ?",
+      speech_en: "I'm a little cat who loves languages and making friends~ want to learn English or Thai?",
     },
     follow_up: {
       type: "none",
@@ -271,8 +271,8 @@ export const GREETING_BY_TIME = {
 
 export const GREETING_APPENDS = {
   first_session_ever: {
-    th: "หนูชื่อมิโอมิค่า อยากเรียนภาษาอะไรกับหนูดีคะ?",
-    en: "I'm Miomi. What language would you like to learn?",
+    th: "อยากเรียนภาษาอะไรกับหนูดีคะ?",
+    en: "What language would you like to learn with me?",
   },
   returning_under_24h: {
     th: "วันนี้คุยอะไรกันดีคะ?",

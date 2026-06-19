@@ -332,10 +332,10 @@ export class MiomiTurnClient {
 
     // First-ever meeting: a quick, charming hello WITH her name.
     const firstTime = [
-      "Oh! Hi hi~ I'm Miomi. So… what are we getting into today?",
-      "Hi~ I'm Miomi! So glad you're here — what shall we talk about?",
-      "Eee, a new friend~ I'm Miomi! What's on your mind?",
-      "Hihi~ I'm Miomi. Tell me one little thing about your day~",
+      "Oh! Hi hi~ so… what are we getting into today?",
+      "Hi~ so glad you're here — what shall we talk about?",
+      "Eee, a new friend~ what's on your mind?",
+      "Hihi~ tell me one little thing about your day~",
     ];
     // Already acquainted: NO introduction, NO name — just familiar warmth.
     const returning = [
@@ -349,11 +349,6 @@ export class MiomiTurnClient {
 
     const pool = audience === "returning" ? returning : firstTime;
     const vibe = pool[Math.floor(Math.random() * pool.length)];
-    const introRule =
-      audience === "returning"
-        ? "They ALREADY KNOW you — do NOT introduce yourself, do NOT say your name, no 'I'm Miomi'. Greet like a friend picking back up warmly."
-        : "This is your first-ever meeting — a quick, charming hello with your name is welcome.";
-
     void this.runHidden(
       `[kickoff] Greet like a cheeky, delighted little cat — playful and SHORT, in the user's language. Lead with THEM, not yourself. Do NOT introduce yourself or state your name — never say 'I'm Miomi' or 'my name is'. Just open warmly and pull them in. Riff in THIS spirit but make it your OWN and fresh — do NOT copy it word-for-word: "${vibe}". Keep it to ONE short, breezy line. Do NOT be formal — never 'lovely to see you', 'thrilled', or 'have a wonderful time'. Warm, fun, a touch cheeky. No emojis.`,
       { isKickoff: true },

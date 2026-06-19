@@ -65,7 +65,7 @@ function buildHomeGreeting(
     const bodies: Record<Situation, string[]> = {
       first: [
         `Welcome! I'm so happy you're here — want to start with a little ${topic}?`,
-        `Hi, I'm Miomi! Shall we get to know each other over some ${topic}?`,
+        `Hi~ shall we get to know each other over some ${topic}?`,
         `You made it~ let's take your first step into ${topic} together.`,
       ],
       today: [
@@ -98,7 +98,7 @@ function buildHomeGreeting(
   const bodies: Record<Situation, string[]> = {
     first: [
       `ยินดีต้อนรับค่ะ~ หนูดีใจมากเลยที่คุณมา มาเริ่ม${topic}กันสักนิดไหมคะ?`,
-      `สวัสดีค่ะ หนูชื่อมิโอมิ! มาทำความรู้จักกันผ่าน${topic}ไหมคะ~`,
+      `สวัสดีค่ะ~ มาทำความรู้จักกันผ่าน${topic}ไหมคะ~`,
       `คุณมาแล้ว~ มาก้าวแรกสู่${topic}ไปด้วยกันนะคะ`,
     ],
     today: [
