@@ -309,6 +309,8 @@ export default function HomePage() {
   const reduceMotion = useReducedMotion();
   const { isGuest, authReady, dismissGuestInvite } = useGuestExploration();
   const { profile } = useProfile();
+  const [homeRevealReady, setHomeRevealReady] = useState(false);
+  const handleHomeReady = useCallback(() => setHomeRevealReady(true), []);
 
   const uiLang = useMemo<Language>(() => {
     if (profile?.ui_language === "en" || profile?.ui_language === "th") return profile.ui_language;
@@ -866,7 +868,7 @@ export default function HomePage() {
   return (
     <>
       <Suspense fallback={null}><CelebrationTrigger /></Suspense>
-      <WelcomeScreen />
+      <WelcomeScreen onComplete={handleHomeReady} />
       <AppShell>
         <div className="flex h-full max-h-full flex-col overflow-hidden">
           <style>{`
@@ -1229,7 +1231,7 @@ export default function HomePage() {
                 <section className="flex flex-col gap-3">
                   <p className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle" style={{ fontFamily: "'Quicksand', sans-serif" }}>{HOME_T[lang].today}</p>
 
-                  <ClosenessCard points={profile?.bond_points ?? 0} lang={lang} />
+                  <ClosenessCard points={profile?.bond_points ?? 0} lang={lang} active={homeRevealReady} />
 
                   <div className="rounded-card border border-line bg-surface p-4 shadow-card">
                     <div className="flex items-center justify-between">

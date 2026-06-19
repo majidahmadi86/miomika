@@ -66,6 +66,7 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
     if (_welcomeShownInSession) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDecided(true);
+      onComplete?.();
       return;
     }
 
@@ -73,7 +74,8 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
     _welcomeShownInSession = true;
     setDecided(true);
     if (decision) setShouldShow(true);
-  }, [profile, authReady]);
+    else onComplete?.();
+  }, [profile, authReady, onComplete]);
 
   useEffect(() => {
     if (!shouldShow) return;
