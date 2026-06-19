@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/client";
 
-export const BOND_THRESHOLDS = [0, 30, 90, 200, 400] as const;
+export const POINTS_PER_HEART = 10;
+export const STAGE_AT_HEARTS = [0, 3, 7, 14, 25] as const;
 
 export const BOND_STAGES: { th: string; en: string }[] = [
   { th: "เพื่อนใหม่", en: "New friends" },
@@ -14,22 +15,25 @@ export const BOND_STAGES: { th: string; en: string }[] = [
 
 export interface BondState {
   points: number;
+  hearts: number;
+  heartPct: number;
   stageIndex: number;
   label: { th: string; en: string };
-  nextAt: number | null;
-  pctToNext: number;
+  heartsToNext: number | null;
 }
 
 export function deriveBond(points: number): BondState {
   const p = Math.max(0, Math.floor(points));
+  const hearts = Math.floor(p / POINTS_PER_HEART);
+  const heartPct = (p % POINTS_PER_HEART) / POINTS_PER_HEART;
   let stageIndex = 0;
-  for (let i = 0; i < BOND_THRESHOLDS.length; i++) {
-    if (p >= BOND_THRESHOLDS[i]) stageIndex = i;
+  for (let i = 0; i < STAGE_AT_HEARTS.length; i++) {
+    if (hearts >= STAGE_AT_HEARTS[i]) stageIndex = i;
   }
-  const curAt = BOND_THRESHOLDS[stageIndex];
-  const nextAt = stageIndex < BOND_THRESHOLDS.length - 1 ? BOND_THRESHOLDS[stageIndex + 1] : null;
-  const pctToNext = nextAt == null ? 1 : Math.min(1, (p - curAt) / (nextAt - curAt));
-  return { points: p, stageIndex, label: BOND_STAGES[stageIndex], nextAt, pctToNext };
+  const nextStageHearts =
+    stageIndex < STAGE_AT_HEARTS.length - 1 ? STAGE_AT_HEARTS[stageIndex + 1] : null;
+  const heartsToNext = nextStageHearts == null ? null : Math.max(0, nextStageHearts - hearts);
+  return { points: p, hearts, heartPct, stageIndex, label: BOND_STAGES[stageIndex], heartsToNext };
 }
 
 export interface BondAward {
@@ -85,7 +89,7 @@ export async function awardBond(amount: number): Promise<BondAward | null> {
   return { from, to, crossedStage, newStageIndex: toStage };
 }
 
-const DAILY_BOND = 5;
+const DAILY_BOND = 10;
 const DAILY_KEY = "miomika.bond.lastDaily";
 
 function todayKey(): string {

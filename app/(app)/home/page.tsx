@@ -24,7 +24,8 @@ import { home } from "@/lib/voice/warmth";
 import { detectLang, speak } from "@/lib/voice/tts";
 import type { Language } from "@/lib/i18n/server";
 import { useUILanguage } from "@/lib/i18n/client";
-import { awardDailyBond, deriveBond, BOND_STAGES, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
+import { awardDailyBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
+import { ClosenessCard } from "@/components/home/ClosenessCard";
 const HOME_T = {
   th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ~", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ~", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
   en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
@@ -330,7 +331,6 @@ export default function HomePage() {
           : "ภาษาไทย"
         : null;
   const greeting = buildHomeGreeting(lang, targetName, profile?.streak ?? 0, greetHour, profile?.last_seen_at ?? null);
-  const bond = deriveBond(profile?.bond_points ?? 0);
 
   const posX = useMotionValue(0);
   const posY = useMotionValue(0);
@@ -1229,25 +1229,7 @@ export default function HomePage() {
                 <section className="flex flex-col gap-3">
                   <p className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle" style={{ fontFamily: "'Quicksand', sans-serif" }}>{HOME_T[lang].today}</p>
 
-                  <div className="rounded-card border border-line bg-surface p-4 shadow-card">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Heart className="h-4 w-4" style={{ color: "#F19CC4" }} fill="#F9C2DC" strokeWidth={2} />
-                        <span className="text-[14px] font-semibold" style={{ fontFamily: "'Quicksand', sans-serif", color: "#C2548A" }}>{bond.label[lang]}</span>
-                      </span>
-                      <span className="text-[12px] text-ink-muted">{lang === "en" ? "Closeness" : "ความสนิท"}</span>
-                    </div>
-                    <div className="mt-3 h-[7px] overflow-hidden rounded-full" style={{ background: "#F3E6EC" }}>
-                      <div className="h-full rounded-full" style={{ width: `${Math.round(bond.pctToNext * 100)}%`, background: "linear-gradient(90deg, #F9A8D4, #F178B6)" }} />
-                    </div>
-                    <p className="mt-2 text-[11px] text-ink-muted">
-                      {bond.nextAt == null
-                        ? (lang === "en" ? "You two are inseparable~" : "คุณสองคนสนิทกันสุดๆ แล้วค่ะ~")
-                        : (lang === "en"
-                            ? `${bond.nextAt - bond.points} to ${BOND_STAGES[bond.stageIndex + 1].en}`
-                            : `อีก ${bond.nextAt - bond.points} ถึง${BOND_STAGES[bond.stageIndex + 1].th}`)}
-                    </p>
-                  </div>
+                  <ClosenessCard points={profile?.bond_points ?? 0} lang={lang} />
 
                   <div className="rounded-card border border-line bg-surface p-4 shadow-card">
                     <div className="flex items-center justify-between">
