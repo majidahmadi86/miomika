@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const INTROS: { th: string; en: string }[] = [
-  { th: "มิโอมิยังจำได้นะคะ~", en: "Miomi still remembers~" },
-  { th: "หนูนึกถึงเรื่องนี้อยู่เลยค่ะ~", en: "I was just thinking about this~" },
-  { th: "เรื่องที่หนูจำเกี่ยวกับคุณได้~", en: "Something I remember about you~" },
-  { th: "หนูสงสัยอยู่ว่าตอนนี้เป็นยังไงบ้าง~", en: "I wonder how this is going~" },
-  { th: "หนูเก็บเรื่องนี้ไว้ในใจนะคะ~", en: "I'm keeping this close~" },
+  { th: "มิโอมิยังจำได้นะคะ", en: "Miomi still remembers" },
+  { th: "หนูนึกถึงเรื่องนี้อยู่เลยค่ะ", en: "I was just thinking about this" },
+  { th: "เรื่องที่หนูจำเกี่ยวกับคุณได้", en: "Something I remember about you" },
+  { th: "หนูสงสัยอยู่ว่าตอนนี้เป็นยังไงบ้าง", en: "I wonder how this is going" },
+  { th: "หนูเก็บเรื่องนี้ไว้ในใจนะคะ", en: "I'm keeping this close" },
 ];
 
 function humanize(fact: string): string {

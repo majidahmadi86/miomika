@@ -454,7 +454,7 @@ export default function LearnPage() {
         await refresh(viewLevel ?? undefined);
         setActiveScenario({ c: coursePos, s: scenarioPos });
       } else if (j.reason === "pro_required") {
-        setSpeakMsg("This scene unlocks with Pro — the first session of every course is yours free~");
+        setSpeakMsg("This scene unlocks with Pro — the first session of every course is yours free");
       } else {
         setSpeakMsg("Miomi could not set that scene — try once more.");
       }
@@ -523,7 +523,7 @@ export default function LearnPage() {
         j = (await r.json()) as SessionResp;
         if (j.ok || (j.reason !== "plan_failed" && j.reason !== "content_incomplete")) break;
         if (attempt === 0) {
-          setSpeakMsg("Almost ready — Miomi is trying once more~");
+          setSpeakMsg("Almost ready — Miomi is trying once more");
         }
       }
       if (j.ok && j.sessionId && j.plan) {
@@ -543,7 +543,7 @@ export default function LearnPage() {
           return;
         }
       } else if (j.reason === "pro_required") {
-        setSpeakMsg("Sessions beyond the first of each course are Pro — your free room is session one~");
+        setSpeakMsg("Sessions beyond the first of each course are Pro — your free room is session one");
       } else {
         setSpeakMsg("Miomi could not prepare the room — try once more.");
       }
@@ -680,7 +680,7 @@ export default function LearnPage() {
                 Your {targetName} path
               </h1>
               <p style={{ ...font, fontSize: 12, fontWeight: 600, color: MUTED, margin: "2px 0 0" }}>
-                Planned by Miomi — she walks every step with you~
+                Planned by Miomi — she walks every step with you
               </p>
             </div>
           </div>
@@ -725,7 +725,7 @@ export default function LearnPage() {
                 {courses.length ? `${scenesDone} of ${scenesTotal} sessions spoken` : "Your private speaking room with Miomi"}
               </span>
               <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,.85)", marginTop: 1 }}>
-                The first session of every course is free~
+                The first session of every course is free
               </span>
             </span>
           </button>
@@ -779,7 +779,7 @@ export default function LearnPage() {
                   <Image src="/miomi/head-happy.png" alt="Miomi celebrating" width={60} height={60} style={{ objectFit: "contain" }} />
                 </span>
                 <h2 style={{ ...font, fontSize: 18, fontWeight: 700, color: INK_STRONG, margin: "10px 0 0", lineHeight: 1.25 }}>
-                  Session complete{typeof resultsSession.results?.minutes === "number" && resultsSession.results.minutes > 0 ? ` — you spoke for ${resultsSession.results.minutes} minute${resultsSession.results.minutes === 1 ? "" : "s"}.` : "~"}
+                  Session complete{typeof resultsSession.results?.minutes === "number" && resultsSession.results.minutes > 0 ? ` — you spoke for ${resultsSession.results.minutes} minute${resultsSession.results.minutes === 1 ? "" : "s"}.` : ""}
                 </h2>
                 <p style={{ ...font, fontSize: 12, fontWeight: 600, color: MUTED, margin: "4px 0 0" }}>
                   {resultsSession.library.title_en} · {resultsSession.library.cefr_level} · {(resultsSession.results?.objectives_done ?? []).length} of {resultsSession.library.plan.objectives.length} objectives earned
@@ -825,7 +825,7 @@ export default function LearnPage() {
 
               {(resultsSession.results?.learned ?? []).length ? (
                 <div style={{ background: "#FFFFFF", border: "1px solid #F9A8D4", borderRadius: 18, padding: "13px 14px", marginBottom: 11 }}>
-                  <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C2497E", margin: "0 0 6px" }}>New from your session — Miomi taught these in class~</p>
+                  <p style={{ ...font, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C2497E", margin: "0 0 6px" }}>New from your session — Miomi taught these in class</p>
                   {(resultsSession.results?.learned ?? []).map((h, hi) => (
                     <div key={hi} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "7px 0", borderBottom: hi < (resultsSession.results?.learned ?? []).length - 1 ? `1px solid ${BORDER}` : "none" }}>
                       <SoundBtn onClick={() => say(h.split("—")[0]?.trim() || h)} />
@@ -854,7 +854,7 @@ export default function LearnPage() {
                 <p style={{ ...font, fontSize: 11, fontWeight: 600, color: INK, lineHeight: 1.45, margin: 0 }}>
                   <b>Share this session</b> — your friend gets their first room free, you earn 30฿
                 </p>
-                <button onClick={() => { try { void navigator.share?.({ title: "Miomika", text: `I just finished a Confident Speaking session with Miomi~ ${resultsSession.library?.title_en ?? ""}`, url: "https://miomika.com" }); } catch { /* share sheet optional */ } }} style={{
+                <button onClick={() => { try { void navigator.share?.({ title: "Miomika", text: `I just finished a Confident Speaking session with Miomi ${resultsSession.library?.title_en ?? ""}`, url: "https://miomika.com" }); } catch { /* share sheet optional */ } }} style={{
                   ...font, display: "inline-flex", alignItems: "center", gap: 5, border: "1.5px solid #34A98F", background: "#FFFFFF",
                   color: TEAL_DEEP, borderRadius: 99, padding: "7px 13px", fontSize: 11, fontWeight: 700, cursor: "pointer", flexShrink: 0,
                 }}>Share</button>
@@ -867,7 +867,7 @@ export default function LearnPage() {
                 }}>Back to Speak</button>
               </div>
               <p style={{ ...font, fontSize: 10.5, fontWeight: 600, color: MUTED, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 }}>
-                {`Notes are Miomi's coaching read — sound grading is coming in an update~`}
+                {`Notes are Miomi's coaching read — sound grading is coming in an update`}
               </p>
             </>
           ) : pendingRoom ? (
@@ -885,7 +885,7 @@ export default function LearnPage() {
               </div>
               <div style={{ background: "#FEF1E3", border: "1px solid #F4D9BC", borderRadius: 18, padding: "13px 14px", marginBottom: 12 }}>
                 <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: "#7A4F26", margin: 0, lineHeight: 1.55 }}>
-                  <b style={{ fontWeight: 700 }}>The scene:</b> {pendingRoom.plan.scene} <b style={{ fontWeight: 700 }}>Just you and Miomi — no one else hears a thing~</b>
+                  <b style={{ fontWeight: 700 }}>The scene:</b> {pendingRoom.plan.scene} <b style={{ fontWeight: 700 }}>Just you and Miomi — no one else hears a thing</b>
                 </p>
               </div>
               <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 12 }}>
@@ -924,7 +924,7 @@ export default function LearnPage() {
                 Enter your room
               </button>
               <p style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 }}>
-                A full guided session — warm-up to exit ticket, ~10 minutes. Uses your speaking minutes.
+                A full guided session — warm-up to exit ticket, about 10 minutes. Uses your speaking minutes.
               </p>
             </>
           ) : activeScene && activeCourse && activeScenario ? (
@@ -944,7 +944,7 @@ export default function LearnPage() {
               </div>
               <div style={{ background: "#FEF1E3", border: "1px solid #F4D9BC", borderRadius: 18, padding: "13px 14px", marginBottom: 12 }}>
                 <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: "#7A4F26", margin: 0, lineHeight: 1.55 }}>
-                  <b style={{ fontWeight: 700 }}>The scene:</b> {activeScene.scene_en} <b style={{ fontWeight: 700 }}>Just you and Miomi — no one else hears a thing~</b>
+                  <b style={{ fontWeight: 700 }}>The scene:</b> {activeScene.scene_en} <b style={{ fontWeight: 700 }}>Just you and Miomi — no one else hears a thing</b>
                 </p>
               </div>
               <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 12 }}>
@@ -964,7 +964,7 @@ export default function LearnPage() {
                 </p>
                 <ArcStrip />
                 <p style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, margin: "9px 0 0", lineHeight: 1.5 }}>
-                  Helper phrases wait on your hint drawer inside — one tap whenever you need them~
+                  Helper phrases wait on your hint drawer inside — one tap whenever you need them
                 </p>
               </div>
               <button onClick={() => void enterRoom({ coursePos: activeScenario.c, scenarioPos: activeScenario.s })} disabled={roomStarting} style={{
@@ -975,7 +975,7 @@ export default function LearnPage() {
                 {roomStarting ? "Preparing your room…" : "Enter your room"}
               </button>
               <p style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 }}>
-                A full guided session — warm-up to exit ticket, ~10 minutes. Uses your speaking minutes.
+                A full guided session — warm-up to exit ticket, about 10 minutes. Uses your speaking minutes.
               </p>
               {speakMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "8px 0 0", textAlign: "center" }}>{speakMsg}</p> : null}
             </>
@@ -1001,7 +1001,7 @@ export default function LearnPage() {
             /* ---------- COURSE LIST + ESP + YOUR SESSIONS ---------- */
             <>
               <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: MUTED, margin: "0 2px 12px", lineHeight: 1.55 }}>
-                <b style={{ color: INK_STRONG }}>Your private speaking room.</b> Warm-up to exit ticket, Miomi leading every step — the first session of every course is free~
+                <b style={{ color: INK_STRONG }}>Your private speaking room.</b> Warm-up to exit ticket, Miomi leading every step — the first session of every course is free
               </p>
 
               {/* Continue banner — an unfinished room is one tap away */}
@@ -1012,7 +1012,7 @@ export default function LearnPage() {
                   </span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ ...font, display: "block", fontSize: 13, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {unfinished.title_en || "Your session"} is waiting~
+                      {unfinished.title_en || "Your session"} is waiting
                     </span>
                     <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>Pick up right where you left off</span>
                   </span>
@@ -1041,7 +1041,7 @@ export default function LearnPage() {
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Create your own session</span>
                       <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
-                        Interview prep, business meetings, anything — your topic, your style~
+                        Interview prep, business meetings, anything — your topic, your style
                       </span>
                     </span>
                     <ProChip />
@@ -1261,7 +1261,7 @@ export default function LearnPage() {
                   <span style={{ minWidth: 0 }}>
                     <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Create your own lesson</span>
                     <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
-                      Any topic, your level — tell Miomi and she plans it just for you~
+                      Any topic, your level — tell Miomi and she plans it just for you
                     </span>
                   </span>
                 </button>
@@ -1566,7 +1566,7 @@ export default function LearnPage() {
               <span style={{ minWidth: 0 }}>
                 <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Say it out loud with Miomi</span>
                 <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
-                  Everything you learn here, you two can chat about~
+                  Everything you learn here, you two can chat about
                 </span>
               </span>
             </Link>
@@ -1577,7 +1577,7 @@ export default function LearnPage() {
       {roomIntro ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(31,30,28,0.55)", padding: 20 }}>
           <div style={{ maxWidth: 360, width: "100%", background: "#FFFDF8", borderRadius: 20, padding: "24px 22px", boxShadow: "0 12px 40px rgba(0,0,0,0.18)", fontFamily: "'Sarabun', sans-serif", color: "#3A332B" }}>
-            <h3 style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 18, fontWeight: 700, margin: "0 0 12px", color: "#1F7A68" }}>How Speaking Rooms work~</h3>
+            <h3 style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 18, fontWeight: 700, margin: "0 0 12px", color: "#1F7A68" }}>How Speaking Rooms work</h3>
             <ul style={{ margin: "0 0 18px", padding: "0 0 0 18px", fontSize: 14, lineHeight: 1.6 }}>
               <li>Each room is one <strong>10-minute</strong> live speaking session with Miomi.</li>
               <li>Re-doing a lesson starts a fresh session and uses another room from your pack.</li>

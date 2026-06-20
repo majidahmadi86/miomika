@@ -154,7 +154,7 @@ export default function DashboardPage() {
           practiceToday: "ฝึกวันนี้",
           startStreak: "เริ่มสตรีควันนี้",
           milestone: (n: number, m: number) => `อีก ${n} วัน → เหรียญ ${m} วัน`,
-          keepGoing: "กำลังไปได้สวยเลย~ ทำต่อไปนะคะ",
+          keepGoing: "กำลังไปได้สวยเลย ทำต่อไปนะคะ",
           yourLevel: "ระดับของคุณ",
           pickLevel: "เลือกระดับของคุณ",
           proLevels: "ระดับ B1 และ B2 ปลดล็อกด้วย Pro",
@@ -166,9 +166,9 @@ export default function DashboardPage() {
           reviewSub: "คำที่บันทึกจากการคุยกับมิโอมิ",
           tabDue: "ถึงเวลาทบทวน",
           tabLearning: "กำลังเรียน",
-          reviewEmpty: "คำที่เรียนกับหนูจะมาอยู่ตรงนี้นะคะ~",
+          reviewEmpty: "คำที่เรียนกับหนูจะมาอยู่ตรงนี้นะคะ",
           startLearning: "เริ่มเรียนเลย",
-          allCaughtUp: "ทบทวนครบแล้ว~ ตอนนี้ยังไม่มีคำที่ต้องทบทวนค่า",
+          allCaughtUp: "ทบทวนครบแล้ว ตอนนี้ยังไม่มีคำที่ต้องทบทวนค่า",
           achievements: "ความสำเร็จ",
           share: "แชร์ความก้าวหน้า",
           shareRef: "ชวนเพื่อน — รับคนละ ฿30",
@@ -177,21 +177,21 @@ export default function DashboardPage() {
           wordsBadge: (n: number) => `${n} คำ`,
           streakBadge: (n: number) => `สตรีค ${n} วัน`,
           toGo: (n: number) => ` · อีก ${n}`,
-          achNote: "อีกนิดเดียวก็ได้เหรียญใหม่แล้ว~ ฝึกต่อไปนะคะ",
+          achNote: "อีกนิดเดียวก็ได้เหรียญใหม่แล้ว ฝึกต่อไปนะคะ",
         };
 
   const miomiNote =
     streakDays >= 3
       ? lang === "en"
         ? `${streakDays} days in a row — I can hear your English getting smoother.`
-        : `${streakDays} วันติดต่อกันแล้ว~ หนูได้ยินว่าคุณพูดลื่นขึ้นเลยค่า`
+        : `${streakDays} วันติดต่อกันแล้ว หนูได้ยินว่าคุณพูดลื่นขึ้นเลยค่า`
       : conversationCount > 0
         ? lang === "en"
           ? "I'm so glad you're showing up to practice — let's keep building."
-          : "ดีใจจังที่คุณมาฝึกกับหนู~ มาเก่งไปด้วยกันนะคะ"
+          : "ดีใจจังที่คุณมาฝึกกับหนู มาเก่งไปด้วยกันนะคะ"
         : lang === "en"
           ? "Let's start your learning journey today — I'm right here."
-          : "มาเริ่มเรียนรู้ไปด้วยกันวันนี้เลยนะคะ~ หนูอยู่ตรงนี้ค่า";
+          : "มาเริ่มเรียนรู้ไปด้วยกันวันนี้เลยนะคะ หนูอยู่ตรงนี้ค่า";
 
   const achievements = [
     {

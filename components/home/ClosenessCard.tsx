@@ -52,7 +52,7 @@ export function ClosenessCard({ points, lang, active = false }: { points: number
     bond.heartsToNext == null
       ? lang === "en"
         ? `${bond.hearts} hearts together — and counting`
-        : `${bond.hearts} ดวงใจด้วยกันแล้ว~ และยังเพิ่มขึ้นเรื่อยๆ`
+        : `${bond.hearts} ดวงใจด้วยกันแล้ว และยังเพิ่มขึ้นเรื่อยๆ`
       : lang === "en"
         ? `next: ${nextLabel} · ${bond.heartsToNext} heart${bond.heartsToNext === 1 ? "" : "s"} to go`
         : `ต่อไป: ${nextLabel} · อีก ${bond.heartsToNext} ดวงใจ`;
@@ -102,8 +102,8 @@ export function ClosenessCard({ points, lang, active = false }: { points: number
     setRevealKey((k) => k + 1);
 
     const tCap = window.setTimeout(() => {
-      if (earned) setCaption(lang === "en" ? "+1 heart · for showing up~" : "+1 ดวงใจ · ที่แวะมาหากันวันนี้~");
-      else if (restPct < 10) setCaption(lang === "en" ? "this fills as we spend time~" : "เต็มขึ้นเรื่อยๆ เมื่อเราใช้เวลาด้วยกัน~");
+      if (earned) setCaption(lang === "en" ? "+1 heart · for showing up" : "+1 ดวงใจ · ที่แวะมาหากันวันนี้");
+      else if (restPct < 10) setCaption(lang === "en" ? "this fills as we spend time" : "เต็มขึ้นเรื่อยๆ เมื่อเราใช้เวลาด้วยกัน");
     }, full ? 1150 : 850);
     const tDone = window.setTimeout(() => {
       setPhase("done");

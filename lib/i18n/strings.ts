@@ -11,8 +11,8 @@ export type Lang = "th" | "en";
 const STRINGS = {
   // Auth surfaces
   welcome_back: {
-    th: "ยินดีต้อนรับกลับค่า~",
-    en: "Welcome back~",
+    th: "ยินดีต้อนรับกลับค่า",
+    en: "Welcome back",
   },
   welcome_back_subtitle: {
     th: "Welcome back",
@@ -48,15 +48,15 @@ const STRINGS = {
   back_to_home: { th: "กลับหน้าหลัก", en: "Back to home" },
   no_account_yet: {
     th: "ยังไม่มีบัญชี? สมัครเลยค่า",
-    en: "No account yet? Sign up~",
+    en: "No account yet? Sign up",
   },
   have_account: {
     th: "มีบัญชีแล้ว? เข้าสู่ระบบค่า",
     en: "Have an account? Sign in",
   },
   signup_start: {
-    th: "มาเริ่มต้นด้วยกันนะคะ~",
-    en: "Let's get started~",
+    th: "มาเริ่มต้นด้วยกันนะคะ",
+    en: "Let's get started",
   },
   signup_subtitle: {
     th: "Create your account",
@@ -65,8 +65,8 @@ const STRINGS = {
 
   // Welcome screen
   welcome_intro: {
-    th: "ยินดีต้อนรับนะคะ~\nหนูรอคุณอยู่ค่า",
-    en: "Welcome~\nI've been waiting for you",
+    th: "ยินดีต้อนรับนะคะ\nหนูรอคุณอยู่ค่า",
+    en: "Welcome\nI've been waiting for you",
   },
   welcome_caption: {
     th: "Welcome · I've been waiting",
@@ -103,8 +103,8 @@ const STRINGS = {
 
   // Desktop hold banner
   desktop_hold_banner: {
-    th: "หนูทำงานดีที่สุดบนมือถือค่า~ เปิดบน iPhone หรือ Android เพื่อประสบการณ์เต็มรูปแบบ",
-    en: "I work best on mobile~ Open on iPhone or Android for the full experience",
+    th: "หนูทำงานดีที่สุดบนมือถือค่า เปิดบน iPhone หรือ Android เพื่อประสบการณ์เต็มรูปแบบ",
+    en: "I work best on mobile Open on iPhone or Android for the full experience",
   },
 
   // PWA update delivery
@@ -119,16 +119,16 @@ const STRINGS = {
 
   // Mic / unsupported browser
   mic_unsupported_chrome: {
-    th: "เปิดใน Chrome เพื่อใช้เสียงค่า~",
-    en: "Open in Chrome to use voice~",
+    th: "เปิดใน Chrome เพื่อใช้เสียงค่า",
+    en: "Open in Chrome to use voice",
   },
   mic_unsupported_typing_ok: {
-    th: "พิมพ์ข้อความได้เลยค่า~",
-    en: "Just type, that works too~",
+    th: "พิมพ์ข้อความได้เลยค่า",
+    en: "Just type, that works too",
   },
   mic_permission_denied: {
-    th: "ไม่ได้รับอนุญาตใช้ไมค์ค่า~",
-    en: "Mic permission denied~",
+    th: "ไม่ได้รับอนุญาตใช้ไมค์ค่า",
+    en: "Mic permission denied",
   },
 } as const satisfies Record<string, Record<Lang, string>>;
 
