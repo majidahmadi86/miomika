@@ -15,6 +15,7 @@ import {
 } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
+import { SmartGuide } from "@/components/onboarding/SmartGuide";
 import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { useProfile } from "@/lib/auth/use-profile";
@@ -870,6 +871,7 @@ export default function HomePage() {
     <>
       <Suspense fallback={null}><CelebrationTrigger /></Suspense>
       <WelcomeScreen onComplete={handleHomeReady} />
+      <SmartGuide />
       <AppShell>
         <div className="flex h-full max-h-full flex-col overflow-hidden">
           <style>{`
