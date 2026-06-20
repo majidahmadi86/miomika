@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
-import { Flame, Heart, Sparkles, type LucideIcon } from "lucide-react";
+import { Flame, Heart, Sparkles } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -245,21 +245,6 @@ function maybeSpeak(text: string): void {
   if (typeof window === "undefined") return;
   if (window.localStorage.getItem("miomika.tts_on") !== "1") return;
   void speak(text, detectLang(text));
-}
-
-function StatPill({ icon: Icon, percent, iconClass, ariaLabel }: {
-  icon: LucideIcon; percent: number; iconClass: string; ariaLabel: string;
-}) {
-  return (
-    <div
-      className={cn("flex items-center gap-1.5 rounded-full border border-[#EAD0DB] bg-white/90 px-3 py-1.5 text-[11px] font-medium text-[#1A1A1A] shadow-sm backdrop-blur-sm", tapFeedback)}
-      role="img"
-      aria-label={ariaLabel}
-    >
-      <Icon className={cn("h-3.5 w-3.5", iconClass)} strokeWidth={2.5} />
-      <span>{Math.round(percent)}%</span>
-    </div>
-  );
 }
 
 const CELEBRATION_STORAGE_KEY = "miomika-signup-celebrated-v1";
