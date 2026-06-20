@@ -238,6 +238,10 @@ function readUiLang(): Language {
   return "th";
 }
 
+function stripTildes(s: string): string {
+  return s.replace(/~/g, "");
+}
+
 function maybeSpeak(text: string): void {
   if (typeof window === "undefined") return;
   if (window.localStorage.getItem("miomika.tts_on") !== "1") return;
@@ -339,7 +343,6 @@ export default function HomePage() {
   const posY = useMotionValue(0);
   const [sleeping, setSleeping] = useState(false);
   const [bubble, setBubble] = useState({ th: "", en: "" });
-  const [bubbleText, setBubbleText] = useState("");
   const [bubbleVisible, setBubbleVisible] = useState(false);
   const [miomiMood, setMiomiMood] = useState<MiomiMood>("idle");
   const [tapBouncing, setTapBouncing] = useState(false);
@@ -468,8 +471,7 @@ export default function HomePage() {
     text: string,
     opts?: { th?: string; en?: string; reactive?: boolean; autoHideMs?: number },
   ) => {
-    setBubbleText(text);
-    if (opts?.th !== undefined) setBubble({ th: opts.th, en: opts.en ?? "" });
+    setBubble({ th: opts?.th ?? text, en: opts?.en ?? text });
     setBubbleVisible(true);
     scheduleBubbleHide(opts?.autoHideMs ?? (opts?.reactive ? 3200 : 4000));
   }, [scheduleBubbleHide]);
@@ -841,8 +843,8 @@ export default function HomePage() {
     requestAnimationFrame(animate);
   }, []);
 
-  const bubbleTh = bubbleText || bubble.th;
-  const bubbleEn = bubbleText ? "" : bubble.en;
+  const bubbleTh = stripTildes(uiLang === "en" ? bubble.en : bubble.th);
+  const bubbleEn = "";
   const miomiExpression = sleeping ? "idle" : miomiMood;
   const bond = deriveBond(profile?.bond_points ?? 0);
 
@@ -947,7 +949,8 @@ export default function HomePage() {
                                 ...(bubbleOnLeft
                                   ? { right: "100%", marginRight: "12px" }
                                   : { left: "100%", marginLeft: "12px" }),
-                                maxWidth: "200px",
+                                maxWidth: "min(200px, 60vw)",
+                                width: "max-content",
                               }}
                               initial={{ opacity: 0, y: 8 }}
                               animate={{
