@@ -1065,7 +1065,7 @@ function pickHomeVector(
   vector: WarmPhrase[],
   lang: Language,
 ): string {
-  return pickMeVector(storageKey, vector, lang);
+  return pickMeVector(storageKey, vector, lang).replace(/~/g, "");
 }
 
 function pickHomeWith(
@@ -1074,7 +1074,7 @@ function pickHomeWith(
   lang: Language,
   placeholders: Record<string, string | number>,
 ): string {
-  return pickMeWith(storageKey, vector, lang, placeholders);
+  return pickMeWith(storageKey, vector, lang, placeholders).replace(/~/g, "");
 }
 
 function homeTimeBucket(): "morning" | "afternoon" | "evening" {

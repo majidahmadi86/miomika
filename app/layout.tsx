@@ -90,8 +90,8 @@ export const metadata: Metadata = {
     icon: [
       { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/miomi/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/miomi/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/manifest-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/manifest-icon-512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: "/apple-touch-icon.png",
     shortcut: "/favicon-32.png",
@@ -117,7 +117,7 @@ export default function RootLayout({
       className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} ${geistSans.variable} ${geistMono.variable} overflow-hidden bg-[var(--mk-canvas)] antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
     >
       <head>
-        <link rel="icon" type="image/png" href="/miomi/icon-512.png" />
+        <link rel="icon" type="image/png" href="/manifest-icon-512.png" />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("miomika-theme");if(t!=="cool"&&t!=="blush"&&t!=="dark"&&t!=="warm")t="warm";document.documentElement.dataset.theme=t;}catch(e){}})();`,
