@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
-import { Coffee, Heart, Sparkles, Zap, type LucideIcon } from "lucide-react";
+import { Heart, Sparkles, type LucideIcon } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -25,7 +25,7 @@ import { home } from "@/lib/voice/warmth";
 import { detectLang, speak } from "@/lib/voice/tts";
 import type { Language } from "@/lib/i18n/server";
 import { useUILanguage } from "@/lib/i18n/client";
-import { awardDailyBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
+import { awardDailyBond, deriveBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
 import { ClosenessCard } from "@/components/home/ClosenessCard";
 import { RemembersCard } from "@/components/home/RemembersCard";
 const HOME_T = {
@@ -138,7 +138,6 @@ const TAP_BUBBLE_CYCLE = [
 ] as const;
 
 const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
-const FEED_BUBBLE = { th: "อิ่มแล้วค่า", en: "All full now" };
 const PLAY_BUBBLE = { th: "เย้ สนุกจัง!", en: "Yay, so fun!" };
 const GUEST_SIGNUP_STORAGE_KEY = "miomika-guest-signup-moment-v1";
 const LEVEL_UP_LINES: { th: string; en: string }[] = [
@@ -350,7 +349,6 @@ export default function HomePage() {
   const [isWandering, setIsWandering] = useState(false);
   const [particles, setParticles] = useState<HeartParticle[]>([]);
   const [bubbleOnLeft, setBubbleOnLeft] = useState(false);
-  const [feedAnimKey, setFeedAnimKey] = useState(0);
   const [playAnimKey, setPlayAnimKey] = useState(0);
   const [levelUpAnimKey, setLevelUpAnimKey] = useState(0);
   const [xpTick, setXpTick] = useState(0);
@@ -584,25 +582,6 @@ export default function HomePage() {
     })();
     return () => { cancelled = true; };
   }, [isGuest, profile, showBubble]);
-
-  const handleFeedPress = useCallback(() => {
-    markActivity(); wakeFromSleep();
-    const firstGuest = showGuestSignupIfFirst();
-    setFeedAnimKey((k) => k + 1);
-    window.setTimeout(() => {
-      if (!firstGuest && !isGuest) showBubble(FEED_BUBBLE.th, { th: FEED_BUBBLE.th, en: FEED_BUBBLE.en });
-      happyUntilRef.current = Date.now() + 2000;
-      setMiomiMood("happy");
-      scheduleHappyEnd();
-    }, 400);
-    setPet((prev) => {
-      const withHunger = { ...prev, hunger: clampStat(prev.hunger + 15) };
-      const { stats, leveledUp } = addXp(withHunger, 10);
-      if (leveledUp) triggerLevelUpCelebration(stats.level);
-      return stats;
-    });
-    setXpTick((t) => t + 1);
-  }, [markActivity, wakeFromSleep, scheduleHappyEnd, triggerLevelUpCelebration, showGuestSignupIfFirst, isGuest, showBubble]);
 
   const handlePlayPress = useCallback(() => {
     markActivity(); wakeFromSleep();
@@ -865,7 +844,7 @@ export default function HomePage() {
   const bubbleTh = bubbleText || bubble.th;
   const bubbleEn = bubbleText ? "" : bubble.en;
   const miomiExpression = sleeping ? "idle" : miomiMood;
-  const resolvedFuelCaption = useMemo(() => home.fuel.caption(uiLang), [uiLang]);
+  const bond = deriveBond(profile?.bond_points ?? 0);
 
   return (
     <>
@@ -1065,7 +1044,6 @@ export default function HomePage() {
                             <MiomiCharacter
                               expression={miomiExpression}
                               sleeping={sleeping}
-                              feedAnimKey={feedAnimKey}
                               playAnimKey={playAnimKey}
                               levelUpAnimKey={levelUpAnimKey}
                               breathe={!reduceMotion && !sleeping && !isDragging}
@@ -1077,29 +1055,25 @@ export default function HomePage() {
                   </motion.div>
               </motion.div>
 
-              {/* Fuel strip */}
+              {/* Closeness strip */}
               <div className="pointer-events-none absolute inset-x-4 bottom-3 z-20">
                 <div
                   style={{
-                    display: "flex", alignItems: "center", gap: "8px",
+                    display: "flex", alignItems: "center", gap: "10px",
                     background: "rgba(255,255,255,0.88)", backdropFilter: "blur(8px)",
-                    borderRadius: "20px", padding: "8px 14px",
+                    borderRadius: "20px", padding: "10px 14px",
                     border: "1px solid rgba(232,229,223,0.8)",
                   }}
                 >
-                  <Heart style={{ width: "14px", height: "14px", color: "#D4537E", flexShrink: 0 }} strokeWidth={2} />
-                  <div style={{ flex: 1, height: "6px", background: "#F0E0E8", borderRadius: "999px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pet.mood}%`, background: "#D4537E", borderRadius: "999px", transition: "width 0.5s ease-out" }} />
+                  <Heart style={{ width: "16px", height: "16px", color: "#E06B9A", flexShrink: 0 }} fill="#F9C2DC" strokeWidth={2} />
+                  <div style={{ flex: 1, height: "7px", background: "#F3E6EC", borderRadius: "999px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.round(bond.heartPct * 100)}%`, background: "#D4537E", borderRadius: "999px", transition: "width 0.6s cubic-bezier(.45,0,.2,1)" }} />
                   </div>
-                  <Zap style={{ width: "14px", height: "14px", color: "#C9A96E", flexShrink: 0, marginLeft: "6px" }} strokeWidth={2} />
-                  <div style={{ flex: 1, height: "6px", background: "#F0E0E8", borderRadius: "999px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pet.energy}%`, background: "#C9A96E", borderRadius: "999px", transition: "width 0.5s ease-out" }} />
-                  </div>
-                  <Coffee style={{ width: "14px", height: "14px", color: "#7DD3C0", flexShrink: 0, marginLeft: "6px" }} strokeWidth={2} />
-                  <div style={{ flex: 1, height: "6px", background: "#F0E0E8", borderRadius: "999px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pet.hunger}%`, background: "#7DD3C0", borderRadius: "999px", transition: "width 0.5s ease-out" }} />
-                  </div>
-                  <div style={{ marginLeft: "8px", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0, color: "#993556" }}>
+                    <Heart style={{ width: "13px", height: "13px", color: "#E06B9A" }} fill="#F9C2DC" strokeWidth={2} />
+                    <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", fontWeight: 700, lineHeight: 1 }}>{bond.hearts}</span>
+                  </span>
+                  <div style={{ marginLeft: "6px", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                     <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 700, color: "#C9A96E", lineHeight: 1 }}>
                       Lv.{pet.level}
                     </span>
@@ -1116,23 +1090,23 @@ export default function HomePage() {
                   style={{
                     marginTop: "8px",
                     textAlign: "center",
-                    fontFamily: "'Quicksand', sans-serif",
+                    fontFamily: lang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif",
                     fontSize: "12px",
                     fontWeight: 500,
                     lineHeight: "16px",
                     color: "#9A8B73",
                   }}
                 >
-                  {resolvedFuelCaption}
+                  {bond.label[lang]}
                 </p>
               </div>
             </div>
 
             {/* Action row */}
-            <div style={{ display: "grid", gridTemplateColumns: "48px 48px 1fr", gap: "10px", padding: "10px 16px 12px", flexShrink: 0, alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "48px 1fr", gap: "10px", padding: "10px 16px 12px", flexShrink: 0, alignItems: "center" }}>
               <button
                 type="button"
-                onClick={handleFeedPress}
+                onClick={handlePlayPress}
                 onPointerDown={(e) => {
                   e.stopPropagation();
                   triggerFuelParticle(e.currentTarget, "#D4537E");
@@ -1140,30 +1114,7 @@ export default function HomePage() {
                 className={tapFeedback}
                 style={{ width: "48px", height: "48px", borderRadius: "50%", border: "1.5px solid #EAD0DB", background: "#FBEAF0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
               >
-                <motion.div
-                  animate={pet.mood < 50 ? { y: [0,-5,0], scale: [1,1.2,1] } : {}}
-                  transition={{ duration: 0.6, ease: "easeInOut", repeat: Infinity, repeatDelay: 4, delay: 0 }}
-                >
-                  <Heart style={{ width: "20px", height: "20px", color: "#D4537E" }} strokeWidth={2} />
-                </motion.div>
-              </button>
-
-              <button
-                type="button"
-                onClick={handlePlayPress}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  triggerFuelParticle(e.currentTarget, "#C9A96E");
-                }}
-                className={tapFeedback}
-                style={{ width: "48px", height: "48px", borderRadius: "50%", border: "1.5px solid #EAD0DB", background: "#FBEAF0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-              >
-                <motion.div
-                  animate={pet.energy < 50 ? { y: [0,-5,0], scale: [1,1.2,1] } : {}}
-                  transition={{ duration: 0.6, ease: "easeInOut", repeat: Infinity, repeatDelay: 4, delay: 2 }}
-                >
-                  <Zap style={{ width: "20px", height: "20px", color: "#C9A96E" }} strokeWidth={2} />
-                </motion.div>
+                <Sparkles style={{ width: "20px", height: "20px", color: "#D4537E" }} strokeWidth={2} />
               </button>
 
               <button
@@ -1211,7 +1162,6 @@ export default function HomePage() {
                     <MiomiCharacter
                       expression={miomiMood}
                       sleeping={false}
-                      feedAnimKey={feedAnimKey}
                       playAnimKey={playAnimKey}
                       levelUpAnimKey={levelUpAnimKey}
                       breathe={!reduceMotion}
