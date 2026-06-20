@@ -27,6 +27,7 @@ import { useUILanguage } from "@/lib/i18n/client";
 import { awardDailyBond, deriveBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
 import { ClosenessCard } from "@/components/home/ClosenessCard";
 import { RemembersCard } from "@/components/home/RemembersCard";
+import { MemoryLine } from "@/components/home/MemoryLine";
 const HOME_T = {
   th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
   en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
@@ -1051,12 +1052,13 @@ export default function HomePage() {
               <div className="pointer-events-none absolute inset-x-4 bottom-3 z-20">
                 <div
                   style={{
-                    display: "flex", alignItems: "center", gap: "10px",
                     background: "rgba(255,255,255,0.88)", backdropFilter: "blur(8px)",
                     borderRadius: "20px", padding: "10px 14px",
                     border: "1px solid rgba(232,229,223,0.8)",
+                    pointerEvents: "auto",
                   }}
                 >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <Heart style={{ width: "16px", height: "16px", color: "#E06B9A", flexShrink: 0 }} fill="#F9C2DC" strokeWidth={2} />
                   <div style={{ flex: 1, height: "7px", background: "#F3E6EC", borderRadius: "999px", overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${Math.round(bond.heartPct * 100)}%`, background: "#D4537E", borderRadius: "999px", transition: "width 0.6s cubic-bezier(.45,0,.2,1)" }} />
@@ -1077,20 +1079,9 @@ export default function HomePage() {
                       />
                     </div>
                   </div>
+                  </div>
+                  <MemoryLine lang={lang} />
                 </div>
-                <p
-                  style={{
-                    marginTop: "8px",
-                    textAlign: "center",
-                    fontFamily: lang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    lineHeight: "16px",
-                    color: "#9A8B73",
-                  }}
-                >
-                  {bond.label[lang]}
-                </p>
               </div>
             </div>
 
