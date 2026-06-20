@@ -16,7 +16,6 @@ import {
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { SmartGuide, SMART_GUIDE_SETTLED_EVENT } from "@/components/onboarding/SmartGuide";
-import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { useProfile } from "@/lib/auth/use-profile";
 import { cn } from "@/lib/utils";
@@ -859,7 +858,8 @@ export default function HomePage() {
       <Suspense fallback={null}><CelebrationTrigger /></Suspense>
       <WelcomeScreen onComplete={handleHomeReady} />
       <SmartGuide />
-      <AppShell>
+      <div className="relative flex h-svh max-h-svh flex-col overflow-hidden bg-transparent md:h-screen md:max-h-screen md:overflow-hidden">
+        <main className="min-h-0 flex-1 overflow-hidden pb-[12px]">
         <div className="flex h-full max-h-full flex-col overflow-hidden">
           <style>{`
             @keyframes miomi-xp-tick {
@@ -1221,7 +1221,8 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </AppShell>
+        </main>
+      </div>
     </>
   );
 }
