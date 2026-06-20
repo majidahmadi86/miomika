@@ -9,7 +9,7 @@ const tabs = [
   { href: "/home",      labelTh: "หน้าหลัก",  labelEn: "Home",   icon: Home     },
   { href: "/learn",     labelTh: "เรียน",      labelEn: "Learn",  icon: BookOpen },
   { href: "/talk",      labelTh: "คุย",        labelEn: "Talk",   icon: Sparkles },
-  { href: "/dashboard", labelTh: "แดชบอร์ด",  labelEn: "Growth", icon: TrendingUp },
+  { href: "/dashboard", labelTh: "ความก้าวหน้า", labelEn: "Growth", icon: TrendingUp },
   { href: "/me",        labelTh: "ฉัน",        labelEn: "Me",     icon: User     },
 ] as const;
 
