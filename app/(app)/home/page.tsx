@@ -20,7 +20,6 @@ import { AppShell } from "@/components/layout/AppShell";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { useProfile } from "@/lib/auth/use-profile";
 import { cn } from "@/lib/utils";
-import { useCompanionStore } from "@/lib/companion/store";
 import { home } from "@/lib/voice/warmth";
 import { detectLang, speak } from "@/lib/voice/tts";
 import type { Language } from "@/lib/i18n/server";
@@ -364,8 +363,6 @@ export default function HomePage() {
     bottom: 0,
   });
 
-  const openCompanion = useCompanionStore((s) => s.open);
-
   const tapCycleIndexRef = useRef(0);
   const lastActivityRef = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -603,14 +600,6 @@ export default function HomePage() {
     });
     setXpTick((t) => t + 1);
   }, [markActivity, wakeFromSleep, triggerLevelUpCelebration, showGuestSignupIfFirst, isGuest, showBubble, scheduleHappyEnd]);
-
-  // Home "Talk to Miomi" CTA opens the ambient companion sheet rather than
-  // routing to /talk. /talk is reachable from the Fullscreen button inside
-  // the sheet OR the Learn tab in the bottom nav. Phase-2 §8 Block A5.
-  const handleTalkCTA = useCallback(() => {
-    markActivity();
-    openCompanion();
-  }, [markActivity, openCompanion]);
 
   const handleStagePointerDown = useCallback(() => {
     markActivity();
@@ -1120,15 +1109,15 @@ export default function HomePage() {
                 <Sparkles style={{ width: "20px", height: "20px", color: "#D4537E" }} strokeWidth={2} />
               </button>
 
-              <button
-                type="button"
-                onClick={handleTalkCTA}
+              <Link
+                href="/talk"
+                onClick={() => markActivity()}
                 className={tapFeedback}
-                style={{ height: "52px", borderRadius: "999px", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: "0 4px 16px -4px rgba(52,169,143,0.40)" }}
+                style={{ height: "52px", borderRadius: "999px", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1px", boxShadow: "0 4px 16px -4px rgba(52,169,143,0.40)", textDecoration: "none" }}
               >
                 <span style={{ fontFamily: "'Kanit', sans-serif", fontSize: "15px", fontWeight: 500, color: "#FFFFFF", lineHeight: 1.3 }}>คุยกับมิโอมิ</span>
                 <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.80)", letterSpacing: "0.06em" }}>Talk to Miomi</span>
-              </button>
+              </Link>
             </div>
           </div>
 
