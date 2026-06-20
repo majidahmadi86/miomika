@@ -81,10 +81,15 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
     if (!shouldShow) return;
 
     const t1 = setTimeout(() => setPhase(1), 80);
-    const t2 = setTimeout(() => setPhase(2), 950);
+    const t2 = setTimeout(() => {
+      setPhase(2);
+      // Mark the splash as shown EARLY — while it's still solid on top — so the
+      // Smart Guide's auto-show opens it UNDERNEATH and the splash fades straight
+      // into the guide, with no bare-home flash between the two.
+      markWelcomeShownLocal();
+    }, 950);
     const t3 = setTimeout(() => setPhase(3), 2900);
     const t4 = setTimeout(() => {
-      markWelcomeShownLocal();
       void markWelcomeShown();
       setShouldShow(false);
       onComplete?.();

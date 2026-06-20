@@ -51,6 +51,15 @@ const AmbientBackground = dynamic(
 
 export const SMART_GUIDE_LOCAL_STORAGE_KEY = "miomika-smartguide-v1";
 export const OPEN_SMART_GUIDE_EVENT = "miomika:open-guide";
+/** Fired when the guide closes OR decides it won't show this load — signals the
+ *  home that no onboarding overlay is covering it, so the closeness reveal may
+ *  play on a visible screen instead of underneath the guide. */
+export const SMART_GUIDE_SETTLED_EVENT = "miomika:guide-settled";
+
+function dispatchGuideSettled(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SMART_GUIDE_SETTLED_EVENT));
+}
 
 /** Force the guide to open (ignores the seen flag). Use for a replay button. */
 export function openSmartGuide(): void {
@@ -191,6 +200,7 @@ export function SmartGuide({ autoShow = true }: { autoShow?: boolean }) {
       // private mode — module guard still prevents re-show this session
     }
     setOpen(false);
+    dispatchGuideSettled();
   }, []);
 
   const next = useCallback(() => {
@@ -235,7 +245,10 @@ export function SmartGuide({ autoShow = true }: { autoShow?: boolean }) {
       }
     };
 
-    if (read(SMART_GUIDE_LOCAL_STORAGE_KEY)) return;
+    if (read(SMART_GUIDE_LOCAL_STORAGE_KEY)) {
+      dispatchGuideSettled();
+      return;
+    }
 
     const reveal = () => {
       if (cancelled) return;

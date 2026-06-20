@@ -71,7 +71,7 @@ export function ClosenessCard({ points, lang, active = false }: { points: number
 
   // Safety: never stay stuck waiting if the visibility signal never arrives.
   useEffect(() => {
-    const t = window.setTimeout(() => setFallbackReady(true), 6000);
+    const t = window.setTimeout(() => setFallbackReady(true), 20000);
     return () => window.clearTimeout(t);
   }, []);
 
