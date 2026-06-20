@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
-import { Heart, Sparkles, type LucideIcon } from "lucide-react";
+import { Flame, Heart, Sparkles, type LucideIcon } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -1066,6 +1066,10 @@ export default function HomePage() {
                   <span style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0, color: "#993556" }}>
                     <Heart style={{ width: "13px", height: "13px", color: "#E06B9A" }} fill="#F9C2DC" strokeWidth={2} />
                     <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", fontWeight: 700, lineHeight: 1 }}>{bond.hearts}</span>
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0, color: "#A66A12" }}>
+                    <Flame style={{ width: "13px", height: "13px", color: "#EFA94A" }} fill="#FCE6C2" strokeWidth={2} />
+                    <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", fontWeight: 700, lineHeight: 1 }}>{profile?.streak ?? 0}</span>
                   </span>
                   <div style={{ marginLeft: "6px", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                     <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "11px", fontWeight: 700, color: "#C9A96E", lineHeight: 1 }}>
