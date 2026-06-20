@@ -7,6 +7,7 @@ import {
   BookOpen,
   Camera,
   ChevronRight,
+  Compass,
   Download,
   FileText,
   Gift,
@@ -29,6 +30,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getStoredTheme, setTheme, type ThemeId } from "@/lib/theme";
 import { AvatarEditSheet } from "@/components/me/AvatarEditSheet";
 import { NameEditSheet } from "@/components/me/NameEditSheet";
+import { SmartGuide, openSmartGuide } from "@/components/onboarding/SmartGuide";
 
 const DEFAULT_AVATAR = "/characters/miomi/companion/companion-idle.png";
 
@@ -73,6 +75,8 @@ const COPY = {
     account: "บัญชี",
     email: "อีเมล",
     help: "ศูนย์ช่วยเหลือ",
+    replayGuide: "แนะนำการใช้งาน",
+    replayGuideSub: "ดูอีกครั้ง",
     privacy: "นโยบายความเป็นส่วนตัว",
     terms: "ข้อกำหนดการให้บริการ",
     yourData: "ข้อมูลของคุณ",
@@ -106,6 +110,8 @@ const COPY = {
     account: "Account",
     email: "Email",
     help: "Help center",
+    replayGuide: "Welcome guide",
+    replayGuideSub: "Take the tour again",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     yourData: "Your data",
@@ -623,6 +629,13 @@ export default function MePage() {
           right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
         />
         <Row
+          icon={<Compass className="h-[18px] w-[18px]" />}
+          label={t.replayGuide}
+          sub={t.replayGuideSub}
+          onClick={openSmartGuide}
+          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+        />
+        <Row
           icon={<Shield className="h-[18px] w-[18px]" />}
           label={t.privacy}
           onClick={() => router.push("/legal/privacy")}
@@ -649,6 +662,7 @@ export default function MePage() {
 
       <AvatarEditSheet open={avatarOpen} userId={profile.id} onClose={() => setAvatarOpen(false)} />
       <NameEditSheet open={nameOpen} userId={profile.id} currentName={profile.display_name ?? ""} onClose={() => setNameOpen(false)} />
+      <SmartGuide autoShow={false} />
       </div>
     </div>
   );

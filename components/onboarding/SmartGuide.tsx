@@ -165,7 +165,7 @@ const UI_TEXT = {
   dialog: { th: "แนะนำการใช้งาน", en: "Welcome guide" },
 };
 
-export function SmartGuide() {
+export function SmartGuide({ autoShow = true }: { autoShow?: boolean }) {
   const mounted = useHasMounted();
   const reduce = useReducedMotion() ?? false;
   const { profile, authReady } = useProfile();
@@ -217,6 +217,7 @@ export function SmartGuide() {
   // going to play; otherwise reveals after a short, graceful beat.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!autoShow) return;
     if (!authReady) return;
     if (_guideAutoDecidedInSession) return;
     _guideAutoDecidedInSession = true;
@@ -269,7 +270,7 @@ export function SmartGuide() {
       if (revealId) window.clearTimeout(revealId);
       if (safetyId) window.clearTimeout(safetyId);
     };
-  }, [authReady, profile]);
+  }, [authReady, profile, autoShow]);
 
   // Replay: open on demand, ignoring the seen flag.
   useEffect(() => {
