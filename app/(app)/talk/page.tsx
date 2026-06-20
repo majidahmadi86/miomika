@@ -1993,12 +1993,12 @@ export default function TalkPage() {
               <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                 {voiceWarn && !voiceExhausted && !roomTimeUp ? (
                   <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "12px", color: "#9A8B73", textAlign: "center", padding: "4px 0" }}>
-                    {uiLang === "en" ? "About a minute of voice left then we can keep going by text" : "เหลือเสียงอีกประมาณหนึ่งนาที จากนั้นเราคุยกันต่อด้วยข้อความได้นะ"}
+                    {uiLang === "en" ? "About a minute of voice left, then we can keep going by text" : "เหลือเสียงอีกประมาณหนึ่งนาที จากนั้นเราคุยกันต่อด้วยข้อความได้นะ"}
                   </div>
                 ) : null}
                 {roomTimeUp ? (
                   <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: 12, color: "#1F7A68", textAlign: "center", padding: "6px 0", display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
-                    <span>{uiLang === "en" ? "That's our session take a moment to read back, then see your results." : "ครบเวลาแล้วน้า อ่านทบทวนได้เลย แล้วค่อยกดดูผลลัพธ์"}</span>
+                    <span>{uiLang === "en" ? "That's our session — take a moment to read back, then see your results." : "ครบเวลาแล้วน้า อ่านทบทวนได้เลย แล้วค่อยกดดูผลลัพธ์"}</span>
                     <button onClick={() => void endRoomSession()} disabled={roomEnding} style={{
                       fontFamily: "'Quicksand', sans-serif", fontSize: 12, fontWeight: 700, padding: "6px 16px",
                       borderRadius: 99, border: "none", background: "linear-gradient(135deg,#6ECDB8,#34A98F)", color: "#FFFFFF", cursor: "pointer",
@@ -2229,7 +2229,7 @@ export default function TalkPage() {
         {voiceExhausted ? (
           <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "12px", color: "#9A8B73", textAlign: "center", padding: "0 4px 8px", lineHeight: 1.45 }}>
             {uiLang === "en"
-              ? "Voice time for today is all used up type here and I'll still be with you"
+              ? "Voice time for today is all used up — type here and I'll still be with you"
               : "เวลาเสียงวันนี้หมดแล้วนะ พิมพ์ตรงนี้ได้เลย หนูยังอยู่กับคุณค่ะ"}
           </div>
         ) : null}

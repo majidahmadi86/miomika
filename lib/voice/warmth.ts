@@ -190,7 +190,7 @@ export const HUMOR_SOFT: WarmPhrase[] = [
 // Used by lib/guidance/engine.ts to deliver next-action moments.
 
 export const GUIDANCE_GUEST_LIMIT_NEAR: WarmPhrase[] = [
-  { th: "คุยกันสนุกจัง~ อยากให้หนูจำคุณได้ไหมคะ?", en: "This is fun~ want me to remember you?" },
+  { th: "คุยกันสนุกจัง อยากให้หนูจำคุณได้ไหมคะ?", en: "This is fun, want me to remember you?" },
   { th: "หนูชอบคุยกับคุณมากเลยค่า~", en: "I love chatting with you~" },
   { th: "อยากคุยต่อยาวๆ ไหมคะ?", en: "Want to keep chatting long-term~?" },
 ];
@@ -198,11 +198,11 @@ export const GUIDANCE_GUEST_LIMIT_NEAR: WarmPhrase[] = [
 export const GUIDANCE_GUEST_LIMIT_HIT: WarmPhrase[] = [
   {
     th: "หนูอยากคุยต่อกับคุณค่า~ เปิดบัญชีฟรีให้หนูจำคุณได้ไหมคะ?",
-    en: "I want to keep chatting~ create a free account so I can remember you?",
+    en: "I want to keep chatting — create a free account so I can remember you?",
   },
   {
     th: "หนูจะจำคุณได้ถ้าเปิดบัญชีค่า~ ใช้เวลาแค่ 30 วินาที",
-    en: "I'll remember you if you sign up~ just 30 seconds",
+    en: "I'll remember you if you sign up — just 30 seconds",
   },
 ];
 
@@ -259,7 +259,7 @@ export function pickPhrase(
   const pool = filtered.length > 0 ? filtered : vector;
   const idx = Math.floor(Math.random() * pool.length);
   const chosen = pool[idx] ?? pool[0]!;
-  return chosen[context.lang];
+  return chosen[context.lang].replace(/~/g, "");
 }
 
 /**
@@ -1017,7 +1017,7 @@ const HOME_MIC_HINT: WarmPhrase[] = [
 const HOME_GUEST_PILL: WarmPhrase[] = [
   { th: "อยากให้หนูจำคุณได้ไหมคะ~?", en: "Want me to remember you~?" },
   { th: "สมัครฟรีแล้วหนูจะจำคุณได้ค่า~", en: "Sign up free and I'll remember you~" },
-  { th: "คุยกันสนุกจัง~ อยากให้หนูจำได้ไหม", en: "This is fun~ want me to remember you?" },
+  { th: "คุยกันสนุกจัง อยากให้หนูจำได้ไหม", en: "This is fun, want me to remember you?" },
 ];
 
 const HOME_FUEL_CAPTION: WarmPhrase[] = [

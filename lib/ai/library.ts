@@ -187,12 +187,12 @@ export const CELEBRATIONS = {
 
 export const CONVERSION = {
   guestToFree: {
-    th: "หนูชอบคุยกับคุณมากเลยค่า~ อยากให้หนูจำชื่อคุณและความก้าวหน้าของคุณได้ไหมคะ~",
-    en: "I love talking with you~ Want me to remember your name and progress~?",
+    th: "หนูชอบคุยกับคุณมากเลยค่า อยากให้หนูจำชื่อคุณและความก้าวหน้าของคุณได้ไหมคะ",
+    en: "I love talking with you. Want me to remember your name and progress?",
   },
   freeToPro: {
-    th: "คุณเก่งขึ้นมากเลยนะคะ~ ถ้าปลดล็อก Pro Miomi หนูจะจำทุกอย่างและช่วยได้มากกว่านี้ค่า~",
-    en: "You've grown so much~ With Pro Miomi I can remember everything and help you even more~",
+    th: "คุณเก่งขึ้นมากเลยนะคะ ถ้าปลดล็อก Pro Miomi หนูจะจำทุกอย่างและช่วยได้มากกว่านี้ค่า",
+    en: "You've grown so much. With Pro Miomi I can remember everything and help you even more.",
   },
 };
 
