@@ -1,39 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, X } from "lucide-react";
 import {
   openSmartGuide,
   SMART_GUIDE_LOCAL_STORAGE_KEY,
 } from "@/components/onboarding/SmartGuide";
 import type { Language } from "@/lib/i18n/server";
 
-// Set once the newcomer either takes the tour or dismisses the nudge.
+// Set once the newcomer taps the entry — the first-run dot then goes quiet.
 const NUDGE_DISMISSED_KEY = "miomika-guide-nudge-v1";
 
-const TEXT = {
-  nudge: {
-    th: "เพิ่งมาใหม่ใช่ไหมคะ มาชมรอบ ๆ กัน",
-    en: "New here? Take a quick tour",
-  },
-  dismiss: { th: "ปิด", en: "Dismiss" },
-  tour: { th: "ดูคู่มืออีกครั้ง", en: "Take the tour" },
-} as const;
+const LABEL = { th: "ดูคู่มือ", en: "Take the tour" } as const;
 
 type Mode = "fresh" | "returning" | null;
 
 /**
- * The opt-in entry into the Smart Guide on home.
- *  - Brand-new users (guide unseen, nudge not dismissed) see a one-time, gentle
- *    nudge inviting them to the tour. Taking it or dismissing it retires it.
- *  - Everyone else sees a small, quiet, always-available "?".
- * Both simply open the (now opt-in) Smart Guide already mounted on home.
+ * Opt-in entry into the Smart Guide: a small top-right "?" that opens the
+ * (now opt-in) guide. First-time users get a gentle pulsing dot to draw the
+ * eye; once tapped — or once they've seen the guide — it goes quiet. It lives
+ * in the top-right corner so it never competes with the centered top banner.
+ * Renders for everyone, guests included — they're who needs the tour most.
  */
-export function GuideEntry({ lang, isGuest }: { lang: Language; isGuest: boolean }) {
-  // null until localStorage is read, so we never flash the wrong entry.
+export function GuideEntry({ lang }: { lang: Language }) {
+  // null until localStorage is read, so we never flash the wrong state.
   const [mode, setMode] = useState<Mode>(null);
-  // Sit below the guest signup pill when it's present, otherwise hug the top.
-  const topPx = isGuest ? 58 : 12;
 
   useEffect(() => {
     let cancelled = false;
@@ -41,10 +31,10 @@ export function GuideEntry({ lang, isGuest }: { lang: Language; isGuest: boolean
       if (cancelled) return;
       try {
         const seenGuide = !!window.localStorage.getItem(SMART_GUIDE_LOCAL_STORAGE_KEY);
-        const nudgeDismissed = !!window.localStorage.getItem(NUDGE_DISMISSED_KEY);
-        setMode(seenGuide || nudgeDismissed ? "returning" : "fresh");
+        const dismissed = !!window.localStorage.getItem(NUDGE_DISMISSED_KEY);
+        setMode(seenGuide || dismissed ? "returning" : "fresh");
       } catch {
-        // private mode — fall back to the quiet persistent entry.
+        // private mode — default to the quiet entry.
         setMode("returning");
       }
     }, 0);
@@ -54,71 +44,31 @@ export function GuideEntry({ lang, isGuest }: { lang: Language; isGuest: boolean
     };
   }, []);
 
-  const retireNudge = () => {
+  const openTour = () => {
     try {
       window.localStorage.setItem(NUDGE_DISMISSED_KEY, "1");
     } catch {
       // best effort
     }
     setMode("returning");
-  };
-
-  const openTour = () => {
-    retireNudge();
     openSmartGuide();
   };
 
   if (mode === null) return null;
+  const isFresh = mode === "fresh";
 
-  if (mode === "fresh") {
-    return (
-      <div className="pointer-events-none absolute right-3 z-40 flex items-center gap-1.5" style={{ top: topPx }}>
-        <button
-          type="button"
-          onClick={openTour}
-          className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-[#EFE2EF] py-2 pl-3 pr-3.5 backdrop-blur-[14px] transition active:scale-[0.97]"
-          style={{
-            background: "rgba(255,255,255,0.92)",
-            boxShadow: "0 6px 18px rgba(169,139,190,0.20)",
-          }}
-        >
-          <Sparkles className="h-3.5 w-3.5" style={{ color: "#A98BBE" }} strokeWidth={2.4} />
-          <span
-            style={{
-              fontFamily: lang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif",
-              fontSize: "12.5px",
-              fontWeight: 600,
-              color: "#6E5A7E",
-              lineHeight: "16px",
-            }}
-          >
-            {TEXT.nudge[lang]}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={retireNudge}
-          aria-label={TEXT.dismiss[lang]}
-          className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-[#EFE2EF] backdrop-blur-[14px] transition active:scale-[0.94]"
-          style={{ background: "rgba(255,255,255,0.92)" }}
-        >
-          <X className="h-3.5 w-3.5" style={{ color: "#B7A7B6" }} strokeWidth={2.4} />
-        </button>
-      </div>
-    );
-  }
-
-  // returning — a quiet, always-available "?"
   return (
     <button
       type="button"
       onClick={openTour}
-      aria-label={TEXT.tour[lang]}
-      className="pointer-events-auto absolute right-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-[#EAE4DD] backdrop-blur-[14px] transition active:scale-[0.94]"
+      aria-label={LABEL[lang]}
+      className="pointer-events-auto absolute right-3 top-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-[14px] transition active:scale-[0.94]"
       style={{
-        top: topPx,
-        background: "rgba(255,255,255,0.82)",
-        boxShadow: "0 3px 10px rgba(0,0,0,0.05)",
+        borderColor: isFresh ? "#E7C9E4" : "#EAE4DD",
+        background: isFresh ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.82)",
+        boxShadow: isFresh
+          ? "0 4px 14px rgba(169,139,190,0.26)"
+          : "0 3px 10px rgba(0,0,0,0.05)",
       }}
     >
       <span
@@ -126,12 +76,29 @@ export function GuideEntry({ lang, isGuest }: { lang: Language; isGuest: boolean
           fontFamily: "'Quicksand', sans-serif",
           fontSize: "15px",
           fontWeight: 700,
-          color: "#9B8C98",
+          color: isFresh ? "#8A5AA0" : "#9B8C98",
           lineHeight: 1,
         }}
       >
         ?
       </span>
+      {isFresh ? (
+        <span
+          aria-hidden
+          className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full"
+          style={{
+            background: "#C9A0D8",
+            boxShadow: "0 0 0 2px rgba(255,255,255,0.92)",
+            animation: "mk-guide-dot 1.8s ease-in-out infinite",
+          }}
+        />
+      ) : null}
+      <style>{`
+        @keyframes mk-guide-dot {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.3); opacity: 0.65; }
+        }
+      `}</style>
     </button>
   );
 }

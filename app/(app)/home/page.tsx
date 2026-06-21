@@ -891,7 +891,7 @@ export default function HomePage() {
                 </div>
               ) : null}
 
-              {authReady ? <GuideEntry lang={lang} isGuest={isGuest} /> : null}
+              {authReady ? <GuideEntry lang={lang} /> : null}
 
               <motion.div
                 className="absolute inset-x-0 z-10 px-2"
@@ -1116,7 +1116,9 @@ export default function HomePage() {
 
           {/* Desktop — Miomi-centered home (alive) */}
           <div className="hidden h-full md:flex md:flex-col md:overflow-hidden">
-            <div className="mx-auto flex h-full w-full max-w-[1120px] flex-col px-8 py-6">
+            <div className="relative mx-auto flex h-full w-full max-w-[1120px] flex-col px-8 py-6">
+              {authReady ? <GuideEntry lang={lang} /> : null}
+
               <div className="mb-6">
                 <h1 className="text-[23px] font-medium leading-snug text-ink">{greeting}</h1>
               </div>
