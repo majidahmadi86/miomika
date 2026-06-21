@@ -15,7 +15,7 @@ import {
 } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
-import { SmartGuide, SMART_GUIDE_SETTLED_EVENT } from "@/components/onboarding/SmartGuide";
+import { SmartGuide } from "@/components/onboarding/SmartGuide";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { useProfile } from "@/lib/auth/use-profile";
 import { cn } from "@/lib/utils";
@@ -300,22 +300,16 @@ export default function HomePage() {
   const { profile } = useProfile();
   const [homeRevealReady, setHomeRevealReady] = useState(false);
   const handleHomeReady = useCallback(() => setHomeRevealReady(true), []);
-  // The closeness reveal should play on a VISIBLE home — after the welcome splash
-  // is done AND the Smart Guide is settled (closed, or decided it won't show) —
-  // not underneath an overlay. A long fallback prevents a stuck-empty bar if the
-  // settled signal never lands. Re-runs each home mount so it replays on refresh.
-  const [guideSettled, setGuideSettled] = useState(false);
+  // The closeness reveal plays on a VISIBLE home — once the welcome splash is
+  // done. The Smart Guide no longer gates first run (it's opt-in now), so the bar
+  // reveals as soon as home is ready. A long fallback prevents a stuck-empty bar
+  // if the ready signal never lands. Re-runs each home mount so it replays on refresh.
   const [revealFallback, setRevealFallback] = useState(false);
   useEffect(() => {
-    const onSettled = () => setGuideSettled(true);
-    window.addEventListener(SMART_GUIDE_SETTLED_EVENT, onSettled);
     const t = window.setTimeout(() => setRevealFallback(true), 20000);
-    return () => {
-      window.removeEventListener(SMART_GUIDE_SETTLED_EVENT, onSettled);
-      window.clearTimeout(t);
-    };
+    return () => window.clearTimeout(t);
   }, []);
-  const revealReady = (homeRevealReady && guideSettled) || revealFallback;
+  const revealReady = homeRevealReady || revealFallback;
 
   const uiLang = useMemo<Language>(() => {
     if (profile?.ui_language === "en" || profile?.ui_language === "th") return profile.ui_language;
@@ -842,7 +836,7 @@ export default function HomePage() {
     <>
       <Suspense fallback={null}><CelebrationTrigger /></Suspense>
       <WelcomeScreen onComplete={handleHomeReady} />
-      <SmartGuide />
+      <SmartGuide autoShow={false} />
       <div className="relative flex h-svh max-h-svh flex-col overflow-hidden bg-transparent md:h-screen md:max-h-screen md:overflow-hidden">
         <main className="min-h-0 flex-1 overflow-hidden pb-[12px]">
         <div className="flex h-full max-h-full flex-col overflow-hidden">
