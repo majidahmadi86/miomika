@@ -838,7 +838,7 @@ export default function HomePage() {
       <Suspense fallback={null}><CelebrationTrigger /></Suspense>
       <WelcomeScreen onComplete={handleHomeReady} />
       <SmartGuide autoShow={false} />
-      <div className="relative flex h-svh max-h-svh flex-col overflow-hidden bg-transparent md:h-screen md:max-h-screen md:overflow-hidden">
+      <div className="relative flex h-full max-h-full flex-col overflow-hidden bg-transparent md:h-full md:max-h-full md:overflow-hidden">
         <main className="min-h-0 flex-1 overflow-hidden pb-[12px]">
         <div className="flex h-full max-h-full flex-col overflow-hidden">
           <style>{`
@@ -891,7 +891,7 @@ export default function HomePage() {
                 </div>
               ) : null}
 
-              {authReady && !isGuest ? <GuideEntry lang={lang} /> : null}
+              {authReady ? <GuideEntry lang={lang} isGuest={isGuest} /> : null}
 
               <motion.div
                 className="absolute inset-x-0 z-10 px-2"

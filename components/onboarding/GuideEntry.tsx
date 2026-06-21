@@ -29,9 +29,11 @@ type Mode = "fresh" | "returning" | null;
  *  - Everyone else sees a small, quiet, always-available "?".
  * Both simply open the (now opt-in) Smart Guide already mounted on home.
  */
-export function GuideEntry({ lang }: { lang: Language }) {
+export function GuideEntry({ lang, isGuest }: { lang: Language; isGuest: boolean }) {
   // null until localStorage is read, so we never flash the wrong entry.
   const [mode, setMode] = useState<Mode>(null);
+  // Sit below the guest signup pill when it's present, otherwise hug the top.
+  const topPx = isGuest ? 58 : 12;
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +72,7 @@ export function GuideEntry({ lang }: { lang: Language }) {
 
   if (mode === "fresh") {
     return (
-      <div className="pointer-events-none absolute right-3 top-3 z-40 flex items-center gap-1.5">
+      <div className="pointer-events-none absolute right-3 z-40 flex items-center gap-1.5" style={{ top: topPx }}>
         <button
           type="button"
           onClick={openTour}
@@ -112,8 +114,9 @@ export function GuideEntry({ lang }: { lang: Language }) {
       type="button"
       onClick={openTour}
       aria-label={TEXT.tour[lang]}
-      className="pointer-events-auto absolute right-3 top-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-[#EAE4DD] backdrop-blur-[14px] transition active:scale-[0.94]"
+      className="pointer-events-auto absolute right-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-[#EAE4DD] backdrop-blur-[14px] transition active:scale-[0.94]"
       style={{
+        top: topPx,
         background: "rgba(255,255,255,0.82)",
         boxShadow: "0 3px 10px rgba(0,0,0,0.05)",
       }}
