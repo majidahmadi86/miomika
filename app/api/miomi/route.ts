@@ -32,7 +32,6 @@ import { resolvePhonetics } from "@/lib/brain/phonetics";
 import {
   detectReuseAndAdvance,
   introduceWord,
-  pickWordToIntroduce,
   type IntroducedWord,
   type MasteryEvent,
 } from "@/lib/brain/teaching";
@@ -232,14 +231,7 @@ export async function POST(req: NextRequest) {
       /* template hijack removed — brain prompt owns unclear input */
     }
 
-    // ── BRAIN STEP 4: mastery detect + optional word introduce ───────────────
-    const introducedWordKeys = [
-      ...new Set([...brainState.introducedWords, ...state.wordsIntroduced]),
-    ];
-    const masteredWordKeys = [
-      ...new Set([...brainState.masteredWords, ...state.wordsUsedCorrectly]),
-    ];
-
+    // ── BRAIN STEP 4: mastery detect ─────────────────────────────────────────
     let masteryEvent: MasteryEvent = { type: "none" };
     let wordToIntroduce: IntroducedWord | null = null;
     let teachCard: TeachCard | null = null;
@@ -262,100 +254,24 @@ export async function POST(req: NextRequest) {
       adaptivePrompt += `\n\nLANGUAGE SWITCH: The user explicitly asked you to speak ${explicitUiSwitch === "th" ? "Thai" : "English"}. Switch to ${explicitUiSwitch === "th" ? "Thai" : "English"} now and stay in it.`;
     }
 
-    // CARDS: show a word card ONLY when the user actually asks to learn one, and
-    // NEVER in chat mode (chat = relaxed practice). No more automatic every-4th cards.
-    const userAskedForWord =
-      brainState.intent === "want_to_learn" ||
-      /\b(teach me|a new word|new word|word for|how (do|to) (you )?say|another word|thai word|english word|a card|word card|สอนคำ|คำใหม่|คำศัพท์|ขอคำ|ขอศัพท์)\b/i.test(userInput);
-    const shouldPickWord =
-      mode !== "chat" &&
-      (mode === "teach" || mode === "auto" || mode === undefined) &&
-      userAskedForWord &&
-      masteryEvent.type === "none" &&
-      brainState.emotionalSignal !== "stuck" &&
-      brainState.emotionalSignal !== "sad";
-
-    if (shouldPickWord) {
-      // Don't "teach" what the user already produces. Gather everything they've said
-      // this conversation; exclude exact matches from the picker, and drop a picked
-      // word if it appears anywhere in their own speech (catches Thai particles —
-      // they said "สวัสดีค่ะ" so we never teach "สวัสดี").
-      const usedText = (Array.isArray(messages) ? messages : [])
-        .filter((m: { role?: string }) => m?.role === "user")
-        .map((m: { content?: string }) => (m?.content ?? ""))
-        .join(" ")
-        .toLowerCase();
-      const usedWordKeys = usedText.split(/[^\p{L}]+/u).filter((w) => w.length >= 2);
-      let sourceWord = extractRequestedWord(userInput);
-      if (!sourceWord) {
-        try {
-          const picked = await pickWordToIntroduce({
-            userId: serverUserId,
-            cefrLevel: brainState.profile.cefrLevel,
-            learningTarget: brainState.profile.learningTarget,
-            alreadyIntroducedWords: introducedWordKeys,
-            alreadyMasteredWords: [...masteredWordKeys, ...usedWordKeys],
-            tier: brainState.profile.tier,
-          });
-          const alreadyUsed = picked
-            ? [picked.word_th, picked.word_en]
-                .map((x) => (x ?? "").toLowerCase())
-                .find((x) => x.length >= 2 && usedText.includes(x))
-            : undefined;
-          // If the pick is something the user already said, don't re-teach it.
-          sourceWord = alreadyUsed ? null : picked?.word_en ?? null;
-        } catch (err) {
-          console.error("[brain] pickWordToIntroduce failed:", err);
-        }
-      }
-      // Resolve to a COMPLETE, verified card (phonetics + example) — same builder
-      // /api/teach-word uses. Bank hit = instant; miss = generate (Groq-only when
-      // Gemini is off). The model is told to teach exactly this word → card == speech.
-      if (sourceWord) {
-        try {
-          const target = brainState.profile.learningTarget ?? "th";
-          const resolved = await resolveOrGenerateWord({
-            word: sourceWord,
-            learningTarget: target,
-            cefrLevel: brainState.profile.cefrLevel,
-          });
-          if (resolved) {
-            const phon = await resolvePhonetics({
-              word_th: resolved.word_th,
-              word_en: resolved.word_en,
-              learningTarget: target,
-              bankRomanization: resolved.th_romanization,
-              bankIpa: resolved.en_ipa,
-            });
-            wordToIntroduce = {
-              word: resolved.word_en,
-              word_en: resolved.word_en,
-              word_th: resolved.word_th,
-              cefr_level: resolved.cefr_level,
-              emoji: resolved.emoji,
-            };
-            teachCard = {
-              word_en: resolved.word_en,
-              word_th: resolved.word_th,
-              emoji: resolved.emoji,
-              cefr_level: resolved.cefr_level,
-              phonetics: phon.phonetics,
-              phonetics_source: phon.phonetics_source,
-              ...(phon.th_romanization ? { th_romanization: phon.th_romanization } : {}),
-              ...(phon.en_ipa ? { en_ipa: phon.en_ipa } : {}),
-              ...(resolved.example_th ? { example_th: resolved.example_th } : {}),
-              ...(resolved.example_en ? { example_en: resolved.example_en } : {}),
-            };
-          }
-        } catch (err) {
-          console.error("[brain] card enrich failed:", err);
-        }
-      }
+    // TEACHING DECISION: the model now decides if/what to teach at i+1 from the conversation and emits a
+    // [[CARD: th | roman | en]] tag we turn into a verified card AFTER its reply — so the card always
+    // matches exactly what it taught (no more pre-picked, frequency-level cards). We only SUPPRESS
+    // teaching when it would be unwelcome: relaxed chat, or when they're stuck / sad / just mastered one.
+    const suppressTeaching =
+      mode === "chat" ||
+      masteryEvent.type !== "none" ||
+      brainState.emotionalSignal === "stuck" ||
+      brainState.emotionalSignal === "sad";
+    if (suppressTeaching) {
+      adaptivePrompt += `\n\nNO TEACHING THIS TURN: Just be a warm friend — do NOT introduce a new word and do NOT add any [[CARD]] tag. ${
+        masteryEvent.type !== "none"
+          ? "They just used a word well — notice it and celebrate that instead."
+          : "Stay with them."
+      }`;
     }
 
-    if (wordToIntroduce) {
-      adaptivePrompt += `\n\nTEACHING HINT: Naturally weave the word "${wordToIntroduce.word_en}" (${wordToIntroduce.word_th}) into your reply ONE time. Use it in context, don't define it formally — like a friend dropping it into conversation. The system will show the user a card after your reply.`;
-    }
+    // (word selection now happens AFTER the model reply, from its [[CARD]] tag — see Stage 10.)
 
     if (isLastFreeGuestTurn) {
       // Guest's final free turn. DELIVER value (Mike's "B", 2026-06-19) — do NOT tease-and-withhold.
@@ -434,6 +350,64 @@ export async function POST(req: NextRequest) {
           : Promise.resolve(),
       ]);
       content = result.content;
+      // STAGE 10b: turn the model's [[CARD: th | roman | en]] tag into a verified card == exactly what
+      // it taught, then strip the tag so it never leaks. Always strip; build the card only when teaching
+      // is allowed and the tag is well-formed (resolve fills phonetics + example, same builder as before).
+      {
+        const cardTag = content.match(
+          /\[\[\s*CARD\s*:\s*([^|\]]+?)\s*\|\s*([^|\]]+?)\s*\|\s*([^\]]+?)\s*\]\]/i
+        );
+        content = content
+          .replace(/\[\[\s*CARD\s*:[^\]]*\]\]/gi, "")
+          .replace(/[ \t]+\n/g, "\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+        if (cardTag && !suppressTeaching) {
+          const taughtTh = (cardTag[1] ?? "").trim();
+          const taughtEn = (cardTag[3] ?? "").trim();
+          const wordKey = taughtEn || taughtTh;
+          if (wordKey) {
+            try {
+              const cardTarget = brainState.profile.learningTarget ?? "th";
+              const resolved = await resolveOrGenerateWord({
+                word: wordKey,
+                learningTarget: cardTarget,
+                cefrLevel: brainState.profile.cefrLevel,
+              });
+              if (resolved) {
+                const phon = await resolvePhonetics({
+                  word_th: resolved.word_th,
+                  word_en: resolved.word_en,
+                  learningTarget: cardTarget,
+                  bankRomanization: resolved.th_romanization,
+                  bankIpa: resolved.en_ipa,
+                });
+                wordToIntroduce = {
+                  word: resolved.word_en,
+                  word_en: resolved.word_en,
+                  word_th: resolved.word_th,
+                  cefr_level: resolved.cefr_level,
+                  emoji: resolved.emoji,
+                };
+                teachCard = {
+                  word_en: resolved.word_en,
+                  word_th: resolved.word_th,
+                  emoji: resolved.emoji,
+                  cefr_level: resolved.cefr_level,
+                  phonetics: phon.phonetics,
+                  phonetics_source: phon.phonetics_source,
+                  ...(phon.th_romanization ? { th_romanization: phon.th_romanization } : {}),
+                  ...(phon.en_ipa ? { en_ipa: phon.en_ipa } : {}),
+                  ...(resolved.example_th ? { example_th: resolved.example_th } : {}),
+                  ...(resolved.example_en ? { example_en: resolved.example_en } : {}),
+                };
+              }
+            } catch (err) {
+              console.error("[brain] card from tag failed:", err);
+            }
+          }
+        }
+      }
       servedVia = `ai_${result.engine}__${mode ?? "auto"}`;
       wasFailover = result.wasFailover;
       aiCostUsd = result.engine === "groq" ? 0 : 0.0008;
@@ -566,18 +540,6 @@ export async function POST(req: NextRequest) {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
-
-/** Pull a specific word/meaning the user named ("word for cat", "how do you say hello", "teach me dog"). */
-function extractRequestedWord(input: string): string | null {
-  const m = input.match(
-    /(?:word for|how (?:do you |to )?say|teach me(?: the word(?: for)?| how to say)?)\s+["']?([\p{L}][\p{L}\s'-]{1,30})["']?/iu,
-  );
-  if (!m) return null;
-  const w = m[1].trim().replace(/[?.!,]+$/, "").toLowerCase();
-  const generic = new Set(["a word", "word", "a new word", "new word", "another word", "something", "anything", "more", "that", "this", "a card", "one", "me", "you"]);
-  if (w.length < 2 || generic.has(w)) return null;
-  return w;
-}
 
 function detectReplyLanguageFromContent(
   text: string,
