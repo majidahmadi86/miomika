@@ -16,6 +16,7 @@ import {
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { SmartGuide } from "@/components/onboarding/SmartGuide";
+import { GuideEntry } from "@/components/onboarding/GuideEntry";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { useProfile } from "@/lib/auth/use-profile";
 import { cn } from "@/lib/utils";
@@ -889,6 +890,8 @@ export default function HomePage() {
                   </Link>
                 </div>
               ) : null}
+
+              {authReady && !isGuest ? <GuideEntry lang={lang} /> : null}
 
               <motion.div
                 className="absolute inset-x-0 z-10 px-2"
