@@ -377,6 +377,10 @@ export default function TalkPage() {
     userInputFinalizedRef.current = false;
   }, []);
 
+  // True only while the user is in an explicit voice session (they tapped the mic).
+  // Texting leaves it false, so the continuous mic can never open on its own.
+  const voiceModeRef = useRef(false);
+
   const stopContinuousMic = useCallback(() => {
     mediaRef.current?.suspendMicSend(false);
     mediaRef.current?.stopAudio();
@@ -384,6 +388,7 @@ export default function TalkPage() {
   }, []);
 
   const startContinuousMic = useCallback(async () => {
+    if (!voiceModeRef.current) return; // mic opens only in an explicit voice session
     if (!mediaRef.current) return;
     mediaRef.current.suspendMicSend(false);
     await mediaRef.current.startAudio((pcm) => {
@@ -457,7 +462,8 @@ export default function TalkPage() {
           },
           isGuest: () => isGuestRef.current,
           isMounted: () => mountedRef.current,
-          onLiveUi: (ui: LiveUiPhase) => setLiveUiState(ui),
+          onLiveUi: (ui: LiveUiPhase) =>
+            setLiveUiState(ui === "listening" && !voiceModeRef.current ? "idle" : ui),
           onAwaitingMic: setAwaitingMic,
           onGuestExchanges: (n) => {
             guestExchangesRef.current = n;
@@ -498,6 +504,7 @@ export default function TalkPage() {
             if (canvasRef.current) canvasRef.current.scrollTop = 0;
           },
           onStartMic: async () => {
+            if (!voiceModeRef.current) return; // text mode — never open the mic
             await startContinuousMic();
             setLiveUiState("listening");
           },
@@ -1696,10 +1703,12 @@ export default function TalkPage() {
         ) {
           return;
         }
+        voiceModeRef.current = false;
         dispatchTurn({ type: "orb_mic_stop" });
         return;
       }
       if (awaitingMic || liveUiState === "idle") {
+        voiceModeRef.current = true; // user tapped to talk -> voice mode
         dispatchTurn({ type: "orb_mic_start" });
         return;
       }
@@ -1715,9 +1724,11 @@ export default function TalkPage() {
       }
       killAllAudio();
       mediaRef.current?.stopAudioPlayback();
+      voiceModeRef.current = false;
       dispatchTurn({ type: "orb_mic_stop" });
       return;
     }
+    voiceModeRef.current = true; // first orb tap -> user wants voice
     void (async () => {
       await ensurePlaybackUnlocked();
       await startLiveSession();
@@ -1740,6 +1751,7 @@ export default function TalkPage() {
   const handleSendText = useCallback(() => {
     const trimmed = textInput.trim();
     if (!trimmed) return;
+    voiceModeRef.current = false; // texting -> leave voice mode; the mic stays shut
     primeAudio();
     if (isLocked) {
       openGuestSignupSheet("talk");
