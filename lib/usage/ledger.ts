@@ -28,7 +28,7 @@ function costFor(provider: UsageProvider, model: string, u: { promptTokens?: num
 }
 
 type Row = { provider: UsageProvider; kind: UsageKind; model: string; prompt_tokens: number; completion_tokens: number; total_tokens: number; chars: number; audio_seconds: number; est_cost_usd: number; latency_ms: number | null; ok: boolean; meta: Record<string, unknown> | null };
-type Ctx = { fn: string; userId: string | null; requestId: string; rows: Row[] };
+type Ctx = { fn: string; userId: string | null; requestId: string; rows: Row[]; tier: string | null; dailySpentUsd: number };
 
 const als = new AsyncLocalStorage<Ctx>();
 
@@ -58,11 +58,59 @@ export function recordUsage(rec: {
 }
 
 export async function withUsage<T>(fn: string, userId: string | null, run: () => Promise<T>): Promise<T> {
-  const ctx: Ctx = { fn, userId, requestId: crypto.randomUUID(), rows: [] };
+  const ctx: Ctx = { fn, userId, requestId: crypto.randomUUID(), rows: [], tier: null, dailySpentUsd: 0 };
   try {
     return await als.run(ctx, run);
   } finally {
     await flush(ctx);
+  }
+}
+
+// ─── COST GATE SUPPORT ────────────────────────────────────────────────────────
+// Turn on budget enforcement for the current request. A route opts in by calling
+// this once (with the user's tier) inside its withUsage callback; it loads the
+// user's spend-so-far today. Until a route calls this, enforcement is a no-op
+// (the gate sees tier=null) — so coverage can roll out route by route safely.
+export async function enableBudget(tier: string): Promise<void> {
+  const ctx = als.getStore();
+  if (!ctx) return;
+  ctx.tier = tier;
+  ctx.dailySpentUsd = ctx.userId ? await loadDailySpend(ctx.userId) : 0;
+}
+
+// Sum of est_cost_usd recorded so far in the current request (0 outside one).
+export function runningCostUsd(): number {
+  const ctx = als.getStore();
+  if (!ctx) return 0;
+  return ctx.rows.reduce((s, r) => s + r.est_cost_usd, 0);
+}
+
+// Snapshot the running budget picture for the gate. null outside a request, or
+// when the route hasn't opted into enforcement (tier still null).
+export function budgetState(): { tier: string | null; dailySpentUsd: number; runningUsd: number } | null {
+  const ctx = als.getStore();
+  if (!ctx) return null;
+  return { tier: ctx.tier, dailySpentUsd: ctx.dailySpentUsd, runningUsd: ctx.rows.reduce((s, r) => s + r.est_cost_usd, 0) };
+}
+
+function startOfTodayIso(): string {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+// Today's accumulated spend for a user (UTC day). Best-effort; 0 on any error.
+async function loadDailySpend(userId: string): Promise<number> {
+  try {
+    const supabase = await createServiceClient();
+    const { data } = await supabase
+      .from("llm_usage")
+      .select("est_cost_usd")
+      .eq("user_id", userId)
+      .gte("created_at", startOfTodayIso());
+    return (data ?? []).reduce((s: number, r: { est_cost_usd: number | null }) => s + (r.est_cost_usd ?? 0), 0);
+  } catch {
+    return 0;
   }
 }
 

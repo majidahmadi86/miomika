@@ -2,6 +2,7 @@
 
 import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
+import { assertBudget, estimateLlmUsd, BudgetExceededError } from "@/lib/usage/gate";
 import { isAcceptableBankRomanization, isAcceptableGeneratedRomanization } from "./romanization-guard";
 
 export type PhoneticsSource = "bank" | "generated";
@@ -34,6 +35,8 @@ function cleanPhoneticsOutput(raw: string): string {
 }
 
 async function callGroqPhonetics(system: string, user: string): Promise<string | null> {
+  try { assertBudget("phonetics", estimateLlmUsd(system.length + user.length, 40)); }
+  catch (e) { if (e instanceof BudgetExceededError) return null; throw e; }
   const groq = getGroq();
   if (!groq) return null;
   try {
@@ -57,6 +60,8 @@ async function callGroqPhonetics(system: string, user: string): Promise<string |
 async function callGeminiPhonetics(system: string, user: string): Promise<string | null> {
   // Gemini OFF by default (wallet protection); callers fall back to Groq.
   if (process.env.ENABLE_GEMINI_FALLBACK !== "true") return null;
+  try { assertBudget("phonetics", estimateLlmUsd(system.length + user.length, 40)); }
+  catch (e) { if (e instanceof BudgetExceededError) return null; throw e; }
   const gemini = getGemini();
   if (!gemini) return null;
   try {

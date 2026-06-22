@@ -5,6 +5,7 @@ import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
 import { log } from "@/lib/debug/log";
 import { recordUsage } from "@/lib/usage/ledger";
+import { assertBudget, estimateLlmUsd, BudgetExceededError } from "@/lib/usage/gate";
 import { getFailoverResponse } from "./session";
 // Lazy clients — constructing at module load fails Next 16's page-data
 // collection step when env vars are absent (build-time).
@@ -84,6 +85,17 @@ function aiErrorFields(error: unknown): { message: string; status?: number } {
     status: err?.status,
   };
 }
+// Warm fallback shown when a user hits their cost ceiling — never an error.
+// TODO Mike: replace the Thai copy with your own wording.
+const CAPPED_DAILY = {
+  en: "We've had such a good chat today! I need a little catnap now — let's pick this up again tomorrow.",
+  th: "วันนี้เราคุยกันสนุกมากเลยน้า! ขอมิโอมิงีบสักหน่อยนะ เดี๋ยวพรุ่งนี้มาคุยกันต่อนะ",
+};
+const CAPPED_TURN = {
+  en: "Ooh, that's a big one! Let's take it a little at a time — try me again in a moment?",
+  th: "โอ้ว อันนี้ยาวเลยน้า! ค่อยๆ เป็นค่อยๆ ไปนะ เดี๋ยวลองถามมิโอมิอีกทีนะ",
+};
+
 export async function getAIResponse(
   messages: Message[],
   systemPrompt: string,
@@ -95,6 +107,19 @@ export async function getAIResponse(
   });
   // Only the most recent turns are needed — keeps per-call token cost bounded.
   const recent = messages.slice(-MAX_HISTORY_MESSAGES);
+
+  // COST GATE — check the turn/day budget BEFORE spending. If over, return a warm
+  // capped message rather than an error (a reply must always come back).
+  try {
+    const estChars = systemPrompt.length + recent.reduce((s, m) => s + m.content.length, 0);
+    assertBudget("reply", estimateLlmUsd(estChars, MAX_REPLY_TOKENS));
+  } catch (err) {
+    if (err instanceof BudgetExceededError) {
+      const capped = err.scope === "daily" ? CAPPED_DAILY : CAPPED_TURN;
+      return { content: uiLanguage === "th" ? capped.th : capped.en, engine: "capped", wasFailover: true };
+    }
+    throw err;
+  }
   const geminiEnabled = process.env.ENABLE_GEMINI_FALLBACK === "true";
   // LANGUAGE-AWARE ROUTING. Groq is fast but weak at Thai; Gemini (Vertex) is the
   // accurate-Thai model. For THAI replies, lead with Gemini (quality where Groq is

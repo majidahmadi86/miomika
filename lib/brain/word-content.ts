@@ -8,6 +8,7 @@ import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
 import { createServiceClient } from "@/lib/supabase/service";
 import { recordUsage } from "@/lib/usage/ledger";
+import { assertBudget, estimateLlmUsd, BudgetExceededError } from "@/lib/usage/gate";
 import { isVocabularySlug } from "@/lib/talk/teach-word-card";
 
 export type ResolvedWordSource = "bank" | "generated";
@@ -75,6 +76,8 @@ function getGemini(): GoogleGenAI | null {
 }
 
 export async function callGroqJson(system: string, user: string, maxTokens: number = 600): Promise<string | null> {
+  try { assertBudget("card", estimateLlmUsd(system.length + user.length, maxTokens)); }
+  catch (e) { if (e instanceof BudgetExceededError) return null; throw e; }
   const groq = getGroq();
   if (!groq) {
     console.error("[brain] groq unavailable: GROQ_API_KEY missing");
@@ -108,6 +111,8 @@ export async function callGroqJson(system: string, user: string, maxTokens: numb
 
 export async function callGeminiJson(system: string, user: string, maxTokens: number = 800): Promise<string | null> {
   if (process.env.ENABLE_GEMINI_FALLBACK !== "true") return null;
+  try { assertBudget("card", estimateLlmUsd(system.length + user.length, maxTokens)); }
+  catch (e) { if (e instanceof BudgetExceededError) return null; throw e; }
   const gemini = getGemini();
   if (!gemini) {
     console.error("[brain] gemini unavailable: GEMINI_API_KEY missing");

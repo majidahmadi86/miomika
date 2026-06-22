@@ -37,7 +37,7 @@ import {
 } from "@/lib/brain/teaching";
 import type { PronunciationLesson } from "@/lib/brain/pronunciation";
 import { log } from "@/lib/debug/log";
-import { withUsage } from "@/lib/usage/ledger";
+import { withUsage, enableBudget } from "@/lib/usage/ledger";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -83,8 +83,8 @@ export async function POST(req: NextRequest) {
     const profile = await getServerProfile();
     const serverUserId = profile?.id ?? null;
     return await withUsage("talk.miomi", serverUserId, async () => {
+    await enableBudget(profile?.tier ?? "guest");
     const serverIsGuest = !profile;
-    // Phase 4 will read profile.tier here for cost-cap enforcement.
 
     const body = await req.json();
     const {
