@@ -337,6 +337,16 @@ export default function LearnPage() {
     })();
   }, [authReady, isGuest]);
 
+  // Deep-link: /learn?tab=tests selects a built surface on arrival (e.g. the dashboard retake link).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (!tab) return;
+    const match = SURFACES.find((s) => s.toLowerCase() === tab.toLowerCase());
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time deep-link, mirrors the ?session= handler above
+    if (match && (BUILT_SURFACES as readonly string[]).includes(match)) setSurface(match);
+  }, []);
+
   const planJourney = useCallback(async () => {
     if (planning) return;
     setPlanning(true);

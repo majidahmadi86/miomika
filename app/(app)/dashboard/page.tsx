@@ -126,6 +126,8 @@ export default function DashboardPage() {
           pickLevel: "Pick your level",
           proLevels: "Levels B1 & B2 unlock with Pro",
           changeLevel: "Change level",
+          retakeCheck: "Retake the level check",
+          checkLevel: "Check my level",
           wordsMastered: "Words mastered",
           conversations: "Conversations",
           wordsDue: "Words due",
@@ -159,6 +161,8 @@ export default function DashboardPage() {
           pickLevel: "เลือกระดับของคุณ",
           proLevels: "ระดับ B1 และ B2 ปลดล็อกด้วย Pro",
           changeLevel: "เปลี่ยนระดับ",
+          retakeCheck: "วัดระดับอีกครั้ง",
+          checkLevel: "วัดระดับของฉัน",
           wordsMastered: "คำที่จำได้แล้ว",
           conversations: "บทสนทนา",
           wordsDue: "คำที่ถึงเวลาทบทวน",
@@ -301,10 +305,16 @@ export default function DashboardPage() {
             ) : (
               <p className="mt-2 text-[13px] text-ink-muted">{t.pickLevel}</p>
             )}
-            <Link href="/me" className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-accent">
-              {cefrLevel ? t.changeLevel : t.pickLevel}
-              <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            </Link>
+            <div className="mt-3 flex flex-col items-start gap-1.5">
+              <Link href="/learn?tab=tests" className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-accent">
+                <Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                {cefrLevel ? t.retakeCheck : t.checkLevel}
+                <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              </Link>
+              <Link href="/me" className="inline-flex items-center gap-1 text-[11.5px] font-medium text-ink-muted">
+                {cefrLevel ? t.changeLevel : t.pickLevel}
+              </Link>
+            </div>
           </div>
         </div>
 
