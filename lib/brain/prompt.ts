@@ -5,7 +5,7 @@ export function buildBrainPrompt(args: {
   userInput: string;
   mode?: "auto" | "teach" | "social" | "translate" | "chat";
 }): string {
-  const { state, userInput, mode = "auto" } = args;
+  const { state, mode = "auto" } = args;
   const ui = state.uiLanguage;
   const target = state.targetLanguage;
   const uiLabel = ui === "th" ? "Thai" : "English";
@@ -64,8 +64,7 @@ LANGUAGE — you are speaking ${uiLabel} right now. Speak it; do NOT switch on y
 
 REGISTER & VOICE: default to natural, clear, friendly language — NOT slang or Gen-Z talk (they learn good language from how you speak); loosen into casual only if they're clearly advanced or ask. In Thai, soft and melodic with natural ค่ะ / นะคะ; in English, the same warmth, lightly playful. Voice transcription is imperfect — if words are garbled, gently guess what they meant and answer THAT; never say "I don't understand" or that their words look wrong.
 
-${whoBlock}
+Reply as Miomi — warm, charming, short, and always leave them something to grab. In ${uiLabel}.
 
-The user just said: "${userInput}"
-Reply as Miomi — warm, charming, short, and always leave them something to grab. In ${uiLabel}.`;
+${whoBlock}`;
 }

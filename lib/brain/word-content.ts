@@ -273,7 +273,7 @@ export async function verifyCard(args: {
 }): Promise<CardCheck> {
   const system = buildVerifySystem();
   const user = `Thai word/phrase: ${args.word_th}\nClaimed English meaning: ${args.word_en}\nThai example: ${args.example_th ?? "(none)"}\nEnglish example: ${args.example_en ?? "(none)"}`;
-  const raw = (await callGeminiJson(system, user)) ?? (await callGroqJson(system, user));
+  const raw = await callGroqJson(system, user); // Groq-only: Gemini is blocked; the dead attempt wasted a call
   if (!raw) return { headwordOk: false, exampleOk: false };
   try {
     const v = JSON.parse(raw.replace(/```json|```/g, "").trim()) as {
@@ -303,38 +303,28 @@ export async function generateWordCard(
 ): Promise<ResolvedWord | null> {
   const system = buildGenSystem(target, cefr);
   const user = `Word, short phrase, or meaning to teach: ${word}`;
-  // Two independent attempts (Groq, then Gemini). The headword must verify or we
-  // skip the candidate (and ultimately withhold). Prefer a candidate whose example
-  // also verifies; otherwise keep a headword-only card with the example dropped.
-  let fallback: ResolvedWord | null = null;
-  // 3 attempts: Gemini (Vertex) first — accurate Thai — then Groq as a last-resort fallback.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const raw = attempt < 2 ? await callGeminiJson(system, user) : await callGroqJson(system, user);
-    const parsed = parseCard(raw);
-    if (!isValidCard(parsed)) continue;
-    const word_en = (parsed.word_en ?? "").trim();
-    const word_th = (parsed.word_th ?? "").trim();
-    const example_en = (parsed.example_en ?? "").trim() || null;
-    const example_th = (parsed.example_th ?? "").trim() || null;
-    const check = await verifyCard({ word_en, word_th, example_th, example_en });
-    if (!check.headwordOk) continue;
-    const card: ResolvedWord = {
-      word_en,
-      word_th,
-      example_en: check.exampleOk ? example_en : null,
-      example_th: check.exampleOk ? example_th : null,
-      topic: (parsed.topic ?? "").trim() || null,
-      register: (parsed.register ?? "").trim() || null,
-      cefr_level: cefr,
-      emoji: null,
-      th_romanization: null,
-      en_ipa: null,
-      source: "generated",
-    };
-    if (check.exampleOk) return card;
-    if (!fallback) fallback = card;
-  }
-  return fallback;
+  // ONE Groq call. Gemini is blocked, and a verify pass per attempt multiplied token
+  // cost ~6x per taught word. Trust a single generation; the verified bank stays primary.
+  const raw = await callGroqJson(system, user);
+  const parsed = parseCard(raw);
+  if (!isValidCard(parsed)) return null;
+  const word_en = (parsed.word_en ?? "").trim();
+  const word_th = (parsed.word_th ?? "").trim();
+  const example_en = (parsed.example_en ?? "").trim() || null;
+  const example_th = (parsed.example_th ?? "").trim() || null;
+  return {
+    word_en,
+    word_th,
+    example_en,
+    example_th,
+    topic: (parsed.topic ?? "").trim() || null,
+    register: (parsed.register ?? "").trim() || null,
+    cefr_level: cefr,
+    emoji: null,
+    th_romanization: null,
+    en_ipa: null,
+    source: "generated",
+  };
 }
 
 /**
