@@ -14,6 +14,7 @@ import { useGuestExploration } from "@/components/guest/GuestExplorationContext"
 import { useProfile } from "@/lib/auth/use-profile";
 import { detectLang, speak } from "@/lib/voice/tts";
 import { sfxSuccess } from "@/lib/sound/sfx";
+import TestSurface from "@/components/learn/TestSurface";
 
 type LessonLite = {
   id: string;
@@ -120,7 +121,7 @@ type SessionDetail = {
 
 const LADDER = ["A1", "A2", "B1", "B2", "C1"] as const;
 const SURFACES = ["Course", "Speak", "Tests", "Reading", "Fun"] as const;
-const BUILT_SURFACES: ReadonlyArray<(typeof SURFACES)[number]> = ["Course", "Speak"];
+const BUILT_SURFACES: ReadonlyArray<(typeof SURFACES)[number]> = ["Course", "Speak", "Tests"];
 type Surface = (typeof SURFACES)[number];
 
 const REGISTER_OPTIONS = [
@@ -764,6 +765,8 @@ export default function LearnPage() {
               Sign up free
             </Link>
           </div>
+        ) : surface === "Tests" ? (
+          <TestSurface uiLang={profile?.ui_language === "th" ? "th" : "en"} />
         ) : surface === "Speak" ? (
           resultsSession && resultsSession.library ? (
             /* ---------- RESULTS / EXIT TICKET ---------- */
