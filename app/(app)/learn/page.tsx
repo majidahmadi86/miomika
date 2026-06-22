@@ -121,7 +121,7 @@ type SessionDetail = {
 
 const LADDER = ["A1", "A2", "B1", "B2", "C1"] as const;
 const SURFACES = ["Course", "Speak", "Tests", "Reading", "Fun"] as const;
-const BUILT_SURFACES: ReadonlyArray<(typeof SURFACES)[number]> = ["Course", "Speak", "Tests"];
+const BUILT_SURFACES: ReadonlyArray<(typeof SURFACES)[number]> = ["Course", "Speak"];
 type Surface = (typeof SURFACES)[number];
 
 const REGISTER_OPTIONS = [
