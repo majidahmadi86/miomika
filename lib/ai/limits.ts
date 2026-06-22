@@ -17,7 +17,7 @@ export const COST_CAPS_USD = {
 /** Per-day cost caps in USD */
 export const DAILY_COST_CAPS_USD = {
   guest: 0.02,
-  free: 0.05,
+  free: 0.1,
   pro: 0.5,
   pro_max: 2.0,
 } as const;
