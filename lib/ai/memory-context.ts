@@ -41,6 +41,6 @@ export function buildMemoryContext(profile: ServerProfile | null, memories: stri
       recalled.map((m) => `- ${m}`).join("\n");
   }
 
-  block += `\nLet a memory or fact surface only when it lands warmly. If nothing fits, just be present with them. Knowing them quietly is enough — you don't have to prove it.`;
+  block += `\nLet a memory or fact surface only when it lands warmly, as a response to what they're saying now — never OPEN by reciting one ("I was just thinking about…"); that feels performed. If nothing fits, just be present with them. Knowing them quietly is enough — you don't have to prove it.`;
   return block;
 }

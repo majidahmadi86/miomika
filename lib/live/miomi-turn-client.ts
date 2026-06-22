@@ -324,7 +324,7 @@ export class MiomiTurnClient {
     // Memory-as-invitation: they tapped a remembered fact on home to talk about THIS.
     if (seedTopic && seedTopic.trim()) {
       void this.runHidden(
-        `[kickoff] They just tapped a memory on their home screen because they want to talk about THIS: "${seedTopic.trim()}". Open by warmly, naturally bringing it up — like it's been on your mind too — in ONE short, breezy, curious line in the user's language, a touch cheeky, inviting them to tell you more. Do NOT introduce yourself or say your name. No emojis. Do NOT be formal.`,
+        `[kickoff] They just tapped a memory on their home screen because they want to talk about THIS: "${seedTopic.trim()}". Dive straight in with warm, genuine curiosity about IT — ask what's happening with it now, like a friend eager to hear more — in ONE short, breezy line in the user's language, a touch cheeky. Do NOT claim you were just thinking about it or that it's been on your mind — no performed recall; just be truly interested in THEM. Do NOT introduce yourself or say your name. No emojis. Do NOT be formal.`,
         { isKickoff: true },
       );
       return;
