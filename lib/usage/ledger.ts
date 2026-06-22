@@ -28,7 +28,7 @@ function costFor(provider: UsageProvider, model: string, u: { promptTokens?: num
 }
 
 type Row = { provider: UsageProvider; kind: UsageKind; model: string; prompt_tokens: number; completion_tokens: number; total_tokens: number; chars: number; audio_seconds: number; est_cost_usd: number; latency_ms: number | null; ok: boolean; meta: Record<string, unknown> | null };
-type Ctx = { fn: string; userId: string | null; requestId: string; rows: Row[]; tier: string | null; dailySpentUsd: number };
+type Ctx = { fn: string; userId: string | null; requestId: string; rows: Row[]; tier: string | null; dailySpentUsd: number; dailyExchanges: number };
 
 const als = new AsyncLocalStorage<Ctx>();
 
@@ -58,7 +58,7 @@ export function recordUsage(rec: {
 }
 
 export async function withUsage<T>(fn: string, userId: string | null, run: () => Promise<T>): Promise<T> {
-  const ctx: Ctx = { fn, userId, requestId: crypto.randomUUID(), rows: [], tier: null, dailySpentUsd: 0 };
+  const ctx: Ctx = { fn, userId, requestId: crypto.randomUUID(), rows: [], tier: null, dailySpentUsd: 0, dailyExchanges: 0 };
   try {
     return await als.run(ctx, run);
   } finally {
@@ -75,7 +75,11 @@ export async function enableBudget(tier: string): Promise<void> {
   const ctx = als.getStore();
   if (!ctx) return;
   ctx.tier = tier;
-  ctx.dailySpentUsd = ctx.userId ? await loadDailySpend(ctx.userId) : 0;
+  if (ctx.userId) {
+    const daily = await loadDailyUsage(ctx.userId);
+    ctx.dailySpentUsd = daily.spentUsd;
+    ctx.dailyExchanges = daily.exchanges;
+  }
 }
 
 // Sum of est_cost_usd recorded so far in the current request (0 outside one).
@@ -87,10 +91,10 @@ export function runningCostUsd(): number {
 
 // Snapshot the running budget picture for the gate. null outside a request, or
 // when the route hasn't opted into enforcement (tier still null).
-export function budgetState(): { tier: string | null; dailySpentUsd: number; runningUsd: number } | null {
+export function budgetState(): { tier: string | null; dailySpentUsd: number; dailyExchanges: number; runningUsd: number } | null {
   const ctx = als.getStore();
   if (!ctx) return null;
-  return { tier: ctx.tier, dailySpentUsd: ctx.dailySpentUsd, runningUsd: ctx.rows.reduce((s, r) => s + r.est_cost_usd, 0) };
+  return { tier: ctx.tier, dailySpentUsd: ctx.dailySpentUsd, dailyExchanges: ctx.dailyExchanges, runningUsd: ctx.rows.reduce((s, r) => s + r.est_cost_usd, 0) };
 }
 
 function startOfTodayIso(): string {
@@ -99,18 +103,23 @@ function startOfTodayIso(): string {
   return d.toISOString();
 }
 
-// Today's accumulated spend for a user (UTC day). Best-effort; 0 on any error.
-async function loadDailySpend(userId: string): Promise<number> {
+// Today's accumulated spend AND exchange count for a user (UTC day). Best-effort.
+// One exchange = one chat request, counted as distinct talk.miomi request_ids.
+async function loadDailyUsage(userId: string): Promise<{ spentUsd: number; exchanges: number }> {
   try {
     const supabase = await createServiceClient();
     const { data } = await supabase
       .from("llm_usage")
-      .select("est_cost_usd")
+      .select("est_cost_usd, fn, request_id")
       .eq("user_id", userId)
       .gte("created_at", startOfTodayIso());
-    return (data ?? []).reduce((s: number, r: { est_cost_usd: number | null }) => s + (r.est_cost_usd ?? 0), 0);
+    const rows = (data ?? []) as Array<{ est_cost_usd: number | null; fn: string | null; request_id: string | null }>;
+    const spentUsd = rows.reduce((s, r) => s + (r.est_cost_usd ?? 0), 0);
+    const exchangeReqs = new Set<string>();
+    for (const r of rows) if (r.fn === "talk.miomi" && r.request_id) exchangeReqs.add(r.request_id);
+    return { spentUsd, exchanges: exchangeReqs.size };
   } catch {
-    return 0;
+    return { spentUsd: 0, exchanges: 0 };
   }
 }
 

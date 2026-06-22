@@ -10,9 +10,9 @@
 // way to reach a paid provider that bypasses this, because the call functions
 // (chat reply, card/lesson gen, phonetics, and future TTS/STT) all gate here.
 import { budgetState } from "./ledger";
-import { COST_CAPS_USD, DAILY_COST_CAPS_USD } from "@/lib/ai/limits";
+import { COST_CAPS_USD, DAILY_COST_CAPS_USD, DAILY_EXCHANGE_CAPS } from "@/lib/ai/limits";
 
-export type BudgetScope = "turn" | "daily";
+export type BudgetScope = "turn" | "daily" | "exchanges";
 
 export class BudgetExceededError extends Error {
   readonly scope: BudgetScope;
@@ -59,6 +59,15 @@ export function assertBudget(feature: string, estimateUsd?: number): void {
   if (!state) return;                  // not inside a tracked request
   const tier = resolveTier(state.tier);
   if (!tier) return;                   // route hasn't opted in yet
+  // The user-facing free limit: count chat exchanges per day. Only "reply" counts
+  // as an exchange (cards/phonetics are parts of one). +1 = this exchange.
+  if (feature === "reply") {
+    const exCap = DAILY_EXCHANGE_CAPS[tier];
+    if (exCap != null && state.dailyExchanges + 1 > exCap) {
+      throw new BudgetExceededError("exchanges", feature);
+    }
+  }
+  // Safety net beneath the exchange limit: hard cost ceilings (per-turn + per-day).
   const est = estimateUsd ?? FEATURE_ESTIMATES[feature] ?? DEFAULT_ESTIMATE_USD;
   if (state.runningUsd + est > COST_CAPS_USD[tier]) {
     throw new BudgetExceededError("turn", feature);

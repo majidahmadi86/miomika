@@ -88,8 +88,8 @@ function aiErrorFields(error: unknown): { message: string; status?: number } {
 // Warm fallback shown when a user hits their cost ceiling — never an error.
 // TODO Mike: replace the Thai copy with your own wording.
 const CAPPED_DAILY = {
-  en: "We've had such a good chat today! I need a little catnap now — let's pick this up again tomorrow.",
-  th: "วันนี้เราคุยกันสนุกมากเลยน้า! ขอมิโอมิงีบสักหน่อยนะ เดี๋ยวพรุ่งนี้มาคุยกันต่อนะ",
+  en: "We've had so much fun today — that's all our free chats until tomorrow! I'll be right here when they refresh. Or if you'd rather not wait, you can unlock unlimited time with me anytime.",
+  th: "วันนี้เราคุยกันสนุกมากเลยน้า — โควต้าแชทฟรีของวันนี้หมดแล้ว! พรุ่งนี้พอรีเฟรชแล้วหนูจะรออยู่ตรงนี้นะ หรือถ้าไม่อยากรอ ก็ปลดล็อกคุยกับหนูได้ไม่จำกัดเลยน้า",
 };
 const CAPPED_TURN = {
   en: "Ooh, that's a big one! Let's take it a little at a time — try me again in a moment?",
@@ -115,7 +115,7 @@ export async function getAIResponse(
     assertBudget("reply", estimateLlmUsd(estChars, MAX_REPLY_TOKENS));
   } catch (err) {
     if (err instanceof BudgetExceededError) {
-      const capped = err.scope === "daily" ? CAPPED_DAILY : CAPPED_TURN;
+      const capped = err.scope === "turn" ? CAPPED_TURN : CAPPED_DAILY;
       return { content: uiLanguage === "th" ? capped.th : capped.en, engine: "capped", wasFailover: true };
     }
     throw err;
