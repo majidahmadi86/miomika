@@ -4,7 +4,7 @@ export const maxDuration = 60;
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
-import { buildLesson } from "@/lib/brain/lesson-builder";
+import { buildLesson, type BuildLessonResult } from "@/lib/brain/lesson-builder";
 import { withUsage, enableBudget } from "@/lib/usage/ledger";
 import { loadCefrLevel } from "@/lib/vocab/user-state-read";
 import {
@@ -128,16 +128,69 @@ export async function POST(req: NextRequest) {
     } catch {
       knownWords = [];
     }
-    const result = await withUsage("lessons.create", profile.id, async () => {
-      await enableBudget(profile.tier);
-      return buildLesson({
-        userId: profile.id,
-        topicAsk,
-        cefrLevel: level,
-        learningTarget: targetAsk ?? learningTarget,
-        knownWords,
-      });
-    });
+    // STANDARD COURSE: copy a pre-built, verified catalog lesson (zero LLM). Only a custom
+    // topic, or a level whose catalog is not built yet, falls through to generation.
+    const learning_target = targetAsk ?? learningTarget;
+    let copied: BuildLessonResult | null = null;
+    if (!topicAsk) {
+      try {
+        const supabase = await createServiceClient();
+        const { data: mine } = await supabase
+          .from("lessons")
+          .select("catalog_slug")
+          .eq("user_id", profile.id)
+          .not("catalog_slug", "is", null);
+        const taken = new Set((mine ?? []).map((r) => r.catalog_slug as string));
+        const { data: cat } = await supabase
+          .from("lesson_catalog")
+          .select("slug, title_en, title_th, topic, color, cefr_level, learning_target, content")
+          .eq("cefr_level", level)
+          .eq("learning_target", learning_target)
+          .order("position", { ascending: true });
+        const next = (cat ?? []).find((c) => !taken.has(c.slug as string));
+        if (next) {
+          const { count } = await supabase
+            .from("lessons")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", profile.id);
+          const { data: ins, error: insErr } = await supabase
+            .from("lessons")
+            .insert({
+              user_id: profile.id,
+              title_en: next.title_en,
+              title_th: next.title_th ?? null,
+              topic: next.topic,
+              color: next.color,
+              cefr_level: next.cefr_level,
+              learning_target: next.learning_target,
+              position: count ?? 0,
+              status: "planned",
+              content: next.content,
+              progress: {},
+              catalog_slug: next.slug,
+            })
+            .select("id")
+            .single();
+          if (!insErr && ins) {
+            copied = { ok: true, lessonId: ins.id as string, title_en: String(next.title_en), topic: String(next.topic) };
+          }
+        }
+      } catch (e) {
+        console.error("[api/lessons] catalog copy failed, will generate:", e);
+      }
+    }
+    const result =
+      copied ??
+      (await withUsage("lessons.create", profile.id, async () => {
+        await enableBudget(profile.tier);
+        return buildLesson({
+          userId: profile.id,
+          topicAsk,
+          cefrLevel: level,
+          learningTarget: learning_target,
+          knownWords,
+        });
+      }));
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
     console.error("[api/lessons] generate failed:", err);
