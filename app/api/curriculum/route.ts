@@ -174,6 +174,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, existing: true, curriculumId: existing.id });
     }
 
+    // FIXED CURATED JOURNEY: copy the catalog plan when one exists (zero LLM); else plan with the model.
+    const { data: catPlan } = await supabase
+      .from("curriculum_catalog")
+      .select("plan")
+      .eq("cefr_level", level)
+      .eq("learning_target", learningTarget)
+      .maybeSingle();
+    if (catPlan?.plan) {
+      const { data: cins, error: cinsErr } = await supabase
+        .from("curricula")
+        .insert({
+          user_id: profile.id,
+          cefr_level: level,
+          learning_target: learningTarget,
+          status: "planned",
+          plan: catPlan.plan,
+          progress: { current_unit: 1 },
+        })
+        .select("id")
+        .single();
+      if (!cinsErr && cins) {
+        return NextResponse.json({ ok: true, existing: false, curriculumId: cins.id as string });
+      }
+    }
+
     const targetName = learningTarget === "en" ? "English" : "Thai";
     const units = await callCurriculumPlan(level, targetName);
     if (!units) return NextResponse.json({ ok: false, reason: "plan_failed" }, { status: 200 });

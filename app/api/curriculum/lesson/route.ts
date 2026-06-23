@@ -111,16 +111,54 @@ export async function POST(req: NextRequest) {
       knownWords = [];
     }
 
-    const result = await buildLesson({
-      userId: profile.id,
-      topicAsk: `${unit.title_en} — ${nextTitle}`,
-      cefrLevel: level,
-      learningTarget,
-      knownWords,
-    });
-    if (!result.ok) return NextResponse.json(result, { status: 200 });
+    // FIXED CURATED JOURNEY: serve the catalog lesson for this slot (zero LLM); else generate.
+    let lessonId: string | null = null;
+    const { data: catLesson } = await supabase
+      .from("lesson_catalog")
+      .select("slug, title_en, title_th, topic, color, cefr_level, learning_target, content")
+      .eq("cefr_level", level)
+      .eq("learning_target", learningTarget)
+      .eq("unit", firstOpen)
+      .eq("position", builtCount)
+      .maybeSingle();
+    if (catLesson) {
+      const { count } = await supabase
+        .from("lessons")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id);
+      const { data: ins, error: insErr } = await supabase
+        .from("lessons")
+        .insert({
+          user_id: profile.id,
+          title_en: catLesson.title_en,
+          title_th: catLesson.title_th ?? null,
+          topic: catLesson.topic,
+          color: catLesson.color,
+          cefr_level: catLesson.cefr_level,
+          learning_target: catLesson.learning_target,
+          position: count ?? 0,
+          status: "planned",
+          content: catLesson.content,
+          progress: {},
+          catalog_slug: catLesson.slug,
+        })
+        .select("id")
+        .single();
+      if (!insErr && ins) lessonId = ins.id as string;
+    }
+    if (!lessonId) {
+      const result = await buildLesson({
+        userId: profile.id,
+        topicAsk: `${unit.title_en} — ${nextTitle}`,
+        cefrLevel: level,
+        learningTarget,
+        knownWords,
+      });
+      if (!result.ok) return NextResponse.json(result, { status: 200 });
+      lessonId = result.lessonId;
+    }
 
-    unit.lesson_ids = [...(unit.lesson_ids ?? []), result.lessonId];
+    unit.lesson_ids = [...(unit.lesson_ids ?? []), lessonId];
     unit.status = "in_progress";
     const progress = (cur.progress ?? {}) as Record<string, unknown>;
     progress.current_unit = firstOpen;
@@ -130,10 +168,9 @@ export async function POST(req: NextRequest) {
       .eq("id", cur.id);
     if (upErr) {
       console.error("[api/curriculum/lesson] plan update failed:", upErr.message);
-      // The lesson exists; the plan link failed. Surface it honestly.
       return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
     }
-    return NextResponse.json({ ok: true, lessonId: result.lessonId }, { status: 200 });
+    return NextResponse.json({ ok: true, lessonId }, { status: 200 });
   } catch (err) {
     console.error("[api/curriculum/lesson] failed:", err);
     return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
