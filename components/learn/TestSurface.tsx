@@ -101,13 +101,28 @@ function estimate(qs: TestQuestion[], picked: number[]): { level: string; score:
   return { level, score };
 }
 
+type CheckpointInfo = {
+  level: string;
+  badge: string;
+  kind: "checkpoint" | "level_test";
+  title: string;
+  passPct?: number;
+};
+
 export default function TestSurface({
   uiLang = "en",
+  mode = "placement",
+  checkpoint,
+  onDone,
 }: {
   uiLang?: "th" | "en";
+  mode?: "placement" | "checkpoint";
+  checkpoint?: CheckpointInfo;
+  onDone?: (advancedTo?: string) => void;
 }) {
   const t = T[uiLang];
-  const [phase, setPhase] = useState<Phase>("intro");
+  const isCp = mode === "checkpoint" && !!checkpoint;
+  const [phase, setPhase] = useState<Phase>(isCp ? "loading" : "intro");
   const [questions, setQuestions] = useState<TestQuestion[]>([]);
   const [learningTarget, setLearningTarget] = useState(uiLang === "en" ? "th" : "en");
   const [idx, setIdx] = useState(0);
@@ -119,6 +134,7 @@ export default function TestSurface({
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    if (isCp) return;
     let on = true;
     fetch("/api/test/result")
       .then((r) => r.json())
@@ -129,13 +145,20 @@ export default function TestSurface({
     return () => {
       on = false;
     };
-  }, []);
+  }, [isCp]);
 
   const start = useCallback(async () => {
     setFailed(false);
     setPhase("loading");
     try {
-      const r = await fetch("/api/test/level-check", { method: "POST" });
+      const r =
+        isCp && checkpoint
+          ? await fetch("/api/curriculum/checkpoint", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ level: checkpoint.level, badge: checkpoint.badge }),
+            })
+          : await fetch("/api/test/level-check", { method: "POST" });
       const j = await r.json();
       if (j?.ok && Array.isArray(j.questions) && j.questions.length) {
         setQuestions(j.questions);
@@ -154,7 +177,16 @@ export default function TestSurface({
       setFailed(true);
       setPhase("intro");
     }
-  }, []);
+  }, [isCp, checkpoint]);
+
+  // Checkpoint mode skips the placement intro and loads its curated questions immediately.
+  useEffect(() => {
+    if (!isCp) return;
+    const id = setTimeout(() => {
+      void start();
+    }, 0);
+    return () => clearTimeout(id);
+  }, [isCp, start]);
 
   const pick = (oi: number) => {
     if (revealed) return;
@@ -172,6 +204,12 @@ export default function TestSurface({
       setRevealed(false);
       return;
     }
+    if (isCp && checkpoint) {
+      const score = questions.reduce((n, qq, i) => n + (picked[i] === qq.correctIndex ? 1 : 0), 0);
+      setResult({ level: checkpoint.level, score });
+      setPhase("result");
+      return;
+    }
     const res = estimate(questions, picked);
     setResult(res);
     setPhase("result");
@@ -180,6 +218,28 @@ export default function TestSurface({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ level: res.level, score: res.score, total: questions.length }),
     }).catch(() => {});
+  };
+
+  // Level test passed → anchor the NEXT CEFR level via the existing result route
+  // (updates profiles.cefr_level + logs the achievement), then hand control back.
+  const finishLevelTest = async (nextLevel: string) => {
+    if (!result || saved) return;
+    setSaved(true);
+    try {
+      await fetch("/api/test/result", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          level: nextLevel,
+          score: result.score,
+          total: questions.length,
+          setLevel: true,
+        }),
+      });
+    } catch {
+      /* best effort */
+    }
+    onDone?.(nextLevel);
   };
 
   const accept = async () => {
@@ -234,6 +294,89 @@ export default function TestSurface({
   const f = uiLang === "th"
     ? ({ ...font, fontFamily: "'Sarabun', sans-serif" } as const)
     : font;
+
+  // ── CHECKPOINT: loading / failed ─────────────────────────────────────────────
+  if (isCp && checkpoint && (phase === "loading" || phase === "intro")) {
+    const cpTitle =
+      checkpoint.kind === "level_test"
+        ? uiLang === "th"
+          ? `ทดสอบระดับ ${checkpoint.level}`
+          : `${checkpoint.level} level test`
+        : uiLang === "th"
+          ? `เช็กพอยต์ ${checkpoint.badge}`
+          : `Checkpoint ${checkpoint.badge}`;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 20, boxShadow: CARD_SHADOW, padding: "26px 22px", textAlign: "center" }}>
+          <span style={{ width: 72, height: 72, borderRadius: "50%", background: "#E9F8F4", display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            <Image src="/miomi/head-happy.png" alt="Miomi" width={62} height={62} style={{ objectFit: "contain" }} />
+          </span>
+          <h2 style={{ ...f, fontSize: 18, fontWeight: 700, color: INK_STRONG, margin: "12px 0 0" }}>{cpTitle}</h2>
+          <p style={{ ...f, fontSize: 12.5, color: failed ? NO : MUTED, margin: "8px 0 0", fontWeight: failed ? 600 : 400, lineHeight: 1.5 }}>
+            {failed
+              ? uiLang === "th" ? "โหลดไม่สำเร็จ ลองอีกครั้งนะ" : "Couldn't load this — try again."
+              : uiLang === "th" ? "กำลังเตรียมให้…" : "Getting it ready…"}
+          </p>
+          {failed ? (
+            <div style={{ display: "flex", gap: 9, justifyContent: "center", marginTop: 18 }}>
+              <button onClick={() => onDone?.()} style={{ ...font, fontSize: 13.5, fontWeight: 700, padding: "11px 18px", borderRadius: 99, border: `1px solid ${BORDER}`, background: "#FFFFFF", color: INK_STRONG, cursor: "pointer" }}>
+                {uiLang === "th" ? "ปิด" : "Close"}
+              </button>
+              <button onClick={start} style={{ ...font, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, padding: "11px 20px", borderRadius: 99, border: "none", background: CTA, color: "#fff", boxShadow: CTA_SHADOW, cursor: "pointer" }}>
+                <RotateCcw style={{ width: 15, height: 15 }} strokeWidth={2.2} aria-hidden />
+                {uiLang === "th" ? "ลองอีกครั้ง" : "Try again"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  // ── CHECKPOINT: result ───────────────────────────────────────────────────────
+  if (isCp && checkpoint && phase === "result" && result) {
+    const total = questions.length;
+    const pass = result.score / Math.max(1, total) >= (checkpoint.passPct ?? 0.7);
+    const li = LADDER.indexOf(checkpoint.level as (typeof LADDER)[number]);
+    const nextLevel = li >= 0 && li < LADDER.length - 1 ? LADDER[li + 1] : checkpoint.level;
+    const canAdvance = checkpoint.kind === "level_test" && pass && nextLevel !== checkpoint.level;
+    const tint = pass ? { bg: "#E9F8F4", fg: OK } : { bg: "#FBEEEC", fg: NO };
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 20, boxShadow: CARD_SHADOW, padding: "26px 22px", textAlign: "center" }}>
+          <span style={{ width: 72, height: 72, borderRadius: "50%", background: tint.bg, display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            <Image src="/miomi/head-happy.png" alt="Miomi" width={62} height={62} style={{ objectFit: "contain" }} />
+          </span>
+          <div style={{ ...font, marginTop: 12, fontSize: 40, fontWeight: 700, color: tint.fg, lineHeight: 1 }}>
+            {result.score}<span style={{ fontSize: 22, color: MUTED }}>/{total}</span>
+          </div>
+          <p style={{ ...f, fontSize: 13, fontWeight: 600, color: pass ? OK : MUTED, margin: "10px 0 0" }}>
+            {canAdvance
+              ? uiLang === "th" ? `ผ่านแล้ว! ปลดล็อกระดับ ${nextLevel}` : `Passed! ${nextLevel} unlocked`
+              : pass
+                ? uiLang === "th" ? "เยี่ยมมาก!" : "Nicely done!"
+                : uiLang === "th" ? "ลองอีกครั้งได้เสมอนะ" : "Give it another go anytime"}
+          </p>
+          <div style={{ display: "flex", gap: 9, marginTop: 20 }}>
+            <button onClick={start} style={{ ...font, flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 700, padding: "11px 16px", borderRadius: 99, border: `1px solid ${BORDER}`, background: "#FFFFFF", color: INK_STRONG, cursor: "pointer" }}>
+              <RotateCcw style={{ width: 15, height: 15 }} strokeWidth={2.2} aria-hidden />
+              {uiLang === "th" ? "ทำใหม่" : "Retake"}
+            </button>
+            {canAdvance ? (
+              <button onClick={() => void finishLevelTest(nextLevel)} disabled={saved} style={{ ...font, flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 14, fontWeight: 700, padding: "11px 0", borderRadius: 99, border: "none", background: saved ? "#E9F8F4" : CTA, color: saved ? OK : "#fff", boxShadow: saved ? "none" : CTA_SHADOW, cursor: saved ? "default" : "pointer" }}>
+                {uiLang === "th" ? `ไปต่อ ${nextLevel}` : `Continue to ${nextLevel}`}
+                <ChevronRight style={{ width: 16, height: 16 }} strokeWidth={2.4} aria-hidden />
+              </button>
+            ) : (
+              <button onClick={() => onDone?.()} style={{ ...font, flex: 1, fontSize: 14, fontWeight: 700, padding: "11px 0", borderRadius: 99, border: "none", background: CTA, color: "#fff", boxShadow: CTA_SHADOW, cursor: "pointer" }}>
+                {uiLang === "th" ? "เสร็จแล้ว" : "Done"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── INTRO ───────────────────────────────────────────────────────────────────
   if (phase === "intro" || phase === "loading") {
@@ -513,6 +656,13 @@ export default function TestSurface({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {isCp ? (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: -4 }}>
+          <button onClick={() => onDone?.()} aria-label="Close" style={{ display: "inline-flex", alignItems: "center", background: "transparent", border: "none", cursor: "pointer", color: MUTED, padding: 2 }}>
+            <X style={{ width: 16, height: 16 }} strokeWidth={2.4} aria-hidden />
+          </button>
+        </div>
+      ) : null}
       {/* progress */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ ...f, fontSize: 12, fontWeight: 700, color: MUTED }}>

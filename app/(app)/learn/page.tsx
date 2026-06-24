@@ -235,6 +235,11 @@ export default function LearnPage() {
   const [myLevel, setMyLevel] = useState<string>("A1");
   const [viewLevel, setViewLevel] = useState<string | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumRow | null>(null);
+  const [openCp, setOpenCp] = useState<{
+    level: string;
+    badge: string;
+    kind: "checkpoint" | "level_test";
+  } | null>(null);
   const [speaking, setSpeaking] = useState<SpeakingRow | null>(null);
   const [sessions, setSessions] = useState<SessionLite[]>([]);
   const [allLessons, setAllLessons] = useState<LessonLite[]>([]);
@@ -1500,10 +1505,14 @@ export default function LearnPage() {
                               position: "absolute", left: -28.5, top: 14, width: 22, height: 22, borderRadius: "50%",
                               background: "#FFFFFF", border: `2px solid ${cpReached ? "#7DD3C0" : BORDER}`, opacity: cpReached ? 1 : 0.7,
                             }} />
-                            <div style={{
-                              display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF",
-                              border: `1.5px ${cpReached ? "solid #7DD3C0" : `dashed ${BORDER}`}`, borderRadius: 18, padding: "11px 13px",
-                            }}>
+                            <div
+                              onClick={cpReached ? () => setOpenCp({ level: curriculum.cefr_level, badge: cp.badge, kind: cp.kind }) : undefined}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF",
+                                border: `1.5px ${cpReached ? "solid #7DD3C0" : `dashed ${BORDER}`}`, borderRadius: 18, padding: "11px 13px",
+                                cursor: cpReached ? "pointer" : "default",
+                              }}
+                            >
                               <span style={{
                                 ...thaiFont, width: 34, height: 34, borderRadius: "50%", background: "#F1ECE3", color: MUTED,
                                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -1514,7 +1523,7 @@ export default function LearnPage() {
                                   {cp.kind === "level_test" ? `${curriculum.cefr_level} level test` : `Checkpoint ${cp.badge}`}
                                 </span>
                                 <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED }}>
-                                  {cpReached ? "Miomi is preparing this — coming in an update" : `After unit ${cp.after_unit}`}
+                                  {cpReached ? (profile?.ui_language === "th" ? "แตะเพื่อเริ่ม" : "Tap to start") : `After unit ${cp.after_unit}`}
                                 </span>
                               </span>
                             </div>
@@ -1599,6 +1608,27 @@ export default function LearnPage() {
             <button onClick={acceptRoomIntro} style={{ width: "100%", fontFamily: "'Quicksand', sans-serif", fontSize: 14, fontWeight: 700, padding: "11px 0", borderRadius: 99, border: "none", background: "linear-gradient(135deg,#6ECDB8,#34A98F)", color: "#FFFFFF", cursor: "pointer" }}>
               Got it — enter my room
             </button>
+          </div>
+        </div>
+      ) : null}
+      {openCp ? (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(31,30,28,0.55)", padding: 20 }}>
+          <div style={{ maxWidth: 420, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+            <TestSurface
+              uiLang={profile?.ui_language === "th" ? "th" : "en"}
+              mode="checkpoint"
+              checkpoint={{
+                level: openCp.level,
+                badge: openCp.badge,
+                kind: openCp.kind,
+                title: openCp.kind === "level_test" ? `${openCp.level} level test` : `Checkpoint ${openCp.badge}`,
+                passPct: 0.7,
+              }}
+              onDone={(advancedTo) => {
+                setOpenCp(null);
+                if (advancedTo && typeof window !== "undefined") window.location.reload();
+              }}
+            />
           </div>
         </div>
       ) : null}
