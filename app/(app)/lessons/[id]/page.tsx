@@ -472,6 +472,9 @@ function GamesStep(props: {
   const handleDone = (key: string) => {
     sfxSuccess();
     onGameDone(key);
+    // "Say it" ends in a review state (compare Miomi vs you, or re-record) the learner
+    // should stay in — don't auto-jump to the next game and yank them out of it.
+    if (key === "say") return;
     const rest = available.filter((k) => k !== key && !games[k]);
     if (rest.length) setTimeout(() => setTab(rest[0]!), 900);
   };

@@ -34,6 +34,7 @@ export type LessonListItem = {
   phrases_count: number;
   has_checkpoint: boolean;
   progress: Record<string, unknown>;
+  catalog_slug: string | null;
 };
 
 export async function GET() {
@@ -44,7 +45,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("lessons")
       .select(
-        "id, title_en, title_th, topic, color, cefr_level, learning_target, status, position, content, progress",
+        "id, title_en, title_th, topic, color, cefr_level, learning_target, status, position, content, progress, catalog_slug",
       )
       .eq("user_id", profile.id)
       .order("position", { ascending: true });
@@ -69,6 +70,7 @@ export async function GET() {
         phrases_count: Array.isArray(content.phrases) ? content.phrases.length : 0,
         has_checkpoint: Array.isArray(content.candos) && content.candos.length > 0,
         progress: (row.progress ?? {}) as Record<string, unknown>,
+        catalog_slug: (row.catalog_slug as string | null) ?? null,
       };
     });
     let cefrLevel: string | null = null;

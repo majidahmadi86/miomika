@@ -21,6 +21,7 @@ type LessonLite = {
   title_en: string;
   status: string;
   progress: { step?: number; checkpoint?: { score: number; total: number } };
+  catalog_slug?: string | null;
 };
 
 type CurriculumUnit = {
@@ -632,7 +633,9 @@ export default function LearnPage() {
   const firstOpen = units.find((u) => !unitComplete(u))?.position ?? (units.length ? units.length + 1 : 0);
   const openUnit = expandedUnit ?? firstOpen;
   const journeyIds = new Set(units.flatMap((u) => u.lesson_ids ?? []));
-  const ownLessons = allLessons.filter((l) => !journeyIds.has(l.id));
+  // "Your own lessons" = only lessons the learner created themselves. Exclude the current
+  // journey AND any catalog lesson (e.g. a prior level's), which otherwise pile up here after a level-up.
+  const ownLessons = allLessons.filter((l) => !journeyIds.has(l.id) && !l.catalog_slug);
 
   const stats = [
     { n: myLevel, l: "Level", icon: ShieldCheck },
