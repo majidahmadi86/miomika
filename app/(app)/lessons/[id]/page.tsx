@@ -201,6 +201,7 @@ export default function LessonPlayerPage() {
   return (
     <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "transparent" }}>
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
+        <div style={{ maxWidth: 768, margin: "0 auto", width: "100%" }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button
@@ -302,6 +303,7 @@ export default function LessonPlayerPage() {
             <RecapStep lesson={lesson} words={words} phrases={phrases} candos={candos} result={result} say={say} onRetry={() => { setAttempt((a) => a + 1); setResult(null); setStep(4); }} onReview={() => { setResult(null); setStep(0); setMaxVisited(4); }} />
           )
         ) : null}
+        </div>
       </div>
     </div>
   );
