@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { X, Check, Crown, Sparkles } from "lucide-react";
+import Image from "next/image";
+import { X, Check, Crown } from "lucide-react";
 import { useUILanguage } from "@/lib/i18n/client";
 import {
   UPGRADE_PLANS,
@@ -155,22 +156,17 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
         >
           {/* header */}
           <div style={{ textAlign: "center", marginBottom: 18 }}>
-            <span
-              aria-hidden
+            <Image
+              src="/miomi/head-happy.png"
+              alt="Miomi"
+              width={78}
+              height={78}
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 54,
-                height: 54,
-                borderRadius: 17,
-                background: ACCENT_GRAD,
-                boxShadow: "0 6px 18px -6px rgba(52,169,143,0.55)",
-                marginBottom: 12,
+                objectFit: "contain",
+                marginBottom: 8,
+                filter: "drop-shadow(0 6px 14px rgba(52,169,143,0.22))",
               }}
-            >
-              <Sparkles style={{ width: 27, height: 27, color: "#fff" }} strokeWidth={2.2} />
-            </span>
+            />
             <h2 style={{ ...sans, fontSize: 23, fontWeight: 800, color: "var(--mk-ink, #2A2A28)", margin: "0 0 6px" }}>
               {t(header.title)}
             </h2>
