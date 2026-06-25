@@ -240,17 +240,19 @@ export async function POST(req: NextRequest) {
       } satisfies MiomiResponse);
     }
 
-    // ── DAILY MESSAGE LIMIT (members) — warm "see you tomorrow" before the reply ──
-    // Free users get DAILY_EXCHANGE_CAPS.free real replies/day; pro / pro_max get a
-    // far higher cap that acts as an abuse backstop, not a felt wall. Guests are
-    // bounded per-session by GUEST_EXCHANGE_LIMIT above instead. The count is the
-    // ledger's tally of today's real model-call exchanges (kickoff openers and this
-    // limit message make no model call, so they don't consume the allowance). The
-    // hard cost caps in gate.ts stay as the silent net beneath this.
+    // ── DAILY MESSAGE LIMIT (members) — warm "see you tomorrow" on the NEXT turn ──
+    // The user's CURRENT input ALWAYS earns a real reply — we never swallow the
+    // message they just sent. Enforcement is `>` (strictly past the cap): the turn
+    // that reaches the cap still answers; only when they come back OVER it do they get
+    // the goodbye (+ the upgrade CTA the client shows off `limitReached`). Free users
+    // get ~DAILY_EXCHANGE_CAPS.free replies/day; pro / pro_max sit far higher as an
+    // abuse backstop. Guests are bounded per-session by GUEST_EXCHANGE_LIMIT above.
+    // Count = the ledger's tally of today's real model-call exchanges (kickoff openers
+    // and this limit message make no model call, so they don't consume the allowance).
     const memberTier = profile?.tier ?? "guest";
     const dailyExchangeCap = DAILY_EXCHANGE_CAPS[memberTier];
     const exchangesToday = budgetState()?.dailyExchanges ?? 0;
-    if (!serverIsGuest && dailyExchangeCap != null && exchangesToday >= dailyExchangeCap) {
+    if (!serverIsGuest && dailyExchangeCap != null && exchangesToday > dailyExchangeCap) {
       const limitContent = pickPhrase(GUIDANCE_DAILY_LIMIT_HIT, { lang: brainState.uiLanguage });
       return NextResponse.json({
         content: limitContent,
