@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
+import { usePaywall } from "@/components/billing/Paywall";
 import { useProfile } from "@/lib/auth/use-profile";
 import { BondPill } from "@/components/talk/BondPill";
 import { awardDailyBond } from "@/lib/companion/bond";
@@ -123,6 +124,7 @@ export default function TalkPage() {
   const { isGuest, authReady: guestAuthReady } = useGuestExploration();
   const { profile, authReady: profileAuthReady } = useProfile();
   const browserUi = useUILanguage();
+  const { open: openPaywall } = usePaywall();
   /** Members must wait for profile row — guest auth alone is not enough (entryStartedRef race). */
   const canUseLive =
     guestAuthReady && (isGuest || (profileAuthReady && !!profile));
@@ -544,6 +546,7 @@ export default function TalkPage() {
         logEvent({ kind: "state", level: "info", message: "live connected" });
       },
       onMessage: (msg) => handleLiveMessageRef.current(msg),
+      onLimitReached: () => openPaywall("daily_limit"),
       onStatus: (status) => {
         if ((status as { phase?: string } | null)?.phase === "thinking") {
           setLiveUiState("thinking");
@@ -560,7 +563,7 @@ export default function TalkPage() {
         }
       },
     }) as unknown as MiomiLiveClient;
-  }, [ensureTurnRuntime]);
+  }, [ensureTurnRuntime, openPaywall]);
 
   const primeAudio = useCallback(() => {
     if (!mediaRef.current) mediaRef.current = new MediaHandler();

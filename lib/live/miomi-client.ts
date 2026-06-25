@@ -62,6 +62,8 @@ export type LiveClientCallbacks = {
   onClose?: (detail: LiveClientCloseDetail) => void;
   onError?: (detail: LiveClientErrorDetail) => void;
   onStatus?: (msg: { status: string; voice?: string; model?: string; code?: number | null; reason?: string }) => void;
+  /** Fired when the route reports the member hit their per-day chat cap (turn-based engine only). */
+  onLimitReached?: () => void;
 };
 
 type LiveSession = {

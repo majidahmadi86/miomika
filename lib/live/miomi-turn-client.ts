@@ -70,6 +70,7 @@ type MiomiResponse = {
   } | null;
   sessionContext?: unknown;
   replyLanguage?: "th" | "en";
+  limitReached?: "daily";
   [k: string]: unknown;
 };
 
@@ -678,6 +679,11 @@ export class MiomiTurnClient {
 
     // model_transcript flips the orb to "speaking" + writes the bubble
     this.emit({ type: "gemini", text: content } as LiveClientMessage);
+
+    // Member hit their per-day chat cap — surface the upgrade sheet AFTER the
+    // goodbye line is on screen. The off-by-one fix already guaranteed their last
+    // real input got a real reply on the prior turn; this is the next-turn nudge.
+    if (reply.limitReached === "daily") this.cb.onLimitReached?.();
 
     // her real voice (per-segment Leda) — NOT MediaHandler's raw player
     try {

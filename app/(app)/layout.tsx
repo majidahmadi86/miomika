@@ -10,6 +10,7 @@ import {
 import { DesktopHoldBanner } from "@/components/layout/DesktopHoldBanner";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { Rail } from "@/components/layout/Rail";
+import { PaywallProvider } from "@/components/billing/Paywall";
 import { useRef, useCallback, useEffect } from "react";
 
 const AmbientBackground = dynamic(
@@ -24,7 +25,9 @@ export default function AppLayout({
 }>) {
   return (
     <GuestExplorationProvider>
-      <AppLayoutInner>{children}</AppLayoutInner>
+      <PaywallProvider>
+        <AppLayoutInner>{children}</AppLayoutInner>
+      </PaywallProvider>
     </GuestExplorationProvider>
   );
 }

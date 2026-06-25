@@ -11,6 +11,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLeft, Compass, Sparkles, type LucideIcon } from "lucide-react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
+import { usePaywall } from "@/components/billing/Paywall";
 import { useProfile } from "@/lib/auth/use-profile";
 import { detectLang, speak } from "@/lib/voice/tts";
 import { sfxSuccess } from "@/lib/sound/sfx";
@@ -246,6 +247,7 @@ function ArcStrip() {
 export default function LearnPage() {
   const router = useRouter();
   const { isGuest, authReady } = useGuestExploration();
+  const { open: openPaywall } = usePaywall();
   const { profile } = useProfile();
   const [myLevel, setMyLevel] = useState<string>("A1");
   const [viewLevel, setViewLevel] = useState<string | null>(null);
@@ -452,6 +454,10 @@ export default function LearnPage() {
         setTopic("");
         setAskOpen(false);
         await refresh(viewLevel ?? undefined);
+      } else if (j.reason === "upgrade_required") {
+        setCreateMsg(null);
+        setAskOpen(false);
+        openPaywall("custom_course");
       } else {
         setCreateMsg(`Miomi could not finish planning that one (reason: ${j.reason ?? "unknown"}) — try once more, or a different topic.`);
       }
@@ -460,7 +466,7 @@ export default function LearnPage() {
     } finally {
       setCreating(false);
     }
-  }, [creating, topic, planLevel, planTarget, viewLevel, refresh]);
+  }, [creating, topic, planLevel, planTarget, viewLevel, refresh, openPaywall]);
 
   const planSpeaking = useCallback(async () => {
     if (speakPlanning) return;
