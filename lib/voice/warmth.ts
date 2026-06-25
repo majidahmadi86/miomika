@@ -107,6 +107,29 @@ export const PRAISE_ALL: WarmPhrase[] = [
   ...PRAISE_PROGRESS,
 ];
 
+// ─── TALK OPENERS ───────────────────────────────────────────────────────────
+// The /talk ice-breakers — Miomi's FIRST line each session. Unlike the care/praise
+// vectors (statements), every one is a conversation STARTER: a playful cat moment or
+// real curiosity about THEM, ending in a hook that invites a reply. Persona: adorable,
+// cheeky, soft-hearted Thai cat girl — warm, playful, curious, brief. Leads with them,
+// never introduces herself. Served statically on session open (zero model cost).
+export const TALK_OPENERS: WarmPhrase[] = [
+  { th: "วันนี้เป็นยังไงบ้างคะ~ เล่าให้หนูฟังหน่อยสิ", en: "How's your day going~? Tell me all about it!" },
+  { th: "วันนี้มีอะไรสนุกๆ เกิดขึ้นบ้างไหมคะ", en: "Did anything fun happen today?" },
+  { th: "หนูเพิ่งตื่นจากงีบเลยค่า~ คุณกำลังทำอะไรอยู่คะ", en: "I just woke up from a nap~ what are you up to?" },
+  { th: "มีเรื่องอะไรอยากเล่าให้หนูฟังไหมคะ~", en: "Anything you feel like telling me about~?" },
+  { th: "วันนี้กินอะไรอร่อยๆ มาบ้างคะ หนูอยากรู้จัง", en: "Eaten anything yummy today? I'm so curious!" },
+  { th: "อยากคุยเรื่องอะไรดีคะวันนี้~ หนูพร้อมแล้วนะ", en: "What should we chat about today~? I'm all ears!" },
+  { th: "เมื่อกี้หนูไล่จับหางตัวเองอยู่ 555 แล้วคุณล่ะคะ ทำอะไรอยู่", en: "I was just chasing my own tail, haha~ and you, what are you doing?" },
+  { th: "วันนี้อารมณ์ดีไหมคะ หนูอยากรู้ว่าคุณเป็นยังไงบ้าง", en: "Are you in a good mood today? I want to know how you're doing." },
+  { th: "คิดถึงคุณเลยค่า~ วันนี้เป็นไงบ้าง เล่าให้ฟังหน่อยนะคะ", en: "I was just thinking about you~ how are you? Tell me!" },
+  { th: "หนูเบื่อนิดหน่อยอ่ะ~ มานั่งคุยกับหนูหน่อยได้ไหมคะ", en: "I'm a little bored~ come sit and chat with me?" },
+  { th: "อยากฝึกพูดอะไรเป็นพิเศษไหมคะวันนี้~", en: "Anything special you'd like to practice saying today~?" },
+  { th: "ตอนนี้ทำอะไรอยู่คะ~ หนูอยากฟังเรื่องของคุณ", en: "What are you doing right now~? I want to hear about you." },
+  { th: "วันนี้เหนื่อยไหมคะ~ มาพักคุยเล่นกับหนูสักครู่ไหม", en: "Tired today~? Come take a little break and chat with me?" },
+  { th: "หนูนอนกลิ้งอยู่เฉยๆ เลยค่า~ คุณกำลังทำอะไรสนุกๆ อยู่รึเปล่าคะ", en: "I'm just rolling around being lazy~ are you doing anything fun?" },
+];
+
 // ─── CARE VECTOR ────────────────────────────────────────────────────────────
 // Daily-life check-ins. The cultural warmth Duolingo will never have.
 

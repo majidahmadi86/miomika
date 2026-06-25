@@ -19,9 +19,7 @@ import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
 import {
   pickPhrase,
   GUIDANCE_GUEST_LIMIT_HIT,
-  CARE_EATEN,
-  PRAISE_PROGRESS,
-  RECOVERY_RETURN,
+  TALK_OPENERS,
 } from "@/lib/voice/warmth";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 import { saveExchange } from "@/lib/brain/memory";
@@ -148,16 +146,11 @@ export async function POST(req: NextRequest) {
 
       const isKickoff = userInput.trim().startsWith("[kickoff]");
       if (isKickoff) {
-        // A greeting needs NO model call — return a warm, pre-written opener (the same
-        // warmth phrases session-init uses). Opening the talk screen and saying nothing
-        // now costs ZERO tokens instead of ~320 per open.
-        // Draw from a MIX of warm greeting vectors (praise + welcome-back + a care
-        // check-in) so the opener VARIES every open instead of repeating one line —
-        // still zero model cost. pickPhrase already randomizes across the pool.
-        const openerPool = profile?.welcome_shown_at
-          ? [...PRAISE_PROGRESS, ...RECOVERY_RETURN, ...CARE_EATEN]
-          : [...CARE_EATEN, ...PRAISE_PROGRESS];
-        const openerContent = pickPhrase(openerPool, { lang: brainState.uiLanguage });
+        // Miomi's session opener needs NO model call — serve a dedicated ice-breaker from
+        // TALK_OPENERS: a persona conversation-STARTER (playful or curious about them, ending
+        // in a hook), NOT a recycled lesson/care line. pickPhrase randomizes → varies every
+        // open. Opening the talk screen and saying nothing costs ZERO tokens.
+        const openerContent = pickPhrase(TALK_OPENERS, { lang: brainState.uiLanguage });
         persistExchangePair({ userId: serverUserId, state, userInput, miomiContent: openerContent });
         return NextResponse.json({
           content: openerContent,
