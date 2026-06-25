@@ -683,39 +683,6 @@ export default function LearnPage() {
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
         <div style={{ maxWidth: 560, margin: "0 auto" }}>
 
-        {/* Level rail */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-          {LADDER.map((lv, i) => {
-            const done = i < myRank;
-            const isView = (viewLevel ?? myLevel) === lv;
-            const open = i <= myRank + 1;
-            const current = i === myRank; // the learner's actual level (vs the one being previewed)
-            return (
-              <button key={lv} onClick={() => { if (!open) return; setViewLevel(lv); setExpandedUnit(null); setExpandedCourse(null); setActiveScenario(null); setPendingRoom(null); void refresh(lv); }} style={{
-                ...font, position: "relative", display: "inline-flex", alignItems: "center", gap: 4,
-                fontSize: 12.5, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
-                border: isView ? "1px solid transparent" : `1px solid ${done ? "#E8C77A" : BORDER}`,
-                background: isView ? CTA : "#FFFFFF",
-                color: isView ? "#fff" : done ? "#A8853F" : open ? INK_STRONG : MUTED,
-                opacity: open ? 1 : 0.45, cursor: open ? "pointer" : "default",
-              }}>
-                {lv}
-                {!open ? <Lock style={{ width: 10, height: 10 }} aria-hidden /> : null}
-                {current ? (
-                  <span
-                    aria-label="your current level"
-                    style={{
-                      position: "absolute", top: -3, right: -3, width: 9, height: 9, borderRadius: "50%",
-                      background: isView ? "#FFFFFF" : "#34B27B", border: "1.5px solid #FFFFFF",
-                      boxShadow: "0 0 0 1px rgba(0,0,0,0.05)",
-                    }}
-                  />
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Header card */}
         <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: "14px 15px", marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1380,6 +1347,39 @@ export default function LearnPage() {
                   {createMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "8px 0 0", lineHeight: 1.5, textAlign: "center" }}>{createMsg}</p> : null}
                 </div>
               )}
+            </div>
+
+            {/* Level rail — sits with the journey it controls, so switching a level visibly changes the section right below */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+              {LADDER.map((lv, i) => {
+                const done = i < myRank;
+                const isView = (viewLevel ?? myLevel) === lv;
+                const open = i <= myRank + 1;
+                const current = i === myRank;
+                return (
+                  <button key={lv} onClick={() => { if (!open) return; setViewLevel(lv); setExpandedUnit(null); setExpandedCourse(null); setActiveScenario(null); setPendingRoom(null); void refresh(lv); }} style={{
+                    ...font, position: "relative", display: "inline-flex", alignItems: "center", gap: 4,
+                    fontSize: 12.5, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
+                    border: isView ? "1px solid transparent" : `1px solid ${done ? "#E8C77A" : BORDER}`,
+                    background: isView ? CTA : "#FFFFFF",
+                    color: isView ? "#fff" : done ? "#A8853F" : open ? INK_STRONG : MUTED,
+                    opacity: open ? 1 : 0.45, cursor: open ? "pointer" : "default",
+                  }}>
+                    {lv}
+                    {!open ? <Lock style={{ width: 10, height: 10 }} aria-hidden /> : null}
+                    {current ? (
+                      <span
+                        aria-label="your current level"
+                        style={{
+                          position: "absolute", top: -3, right: -3, width: 9, height: 9, borderRadius: "50%",
+                          background: isView ? "#FFFFFF" : "#34B27B", border: "1.5px solid #FFFFFF",
+                          boxShadow: "0 0 0 1px rgba(0,0,0,0.05)",
+                        }}
+                      />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
 
             {!curriculum || !units.length ? (
