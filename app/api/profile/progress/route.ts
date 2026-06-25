@@ -163,13 +163,13 @@ export async function GET() {
       const { data: bankRows, error: bankErr } = await supabase
         .from("vocabulary_bank")
         .select("word_en, word_th, th_romanization, en_ipa, emoji, cefr_level, example_th, example_en")
-        .in("word_en", wordEns);
+        .in("word_en", Array.from(new Set(wordEns.flatMap((w) => [w, w.toLowerCase()]))));
 
       if (bankErr) throw bankErr;
 
       for (const row of bankRows ?? []) {
         if (row.word_en && row.word_th) {
-          bankByEn.set(row.word_en as string, {
+          bankByEn.set((row.word_en as string).toLowerCase(), {
             word_en: row.word_en as string,
             word_th: row.word_th as string,
             th_romanization: (row.th_romanization as string | null) ?? null,
@@ -183,21 +183,26 @@ export async function GET() {
       }
     }
 
-    const learningWords: LearningWord[] = (learningRows ?? []).map((row) => {
-      const bank = bankByEn.get(row.word_en as string);
-      return {
-        word_en: row.word_en as string,
-        word_th: bank?.word_th ?? (row.word_en as string),
-        th_romanization: bank?.th_romanization ?? null,
-        en_ipa: bank?.en_ipa ?? null,
-        emoji: bank?.emoji ?? null,
-        cefr_level: bank?.cefr_level ?? null,
-        example_th: bank?.example_th ?? null,
-        example_en: bank?.example_en ?? null,
-        mastery_level: (row.mastery_level as number) ?? 0,
-        next_spiral_at: (row.next_spiral_at as string | null) ?? null,
-      };
-    });
+    const learningWords: LearningWord[] = (learningRows ?? [])
+      .map((row): LearningWord | null => {
+        const bank = bankByEn.get((row.word_en as string).toLowerCase());
+        // No Thai for this word (truly off-bank) → skip it. Showing the English word
+        // in the Thai slot (e.g. "excuse me / excuse me") is meaningless to a Thai learner.
+        if (!bank) return null;
+        return {
+          word_en: row.word_en as string,
+          word_th: bank.word_th,
+          th_romanization: bank.th_romanization,
+          en_ipa: bank.en_ipa,
+          emoji: bank.emoji,
+          cefr_level: bank.cefr_level,
+          example_th: bank.example_th,
+          example_en: bank.example_en,
+          mastery_level: (row.mastery_level as number) ?? 0,
+          next_spiral_at: (row.next_spiral_at as string | null) ?? null,
+        };
+      })
+      .filter((w): w is LearningWord => w !== null);
 
     const payload: ProgressResponse = {
       wordsMastered: wordsMastered ?? 0,
