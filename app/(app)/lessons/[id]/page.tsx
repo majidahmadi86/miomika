@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { BookOpen, MessagesSquare, Gamepad2, Target, type LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -52,6 +53,22 @@ const CARD_SHADOW = "0 1px 2px rgba(74,65,54,.05), 0 8px 22px rgba(74,65,54,.06)
 const font = { fontFamily: "'Quicksand', sans-serif" } as const;
 const thai = { fontFamily: "'Sarabun', sans-serif" } as const;
 const PASS_RATIO = 2 / 3;
+
+// Masterclass section header: a tinted icon tile anchors the title + subtitle so the
+// label reads as intentional, never bare text floating on the background.
+function SectionIntro({ icon: Icon, title, subtitle, bg, fg }: { icon: LucideIcon; title: ReactNode; subtitle?: ReactNode; bg: string; fg: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, margin: "0 0 16px" }}>
+      <span aria-hidden style={{ width: 40, height: 40, borderRadius: 12, flex: "0 0 40px", background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Icon style={{ width: 21, height: 21, color: fg }} strokeWidth={2} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <h3 style={{ ...font, fontSize: 19, fontWeight: 700, color: INK_STRONG, margin: "1px 0 3px" }}>{title}</h3>
+        {subtitle ? <p style={{ ...font, fontSize: 13, color: MUTED, lineHeight: 1.45, margin: 0 }}>{subtitle}</p> : null}
+      </span>
+    </div>
+  );
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -343,10 +360,10 @@ function IntroStep({ lesson, review, onNext }: { lesson: Lesson; review: boolean
           ? "Welcome back — wander anywhere on the trail. Reviewing is how it sticks~"
           : `${w} words, ${p} phrases, games for your voice, ears and hands — then show me at the ${lesson.cefr_level} checkpoint. เมี้ยว~`}
       />
-      <h3 style={{ ...font, fontSize: 19, fontWeight: 700, color: INK_STRONG, margin: "0 0 4px" }}>What this lesson covers</h3>
-      <p style={{ ...font, fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: "0 0 16px" }}>
-        Words you will actually say, phrases that do the talking, and proof of what you can do by the end.
-      </p>
+      <SectionIntro icon={Target} bg={MINT_SOFT} fg={MINT_DEEP}
+        title="What this lesson covers"
+        subtitle="Words you will actually say, phrases that do the talking, and proof of what you can do by the end."
+      />
       <PrimaryBtn label={review ? "Walk the trail again" : "Start lesson"} onClick={onNext} />
     </div>
   );
@@ -357,8 +374,10 @@ function WordsStep({ words, target, soft, say, onExtend, onNext }: { words: Word
   const [extState, setExtState] = useState<"idle" | "busy" | "done" | "none">("idle");
   return (
     <div>
-      <h3 style={{ ...font, fontSize: 19, fontWeight: 700, color: INK_STRONG, margin: "0 0 4px" }}>{words.length} words to know</h3>
-      <p style={{ ...font, fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: "0 0 16px" }}>Tap any sound — hear Miomi, then say it.</p>
+      <SectionIntro icon={BookOpen} bg={TEAL_SOFT} fg={TEAL_DEEP}
+        title={`${words.length} words to know`}
+        subtitle="Tap any sound — hear Miomi, then say it."
+      />
       {words.map((w, i) => (
         <div key={i} style={{ position: "relative", background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${PEACH}`, borderRadius: 14, boxShadow: CARD_SHADOW, padding: "12px 13px", marginBottom: 10 }}>
           <span style={{ position: "absolute", top: 10, right: 10 }}>
@@ -433,8 +452,10 @@ function WordsStep({ words, target, soft, say, onExtend, onNext }: { words: Word
 function PhrasesStep({ phrases, target, say, onNext }: { phrases: PhraseItem[]; target: string; say: (t: string) => void; onNext: () => void }) {
   return (
     <div>
-      <h3 style={{ ...font, fontSize: 19, fontWeight: 700, color: INK_STRONG, margin: "0 0 4px" }}>{phrases.length} phrases that talk</h3>
-      <p style={{ ...font, fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: "0 0 16px" }}>Complete things you can say today — your new words are hiding inside.</p>
+      <SectionIntro icon={MessagesSquare} bg={PINK_SOFT} fg={PINK_DEEP}
+        title={`${phrases.length} phrases that talk`}
+        subtitle="Complete things you can say today — your new words are hiding inside."
+      />
       {phrases.map((p, i) => (
         <div key={i} style={{ position: "relative", background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${PINK}`, borderRadius: 14, boxShadow: CARD_SHADOW, padding: "13px 14px", marginBottom: 10 }}>
           <span style={{ position: "absolute", top: 10, right: 10 }}>
@@ -486,8 +507,10 @@ function GamesStep(props: {
   };
   return (
     <div>
-      <h3 style={{ ...font, fontSize: 19, fontWeight: 700, color: INK_STRONG, margin: "0 0 4px" }}>Play it {available.length} ways</h3>
-      <p style={{ ...font, fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: "0 0 16px" }}>Voice, memory, ears, context — finish every game to unlock the checkpoint.</p>
+      <SectionIntro icon={Gamepad2} bg={LAV_SOFT} fg={LAV_DEEP}
+        title={`Play it ${available.length} ways`}
+        subtitle="Voice, memory, ears, context — finish every game to unlock the checkpoint."
+      />
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${available.length}, 1fr)`, gap: 6, marginBottom: 16 }}>
         {available.map((k) => {
           const m = META[k]!;

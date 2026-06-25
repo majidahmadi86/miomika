@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLeft } from "lucide-react";
+import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLeft, Compass, Sparkles, type LucideIcon } from "lucide-react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { useProfile } from "@/lib/auth/use-profile";
 import { detectLang, speak } from "@/lib/voice/tts";
@@ -209,11 +209,13 @@ function SoundBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
-function SectionHeader({ title, meta, topMargin = 0 }: { title: ReactNode; meta?: ReactNode; topMargin?: number }) {
+function SectionHeader({ icon: Icon, title, meta, bg, fg, topMargin = 0 }: { icon: LucideIcon; title: ReactNode; meta?: ReactNode; bg: string; fg: string; topMargin?: number }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, margin: `${topMargin}px 2px 10px` }}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 9, minWidth: 0 }}>
-        <span aria-hidden style={{ width: 4, height: 17, borderRadius: 99, background: "linear-gradient(180deg,#34A98F,#1F7A68)", flex: "0 0 4px" }} />
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <span aria-hidden style={{ width: 34, height: 34, borderRadius: 10, flex: "0 0 34px", background: bg, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon style={{ width: 18, height: 18, color: fg }} strokeWidth={2} />
+        </span>
         <h2 style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</h2>
       </span>
       {meta != null ? <span style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED, flex: "0 0 auto" }}>{meta}</span> : null}
@@ -1417,6 +1419,9 @@ export default function LearnPage() {
             ) : (
               <>
                 <SectionHeader
+                  icon={Compass}
+                  bg="#E9F8F4"
+                  fg="#3E9C82"
                   title={<>{targetName} · {curriculum.cefr_level} journey</>}
                   meta={<>{units.length} units · {checkpoints.length} checkpoints</>}
                 />
@@ -1585,7 +1590,7 @@ export default function LearnPage() {
 
             {ownLessons.length ? (
               <>
-                <SectionHeader title="Your own lessons" meta={ownLessons.length} topMargin={18} />
+                <SectionHeader icon={Sparkles} bg="#F1EEFE" fg="#6D5BBF" title="Your own lessons" meta={ownLessons.length} topMargin={18} />
                 {ownLessons.map((l) => {
                   const v = l.progress?.checkpoint;
                   const lGold = l.status === "completed" && !!v && v.score === v.total;
