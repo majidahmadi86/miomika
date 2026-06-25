@@ -372,7 +372,11 @@ export default function DashboardPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-[14.5px] font-bold text-white">{t.share}</h3>
-                  <p className="mt-0.5 text-[12px]" style={{ color: "rgba(255,255,255,0.92)" }}>{t.shareRef}</p>
+                  <p className="mt-0.5 text-[12px]" style={{ color: "rgba(255,255,255,0.92)" }}>
+                    {t.shareRef.split("฿30").map((part, i, arr) => (
+                      <span key={i}>{part}{i < arr.length - 1 ? <span style={{ color: "#FFD86E", fontWeight: 800 }}>฿30</span> : null}</span>
+                    ))}
+                  </p>
                 </div>
               </div>
               <Link href="/invite" className="mt-4 flex items-center justify-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-[13px] font-bold shadow-sm" style={{ color: "var(--mk-accent-grad-to)" }}>
