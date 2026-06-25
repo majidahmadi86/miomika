@@ -140,8 +140,14 @@ export async function POST(req: NextRequest) {
         userInput,
         sessionId: state.sessionId,
         exchangeNumber: state.exchangeNumber,
-        overrideUiLanguage: clientUiLanguage,
-        overrideTargetLanguage: clientTargetLanguage,
+        // R10 — the route owns the language medium. For a logged-in user the
+        // authoritative source is their persisted profile (getServerProfile inside
+        // readBrainState), NOT the client hint: the talk client seeds uiLanguage to
+        // "en" and may POST a stale value before the profile settles, which would
+        // wrongly greet a Thai-UI learner in English. Only a GUEST (no server profile)
+        // needs the client's session-seeded language.
+        overrideUiLanguage: serverIsGuest ? clientUiLanguage : null,
+        overrideTargetLanguage: serverIsGuest ? clientTargetLanguage : null,
       });
 
       const isKickoff = userInput.trim().startsWith("[kickoff]");
