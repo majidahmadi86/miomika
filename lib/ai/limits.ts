@@ -33,7 +33,7 @@ export const DAILY_COST_CAPS_USD = {
  * limits are config — adjust freely.
  */
 export const DAILY_EXCHANGE_CAPS: Record<string, number> = {
-  free: 25,
-  pro: 200,
-  pro_max: 400,
+  free: 2,
+  pro: 2,
+  pro_max: 2,
 };
