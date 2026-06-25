@@ -21,6 +21,7 @@ import {
   GUIDANCE_GUEST_LIMIT_HIT,
   CARE_EATEN,
   PRAISE_PROGRESS,
+  RECOVERY_RETURN,
 } from "@/lib/voice/warmth";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 import { saveExchange } from "@/lib/brain/memory";
@@ -150,8 +151,13 @@ export async function POST(req: NextRequest) {
         // A greeting needs NO model call — return a warm, pre-written opener (the same
         // warmth phrases session-init uses). Opening the talk screen and saying nothing
         // now costs ZERO tokens instead of ~320 per open.
-        const openerVector = profile?.welcome_shown_at ? PRAISE_PROGRESS : CARE_EATEN;
-        const openerContent = pickPhrase(openerVector, { lang: brainState.uiLanguage });
+        // Draw from a MIX of warm greeting vectors (praise + welcome-back + a care
+        // check-in) so the opener VARIES every open instead of repeating one line —
+        // still zero model cost. pickPhrase already randomizes across the pool.
+        const openerPool = profile?.welcome_shown_at
+          ? [...PRAISE_PROGRESS, ...RECOVERY_RETURN, ...CARE_EATEN]
+          : [...CARE_EATEN, ...PRAISE_PROGRESS];
+        const openerContent = pickPhrase(openerPool, { lang: brainState.uiLanguage });
         persistExchangePair({ userId: serverUserId, state, userInput, miomiContent: openerContent });
         return NextResponse.json({
           content: openerContent,
