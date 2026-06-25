@@ -23,12 +23,17 @@ export const DAILY_COST_CAPS_USD = {
 } as const;
 
 /**
- * Per-day exchange (chat reply) caps by tier — the user-facing free limit.
- * A free user gets this many chat exchanges per day, then the warm
- * "tomorrow / upgrade" message. Tiers NOT listed here have no exchange cap
- * (they're governed by the cost cap above only). The cost caps remain as an
- * invisible safety net beneath this for any single runaway turn.
+ * Per-day exchange (chat reply) caps by tier — the user-facing daily limit.
+ * A user gets this many real AI chat replies per day, then the warm
+ * "see you tomorrow" message. Free is the meaningful wall; pro / pro_max are set
+ * high as an abuse backstop, not a felt limit. Only exchanges that make a real
+ * model call count (kickoff openers and the limit message itself are free). Tiers
+ * NOT listed here (guest) are bounded per-session by GUEST_EXCHANGE_LIMIT instead.
+ * The hard cost caps above remain an invisible safety net beneath this. Prices and
+ * limits are config — adjust freely.
  */
 export const DAILY_EXCHANGE_CAPS: Record<string, number> = {
-  free: 50,
+  free: 25,
+  pro: 200,
+  pro_max: 400,
 };

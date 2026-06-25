@@ -15,10 +15,11 @@ import {
 } from "@/lib/ai/session";
 import { classifyIntentAdvanced } from "@/lib/ai/intents";
 import { cefrToLevel } from "@/lib/ai/vocabulary";
-import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
+import { GUEST_EXCHANGE_LIMIT, DAILY_EXCHANGE_CAPS } from "@/lib/ai/limits";
 import {
   pickPhrase,
   GUIDANCE_GUEST_LIMIT_HIT,
+  GUIDANCE_DAILY_LIMIT_HIT,
   TALK_OPENERS,
 } from "@/lib/voice/warmth";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
@@ -38,7 +39,7 @@ import {
 } from "@/lib/brain/teaching";
 import type { PronunciationLesson } from "@/lib/brain/pronunciation";
 import { log } from "@/lib/debug/log";
-import { withUsage, enableBudget } from "@/lib/usage/ledger";
+import { withUsage, enableBudget, budgetState } from "@/lib/usage/ledger";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,8 @@ type MiomiResponse = {
   replyLanguage: "th" | "en";
   userSpeaksLanguage: "th" | "en";
   guestHandoff?: boolean;
+  /** Set when a member hit their per-day chat cap — client shows the upgrade prompt. */
+  limitReached?: "daily";
 };
 
 const BRAIN_PROMPT_FALLBACK =
@@ -234,6 +237,37 @@ export async function POST(req: NextRequest) {
         pronunciationLesson: null,
         replyLanguage: guestReplyLang,
         userSpeaksLanguage: brainState.uiLanguage,
+      } satisfies MiomiResponse);
+    }
+
+    // ── DAILY MESSAGE LIMIT (members) — warm "see you tomorrow" before the reply ──
+    // Free users get DAILY_EXCHANGE_CAPS.free real replies/day; pro / pro_max get a
+    // far higher cap that acts as an abuse backstop, not a felt wall. Guests are
+    // bounded per-session by GUEST_EXCHANGE_LIMIT above instead. The count is the
+    // ledger's tally of today's real model-call exchanges (kickoff openers and this
+    // limit message make no model call, so they don't consume the allowance). The
+    // hard cost caps in gate.ts stay as the silent net beneath this.
+    const memberTier = profile?.tier ?? "guest";
+    const dailyExchangeCap = DAILY_EXCHANGE_CAPS[memberTier];
+    const exchangesToday = budgetState()?.dailyExchanges ?? 0;
+    if (!serverIsGuest && dailyExchangeCap != null && exchangesToday >= dailyExchangeCap) {
+      const limitContent = pickPhrase(GUIDANCE_DAILY_LIMIT_HIT, { lang: brainState.uiLanguage });
+      return NextResponse.json({
+        content: limitContent,
+        wordCard: null,
+        phraseCard: null,
+        creatorAsset: null,
+        sessionContext: buildSessionContext(state),
+        servedVia: "daily_limit",
+        wasFailover: false,
+        intent: null,
+        sessionMode: state.sessionMode,
+        needsClarification: false,
+        masteryEvent: null,
+        pronunciationLesson: null,
+        replyLanguage: brainState.uiLanguage,
+        userSpeaksLanguage: brainState.uiLanguage,
+        limitReached: "daily",
       } satisfies MiomiResponse);
     }
 

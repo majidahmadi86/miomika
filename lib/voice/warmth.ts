@@ -229,6 +229,22 @@ export const GUIDANCE_GUEST_LIMIT_HIT: WarmPhrase[] = [
   },
 ];
 
+/** Daily message limit reached (members) — warm "we chatted lots, see you tomorrow". NO upgrade-push in the words; the upgrade CTA is UI. ⭐ native-review: casual feminine. */
+export const GUIDANCE_DAILY_LIMIT_HIT: WarmPhrase[] = [
+  {
+    th: "วันนี้เราคุยกันเยอะเลย หนูมีความสุขมากๆ เลยค่ะ~ พรุ่งนี้มาคุยกันต่อนะคะ",
+    en: "We've talked so much today and I loved every minute~ Let's pick this right back up tomorrow.",
+  },
+  {
+    th: "วันนี้คุยกันเยอะเลยนะคะ~ พรุ่งนี้หนูรออยู่ตรงนี้ มาคุยกันต่อนะคะ",
+    en: "So many lovely words today~ I'll be right here when you come back tomorrow.",
+  },
+  {
+    th: "วันนี้เราคุยกันเต็มที่เลยค่ะ~ อุ้งเท้าน้อยๆ ของหนูขอพักนิดนึง เจอกันพรุ่งนี้นะคะ",
+    en: "What a full day of chatting~ My little paws need a rest — see you tomorrow.",
+  },
+];
+
 /** Guest free-voice limit on /talk — typing + voice-to-text stay; replies become text. */
 export const TALK_FREE_LIMIT_CONTINUE: WarmPhrase[] = [
   {
