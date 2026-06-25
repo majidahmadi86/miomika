@@ -20,6 +20,8 @@ export type Plan = {
   highlighted?: boolean;
   /** Stripe price id — wired in #4. */
   stripePriceId?: string;
+  /** Stripe price id for the annual interval — wired in #4. */
+  stripePriceIdYearly?: string;
 };
 
 export const PLANS: Plan[] = [
@@ -70,3 +72,19 @@ export function planById(id: TierId): Plan | undefined {
 
 /** The upgrade targets shown in the paywall (Free is the baseline, not an option). */
 export const UPGRADE_PLANS: Plan[] = PLANS.filter((p) => p.id !== "free");
+
+// ---------------------------------------------------------------------------
+// Annual billing. ONE knob: how many months we charge for a full year.
+// 10 = "2 months free" (≈17% off) — the category-standard hook. Lower it to 11
+// ("1 month free", ≈8%) for a more conservative discount, or 12 for none.
+// Stripe annual prices (#4) should equal yearlyPriceTHB(plan).
+// ---------------------------------------------------------------------------
+export const ANNUAL_MONTHS_CHARGED = 10;
+
+/** Whole-percent saving vs paying monthly for twelve months. */
+export const ANNUAL_SAVING_PCT = Math.round((1 - ANNUAL_MONTHS_CHARGED / 12) * 100);
+
+/** Annual total in THB for a plan (null for free). */
+export function yearlyPriceTHB(plan: Plan): number | null {
+  return plan.priceTHB == null ? null : plan.priceTHB * ANNUAL_MONTHS_CHARGED;
+}

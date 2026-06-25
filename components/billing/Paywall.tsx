@@ -9,9 +9,17 @@ import {
 } from "react";
 import { X, Check, Crown, Sparkles } from "lucide-react";
 import { useUILanguage } from "@/lib/i18n/client";
-import { UPGRADE_PLANS, type Bilingual, type Plan, type TierId } from "@/lib/billing/tiers";
+import {
+  UPGRADE_PLANS,
+  ANNUAL_SAVING_PCT,
+  yearlyPriceTHB,
+  type Bilingual,
+  type Plan,
+  type TierId,
+} from "@/lib/billing/tiers";
 
 export type PaywallReason = "daily_limit" | "custom_course" | "rooms" | "generic";
+type Billing = "monthly" | "yearly";
 
 type PaywallContextValue = {
   /** Open the upgrade sheet, optionally themed to why it appeared. */
@@ -22,6 +30,7 @@ type PaywallContextValue = {
 const PaywallContext = createContext<PaywallContextValue | null>(null);
 
 const sans = { fontFamily: "'Quicksand', sans-serif" } as const;
+const ACCENT_GRAD = "linear-gradient(135deg,#6ECDB8 0%,#34A98F 100%)";
 
 const HEADERS: Record<PaywallReason, { title: Bilingual; subtitle: Bilingual }> = {
   daily_limit: {
@@ -82,135 +91,204 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
   const lang = useUILanguage();
   const t = (b: Bilingual) => (lang === "th" ? b.th : b.en);
   const [selected, setSelected] = useState<TierId | null>(null);
+  const [billing, setBilling] = useState<Billing>("monthly");
   const header = HEADERS[reason] ?? HEADERS.generic;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 1000,
-        background: "rgba(28,24,20,0.46)",
-        backdropFilter: "blur(3px)",
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        animation: "mk-paywall-fade 180ms ease",
+        background: "var(--mk-canvas, #FAFAF6)",
+        overflowY: "auto",
+        animation: "mk-paywall-fade 200ms ease",
       }}
     >
       <style>{`
         @keyframes mk-paywall-fade { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes mk-paywall-rise { from { transform: translateY(26px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+        @keyframes mk-paywall-rise { from { transform: translateY(14px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
       `}</style>
-      <div
-        onClick={(e) => e.stopPropagation()}
+
+      {/* close — floats top-right, always reachable */}
+      <button
+        onClick={onClose}
+        aria-label={lang === "th" ? "ปิด" : "Close"}
         style={{
-          width: "100%",
-          maxWidth: 460,
-          maxHeight: "94svh",
-          overflowY: "auto",
-          background: "var(--mk-canvas, #FAFAF6)",
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          boxShadow: "0 -10px 44px rgba(40,36,32,0.22)",
-          padding: "10px 18px 26px",
-          animation: "mk-paywall-rise 240ms cubic-bezier(0.2,0.8,0.2,1)",
+          position: "fixed",
+          top: 16,
+          right: 18,
+          zIndex: 1001,
+          width: 38,
+          height: 38,
+          borderRadius: 99,
+          border: "1px solid var(--mk-border, #EDE8E0)",
+          background: "var(--mk-surface, #fff)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          boxShadow: "0 2px 8px rgba(40,36,32,0.08)",
         }}
       >
-        {/* grabber */}
-        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 6 }}>
-          <span style={{ width: 38, height: 4, borderRadius: 99, background: "var(--mk-border, #EDE8E0)" }} />
-        </div>
+        <X style={{ width: 18, height: 18, color: "var(--mk-ink-muted, #9A8B73)" }} />
+      </button>
 
-        {/* close */}
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button
-            onClick={onClose}
-            aria-label={lang === "th" ? "ปิด" : "Close"}
+      {/* centering frame: centers when it fits, scrolls from top when it doesn't */}
+      <div
+        style={{
+          minHeight: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "32px 18px 32px",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 700,
+            animation: "mk-paywall-rise 260ms cubic-bezier(0.2,0.8,0.2,1)",
+          }}
+        >
+          {/* header */}
+          <div style={{ textAlign: "center", marginBottom: 18 }}>
+            <span
+              aria-hidden
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 54,
+                height: 54,
+                borderRadius: 17,
+                background: ACCENT_GRAD,
+                boxShadow: "0 6px 18px -6px rgba(52,169,143,0.55)",
+                marginBottom: 12,
+              }}
+            >
+              <Sparkles style={{ width: 27, height: 27, color: "#fff" }} strokeWidth={2.2} />
+            </span>
+            <h2 style={{ ...sans, fontSize: 23, fontWeight: 800, color: "var(--mk-ink, #2A2A28)", margin: "0 0 6px" }}>
+              {t(header.title)}
+            </h2>
+            <p style={{ ...sans, fontSize: 14, lineHeight: 1.5, color: "var(--mk-ink-muted, #9A8B73)", margin: "0 auto", maxWidth: 420 }}>
+              {t(header.subtitle)}
+            </p>
+          </div>
+
+          {/* billing toggle */}
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                gap: 3,
+                padding: 4,
+                borderRadius: 99,
+                background: "var(--mk-surface-2, #F7F4EE)",
+                border: "1px solid var(--mk-border, #EDE8E0)",
+              }}
+            >
+              <SegBtn active={billing === "monthly"} onClick={() => setBilling("monthly")}>
+                {lang === "th" ? "รายเดือน" : "Monthly"}
+              </SegBtn>
+              <SegBtn active={billing === "yearly"} onClick={() => setBilling("yearly")}>
+                {lang === "th" ? "รายปี" : "Yearly"}
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    padding: "2px 6px",
+                    borderRadius: 99,
+                    background: billing === "yearly" ? "rgba(255,255,255,0.26)" : "#E9F8F4",
+                    color: billing === "yearly" ? "#fff" : "#2C8E76",
+                  }}
+                >
+                  {lang === "th" ? `ประหยัด ${ANNUAL_SAVING_PCT}%` : `Save ${ANNUAL_SAVING_PCT}%`}
+                </span>
+              </SegBtn>
+            </div>
+          </div>
+
+          {/* plan cards — 2-up on desktop, stacks on mobile */}
+          <div
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: 99,
-              border: "none",
-              background: "var(--mk-surface-2, #F7F4EE)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
+              gap: 14,
+              alignItems: "start",
             }}
           >
-            <X style={{ width: 17, height: 17, color: "var(--mk-ink-muted, #9A8B73)" }} />
-          </button>
-        </div>
+            {UPGRADE_PLANS.map((plan) => (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                lang={lang}
+                t={t}
+                billing={billing}
+                selected={selected === plan.id}
+                onSelect={() => setSelected(plan.id)}
+              />
+            ))}
+          </div>
 
-        {/* header */}
-        <div style={{ textAlign: "center", padding: "2px 6px 18px" }}>
-          <span
-            aria-hidden
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 52,
-              height: 52,
-              borderRadius: 16,
-              background: "linear-gradient(135deg,#6ECDB8 0%,#34A98F 100%)",
-              boxShadow: "0 6px 18px -6px rgba(52,169,143,0.55)",
-              marginBottom: 12,
-            }}
-          >
-            <Sparkles style={{ width: 26, height: 26, color: "#fff" }} strokeWidth={2.2} />
-          </span>
-          <h2 style={{ ...sans, fontSize: 21, fontWeight: 800, color: "var(--mk-ink, #2A2A28)", margin: "0 0 6px" }}>
-            {t(header.title)}
-          </h2>
-          <p style={{ ...sans, fontSize: 13.5, lineHeight: 1.5, color: "var(--mk-ink-muted, #9A8B73)", margin: 0 }}>
-            {t(header.subtitle)}
+          {/* coming-soon note (until Stripe lands) */}
+          {selected ? (
+            <p
+              style={{
+                ...sans,
+                textAlign: "center",
+                fontSize: 12.5,
+                lineHeight: 1.5,
+                color: "var(--mk-accent-press, #1F7A68)",
+                background: "#EAF7F2",
+                border: "1px solid #CDEBE1",
+                borderRadius: 12,
+                padding: "10px 12px",
+                margin: "16px auto 0",
+                maxWidth: 460,
+              }}
+            >
+              {t(SOON)}
+            </p>
+          ) : null}
+
+          <p style={{ ...sans, textAlign: "center", fontSize: 11.5, color: "var(--mk-ink-subtle, #A89C88)", margin: "18px 0 0" }}>
+            {lang === "th"
+              ? `ยกเลิกได้ทุกเมื่อ · เรียกเก็บ${billing === "yearly" ? "รายปี" : "รายเดือน"}`
+              : `Cancel anytime · Billed ${billing === "yearly" ? "annually" : "monthly"}`}
           </p>
         </div>
-
-        {/* plan cards */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {UPGRADE_PLANS.map((plan) => (
-            <PlanCard
-              key={plan.id}
-              plan={plan}
-              lang={lang}
-              t={t}
-              selected={selected === plan.id}
-              onSelect={() => setSelected(plan.id)}
-            />
-          ))}
-        </div>
-
-        {/* coming-soon note (until Stripe lands) */}
-        {selected ? (
-          <p
-            style={{
-              ...sans,
-              textAlign: "center",
-              fontSize: 12.5,
-              lineHeight: 1.5,
-              color: "var(--mk-accent-press, #1F7A68)",
-              background: "#EAF7F2",
-              border: "1px solid #CDEBE1",
-              borderRadius: 12,
-              padding: "10px 12px",
-              margin: "14px 2px 0",
-            }}
-          >
-            {t(SOON)}
-          </p>
-        ) : null}
-
-        <p style={{ ...sans, textAlign: "center", fontSize: 11.5, color: "var(--mk-ink-subtle, #A89C88)", margin: "16px 0 0" }}>
-          {lang === "th" ? "ยกเลิกได้ทุกเมื่อ · เรียกเก็บรายเดือน" : "Cancel anytime · Billed monthly"}
-        </p>
       </div>
     </div>
+  );
+}
+
+function SegBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        ...sans,
+        display: "inline-flex",
+        alignItems: "center",
+        border: "none",
+        borderRadius: 99,
+        padding: "8px 16px",
+        fontSize: 13.5,
+        fontWeight: 700,
+        cursor: "pointer",
+        background: active ? ACCENT_GRAD : "transparent",
+        color: active ? "#fff" : "var(--mk-ink-muted, #9A8B73)",
+        boxShadow: active ? "0 3px 10px -3px rgba(52,169,143,0.5)" : "none",
+        transition: "color 120ms ease",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -218,17 +296,24 @@ function PlanCard({
   plan,
   lang,
   t,
+  billing,
   selected,
   onSelect,
 }: {
   plan: Plan;
   lang: "th" | "en";
   t: (b: Bilingual) => string;
+  billing: Billing;
   selected: boolean;
   onSelect: () => void;
 }) {
   const featured = !!plan.highlighted;
   const accent = "#34A98F";
+  const yearly = yearlyPriceTHB(plan);
+  const showYearly = billing === "yearly" && yearly != null && plan.priceTHB != null;
+  const perMonth = showYearly ? Math.round((yearly as number) / 12) : plan.priceTHB;
+  const saved = showYearly ? (plan.priceTHB as number) * 12 - (yearly as number) : 0;
+
   return (
     <div
       style={{
@@ -236,7 +321,7 @@ function PlanCard({
         background: "var(--mk-surface, #fff)",
         border: featured ? `2px solid ${accent}` : "1px solid var(--mk-border, #EDE8E0)",
         borderRadius: 18,
-        padding: "16px 16px 15px",
+        padding: "18px 16px 16px",
         boxShadow: featured
           ? "0 10px 26px -10px rgba(52,169,143,0.30)"
           : "0 1px 2px rgba(74,65,54,.05), 0 8px 20px rgba(74,65,54,.05)",
@@ -251,9 +336,9 @@ function PlanCard({
             display: "inline-flex",
             alignItems: "center",
             gap: 4,
-            background: "linear-gradient(135deg,#6ECDB8 0%,#34A98F 100%)",
+            background: ACCENT_GRAD,
             color: "#fff",
-            fontFamily: "'Quicksand', sans-serif",
+            ...sans,
             fontSize: 11,
             fontWeight: 800,
             letterSpacing: 0.2,
@@ -267,17 +352,22 @@ function PlanCard({
       ) : null}
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
-        <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 16, fontWeight: 800, color: "var(--mk-ink, #2A2A28)" }}>
-          {t(plan.name)}
-        </span>
-        <span style={{ fontFamily: "'Quicksand', sans-serif", color: "var(--mk-ink, #2A2A28)" }}>
-          <span style={{ fontSize: 21, fontWeight: 800 }}>฿{plan.priceTHB}</span>
+        <span style={{ ...sans, fontSize: 16, fontWeight: 800, color: "var(--mk-ink, #2A2A28)" }}>{t(plan.name)}</span>
+        <span style={{ ...sans, color: "var(--mk-ink, #2A2A28)", textAlign: "right" }}>
+          <span style={{ fontSize: 22, fontWeight: 800 }}>฿{perMonth}</span>
           <span style={{ fontSize: 12, fontWeight: 600, color: "var(--mk-ink-muted, #9A8B73)" }}>{lang === "th" ? "/เดือน" : "/mo"}</span>
         </span>
       </div>
-      <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 12.5, color: "var(--mk-ink-muted, #9A8B73)", margin: "0 0 12px" }}>
-        {t(plan.tagline)}
-      </p>
+
+      {showYearly ? (
+        <p style={{ ...sans, fontSize: 11.5, color: "#2C8E76", fontWeight: 700, textAlign: "right", margin: "0 0 10px" }}>
+          {lang === "th"
+            ? `฿${(yearly as number).toLocaleString()}/ปี · ประหยัด ฿${saved.toLocaleString()}`
+            : `฿${(yearly as number).toLocaleString()}/yr · save ฿${saved.toLocaleString()}`}
+        </p>
+      ) : (
+        <p style={{ ...sans, fontSize: 12.5, color: "var(--mk-ink-muted, #9A8B73)", margin: "0 0 12px" }}>{t(plan.tagline)}</p>
+      )}
 
       <ul style={{ listStyle: "none", margin: "0 0 14px", padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
         {plan.features.map((f, i) => (
@@ -298,9 +388,7 @@ function PlanCard({
             >
               <Check style={{ width: 12, height: 12, color: "#2C8E76" }} strokeWidth={3} />
             </span>
-            <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 13, lineHeight: 1.4, color: "var(--mk-ink, #2A2A28)" }}>
-              {t(f)}
-            </span>
+            <span style={{ ...sans, fontSize: 13, lineHeight: 1.4, color: "var(--mk-ink, #2A2A28)" }}>{t(f)}</span>
           </li>
         ))}
       </ul>
@@ -308,13 +396,13 @@ function PlanCard({
       <button
         onClick={onSelect}
         style={{
+          ...sans,
           width: "100%",
           padding: "12px 14px",
           borderRadius: 13,
           border: featured ? "none" : `1.5px solid ${accent}`,
-          background: featured ? "linear-gradient(135deg,#6ECDB8 0%,#34A98F 100%)" : "transparent",
+          background: featured ? ACCENT_GRAD : "transparent",
           color: featured ? "#fff" : "#1F7A68",
-          fontFamily: "'Quicksand', sans-serif",
           fontSize: 14.5,
           fontWeight: 800,
           cursor: "pointer",
