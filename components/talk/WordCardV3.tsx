@@ -60,6 +60,7 @@ export function WordCardV3({
 }: WordCardV3Props) {
   const [expanded, setExpanded] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
+  const [examplePlaying, setExamplePlaying] = useState(false);
 
   const isThaiLearner = direction === "th_to_en";
   const primaryWord = isThaiLearner ? word.word_en : word.word_th;
@@ -87,6 +88,15 @@ export function WordCardV3({
       await playWordAudio(audioKey, primaryWord, audioLang);
     }
     setAudioPlaying(false);
+  };
+
+  // Replay the example in the language being learned (matches the headword's audio).
+  const exampleAudioText = isThaiLearner ? word.example_en : word.example_th;
+  const handleExampleAudio = async () => {
+    if (examplePlaying || !exampleAudioText) return;
+    setExamplePlaying(true);
+    await playWordAudio(undefined, exampleAudioText, audioLang);
+    setExamplePlaying(false);
   };
 
   const hasNote = !!(word.miomi_note_th || word.miomi_note_en);
@@ -162,9 +172,28 @@ export function WordCardV3({
         {hasExtras && (
           <div style={{ marginTop: "9px", display: "flex", flexDirection: "column", gap: "8px" }}>
             {hasExample && (
-              <div style={{ background: CREAM, borderRadius: "10px", padding: "8px 11px" }}>
-                {word.example_en && (<p style={{ fontFamily: FONT_LATIN, fontSize: "12.5px", fontStyle: "italic", color: INK, lineHeight: 1.4, margin: 0 }}>&ldquo;{word.example_en}&rdquo;</p>)}
-                {word.example_th && (<p style={{ fontFamily: FONT_THAI, fontSize: "12px", color: MUTE, margin: "2px 0 0" }}>&ldquo;{word.example_th}&rdquo;</p>)}
+              <div style={{ background: CREAM, borderRadius: "10px", padding: "8px 11px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {word.example_en && (<p style={{ fontFamily: FONT_LATIN, fontSize: "12.5px", fontStyle: "italic", color: INK, lineHeight: 1.4, margin: 0 }}>&ldquo;{word.example_en}&rdquo;</p>)}
+                  {word.example_th && (<p style={{ fontFamily: FONT_THAI, fontSize: "12px", color: MUTE, margin: "2px 0 0" }}>&ldquo;{word.example_th}&rdquo;</p>)}
+                </div>
+                {exampleAudioText && (
+                  <motion.button
+                    type="button"
+                    onClick={handleExampleAudio}
+                    whileTap={{ scale: 0.9 }}
+                    animate={examplePlaying ? { scale: [1, 1.12, 1] } : {}}
+                    transition={{ duration: 0.24 }}
+                    aria-label="Play example audio"
+                    style={{
+                      flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%",
+                      background: "rgba(52,169,143,0.10)", border: "none", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <Volume2 style={{ width: "13px", height: "13px", color: examplePlaying ? GOLD : "#C4BDB5" }} strokeWidth={1.9} />
+                  </motion.button>
+                )}
               </div>
             )}
             {hasNote && (
