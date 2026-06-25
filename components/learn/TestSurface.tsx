@@ -113,11 +113,13 @@ export default function TestSurface({
   uiLang = "en",
   mode = "placement",
   checkpoint,
+  currentLevel,
   onDone,
 }: {
   uiLang?: "th" | "en";
   mode?: "placement" | "checkpoint";
   checkpoint?: CheckpointInfo;
+  currentLevel?: string;
   onDone?: (advancedTo?: string) => void;
 }) {
   const t = T[uiLang];
@@ -347,7 +349,11 @@ export default function TestSurface({
     const pass = result.score / Math.max(1, total) >= (checkpoint.passPct ?? 0.7);
     const li = LADDER.indexOf(checkpoint.level as (typeof LADDER)[number]);
     const nextLevel = li >= 0 && li < LADDER.length - 1 ? LADDER[li + 1] : checkpoint.level;
-    const canAdvance = checkpoint.kind === "level_test" && pass && nextLevel !== checkpoint.level;
+    // Only when passing THIS test would actually move the learner up — i.e. it's their
+    // current level. Replaying a lower level's test (already advanced past it) shows
+    // "Passed / Done", not a misleading "Continue to <next>".
+    const atCurrentLevel = !currentLevel || checkpoint.level === currentLevel;
+    const canAdvance = checkpoint.kind === "level_test" && pass && nextLevel !== checkpoint.level && atCurrentLevel;
     const tint = pass ? { bg: "#E9F8F4", fg: OK } : { bg: "#FBEEEC", fg: NO };
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

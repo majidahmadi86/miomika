@@ -6,6 +6,7 @@ import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const VALID_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
+const LEVEL_COOKIE = "miomika.teach_level";
 
 // POST: record a level-check result (history → growth + share) and, when the learner
 // accepts it (setLevel), anchor their CEFR on the profile so the curriculum + brain use it.
@@ -45,8 +46,19 @@ export async function POST(req: NextRequest) {
         .from("profiles")
         .update({ cefr_level: level })
         .eq("id", profile.id);
+      // The teach_level cookie is the de-facto "current level" every route reads
+      // (curriculum, lessons, speaking, teach-word). On advance it must follow the new
+      // level — otherwise a stale cookie (e.g. from previewing a lower level) keeps the
+      // learner on the old level after the post-advance reload.
+      const res = NextResponse.json({ ok: true, level, saved: true });
+      res.cookies.set(LEVEL_COOKIE, level, {
+        path: "/",
+        maxAge: 31536000,
+        sameSite: "lax",
+      });
+      return res;
     }
-    return NextResponse.json({ ok: true, level, saved: body.setLevel === true });
+    return NextResponse.json({ ok: true, level, saved: false });
   } catch (err) {
     console.error("[test] save result failed:", err);
     return NextResponse.json({ ok: false, reason: "error" }, { status: 200 });

@@ -1655,6 +1655,7 @@ export default function LearnPage() {
             <TestSurface
               uiLang={profile?.ui_language === "th" ? "th" : "en"}
               mode="checkpoint"
+              currentLevel={myLevel}
               checkpoint={{
                 level: openCp.level,
                 badge: openCp.badge,
