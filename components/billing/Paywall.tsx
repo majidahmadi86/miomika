@@ -64,11 +64,6 @@ const HEADERS: Record<PaywallReason, { title: Bilingual; subtitle: Bilingual }> 
   },
 };
 
-const SOON: Bilingual = {
-  en: "Checkout opens here very soon — thank you for being early.",
-  th: "ระบบชำระเงินกำลังจะเปิดที่นี่เร็วๆ นี้ ขอบคุณที่อยู่กับเราตั้งแต่แรกนะคะ",
-};
-
 export function PaywallProvider({ children }: { children: ReactNode }) {
   const [reason, setReason] = useState<PaywallReason | null>(null);
   const open = useCallback((r: PaywallReason = "generic") => setReason(r), []);
@@ -91,9 +86,35 @@ export function usePaywall(): PaywallContextValue {
 function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () => void }) {
   const lang = useUILanguage();
   const t = (b: Bilingual) => (lang === "th" ? b.th : b.en);
-  const [selected, setSelected] = useState<TierId | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<TierId | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [billing, setBilling] = useState<Billing>("monthly");
   const header = HEADERS[reason] ?? HEADERS.generic;
+
+  const startCheckout = async (planId: TierId) => {
+    if (loadingPlan) return;
+    setError(null);
+    setLoadingPlan(planId);
+    const fallback =
+      lang === "th" ? "เริ่มการชำระเงินไม่สำเร็จ ลองอีกครั้งนะคะ" : "Couldn't start checkout. Please try again.";
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planId, interval: billing }),
+      });
+      const json = (await res.json()) as { url?: string; error?: string };
+      if (res.ok && json.url) {
+        window.location.assign(json.url); // leaving the page — keep the spinner
+        return;
+      }
+      setError(json.error ?? fallback);
+      setLoadingPlan(null);
+    } catch {
+      setError(fallback);
+      setLoadingPlan(null);
+    }
+  };
 
   return (
     <div
@@ -226,30 +247,30 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
                 lang={lang}
                 t={t}
                 billing={billing}
-                selected={selected === plan.id}
-                onSelect={() => setSelected(plan.id)}
+                loading={loadingPlan === plan.id}
+                onSelect={() => startCheckout(plan.id)}
               />
             ))}
           </div>
 
-          {/* coming-soon note (until Stripe lands) */}
-          {selected ? (
+          {/* checkout error (if any) */}
+          {error ? (
             <p
               style={{
                 ...sans,
                 textAlign: "center",
                 fontSize: 12.5,
                 lineHeight: 1.5,
-                color: "var(--mk-accent-press, #1F7A68)",
-                background: "#EAF7F2",
-                border: "1px solid #CDEBE1",
+                color: "#B4453C",
+                background: "#FCEEEC",
+                border: "1px solid #F3D2CD",
                 borderRadius: 12,
                 padding: "10px 12px",
                 margin: "16px auto 0",
                 maxWidth: 460,
               }}
             >
-              {t(SOON)}
+              {error}
             </p>
           ) : null}
 
@@ -294,14 +315,14 @@ function PlanCard({
   lang,
   t,
   billing,
-  selected,
+  loading,
   onSelect,
 }: {
   plan: Plan;
   lang: "th" | "en";
   t: (b: Bilingual) => string;
   billing: Billing;
-  selected: boolean;
+  loading: boolean;
   onSelect: () => void;
 }) {
   const featured = !!plan.highlighted;
@@ -392,6 +413,7 @@ function PlanCard({
 
       <button
         onClick={onSelect}
+        disabled={loading}
         style={{
           ...sans,
           width: "100%",
@@ -402,14 +424,15 @@ function PlanCard({
           color: featured ? "#fff" : "#1F7A68",
           fontSize: 14.5,
           fontWeight: 800,
-          cursor: "pointer",
+          cursor: loading ? "default" : "pointer",
+          opacity: loading ? 0.7 : 1,
           boxShadow: featured ? "0 4px 16px -4px rgba(52,169,143,0.45)" : "none",
         }}
       >
-        {selected
+        {loading
           ? lang === "th"
-            ? "เลือกแล้ว"
-            : "Selected"
+            ? "กำลังพาไป…"
+            : "Redirecting…"
           : lang === "th"
             ? `เลือก ${t(plan.name)}`
             : `Choose ${t(plan.name)}`}
