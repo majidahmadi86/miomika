@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
+import { withBudget } from "@/lib/usage/ledger";
 import {
   normalizeLearningTarget,
   normalizeUiLanguage,
@@ -127,11 +128,13 @@ export async function POST(req: NextRequest) {
   const effectiveLevel = levelFromCookie(req) ?? (isGuest ? "A1" : cefrLevel);
 
   if (chosenWord) {
-    const resolved = await resolveOrGenerateWord({
-      word: chosenWord,
-      learningTarget,
-      cefrLevel: effectiveLevel,
-    });
+    const resolved = await withBudget("teach.word", userId, tier, () =>
+      resolveOrGenerateWord({
+        word: chosenWord,
+        learningTarget,
+        cefrLevel: effectiveLevel,
+      }),
+    );
     if (!resolved) {
       log("teach-word", "get_word_to_teach", {
         userId: userId ?? "guest",
@@ -229,11 +232,13 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const resolvedServe = await resolveOrGenerateWord({
-    word: serve.wordId,
-    learningTarget,
-    cefrLevel: effectiveLevel,
-  });
+  const resolvedServe = await withBudget("teach.word", userId, tier, () =>
+    resolveOrGenerateWord({
+      word: serve.wordId,
+      learningTarget,
+      cefrLevel: effectiveLevel,
+    }),
+  );
   const word = resolvedServe
     ? rowToIntroducedWord(resolvedServe, learningTarget)
     : null;

@@ -82,6 +82,24 @@ export async function enableBudget(tier: string): Promise<void> {
   }
 }
 
+/**
+ * Run a paid block with the cost gate active for this user's tier — the one-liner
+ * a route uses to opt its model/TTS calls into enforcement (withUsage context +
+ * enableBudget in one). assertBudget inside `run` then enforces the per-turn and
+ * per-day caps; budget-exceeded surfaces as the call returning null (graceful).
+ */
+export async function withBudget<T>(
+  fn: string,
+  userId: string | null,
+  tier: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  return withUsage(fn, userId, async () => {
+    await enableBudget(tier);
+    return run();
+  });
+}
+
 // Sum of est_cost_usd recorded so far in the current request (0 outside one).
 export function runningCostUsd(): number {
   const ctx = als.getStore();

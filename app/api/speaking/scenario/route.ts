@@ -5,6 +5,7 @@ export const maxDuration = 60;
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withBudget } from "@/lib/usage/ledger";
 import { callGeminiJson, callGroqJson } from "@/lib/brain/word-content";
 import { buildExtraPhrases } from "@/lib/brain/lesson-builder";
 import { loadCefrLevel } from "@/lib/vocab/user-state-read";
@@ -137,17 +138,21 @@ export async function POST(req: NextRequest) {
     if (!title) return NextResponse.json({ ok: false, reason: "course_built" }, { status: 200 });
 
     const targetName = learningTarget === "en" ? "English" : "Thai";
-    const scene = await callScene(level, targetName, course.title_en, title);
+    const scene = await withBudget("scenario.scene", profile.id, profile.tier, () =>
+      callScene(level, targetName, course.title_en, title),
+    );
     if (!scene) return NextResponse.json({ ok: false, reason: "content_incomplete" }, { status: 200 });
 
     // Helper phrases pass the SAME accuracy gate as lessons.
-    const phrases = await buildExtraPhrases({
-      topic: `${course.title_en} — ${title}`,
-      cefrLevel: level,
-      learningTarget,
-      exclude: [],
-      count: 3,
-    });
+    const phrases = await withBudget("scenario.phrases", profile.id, profile.tier, () =>
+      buildExtraPhrases({
+        topic: `${course.title_en} — ${title}`,
+        cefrLevel: level,
+        learningTarget,
+        exclude: [],
+        count: 3,
+      }),
+    );
     if (phrases.length < 2) {
       return NextResponse.json({ ok: false, reason: "content_incomplete" }, { status: 200 });
     }

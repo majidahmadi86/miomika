@@ -5,6 +5,7 @@ export const maxDuration = 60;
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withBudget } from "@/lib/usage/ledger";
 import { callGeminiJson, callGroqJson } from "@/lib/brain/word-content";
 import { buildExtraPhrases } from "@/lib/brain/lesson-builder";
 import { loadCefrLevel } from "@/lib/vocab/user-state-read";
@@ -221,25 +222,31 @@ export async function POST(req: NextRequest) {
       plan = (hit.plan as SessionPlan) ?? null;
     } else {
       const targetName = learningTarget === "en" ? "English" : "Thai";
-      const generated = await generatePlan(level, targetName, topic, register);
+      const generated = await withBudget("session.plan", profile.id, profile.tier, () =>
+        generatePlan(level, targetName, topic, register),
+      );
       if (!generated) return NextResponse.json({ ok: false, reason: "plan_failed" }, { status: 200 });
       // Helper phrases pass the SAME accuracy gate as lessons.
-      let phrases = await buildExtraPhrases({
-        topic: `phrases a person actually says during: ${topic}`,
-        cefrLevel: level,
-        learningTarget,
-        exclude: [],
-        count: 5,
-      });
-      if (phrases.length < 3) {
-        // One more honest attempt before giving up — entry must not feel flaky.
-        const more = await buildExtraPhrases({
+      let phrases = await withBudget("session.phrases", profile.id, profile.tier, () =>
+        buildExtraPhrases({
           topic: `phrases a person actually says during: ${topic}`,
           cefrLevel: level,
           learningTarget,
-          exclude: phrases.map((p) => p.en),
+          exclude: [],
           count: 5,
-        });
+        }),
+      );
+      if (phrases.length < 3) {
+        // One more honest attempt before giving up — entry must not feel flaky.
+        const more = await withBudget("session.phrases", profile.id, profile.tier, () =>
+          buildExtraPhrases({
+            topic: `phrases a person actually says during: ${topic}`,
+            cefrLevel: level,
+            learningTarget,
+            exclude: phrases.map((p) => p.en),
+            count: 5,
+          }),
+        );
         phrases = [...phrases, ...more].slice(0, 5);
       }
       if (phrases.length < 4) {

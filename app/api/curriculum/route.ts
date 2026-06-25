@@ -5,6 +5,7 @@ export const maxDuration = 60;
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withBudget } from "@/lib/usage/ledger";
 import { callGeminiJson, callGroqJson } from "@/lib/brain/word-content";
 import { loadCefrLevel } from "@/lib/vocab/user-state-read";
 import {
@@ -200,7 +201,9 @@ export async function POST(req: NextRequest) {
     }
 
     const targetName = learningTarget === "en" ? "English" : "Thai";
-    const units = await callCurriculumPlan(level, targetName);
+    const units = await withBudget("curriculum.plan", profile.id, profile.tier, () =>
+      callCurriculumPlan(level, targetName),
+    );
     if (!units) return NextResponse.json({ ok: false, reason: "plan_failed" }, { status: 200 });
 
     const { data, error } = await supabase
