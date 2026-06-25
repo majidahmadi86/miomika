@@ -585,7 +585,7 @@ function SayGame({ phrase, target, say, done, onDone }: { phrase: PhraseItem; ta
       {recState === "idle" ? (
         <p style={{ ...font, fontSize: 13, fontWeight: 700, color: MUTED, lineHeight: 1.5, margin: 0 }}>
           Hear Miomi, then tap the mic and say it — really out loud.<br />
-          Record, then compare — Miomi starts grading your sound in a coming update.
+          Then play both back and compare, ear to ear — your own ear is the best judge.
         </p>
       ) : null}
       {recState === "recording" ? (

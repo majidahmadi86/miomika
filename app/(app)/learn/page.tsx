@@ -672,9 +672,10 @@ export default function LearnPage() {
             const done = i < myRank;
             const isView = (viewLevel ?? myLevel) === lv;
             const open = i <= myRank + 1;
+            const current = i === myRank; // the learner's actual level (vs the one being previewed)
             return (
               <button key={lv} onClick={() => { if (!open) return; setViewLevel(lv); setExpandedUnit(null); setExpandedCourse(null); setActiveScenario(null); setPendingRoom(null); void refresh(lv); }} style={{
-                ...font, display: "inline-flex", alignItems: "center", gap: 4,
+                ...font, position: "relative", display: "inline-flex", alignItems: "center", gap: 4,
                 fontSize: 12.5, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
                 border: isView ? "1px solid transparent" : `1px solid ${done ? "#E8C77A" : BORDER}`,
                 background: isView ? CTA : "#FFFFFF",
@@ -683,6 +684,16 @@ export default function LearnPage() {
               }}>
                 {lv}
                 {!open ? <Lock style={{ width: 10, height: 10 }} aria-hidden /> : null}
+                {current ? (
+                  <span
+                    aria-label="your current level"
+                    style={{
+                      position: "absolute", top: -3, right: -3, width: 9, height: 9, borderRadius: "50%",
+                      background: isView ? "#FFFFFF" : "#34B27B", border: "1.5px solid #FFFFFF",
+                      boxShadow: "0 0 0 1px rgba(0,0,0,0.05)",
+                    }}
+                  />
+                ) : null}
               </button>
             );
           })}
