@@ -241,6 +241,8 @@ export default function LearnPage() {
     badge: string;
     kind: "checkpoint" | "level_test";
   } | null>(null);
+  // Set of "<level>:<badge>" for checkpoints the learner has cleared (lights up the path dots).
+  const [passedCps, setPassedCps] = useState<Set<string>>(new Set());
   const [speaking, setSpeaking] = useState<SpeakingRow | null>(null);
   const [sessions, setSessions] = useState<SessionLite[]>([]);
   const [allLessons, setAllLessons] = useState<LessonLite[]>([]);
@@ -278,11 +280,12 @@ export default function LearnPage() {
   const refresh = useCallback(async (levelAsk?: string) => {
     try {
       const q = levelAsk ? `?level=${encodeURIComponent(levelAsk)}` : "";
-      const [curRes, spkRes, sesRes, lesRes] = await Promise.all([
+      const [curRes, spkRes, sesRes, lesRes, cpRes] = await Promise.all([
         fetch(`/api/curriculum${q}`),
         fetch(`/api/speaking${q}`),
         fetch("/api/speaking/session"),
         fetch("/api/lessons"),
+        fetch("/api/curriculum/checkpoint/result"),
       ]);
       const curJson = (await curRes.json()) as { curriculum?: CurriculumRow | null; level?: string };
       const spkJson = (await spkRes.json()) as { speaking?: SpeakingRow | null };
@@ -306,6 +309,11 @@ export default function LearnPage() {
       if (lesJson.cefrLevel && (LADDER as readonly string[]).includes(lesJson.cefrLevel.toUpperCase())) {
         setMyLevel(lesJson.cefrLevel.toUpperCase());
       }
+      try {
+        const cpJson = (await cpRes.json()) as { passed?: { level: string; badge: string }[] };
+        const arr = Array.isArray(cpJson.passed) ? cpJson.passed : [];
+        setPassedCps(new Set(arr.map((p) => `${p.level}:${p.badge}`)));
+      } catch { /* checkpoint marks are best-effort */ }
       setCurriculum(curJson.curriculum ?? null);
       setSpeaking(spkJson.speaking ?? null);
       setSessions(Array.isArray(sesJson.sessions) ? sesJson.sessions : []);
@@ -315,6 +323,15 @@ export default function LearnPage() {
     } finally {
       setLoaded(true);
     }
+  }, []);
+
+  const reloadCheckpoints = useCallback(async () => {
+    try {
+      const r = await fetch("/api/curriculum/checkpoint/result");
+      const j = (await r.json()) as { passed?: { level: string; badge: string }[] };
+      const arr = Array.isArray(j.passed) ? j.passed : [];
+      setPassedCps(new Set(arr.map((p) => `${p.level}:${p.badge}`)));
+    } catch { /* checkpoint marks are best-effort */ }
   }, []);
 
   useEffect(() => {
@@ -1407,6 +1424,8 @@ export default function LearnPage() {
                     const isOpen = u.position === openUnit;
                     const cp = checkpoints.find((c) => c.after_unit === u.position);
                     const cpReached = cp ? firstOpen > cp.after_unit : false;
+                    const cpPassed = cp ? passedCps.has(`${curriculum?.cefr_level ?? ""}:${cp.badge}`) : false;
+                    const cpTappable = cpReached || cpPassed;
                     const firstNonGoldId = built.find((l) => {
                       const v = l.progress?.checkpoint;
                       return l.status === "completed" && !(v && v.score === v.total);
@@ -1517,27 +1536,32 @@ export default function LearnPage() {
                           <div style={{ position: "relative", marginBottom: 10 }}>
                             <span style={{
                               position: "absolute", left: -28.5, top: 14, width: 22, height: 22, borderRadius: "50%",
-                              background: "#FFFFFF", border: `2px solid ${cpReached ? "#7DD3C0" : BORDER}`, opacity: cpReached ? 1 : 0.7,
+                              background: cpPassed ? "#7DD3C0" : "#FFFFFF", border: `2px solid ${cpTappable ? "#7DD3C0" : BORDER}`, opacity: cpTappable ? 1 : 0.7,
                             }} />
                             <div
-                              onClick={cpReached ? () => setOpenCp({ level: curriculum.cefr_level, badge: cp.badge, kind: cp.kind }) : undefined}
+                              onClick={cpTappable ? () => setOpenCp({ level: curriculum.cefr_level, badge: cp.badge, kind: cp.kind }) : undefined}
                               style={{
                                 display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF",
-                                border: `1.5px ${cpReached ? "solid #7DD3C0" : `dashed ${BORDER}`}`, borderRadius: 18, padding: "11px 13px",
-                                cursor: cpReached ? "pointer" : "default",
+                                border: `1.5px ${cpTappable ? "solid #7DD3C0" : `dashed ${BORDER}`}`, borderRadius: 18, padding: "11px 13px",
+                                cursor: cpTappable ? "pointer" : "default",
                               }}
                             >
                               <span style={{
-                                ...thaiFont, width: 34, height: 34, borderRadius: "50%", background: "#F1ECE3", color: MUTED,
+                                ...thaiFont, width: 34, height: 34, borderRadius: "50%",
+                                background: cpPassed ? "#E9F8F4" : "#F1ECE3", color: cpPassed ? "#3E9C82" : MUTED,
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 fontSize: 16, fontWeight: 700, flex: "0 0 34px",
-                              }}>{cp.badge}</span>
+                              }}>{cpPassed ? "✓" : cp.badge}</span>
                               <span style={{ flex: 1 }}>
                                 <span style={{ ...font, display: "block", fontSize: 13, fontWeight: 700, color: INK_STRONG }}>
                                   {cp.kind === "level_test" ? `${curriculum.cefr_level} level test` : `Checkpoint ${cp.badge}`}
                                 </span>
-                                <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED }}>
-                                  {cpReached ? (profile?.ui_language === "th" ? "แตะเพื่อเริ่ม" : "Tap to start") : `After unit ${cp.after_unit}`}
+                                <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: cpPassed ? "#3E9C82" : MUTED }}>
+                                  {cpPassed
+                                    ? (profile?.ui_language === "th" ? "ผ่านแล้ว · แตะเพื่อลองใหม่" : "Passed · tap to retry")
+                                    : cpReached
+                                      ? (profile?.ui_language === "th" ? "แตะเพื่อเริ่ม" : "Tap to start")
+                                      : `After unit ${cp.after_unit}`}
                                 </span>
                               </span>
                             </div>
@@ -1640,7 +1664,8 @@ export default function LearnPage() {
               }}
               onDone={(advancedTo) => {
                 setOpenCp(null);
-                if (advancedTo && typeof window !== "undefined") window.location.reload();
+                if (advancedTo && typeof window !== "undefined") { window.location.reload(); return; }
+                void reloadCheckpoints();
               }}
             />
           </div>

@@ -206,8 +206,16 @@ export default function TestSurface({
     }
     if (isCp && checkpoint) {
       const score = questions.reduce((n, qq, i) => n + (picked[i] === qq.correctIndex ? 1 : 0), 0);
+      const total = questions.length;
+      const passed = score / Math.max(1, total) >= (checkpoint.passPct ?? 0.7);
       setResult({ level: checkpoint.level, score });
       setPhase("result");
+      // Persist the attempt so cleared checkpoints stay marked on the path (separate from placement history).
+      void fetch("/api/curriculum/checkpoint/result", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level: checkpoint.level, badge: checkpoint.badge, score, total, passed }),
+      }).catch(() => {});
       return;
     }
     const res = estimate(questions, picked);
