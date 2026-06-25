@@ -163,7 +163,8 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
               height={78}
               style={{
                 objectFit: "contain",
-                marginBottom: 8,
+                display: "block",
+                margin: "0 auto 8px",
                 filter: "drop-shadow(0 6px 14px rgba(52,169,143,0.22))",
               }}
             />
