@@ -3,6 +3,7 @@ import {
   BookOpen,
   ChevronRight,
   Flame,
+  Gift,
   GraduationCap,
   MessageCircle,
   RotateCcw,
@@ -364,13 +365,20 @@ export default function DashboardPage() {
               <p className="mt-3 text-[11.5px] text-ink-muted">{t.achNote}</p>
             </div>
 
-            <div className="rounded-card border border-[#E6DECF] bg-[#F8F4ED] p-4 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-[13px] font-semibold text-ink-muted">
-                <Share2 className="h-4 w-4" strokeWidth={2} aria-hidden />
-                {t.share}
+            <div className="overflow-hidden rounded-card p-5 shadow-card" style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.2)" }}>
+                  <Gift className="h-5 w-5 text-white" strokeWidth={2} aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-[14.5px] font-bold text-white">{t.share}</h3>
+                  <p className="mt-0.5 text-[12px]" style={{ color: "rgba(255,255,255,0.92)" }}>{t.shareRef}</p>
+                </div>
               </div>
-              <p className="mt-1 text-[11px] text-ink-subtle">{t.shareRef}</p>
-              <Link href="/invite" className="mt-3 inline-block rounded-full border border-line bg-white px-4 py-2 text-[12px] font-semibold text-ink-muted">{t.shareBtn}</Link>
+              <Link href="/invite" className="mt-4 flex items-center justify-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-[13px] font-bold shadow-sm" style={{ color: "var(--mk-accent-grad-to)" }}>
+                <Share2 className="h-4 w-4" strokeWidth={2.4} aria-hidden />
+                {t.shareBtn}
+              </Link>
             </div>
           </div>
         </div>
