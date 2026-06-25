@@ -5,7 +5,7 @@
 // Speaking with the SPEAKING ROOM: door → live session in /talk → results.
 // Tests/Reading/Fun ship next.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -206,6 +206,18 @@ function SoundBtn({ onClick }: { onClick: () => void }) {
     }}>
       <Volume2 style={{ width: 14, height: 14, color: "#3E9C82" }} strokeWidth={2.2} aria-hidden />
     </button>
+  );
+}
+
+function SectionHeader({ title, meta, topMargin = 0 }: { title: ReactNode; meta?: ReactNode; topMargin?: number }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, margin: `${topMargin}px 2px 10px` }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+        <span aria-hidden style={{ width: 4, height: 17, borderRadius: 99, background: "linear-gradient(180deg,#34A98F,#1F7A68)", flex: "0 0 4px" }} />
+        <h2 style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</h2>
+      </span>
+      {meta != null ? <span style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED, flex: "0 0 auto" }}>{meta}</span> : null}
+    </div>
   );
 }
 
@@ -1404,14 +1416,10 @@ export default function LearnPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "0 2px 10px" }}>
-                  <h2 style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>
-                    {targetName} · {curriculum.cefr_level} journey
-                  </h2>
-                  <span style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED }}>
-                    {units.length} units · {checkpoints.length} checkpoints
-                  </span>
-                </div>
+                <SectionHeader
+                  title={<>{targetName} · {curriculum.cefr_level} journey</>}
+                  meta={<>{units.length} units · {checkpoints.length} checkpoints</>}
+                />
                 <div style={{ borderLeft: `3px solid ${BORDER}`, marginLeft: 10, paddingLeft: 16 }}>
                   {units.map((u) => {
                     const tc = TOPIC_HEX[u.color] ?? TOPIC_HEX.peach;
@@ -1577,10 +1585,7 @@ export default function LearnPage() {
 
             {ownLessons.length ? (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "18px 2px 10px" }}>
-                  <h2 style={{ ...font, fontSize: 15, fontWeight: 700, color: INK_STRONG, margin: 0 }}>Your own lessons</h2>
-                  <span style={{ ...font, fontSize: 11.5, fontWeight: 700, color: MUTED }}>{ownLessons.length}</span>
-                </div>
+                <SectionHeader title="Your own lessons" meta={ownLessons.length} topMargin={18} />
                 {ownLessons.map((l) => {
                   const v = l.progress?.checkpoint;
                   const lGold = l.status === "completed" && !!v && v.score === v.total;
