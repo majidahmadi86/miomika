@@ -19,6 +19,8 @@ import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
 import {
   pickPhrase,
   GUIDANCE_GUEST_LIMIT_HIT,
+  CARE_EATEN,
+  PRAISE_PROGRESS,
 } from "@/lib/voice/warmth";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 import { saveExchange } from "@/lib/brain/memory";
@@ -145,16 +147,33 @@ export async function POST(req: NextRequest) {
 
       const isKickoff = userInput.trim().startsWith("[kickoff]");
       if (isKickoff) {
-        // A greeting does NOT need the full teaching brain (~1,440 tokens per call). The
-        // kickoff directive (carried in the message) holds the instructions — ship a tiny
-        // persona only. Saves ~1.4k tokens on every session's opening turn.
-        adaptivePrompt = `You are Miomi (มิโอมิ), an adorable, cheeky, soft-hearted Thai cat girl — warm, playful, curious, and brief. Lead with THEM, never yourself; never introduce yourself or state your name. Spoken aloud: plain text only — no emojis, asterisks, markdown, "~", or "(actions)". Reply in ${brainState.uiLanguage === "th" ? "Thai" : "English"} in ONE short, breezy line, following the greeting directive exactly.`;
-      } else {
-        adaptivePrompt = buildBrainPrompt({ state: brainState, userInput, mode });
-        adaptivePrompt += `\n\nNAME: Your name is Miomi. Never spell it out, never count its syllables, never write it in Thai script when speaking English. Just say "Miomi" naturally.`;
-        userMemories = serverUserId ? await fetchUserMemories(serverUserId) : [];
-        adaptivePrompt += buildMemoryContext(profile, userMemories);
+        // A greeting needs NO model call — return a warm, pre-written opener (the same
+        // warmth phrases session-init uses). Opening the talk screen and saying nothing
+        // now costs ZERO tokens instead of ~320 per open.
+        const openerVector = profile?.welcome_shown_at ? PRAISE_PROGRESS : CARE_EATEN;
+        const openerContent = pickPhrase(openerVector, { lang: brainState.uiLanguage });
+        persistExchangePair({ userId: serverUserId, state, userInput, miomiContent: openerContent });
+        return NextResponse.json({
+          content: openerContent,
+          wordCard: null,
+          phraseCard: null,
+          creatorAsset: null,
+          sessionContext: buildSessionContext(state),
+          servedVia: "kickoff_static",
+          wasFailover: false,
+          intent: null,
+          sessionMode: state.sessionMode,
+          needsClarification: false,
+          masteryEvent: null,
+          pronunciationLesson: null,
+          replyLanguage: brainState.uiLanguage,
+          userSpeaksLanguage: brainState.uiLanguage,
+        } satisfies MiomiResponse);
       }
+      adaptivePrompt = buildBrainPrompt({ state: brainState, userInput, mode });
+      adaptivePrompt += `\n\nNAME: Your name is Miomi. Never spell it out, never count its syllables, never write it in Thai script when speaking English. Just say "Miomi" naturally.`;
+      userMemories = serverUserId ? await fetchUserMemories(serverUserId) : [];
+      adaptivePrompt += buildMemoryContext(profile, userMemories);
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
       }
