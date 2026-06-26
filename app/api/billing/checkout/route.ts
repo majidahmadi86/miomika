@@ -34,8 +34,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Payments are not set up yet." }, { status: 503 });
   }
 
+  // Send users back to where they actually are (origin), so a stray
+  // NEXT_PUBLIC_APP_URL can't redirect them to localhost or the wrong domain.
   const base =
-    process.env.NEXT_PUBLIC_APP_URL ?? req.headers.get("origin") ?? new URL(req.url).origin;
+    req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
 
   try {
     const session = await createCheckoutSession({
