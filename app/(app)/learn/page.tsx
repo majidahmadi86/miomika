@@ -508,7 +508,8 @@ export default function LearnPage() {
         await refresh(viewLevel ?? undefined);
         setActiveScenario({ c: coursePos, s: scenarioPos });
       } else if (j.reason === "pro_required") {
-        setSpeakMsg("This scene unlocks with Pro — the first session of every course is yours free");
+        setSpeakMsg(null);
+        openPaywall("rooms");
       } else {
         setSpeakMsg("Miomi could not set that scene — try once more.");
       }
@@ -517,7 +518,7 @@ export default function LearnPage() {
     } finally {
       setScenarioBuilding(false);
     }
-  }, [scenarioBuilding, viewLevel, refresh]);
+  }, [scenarioBuilding, viewLevel, refresh, openPaywall]);
 
   const [roomIntro, setRoomIntro] = useState<RoomHandoff | null>(null);
   const doWalkIn = useCallback((handoff: RoomHandoff): boolean => {
@@ -597,7 +598,8 @@ export default function LearnPage() {
           return;
         }
       } else if (j.reason === "pro_required") {
-        setSpeakMsg("Sessions beyond the first of each course are Pro — your free room is session one");
+        setSpeakMsg(null);
+        openPaywall("rooms");
       } else {
         setSpeakMsg("Miomi could not prepare the room — try once more.");
       }
@@ -606,7 +608,7 @@ export default function LearnPage() {
     } finally {
       setRoomStarting(false);
     }
-  }, [roomStarting, viewLevel, myLevel, profile, walkIn]);
+  }, [roomStarting, viewLevel, myLevel, profile, walkIn, openPaywall]);
 
   // Re-enter an unfinished session from its saved plan.
   const continueSession = useCallback(async (id: string) => {

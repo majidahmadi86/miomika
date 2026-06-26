@@ -24,6 +24,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { useProfile } from "@/lib/auth/use-profile";
+import { usePaywall } from "@/components/billing/Paywall";
 import { storeRedirectTo } from "@/lib/auth/redirect-to";
 import { useUILanguage, setUILanguageCookie } from "@/lib/i18n/client";
 import { createClient } from "@/lib/supabase/client";
@@ -222,6 +223,7 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 
 export default function MePage() {
   const router = useRouter();
+  const { open: openPaywall } = usePaywall();
   const supabase = useMemo(() => createClient(), []);
   const { profile, authReady } = useProfile();
   const lang = useUILanguage();
@@ -379,7 +381,7 @@ export default function MePage() {
     if (!profileId) return;
     const locked = ["B1", "B2", "C1", "C2"].includes(lvl) && !isPro;
     if (locked) {
-      router.push("/marketplace");
+      openPaywall("generic");
       return;
     }
     setCefr(lvl);
@@ -602,7 +604,7 @@ export default function MePage() {
           <Row
             icon={<Sparkles className="h-[18px] w-[18px]" />}
             label={t.upgrade}
-            onClick={() => router.push("/marketplace")}
+            onClick={() => openPaywall("generic")}
             right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
           />
         ) : null}
