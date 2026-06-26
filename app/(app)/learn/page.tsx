@@ -23,6 +23,7 @@ type LessonLite = {
   status: string;
   progress: { step?: number; checkpoint?: { score: number; total: number } };
   catalog_slug?: string | null;
+  position: number;
 };
 
 type CurriculumUnit = {
@@ -448,12 +449,17 @@ export default function LearnPage() {
           target: planTarget === "auto" ? undefined : planTarget,
         }),
       });
-      const j = (await r.json()) as { ok?: boolean; reason?: string };
+      const j = (await r.json()) as { ok?: boolean; reason?: string; lessonId?: string };
       if (j.ok) {
         setCreateMsg(null);
         setTopic("");
         setAskOpen(false);
-        await refresh(viewLevel ?? undefined);
+        if (j.lessonId) {
+          // Take them straight into the lesson Miomi just built for them.
+          router.push(`/lessons/${j.lessonId}`);
+        } else {
+          await refresh(viewLevel ?? undefined);
+        }
       } else if (j.reason === "upgrade_required") {
         setCreateMsg(null);
         setAskOpen(false);
@@ -466,7 +472,7 @@ export default function LearnPage() {
     } finally {
       setCreating(false);
     }
-  }, [creating, topic, planLevel, planTarget, viewLevel, refresh, openPaywall]);
+  }, [creating, topic, planLevel, planTarget, viewLevel, refresh, openPaywall, router]);
 
   const planSpeaking = useCallback(async () => {
     if (speakPlanning) return;
@@ -674,7 +680,9 @@ export default function LearnPage() {
   const journeyIds = new Set(units.flatMap((u) => u.lesson_ids ?? []));
   // "Your own lessons" = only lessons the learner created themselves. Exclude the current
   // journey AND any catalog lesson (e.g. a prior level's), which otherwise pile up here after a level-up.
-  const ownLessons = allLessons.filter((l) => !journeyIds.has(l.id) && !l.catalog_slug);
+  const ownLessons = allLessons
+    .filter((l) => !journeyIds.has(l.id) && !l.catalog_slug)
+    .sort((a, b) => b.position - a.position); // newest first
 
   const stats = [
     { n: myLevel, l: "Level", icon: ShieldCheck },
