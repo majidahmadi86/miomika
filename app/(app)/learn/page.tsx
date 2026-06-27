@@ -268,6 +268,7 @@ export default function LearnPage() {
   const [silverCount, setSilverCount] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [surface, setSurface] = useState<Surface>("Course");
+  const [courseTab, setCourseTab] = useState<"journey" | "mine">("journey");
   const [expandedUnit, setExpandedUnit] = useState<number | null>(null);
   const [expandedCourse, setExpandedCourse] = useState<number | null>(null);
   const [activeScenario, setActiveScenario] = useState<{ c: number; s: number } | null>(null);
@@ -1379,6 +1380,21 @@ export default function LearnPage() {
               )}
             </div>
 
+            {/* Course sub-tabs: the curriculum path vs. the learner's own lessons */}
+            <div style={{ display: "flex", background: "#F1ECE3", borderRadius: 14, padding: 4, gap: 4, marginBottom: 14 }}>
+              {([["journey", "My Journey"], ["mine", "My Lessons"]] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setCourseTab(key)} style={{
+                  ...font, flex: 1, fontSize: 12, fontWeight: 700, padding: "8px 0",
+                  borderRadius: 10, border: "none", cursor: "pointer",
+                  background: courseTab === key ? "#FFFFFF" : "transparent",
+                  color: courseTab === key ? INK_STRONG : MUTED,
+                  boxShadow: courseTab === key ? "0 2px 6px rgba(74,65,54,.08)" : "none",
+                }}>{label}{key === "mine" && ownLessons.length ? ` · ${ownLessons.length}` : ""}</button>
+              ))}
+            </div>
+
+            {courseTab === "journey" ? (
+              <>
             {/* Level rail — sits with the journey it controls, so switching a level visibly changes the section right below */}
             <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
               {LADDER.map((lv, i) => {
@@ -1603,7 +1619,9 @@ export default function LearnPage() {
                 {genMsg ? <p style={{ ...font, fontSize: 12, color: MUTED, margin: "4px 0 0", textAlign: "center" }}>{genMsg}</p> : null}
               </>
             )}
-
+              </>
+            ) : (
+              <>
             {ownLessons.length ? (
               <>
                 <SectionHeader icon={Sparkles} bg="#F1EEFE" fg="#6D5BBF" title="Your own lessons" meta={ownLessons.length} topMargin={18} />
@@ -1639,7 +1657,16 @@ export default function LearnPage() {
                   );
                 })}
               </>
-            ) : null}
+            ) : (
+              <div style={{ background: "#FFFFFF", border: `1px solid ${BORDER}`, borderRadius: 18, boxShadow: CARD_SHADOW, padding: 22, textAlign: "center" }}>
+                <p style={{ ...font, fontSize: 13.5, fontWeight: 700, color: INK_STRONG, margin: 0 }}>No lessons of your own yet</p>
+                <p style={{ ...font, fontSize: 12, color: MUTED, margin: "6px 0 0", lineHeight: 1.55 }}>
+                  Tap &ldquo;Create your own lesson&rdquo; above and Miomi will build one on any topic, just for you.
+                </p>
+              </div>
+            )}
+              </>
+            )}
 
             <Link href="/talk" style={{
               display: "flex", alignItems: "center", gap: 11, textDecoration: "none",

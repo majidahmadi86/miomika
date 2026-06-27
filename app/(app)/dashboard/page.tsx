@@ -88,7 +88,9 @@ export default function DashboardPage() {
     (w) => !(w.next_spiral_at && new Date(w.next_spiral_at).getTime() <= now),
   );
   const [tab, setTab] = useState<"due" | "learning">("due");
+  const [showAllWords, setShowAllWords] = useState(false);
   const reviewList = tab === "due" ? dueWords : learningOnly;
+  const shownWords = showAllWords ? reviewList : reviewList.slice(0, 6);
 
   const week = useMemo(() => {
     const set = new Set(activityDates ?? []);
@@ -137,6 +139,8 @@ export default function DashboardPage() {
           reviewEmpty: "Words you learn with Miomi show up here.",
           startLearning: "Start learning",
           allCaughtUp: "All caught up — nothing due right now.",
+          showAll: "Show all",
+          showLess: "Show less",
           achievements: "Achievements",
           share: "Share your progress",
           shareRef: "Invite a friend — you both get ฿30",
@@ -170,6 +174,8 @@ export default function DashboardPage() {
           reviewEmpty: "คำที่เรียนกับหนูจะมาอยู่ตรงนี้นะคะ",
           startLearning: "เริ่มเรียนเลย",
           allCaughtUp: "ทบทวนครบแล้ว ตอนนี้ยังไม่มีคำที่ต้องทบทวนค่า",
+          showAll: "ดูทั้งหมด",
+          showLess: "ดูน้อยลง",
           achievements: "ความสำเร็จ",
           share: "แชร์ความก้าวหน้า",
           shareRef: "ชวนเพื่อน — รับคนละ ฿30",
@@ -324,19 +330,26 @@ export default function DashboardPage() {
             {learningWords.length > 0 ? (
               <>
                 <div className="mt-3 flex gap-2">
-                  <button type="button" onClick={() => setTab("due")} className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition ${tab === "due" ? "border-transparent bg-accent text-white" : "border-line bg-surface text-ink-muted"}`}>
+                  <button type="button" onClick={() => { setTab("due"); setShowAllWords(false); }} className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition ${tab === "due" ? "border-transparent bg-accent text-white" : "border-line bg-surface text-ink-muted"}`}>
                     {t.tabDue} <span className="opacity-70">{dueWords.length}</span>
                   </button>
-                  <button type="button" onClick={() => setTab("learning")} className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition ${tab === "learning" ? "border-transparent bg-accent text-white" : "border-line bg-surface text-ink-muted"}`}>
+                  <button type="button" onClick={() => { setTab("learning"); setShowAllWords(false); }} className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition ${tab === "learning" ? "border-transparent bg-accent text-white" : "border-line bg-surface text-ink-muted"}`}>
                     {t.tabLearning} <span className="opacity-70">{learningOnly.length}</span>
                   </button>
                 </div>
                 {reviewList.length > 0 ? (
-                  <div className="mt-3 flex flex-col gap-2">
-                    {reviewList.map((w) => (
-                      <WordCardV3 key={w.word_en} word={practiceWordToVocabularyEntry(w)} direction={cardDirection} saveState="saved" onReplayAudio={() => handlePracticeReplay(w)} />
-                    ))}
-                  </div>
+                  <>
+                    <div className="mt-3 flex flex-col gap-2">
+                      {shownWords.map((w) => (
+                        <WordCardV3 key={w.word_en} word={practiceWordToVocabularyEntry(w)} direction={cardDirection} saveState="saved" onReplayAudio={() => handlePracticeReplay(w)} />
+                      ))}
+                    </div>
+                    {reviewList.length > 6 ? (
+                      <button type="button" onClick={() => setShowAllWords((v) => !v)} className="mt-3 w-full rounded-full border border-line bg-surface py-2 text-[12px] font-semibold text-ink-muted transition hover:bg-surface-2">
+                        {showAllWords ? t.showLess : `${t.showAll} (${reviewList.length})`}
+                      </button>
+                    ) : null}
+                  </>
                 ) : (
                   <p className="mt-5 text-center text-[12px] text-ink-muted">{t.allCaughtUp}</p>
                 )}
