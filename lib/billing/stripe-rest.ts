@@ -78,6 +78,36 @@ export async function createCheckoutSession(params: {
 }
 
 /**
+ * Create a Stripe Billing Portal session so the customer can update payment,
+ * view invoices, and CANCEL their subscription on Stripe's hosted page. Stripe's
+ * Services Agreement requires subscription merchants to give customers a clear way
+ * to cancel — this is that mechanism.
+ */
+export async function createBillingPortalSession(params: {
+  customerId: string;
+  returnUrl: string;
+}): Promise<{ url: string | null }> {
+  const form = new URLSearchParams();
+  form.set("customer", params.customerId);
+  form.set("return_url", params.returnUrl);
+
+  const res = await fetch(`${STRIPE_API}/billing_portal/sessions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secretKey()}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form.toString(),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Stripe billing portal failed (${res.status}): ${detail}`);
+  }
+  const json = (await res.json()) as { url: string | null };
+  return { url: json.url };
+}
+
+/**
  * Verify a Stripe webhook signature and return the parsed event.
  * Implements Stripe's documented scheme: signed_payload = `${t}.${rawBody}`,
  * HMAC-SHA256 with the endpoint secret, constant-time compared against each v1

@@ -8,6 +8,7 @@ import {
   Camera,
   ChevronRight,
   Compass,
+  CreditCard,
   Download,
   FileText,
   Gift,
@@ -72,6 +73,7 @@ const COPY = {
     stars: "ดาว Miomi",
     upgrade: "อัปเกรดเป็น Pro",
     manageBilling: "จัดการการเรียกเก็บเงิน",
+    manageBillingSub: "อัปเดตการชำระเงินหรือยกเลิกได้ทุกเมื่อ",
     inviteFriend: "ชวนเพื่อน",
     account: "บัญชี",
     email: "อีเมล",
@@ -107,6 +109,7 @@ const COPY = {
     stars: "Miomi stars",
     upgrade: "Upgrade to Pro",
     manageBilling: "Manage billing",
+    manageBillingSub: "Update payment or cancel anytime",
     inviteFriend: "Invite friends",
     account: "Account",
     email: "Email",
@@ -305,6 +308,22 @@ export default function MePage() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const [levelOpen, setLevelOpen] = useState(false);
+  const [billingBusy, setBillingBusy] = useState(false);
+  const openBillingPortal = useCallback(async () => {
+    if (billingBusy) return;
+    setBillingBusy(true);
+    try {
+      const r = await fetch("/api/billing/portal", { method: "POST" });
+      const j = (await r.json()) as { url?: string };
+      if (j.url) {
+        window.location.assign(j.url);
+        return; // navigating away
+      }
+    } catch {
+      // fall through to re-enable
+    }
+    setBillingBusy(false);
+  }, [billingBusy]);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [nameOpen, setNameOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -607,7 +626,15 @@ export default function MePage() {
             onClick={() => openPaywall("generic")}
             right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
           />
-        ) : null}
+        ) : (
+          <Row
+            icon={<CreditCard className="h-[18px] w-[18px]" />}
+            label={t.manageBilling}
+            sub={t.manageBillingSub}
+            onClick={openBillingPortal}
+            right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+          />
+        )}
         <Row
           icon={<Gift className="h-[18px] w-[18px]" />}
           label={t.inviteFriend}
