@@ -279,6 +279,11 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
               ? `ยกเลิกได้ทุกเมื่อ · เรียกเก็บ${billing === "yearly" ? "รายปี" : "รายเดือน"}`
               : `Cancel anytime · Billed ${billing === "yearly" ? "annually" : "monthly"}`}
           </p>
+          <p style={{ ...sans, textAlign: "center", fontSize: 11, color: "var(--mk-ink-subtle, #A89C88)", margin: "6px 0 0" }}>
+            <a href="/legal/terms" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "underline" }}>
+              {lang === "th" ? "ข้อกำหนดและนโยบายการคืนเงิน" : "Terms & refund policy"}
+            </a>
+          </p>
         </div>
       </div>
     </div>
