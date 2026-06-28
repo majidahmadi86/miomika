@@ -227,6 +227,55 @@ function isLowConfidenceSpeech(
   return avgNoSpeech > 0.6 || avgLogprob < -1.2;
 }
 
+/**
+ * Measure the loudness of a PCM WAV buffer (peak + RMS, 0..1 full-scale).
+ * Returns null if the buffer isn't parseable 16-bit PCM (then we just transcribe
+ * normally — never block on a parse failure). This is how we tell "the user
+ * actually spoke" from "the mic was open on a silent room": speech has real
+ * peaks; silence/ambient noise does not. Catching silence HERE means it never
+ * reaches Whisper, which is the only reliable way to stop Whisper inventing
+ * words out of nothing (a downstream text filter can't — it sounds confident).
+ */
+function measureWavLoudness(wav: Buffer): { peak: number; rms: number } | null {
+  if (wav.length < 44) return null;
+  if (wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") return null;
+  // Walk chunks to find 'data' (header size varies when extra chunks are present).
+  let offset = 12;
+  let dataStart = -1;
+  let dataLen = 0;
+  while (offset + 8 <= wav.length) {
+    const id = wav.toString("ascii", offset, offset + 4);
+    const size = wav.readUInt32LE(offset + 4);
+    if (id === "data") {
+      dataStart = offset + 8;
+      dataLen = size;
+      break;
+    }
+    offset += 8 + size + (size % 2);
+  }
+  if (dataStart < 0) return null;
+  const end = Math.min(dataStart + dataLen, wav.length);
+  let sumSq = 0;
+  let peak = 0;
+  let n = 0;
+  for (let i = dataStart; i + 1 < end; i += 2) {
+    const s = wav.readInt16LE(i) / 32768;
+    const a = Math.abs(s);
+    if (a > peak) peak = a;
+    sumSq += s * s;
+    n++;
+  }
+  if (n === 0) return null;
+  return { peak, rms: Math.sqrt(sumSq / n) };
+}
+
+// Below this peak amplitude (fraction of full scale) the clip has no real
+// speech in it — it's a silent/near-silent room. Real speech into a phone mic
+// peaks well above this; quiet rooms sit far below. Conservative so genuine
+// (even soft) speech is never dropped.
+const SILENCE_PEAK = 0.08;
+const SILENCE_RMS = 0.012;
+
 async function transcribeWithGroq(
   audioBlob: File,
   explicitLang: ExplicitLang,
@@ -240,9 +289,10 @@ async function transcribeWithGroq(
     // on confidence and reject silence-hallucinations no matter what words they are.
     response_format: "verbose_json",
     temperature: 0,
-    // No leading example phrase here — a phrase prompt is what Whisper echoes
-    // verbatim when it hears silence/noise. A short neutral hint is enough.
-    prompt: "Thai-English speech.",
+    // NO prompt: any prompt text is what Whisper echoes verbatim when it hears
+    // silence/noise (that's where the "Thai-English speech"→"TIE-English speech"
+    // phantom came from). The silence gate upstream is the real defense; with no
+    // prompt there's nothing to parrot even on a borderline clip.
   };
   if (explicitLang) transcribeOpts.language = explicitLang;
   const result = await groq.audio.transcriptions.create(transcribeOpts);
@@ -357,6 +407,25 @@ export async function POST(request: NextRequest) {
 
   const start = Date.now();
   const audioBytes = Buffer.from(await audioBlob.arrayBuffer());
+
+  // SILENCE GATE: if the clip has no real speech energy, the mic was open on a
+  // quiet room. Return "nothing said" now — never send silence to Whisper/Google,
+  // which would otherwise invent phantom words ("I'm sorry", prompt echoes, etc.).
+  // The client treats empty text as "say nothing" (MicButton: empty → idle).
+  const loudness = measureWavLoudness(audioBytes);
+  if (loudness && loudness.peak < SILENCE_PEAK && loudness.rms < SILENCE_RMS) {
+    log("voice.transcribe", "silent clip — skipped transcription", {
+      peak: Number(loudness.peak.toFixed(4)),
+      rms: Number(loudness.rms.toFixed(4)),
+    });
+    return NextResponse.json({ text: "", silent: true });
+  }
+  if (loudness) {
+    log("voice.transcribe", "loudness", {
+      peak: Number(loudness.peak.toFixed(4)),
+      rms: Number(loudness.rms.toFixed(4)),
+    });
+  }
 
   if (groqKey) {
     try {
