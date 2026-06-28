@@ -471,44 +471,57 @@ export async function POST(req: NextRequest) {
           .trim();
         if (cardTag && !suppressTeaching) {
           const taughtTh = (cardTag[1] ?? "").trim();
+          const taughtRoman = (cardTag[2] ?? "").trim();
           const taughtEn = (cardTag[3] ?? "").trim();
           const wordKey = taughtEn || taughtTh;
-          if (wordKey) {
+          if (wordKey && taughtTh && taughtEn) {
             try {
               const cardTarget = brainState.profile.learningTarget ?? "th";
+              // Resolve ONLY to borrow phonetics + an example sentence. The card's
+              // headword MUST stay exactly what she taught (the tag) — never let a
+              // near-but-different bank row (ilike) swap สนทนา → การศึกษา. We feed the
+              // resolver the verbatim taught word and keep the taught word regardless.
               const resolved = await resolveOrGenerateWord({
                 word: wordKey,
                 learningTarget: cardTarget,
                 cefrLevel: brainState.profile.cefrLevel,
               });
-              if (resolved) {
-                const phon = await resolvePhonetics({
-                  word_th: resolved.word_th,
-                  word_en: resolved.word_en,
-                  learningTarget: cardTarget,
-                  bankRomanization: resolved.th_romanization,
-                  bankIpa: resolved.en_ipa,
-                });
-                wordToIntroduce = {
-                  word: resolved.word_en,
-                  word_en: resolved.word_en,
-                  word_th: resolved.word_th,
-                  cefr_level: resolved.cefr_level,
-                  emoji: resolved.emoji,
-                };
-                teachCard = {
-                  word_en: resolved.word_en,
-                  word_th: resolved.word_th,
-                  emoji: resolved.emoji,
-                  cefr_level: resolved.cefr_level,
-                  phonetics: phon.phonetics,
-                  phonetics_source: phon.phonetics_source,
-                  ...(phon.th_romanization ? { th_romanization: phon.th_romanization } : {}),
-                  ...(phon.en_ipa ? { en_ipa: phon.en_ipa } : {}),
-                  ...(resolved.example_th ? { example_th: resolved.example_th } : {}),
-                  ...(resolved.example_en ? { example_en: resolved.example_en } : {}),
-                };
-              }
+              // Only adopt the resolver's example if it actually contains the word
+              // she taught — otherwise it belongs to a different word and would mislead.
+              const exampleMatches =
+                !!resolved &&
+                ((resolved.example_th?.includes(taughtTh) ?? false) ||
+                  (resolved.example_en?.toLowerCase().includes(taughtEn.toLowerCase()) ?? false));
+              const phon = await resolvePhonetics({
+                word_th: taughtTh,
+                word_en: taughtEn,
+                learningTarget: cardTarget,
+                bankRomanization: taughtRoman || resolved?.th_romanization || null,
+                bankIpa: resolved?.en_ipa ?? null,
+              });
+              wordToIntroduce = {
+                word: taughtEn,
+                word_en: taughtEn,
+                word_th: taughtTh,
+                cefr_level: resolved?.cefr_level ?? brainState.profile.cefrLevel ?? null,
+                emoji: resolved?.emoji ?? null,
+              };
+              teachCard = {
+                word_en: taughtEn,
+                word_th: taughtTh,
+                emoji: resolved?.emoji ?? null,
+                cefr_level: resolved?.cefr_level ?? brainState.profile.cefrLevel ?? null,
+                phonetics: phon.phonetics,
+                phonetics_source: phon.phonetics_source,
+                ...(phon.th_romanization
+                  ? { th_romanization: phon.th_romanization }
+                  : taughtRoman
+                    ? { th_romanization: taughtRoman }
+                    : {}),
+                ...(phon.en_ipa ? { en_ipa: phon.en_ipa } : {}),
+                ...(exampleMatches && resolved?.example_th ? { example_th: resolved.example_th } : {}),
+                ...(exampleMatches && resolved?.example_en ? { example_en: resolved.example_en } : {}),
+              };
             } catch (err) {
               console.error("[brain] card from tag failed:", err);
             }

@@ -168,6 +168,38 @@ async function transcribeWithGoogle(
   }
 }
 
+// Phrases Whisper tends to emit when it's fed silence or pure noise — it echoes
+// its own conditioning prompt or a stock filler. If a transcription IS one of
+// these (and nothing else), it's a hallucination from no real speech, not the
+// user — drop it so the brain never sees garbage. (Root cause of the "Thai
+// garbage" Mike saw: the old prompt below seeded exactly this echo.)
+const HALLUCINATION_PHRASES = [
+  "บทสนทนาภาษาไทย",
+  "thai and english",
+  "bilingual conversation",
+  "ภาษาไทยและภาษาอังกฤษ",
+  "ภาษาไทยและภาษาไทย",
+];
+
+/** True if the transcript is empty, a bare echo of a known filler, or a degenerate repeat. */
+function looksHallucinated(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (t.length === 0) return true;
+  // Pure echo of a stock phrase (allow trivial trailing punctuation/spacing).
+  const stripped = t.replace(/[.\s।ๆ]+$/g, "");
+  if (HALLUCINATION_PHRASES.some((p) => stripped === p.toLowerCase())) return true;
+  // Degenerate repetition: the same short token repeated with little else
+  // (e.g. "ภาษาไทยและภาษาไทย"). If one token is >70% of the content, it's noise.
+  const tokens = t.split(/[\s,]+/).filter(Boolean);
+  if (tokens.length >= 4) {
+    const counts = new Map<string, number>();
+    for (const tok of tokens) counts.set(tok, (counts.get(tok) ?? 0) + 1);
+    const top = Math.max(...counts.values());
+    if (top / tokens.length > 0.7) return true;
+  }
+  return false;
+}
+
 async function transcribeWithGroq(
   audioBlob: File,
   explicitLang: ExplicitLang,
@@ -179,11 +211,18 @@ async function transcribeWithGroq(
     model: "whisper-large-v3-turbo",
     response_format: "json",
     temperature: 0,
-    prompt: "บทสนทนาภาษาไทยและภาษาอังกฤษ Thai and English bilingual conversation.",
+    // No leading example phrase here — a phrase prompt is what Whisper echoes
+    // verbatim when it hears silence/noise. A short neutral hint is enough.
+    prompt: "Thai-English speech.",
   };
   if (explicitLang) transcribeOpts.language = explicitLang;
   const result = await groq.audio.transcriptions.create(transcribeOpts);
-  return (result.text ?? "").trim();
+  const text = (result.text ?? "").trim();
+  if (looksHallucinated(text)) {
+    log("voice.transcribe", "dropped hallucinated transcript", { preview: text.slice(0, 60) });
+    return "";
+  }
+  return text;
 }
 
 /**
