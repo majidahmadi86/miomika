@@ -169,16 +169,23 @@ async function transcribeWithGoogle(
 }
 
 // Phrases Whisper tends to emit when it's fed silence or pure noise — it echoes
-// its own conditioning prompt or a stock filler. If a transcription IS one of
-// these (and nothing else), it's a hallucination from no real speech, not the
-// user — drop it so the brain never sees garbage. (Root cause of the "Thai
-// garbage" Mike saw: the old prompt below seeded exactly this echo.)
+// its own conditioning prompt or a stock filler (these are the classic Whisper
+// "silence hallucinations": the prompt echo, plus stock English fillers like
+// "thanks for watching" / "I'm sorry"). If a transcription IS one of these (and
+// nothing else), it's noise, not the user — drop it. Backstop to the confidence
+// gate below, for the cases where Whisper sounds confident about its phantom.
 const HALLUCINATION_PHRASES = [
   "บทสนทนาภาษาไทย",
   "thai and english",
   "bilingual conversation",
   "ภาษาไทยและภาษาอังกฤษ",
   "ภาษาไทยและภาษาไทย",
+  "i'm sorry",
+  "thanks for watching",
+  "thank you for watching",
+  "thank you for watching.",
+  "please subscribe",
+  "subscribe to my channel",
 ];
 
 /** True if the transcript is empty, a bare echo of a known filler, or a degenerate repeat. */
@@ -187,7 +194,7 @@ function looksHallucinated(text: string): boolean {
   if (t.length === 0) return true;
   // Pure echo of a stock phrase (allow trivial trailing punctuation/spacing).
   const stripped = t.replace(/[.\s।ๆ]+$/g, "");
-  if (HALLUCINATION_PHRASES.some((p) => stripped === p.toLowerCase())) return true;
+  if (HALLUCINATION_PHRASES.some((p) => stripped === p.toLowerCase().replace(/[.\s]+$/g, ""))) return true;
   // Degenerate repetition: the same short token repeated with little else
   // (e.g. "ภาษาไทยและภาษาไทย"). If one token is >70% of the content, it's noise.
   const tokens = t.split(/[\s,]+/).filter(Boolean);
@@ -200,6 +207,26 @@ function looksHallucinated(text: string): boolean {
   return false;
 }
 
+/**
+ * Confidence gate. Whisper hallucinates words out of silence/noise; those
+ * segments carry a high no_speech_prob and/or a very low avg_logprob. This
+ * catches the phantoms by CONFIDENCE — regardless of the exact words — which a
+ * fixed phrase-list can't (it's why "I'm sorry" slipped through before).
+ * Conservative thresholds so real (even quiet) speech is never dropped.
+ */
+function isLowConfidenceSpeech(
+  segments: Array<{ no_speech_prob?: number; avg_logprob?: number }>,
+): boolean {
+  if (segments.length === 0) return false;
+  const noSpeech = segments.map((s) => s.no_speech_prob ?? 0);
+  const logprob = segments.map((s) => s.avg_logprob ?? 0);
+  const avgNoSpeech = noSpeech.reduce((a, b) => a + b, 0) / noSpeech.length;
+  const avgLogprob = logprob.reduce((a, b) => a + b, 0) / logprob.length;
+  // High no-speech probability = it was basically silence. Very low logprob =
+  // the model had no idea and guessed. Either, on its own, means "not real speech".
+  return avgNoSpeech > 0.6 || avgLogprob < -1.2;
+}
+
 async function transcribeWithGroq(
   audioBlob: File,
   explicitLang: ExplicitLang,
@@ -209,7 +236,9 @@ async function transcribeWithGroq(
   const transcribeOpts: Parameters<Groq["audio"]["transcriptions"]["create"]>[0] = {
     file: audioBlob,
     model: "whisper-large-v3-turbo",
-    response_format: "json",
+    // verbose_json gives per-segment no_speech_prob / avg_logprob so we can gate
+    // on confidence and reject silence-hallucinations no matter what words they are.
+    response_format: "verbose_json",
     temperature: 0,
     // No leading example phrase here — a phrase prompt is what Whisper echoes
     // verbatim when it hears silence/noise. A short neutral hint is enough.
@@ -218,6 +247,12 @@ async function transcribeWithGroq(
   if (explicitLang) transcribeOpts.language = explicitLang;
   const result = await groq.audio.transcriptions.create(transcribeOpts);
   const text = (result.text ?? "").trim();
+  const segments =
+    (result as { segments?: Array<{ no_speech_prob?: number; avg_logprob?: number }> }).segments ?? [];
+  if (isLowConfidenceSpeech(segments)) {
+    log("voice.transcribe", "dropped low-confidence transcript", { preview: text.slice(0, 60) });
+    return "";
+  }
   if (looksHallucinated(text)) {
     log("voice.transcribe", "dropped hallucinated transcript", { preview: text.slice(0, 60) });
     return "";
