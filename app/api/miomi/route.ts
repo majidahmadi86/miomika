@@ -2,6 +2,7 @@ export const preferredRegion = ["sin1", "hnd1"];
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAIResponse } from "@/lib/ai/router";
+import { routeTurn } from "@/lib/ai/comprehension-router";
 import {
   matchLibraryFromDB,
   logInteraction,
@@ -326,8 +327,41 @@ export async function POST(req: NextRequest) {
     // [[CARD: th | roman | en]] tag we turn into a verified card AFTER its reply — so the card always
     // matches exactly what it taught (no more pre-picked, frequency-level cards). We only SUPPRESS
     // teaching when it would be unwelcome: relaxed chat, or when they're stuck / sad / just mastered one.
+    // ── COMPREHENSION ROUTER: read the turn, decide real / route / teach ─────
+    // One cheap call that understands the message in context. Biased to the model;
+    // teaching off by default. This is the "understand, THEN route" brain.
+    const turn = await routeTurn(messages, userInput);
+
+    // INPUT GUARD: STT noise, a stray fragment, or just a name with no request —
+    // gently re-prompt instead of inventing a reply or firing a card off junk.
+    if (!turn.real) {
+      const didntCatch =
+        brainState.uiLanguage === "th"
+          ? "ขอโทษค่ะ หนูฟังไม่ค่อยชัดเลย ลองพูดอีกครั้งได้ไหมคะ~"
+          : "Sorry, I didn't quite catch that — could you say it again?";
+      persistExchangePair({ userId: serverUserId, state, userInput, miomiContent: didntCatch });
+      return NextResponse.json({
+        content: didntCatch,
+        wordCard: null,
+        phraseCard: null,
+        creatorAsset: null,
+        sessionContext: buildSessionContext(state),
+        servedVia: "input_guard",
+        wasFailover: false,
+        intent: null,
+        sessionMode: state.sessionMode,
+        needsClarification: false,
+        masteryEvent: null,
+        pronunciationLesson: null,
+        replyLanguage: brainState.uiLanguage,
+        userSpeaksLanguage: brainState.uiLanguage,
+      } satisfies MiomiResponse);
+    }
+
+    // TEACHING is now OFF by default — only when the router sees a genuine
+    // teaching moment (turn.teach). Still suppress on mastery / stuck / sad.
     const suppressTeaching =
-      mode === "chat" ||
+      !turn.teach ||
       masteryEvent.type !== "none" ||
       brainState.emotionalSignal === "stuck" ||
       brainState.emotionalSignal === "sad";
@@ -358,7 +392,12 @@ export async function POST(req: NextRequest) {
       emotionalMomentum: brainState.emotionalSignal,
     };
 
-    const matchResult = await matchLibraryFromDB(userInput, matchContext);
+    // Model-biased: only consult the canned library when the router decided this
+    // turn is trivially formulaic. Anything with real content goes to the model.
+    const matchResult =
+      turn.route === "library"
+        ? await matchLibraryFromDB(userInput, matchContext)
+        : ({ type: "ai", reason: "router_to_model", intent: "unclear" } as const);
 
     // ── STAGE 10: Serve from library or AI ───────────────────────────────────
     let content: string;

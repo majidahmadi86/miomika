@@ -49,12 +49,14 @@ const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GEMINI_MODEL = "gemini-2.5-flash";
 // Cap how much conversation history we send to the LLM each turn. Without this the
 // client re-sends the ENTIRE growing transcript every call → token cost grows turn
-// over turn. The last few exchanges are plenty of context for a chat companion.
-const MAX_HISTORY_MESSAGES = 8;
-// Ceiling on reply length. Replies should be 1-2 sentences (the prompt enforces this);
-// 200 tokens is a safety cap that (a) keeps a runaway reply from burning Groq's
-// per-minute token budget — which is what drops us onto slow Gemini — and (b) caps cost.
-const MAX_REPLY_TOKENS = 200;
+// over turn. Keep enough recent context for a coherent companion that remembers the
+// thread (raised from 8 → she was losing the conversation past a few turns and reading
+// as forgetful). Cost is bounded by the daily caps, not by starving her memory.
+const MAX_HISTORY_MESSAGES = 16;
+// Ceiling on reply length. She should answer naturally — as long as the thought needs,
+// not clipped to a fragment. This is a safety cap against a runaway reply, not a target;
+// the prompt no longer tells her "short is always better". (Raised 200 → 600.)
+const MAX_REPLY_TOKENS = 600;
 // Hard per-engine timeouts. A turn must NEVER hang the mic. We saw a 52-SECOND Gemini
 // call freeze the whole turn; with these, a slow engine is abandoned fast and we fall
 // through to the next option (or the instant library failover) instead of locking up.
