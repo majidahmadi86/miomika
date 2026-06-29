@@ -7,10 +7,66 @@ import { createServiceClient } from "@/lib/supabase/service";
 import {
   getSubscriptionItem,
   changeSubscriptionPrice,
+  getUpgradeProrationPreview,
   priceIdFor,
   tierForPriceId,
 } from "@/lib/billing/stripe-rest";
 import { log, logError } from "@/lib/debug/log";
+
+/** Pro Max per-period list price (major units) for the given interval, for display. */
+const PRO_MAX_LIST: Record<"monthly" | "yearly", number> = { monthly: 699, yearly: 6990 };
+
+/**
+ * GET /api/billing/upgrade — preview the upgrade WITHOUT charging: the prorated
+ * amount due now + the going-forward Pro Max price. Powers the confirmation
+ * screen so the charge is never a surprise.
+ */
+export async function GET() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ error: "Payments are not set up yet." }, { status: 503 });
+  }
+  const profile = await getServerProfile();
+  if (!profile) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  if (profile.tier !== "pro") return NextResponse.json({ error: "Nothing to upgrade." }, { status: 400 });
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("stripe_subscription_id, stripe_customer_id")
+    .eq("id", profile.id)
+    .single();
+  const subscriptionId = (data?.stripe_subscription_id as string | null) ?? null;
+  const customerId = (data?.stripe_customer_id as string | null) ?? null;
+  if (!subscriptionId || !customerId) {
+    return NextResponse.json({ error: "We couldn't find your subscription." }, { status: 400 });
+  }
+
+  try {
+    const item = await getSubscriptionItem(subscriptionId);
+    if (!item) return NextResponse.json({ error: "We couldn't read your subscription." }, { status: 400 });
+    const interval = item.interval ?? tierForPriceId(item.priceId)?.interval ?? "monthly";
+    const proMaxPriceId = priceIdFor("pro_max", interval);
+    if (!proMaxPriceId) return NextResponse.json({ error: "Pro Max isn't available right now." }, { status: 500 });
+    if (item.priceId === proMaxPriceId) {
+      return NextResponse.json({ error: "You're already on Pro Max." }, { status: 400 });
+    }
+    const preview = await getUpgradeProrationPreview({
+      customerId,
+      subscriptionId,
+      itemId: item.itemId,
+      newPriceId: proMaxPriceId,
+    });
+    return NextResponse.json({
+      interval,
+      proratedNow: preview?.proratedNow ?? null,
+      currency: preview?.currency ?? "THB",
+      goingForward: PRO_MAX_LIST[interval],
+    });
+  } catch (e) {
+    logError("billing", "upgrade preview failed", e);
+    return NextResponse.json({ error: "Couldn't load upgrade details." }, { status: 502 });
+  }
+}
 
 /**
  * POST /api/billing/upgrade — move an existing Pro subscriber to Pro Max in-app.

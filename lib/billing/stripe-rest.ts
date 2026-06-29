@@ -108,6 +108,38 @@ export async function getSubscriptionItem(subscriptionId: string): Promise<{
 }
 
 /**
+ * Preview what an upgrade would cost RIGHT NOW without changing anything — the
+ * prorated amount Stripe would charge immediately for the rest of the current
+ * period. Lets the UI show "you'll pay ฿X now, then ฿Y/period" before they
+ * confirm. Returns amounts in major units (e.g. baht), already divided from
+ * Stripe's minor units.
+ */
+export async function getUpgradeProrationPreview(params: {
+  customerId: string;
+  subscriptionId: string;
+  itemId: string;
+  newPriceId: string;
+}): Promise<{ proratedNow: number; currency: string } | null> {
+  const qs = new URLSearchParams();
+  qs.set("customer", params.customerId);
+  qs.set("subscription", params.subscriptionId);
+  qs.set("subscription_items[0][id]", params.itemId);
+  qs.set("subscription_items[0][price]", params.newPriceId);
+  qs.set("subscription_proration_behavior", "always_invoice");
+  const res = await fetch(`${STRIPE_API}/invoices/upcoming?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${secretKey()}` },
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Stripe proration preview failed (${res.status}): ${detail}`);
+  }
+  const json = (await res.json()) as { amount_due?: number; currency?: string };
+  if (typeof json.amount_due !== "number") return null;
+  // Stripe amounts are in the currency's minor unit (satang for THB → /100).
+  return { proratedNow: json.amount_due / 100, currency: (json.currency ?? "thb").toUpperCase() };
+}
+
+/**
  * Switch a subscription to a new price (the in-app upgrade). Bills the prorated
  * difference immediately against the card on file. payment_behavior is
  * error_if_incomplete so that if the charge can't complete (declined / needs
