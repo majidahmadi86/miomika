@@ -86,6 +86,8 @@ export async function getSubscriptionItem(subscriptionId: string): Promise<{
   itemId: string;
   priceId: string;
   interval: BillingInterval | null;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd: string | null;
 } | null> {
   const res = await fetch(`${STRIPE_API}/subscriptions/${subscriptionId}`, {
     headers: { Authorization: `Bearer ${secretKey()}` },
@@ -98,13 +100,47 @@ export async function getSubscriptionItem(subscriptionId: string): Promise<{
     items?: {
       data?: Array<{ id?: string; price?: { id?: string; recurring?: { interval?: string } } }>;
     };
+    cancel_at_period_end?: boolean;
+    current_period_end?: number;
   };
   const item = json.items?.data?.[0];
   if (!item?.id || !item.price?.id) return null;
   const rec = item.price.recurring?.interval;
   const interval: BillingInterval | null =
     rec === "year" ? "yearly" : rec === "month" ? "monthly" : null;
-  return { itemId: item.id, priceId: item.price.id, interval };
+  return {
+    itemId: item.id,
+    priceId: item.price.id,
+    interval,
+    cancelAtPeriodEnd: json.cancel_at_period_end === true,
+    currentPeriodEnd:
+      typeof json.current_period_end === "number"
+        ? new Date(json.current_period_end * 1000).toISOString()
+        : null,
+  };
+}
+
+/**
+ * Undo a pending cancellation — clear cancel_at_period_end so the subscription
+ * keeps renewing. This is the in-app "Resume" (like Claude's). Only meaningful
+ * while the sub is still active and set to cancel at period end; harmless
+ * otherwise.
+ */
+export async function resumeSubscription(subscriptionId: string): Promise<void> {
+  const form = new URLSearchParams();
+  form.set("cancel_at_period_end", "false");
+  const res = await fetch(`${STRIPE_API}/subscriptions/${subscriptionId}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secretKey()}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form.toString(),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Stripe resume failed (${res.status}): ${detail}`);
+  }
 }
 
 /**

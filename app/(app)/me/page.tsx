@@ -18,6 +18,7 @@ import {
   LogOut,
   Palette,
   Pencil,
+  RotateCcw,
   Shield,
   Sparkles,
   Star,
@@ -80,6 +81,11 @@ const COPY = {
     upgradeFail: "อัปเกรดไม่สำเร็จ ลองที่จัดการการเรียกเก็บเงินดูนะ",
     manageBilling: "จัดการการเรียกเก็บเงิน",
     manageBillingSub: "อัปเดตการชำระเงิน แพ็กเกจ หรือใบเสร็จ",
+    cancelsOn: (d: string) => `จะสิ้นสุดวันที่ ${d}`,
+    resume: "กลับมาใช้ต่อ",
+    resumeSub: "ยกเลิกการสิ้นสุด — ใช้งานต่อได้เลย",
+    resuming: "กำลังดำเนินการ…",
+    resumeFail: "ดำเนินการไม่สำเร็จ ลองที่จัดการการเรียกเก็บเงินดูนะ",
     inviteFriend: "ชวนเพื่อน",
     account: "บัญชี",
     email: "อีเมล",
@@ -121,6 +127,11 @@ const COPY = {
     upgradeFail: "Couldn't upgrade — try Manage billing",
     manageBilling: "Manage billing",
     manageBillingSub: "Update payment, plan, or invoices",
+    cancelsOn: (d: string) => `Cancels on ${d}`,
+    resume: "Resume subscription",
+    resumeSub: "Undo the cancellation — keep your plan",
+    resuming: "Resuming…",
+    resumeFail: "Couldn't resume — try Manage billing",
     inviteFriend: "Invite friends",
     account: "Account",
     email: "Email",
@@ -321,6 +332,43 @@ export default function MePage() {
   const [levelOpen, setLevelOpen] = useState(false);
   const [billingBusy, setBillingBusy] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [cancelState, setCancelState] = useState<{ canceling: boolean; periodEnd: string | null }>({
+    canceling: false,
+    periodEnd: null,
+  });
+  const [resumeBusy, setResumeBusy] = useState(false);
+  const [resumeErr, setResumeErr] = useState<string | null>(null);
+  const isSub = !!profile && profile.tier !== "free" && profile.tier !== "guest";
+  useEffect(() => {
+    if (!isSub) return;
+    let cancelled = false;
+    fetch("/api/billing/status")
+      .then((r) => r.json())
+      .then((j: { canceling?: boolean; periodEnd?: string | null }) => {
+        if (!cancelled) setCancelState({ canceling: !!j.canceling, periodEnd: j.periodEnd ?? null });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isSub]);
+  const resumeSub = useCallback(async () => {
+    if (resumeBusy) return;
+    setResumeBusy(true);
+    setResumeErr(null);
+    try {
+      const r = await fetch("/api/billing/resume", { method: "POST" });
+      const j = (await r.json()) as { ok?: boolean; error?: string };
+      if (r.ok && j.ok) {
+        window.location.reload();
+        return;
+      }
+      setResumeErr(j.error ?? t.resumeFail);
+    } catch {
+      setResumeErr(t.resumeFail);
+    }
+    setResumeBusy(false);
+  }, [resumeBusy, t]);
   const openBillingPortal = useCallback(async () => {
     if (billingBusy) return;
     setBillingBusy(true);
@@ -452,6 +500,14 @@ export default function MePage() {
 
   const displayName = profile.display_name?.trim() || (lang === "th" ? "เพื่อน" : "friend");
   const tierLabel = profile.tier === "pro_max" ? "Pro Max" : profile.tier === "pro" ? "Pro" : t.free;
+  const cancelDate =
+    cancelState.canceling && cancelState.periodEnd
+      ? new Date(cancelState.periodEnd).toLocaleDateString(lang === "th" ? "th-TH" : "en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : "";
   const stars = profile.miomi_stars ?? 0;
   const avatarSrc = avatarUrl || DEFAULT_AVATAR;
 
@@ -624,6 +680,7 @@ export default function MePage() {
         <Row
           icon={<Star className="h-[18px] w-[18px]" />}
           label={t.currentPlan}
+          sub={cancelDate ? t.cancelsOn(cancelDate) : undefined}
           right={<span className="text-[13px] font-semibold text-ink">{tierLabel}</span>}
         />
         <Row
@@ -640,7 +697,15 @@ export default function MePage() {
           />
         ) : (
           <>
-            {profile.tier === "pro" ? (
+            {cancelState.canceling ? (
+              <Row
+                icon={<RotateCcw className="h-[18px] w-[18px]" />}
+                label={resumeBusy ? t.resuming : t.resume}
+                sub={t.resumeSub}
+                onClick={resumeSub}
+                right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+              />
+            ) : profile.tier === "pro" ? (
               <Row
                 icon={<Sparkles className="h-[18px] w-[18px]" />}
                 label={t.upgradeProMax}
@@ -656,6 +721,9 @@ export default function MePage() {
               onClick={openBillingPortal}
               right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
             />
+            {resumeErr ? (
+              <p className="px-4 pb-1 pt-2 text-[12px] text-ink-subtle">{resumeErr}</p>
+            ) : null}
           </>
         )}
         <Row
