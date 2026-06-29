@@ -303,52 +303,64 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
               <p style={{ ...sans, textAlign: "center", fontSize: 12.5, color: "var(--mk-ink-muted, #9A8B73)", margin: "0 0 12px" }}>
                 {lang === "th" ? "เติมเซสชันเพิ่มได้ทุกเมื่อ ทุกแพ็กเกจ" : "Top up anytime, on any plan"}
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {SESSION_PACKS.map((pack) => (
-                  <div
-                    key={pack.count}
-                    style={{
-                      position: "relative",
-                      padding: "14px 12px",
-                      borderRadius: 14,
-                      border: pack.tag
-                        ? "1.5px solid rgba(52,169,143,0.5)"
-                        : "1px solid var(--mk-border, #EDE8E0)",
-                      background: "var(--mk-surface, #fff)",
-                      textAlign: "center",
-                    }}
-                  >
-                    {pack.tag ? (
-                      <span
-                        style={{
-                          position: "absolute",
-                          top: -9,
-                          left: "50%",
-                          transform: "translateX(-50%)",
-                          ...sans,
-                          fontSize: 10,
-                          fontWeight: 800,
-                          padding: "2px 8px",
-                          borderRadius: 99,
-                          background: ACCENT_GRAD,
-                          color: "#fff",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {t(pack.tag)}
-                      </span>
-                    ) : null}
-                    <div style={{ ...sans, fontSize: 22, fontWeight: 800, color: "var(--mk-ink, #2A2A28)", lineHeight: 1.1 }}>
-                      {pack.count}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
+                {SESSION_PACKS.map((pack) => {
+                  const perSession = Math.round(pack.price / pack.count);
+                  const featured = !!pack.tag;
+                  return (
+                    <div
+                      key={pack.count}
+                      style={{
+                        position: "relative",
+                        padding: featured ? "18px 12px 15px" : "16px 12px 15px",
+                        borderRadius: 16,
+                        border: featured
+                          ? "1.5px solid rgba(52,169,143,0.55)"
+                          : "1px solid var(--mk-border, #EDE8E0)",
+                        background: featured
+                          ? "linear-gradient(180deg, rgba(52,169,143,0.08), var(--mk-surface, #fff) 62%)"
+                          : "var(--mk-surface, #fff)",
+                        boxShadow: featured ? "0 6px 18px rgba(52,169,143,0.13)" : "0 2px 8px rgba(0,0,0,0.03)",
+                        textAlign: "center",
+                      }}
+                    >
+                      {pack.tag ? (
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: -9,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            ...sans,
+                            fontSize: 9.5,
+                            fontWeight: 800,
+                            letterSpacing: ".04em",
+                            textTransform: "uppercase",
+                            padding: "3px 10px",
+                            borderRadius: 99,
+                            background: ACCENT_GRAD,
+                            color: "#fff",
+                            whiteSpace: "nowrap",
+                            boxShadow: "0 2px 6px rgba(52,169,143,0.3)",
+                          }}
+                        >
+                          {t(pack.tag)}
+                        </span>
+                      ) : null}
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 5 }}>
+                        <span style={{ ...sans, fontSize: 30, fontWeight: 800, color: "var(--mk-ink, #2A2A28)", lineHeight: 1 }}>{pack.count}</span>
+                        <span style={{ ...sans, fontSize: 12.5, fontWeight: 700, color: "var(--mk-ink-muted, #9A8B73)" }}>{lang === "th" ? "เซสชัน" : "sessions"}</span>
+                      </div>
+                      <div style={{ ...sans, fontSize: 11, fontWeight: 600, color: "var(--mk-ink-muted, #9A8B73)", marginTop: 4 }}>
+                        {lang === "th" ? `฿${perSession} / เซสชัน` : `฿${perSession} each`}
+                      </div>
+                      <div style={{ height: 1, background: "var(--mk-border, #EDE8E0)", margin: "11px 8px" }} />
+                      <div style={{ ...sans, fontSize: 18, fontWeight: 800, color: "#2C8E76", lineHeight: 1 }}>
+                        ฿{pack.price.toLocaleString()}
+                      </div>
                     </div>
-                    <div style={{ ...sans, fontSize: 11.5, color: "var(--mk-ink-muted, #9A8B73)", marginBottom: 6 }}>
-                      {lang === "th" ? "เซสชัน" : "sessions"}
-                    </div>
-                    <div style={{ ...sans, fontSize: 15, fontWeight: 700, color: "#2C8E76" }}>
-                      ฿{pack.price.toLocaleString()}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : null}

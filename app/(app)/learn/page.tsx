@@ -1068,8 +1068,8 @@ export default function LearnPage() {
                 <b style={{ color: INK_STRONG }}>Your private speaking room.</b> Warm-up to exit ticket, Miomi leading every step
               </p>
 
-              {/* Continue banner — an unfinished room is one tap away */}
-              {unfinished ? (
+              {/* Continue banner — an unfinished room is one tap away (Pro only) */}
+              {unfinished && isPro ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FFFFFF", border: "1.5px solid #7DD3C0", borderRadius: 18, boxShadow: CARD_SHADOW, padding: "12px 14px", marginBottom: 12 }}>
                   <span style={{ width: 34, height: 34, borderRadius: "50%", background: "#FDEAF4", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px", overflow: "hidden" }}>
                     <Image src="/miomi/head-idle.png" alt="Miomi" width={30} height={30} style={{ objectFit: "contain" }} />
@@ -1210,7 +1210,7 @@ export default function LearnPage() {
                           const built = (c.scenarios ?? []).find((s) => s.position === pos);
                           const isDone = completedScenes.has(`${c.position}-${pos}`);
                           const isNextBuild = !built && pos === (c.scenarios ?? []).length + 1;
-                          const needsPro = pos > 1 && !isPro;
+                          const needsPro = !isPro;
                           return (
                             <div key={si} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: si < 3 ? `1px solid ${BORDER}` : "none", opacity: built || isNextBuild ? 1 : 0.5 }}>
                               <span style={{
@@ -1224,10 +1224,18 @@ export default function LearnPage() {
                               <span style={{ flex: 1, minWidth: 0 }}>
                                 <span style={{ ...font, display: "block", fontSize: 12.5, fontWeight: 700, color: INK_STRONG, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
                                 <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: MUTED }}>
-                                  {isDone ? "Completed" : built ? "Ready" : pos === 1 ? "Free session" : needsPro ? "Unlocks with Pro" : "Up next"}
+                                  {needsPro ? "Unlocks with Pro" : isDone ? "Completed" : built ? "Ready" : "Up next"}
                                 </span>
                               </span>
-                              {built ? (
+                              {needsPro ? (
+                                <button onClick={() => openPaywall("rooms")} aria-label="Unlocks with Pro" style={{
+                                  width: 32, height: 32, borderRadius: "50%", flex: "0 0 32px",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  border: "1px solid #EADFC0", background: "#FBF6EA", cursor: "pointer",
+                                }}>
+                                  <Crown style={{ width: 14, height: 14, color: "#BE9233" }} strokeWidth={2.4} aria-hidden />
+                                </button>
+                              ) : built ? (
                                 <button onClick={() => setActiveScenario({ c: c.position, s: pos })} style={{
                                   ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
                                   border: isDone ? `1px solid ${BORDER}` : "none", cursor: "pointer",
@@ -1236,7 +1244,7 @@ export default function LearnPage() {
                                 }}>
                                   {isDone ? "Again" : "Open"}
                                 </button>
-                              ) : isNextBuild && !needsPro ? (
+                              ) : isNextBuild ? (
                                 <button onClick={() => void buildScenario(c.position, pos)} disabled={scenarioBuilding} style={{
                                   ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
                                   border: "none", cursor: scenarioBuilding ? "default" : "pointer",
@@ -1244,8 +1252,6 @@ export default function LearnPage() {
                                 }}>
                                   {scenarioBuilding ? "Setting up…" : "Start"}
                                 </button>
-                              ) : needsPro ? (
-                                <Crown style={{ width: 15, height: 15, color: "#C9A96E", flex: "0 0 15px" }} strokeWidth={2.2} aria-hidden />
                               ) : null}
                             </div>
                           );
@@ -1289,12 +1295,20 @@ export default function LearnPage() {
                         }}>
                           Review
                         </button>
-                      ) : (
+                      ) : isPro ? (
                         <button onClick={() => void continueSession(s.id)} disabled={roomStarting} style={{
                           ...font, fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 99,
                           border: "none", background: CTA, color: "#fff", boxShadow: CTA_SHADOW, cursor: "pointer", flexShrink: 0,
                         }}>
                           Continue
+                        </button>
+                      ) : (
+                        <button onClick={() => openPaywall("rooms")} aria-label="Unlocks with Pro" style={{
+                          width: 32, height: 32, borderRadius: "50%", flex: "0 0 32px",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          border: "1px solid #EADFC0", background: "#FBF6EA", cursor: "pointer", flexShrink: 0,
+                        }}>
+                          <Crown style={{ width: 14, height: 14, color: "#BE9233" }} strokeWidth={2.4} aria-hidden />
                         </button>
                       )}
                     </div>
