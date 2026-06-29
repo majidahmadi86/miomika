@@ -45,7 +45,7 @@ export const PLANS: Plan[] = [
     features: [
       { en: "200 chats a day", th: "คุยได้ 200 ครั้งต่อวัน" },
       { en: "10 minutes of voice a day", th: "เสียง 10 นาทีต่อวัน" },
-      { en: "1 live speaking session a month", th: "ห้องพูดสด 1 ครั้งต่อเดือน" },
+      { en: "1 live speaking room a month", th: "ห้องพูดสด 1 ครั้งต่อเดือน" },
       { en: "Create your own courses", th: "สร้างคอร์สของคุณเองได้" },
       { en: "Everything in Free", th: "ทุกอย่างในแพ็กฟรี" },
     ],
@@ -58,7 +58,7 @@ export const PLANS: Plan[] = [
     features: [
       { en: "400 chats a day", th: "คุยได้ 400 ครั้งต่อวัน" },
       { en: "30 minutes of voice a day", th: "เสียง 30 นาทีต่อวัน" },
-      { en: "3 live speaking sessions a month", th: "ห้องพูดสด 3 ครั้งต่อเดือน" },
+      { en: "3 live speaking rooms a month", th: "ห้องพูดสด 3 ครั้งต่อเดือน" },
       { en: "Create your own courses", th: "สร้างคอร์สของคุณเองได้" },
       { en: "Everything in Pro", th: "ทุกอย่างในแพ็กโปร" },
     ],
@@ -87,3 +87,37 @@ export const ANNUAL_SAVING_PCT = Math.round((1 - ANNUAL_MONTHS_CHARGED / 12) * 1
 export function yearlyPriceTHB(plan: Plan): number | null {
   return plan.priceTHB == null ? null : plan.priceTHB * ANNUAL_MONTHS_CHARGED;
 }
+
+// ---------------------------------------------------------------------------
+// Room packs — one-off top-ups of Confident Speaking rooms, added to any plan.
+// Shared by the paywall sheet and the standalone /pricing page. Purchase
+// (one-time Stripe checkout) is wired alongside live voice returning.
+// ---------------------------------------------------------------------------
+export type RoomPack = {
+  count: number;
+  priceTHB: number;
+  tag?: Bilingual;
+  /** Stripe price id (one-time) — wired with payments. */
+  stripePriceId?: string;
+};
+
+export const ROOM_PACKS: RoomPack[] = [
+  { count: 10, priceTHB: 499 },
+  { count: 30, priceTHB: 1399, tag: { en: "Best value", th: "คุ้มสุด" } },
+];
+
+/** Per-room price, rounded — for the "฿50 a room" line. */
+export function perRoomTHB(pack: RoomPack): number {
+  return Math.round(pack.priceTHB / pack.count);
+}
+
+/**
+ * What's inside a Confident Speaking room — the short, single-sourced descriptor
+ * shown inside each plan card and each room-pack card so the value reads the same
+ * everywhere. Kept terse: each line is one glanceable phrase.
+ */
+export const ROOM_INSIDE: Bilingual[] = [
+  { en: "Voice role-play with Miomi", th: "สวมบทบาทด้วยเสียงกับมีโอมิ" },
+  { en: "Real scenes · Thai ↔ English", th: "สถานการณ์จริง · ไทย ↔ อังกฤษ" },
+  { en: "Guided warm-up → exit ticket", th: "มีไกด์ตั้งแต่วอร์มอัพ → สรุปจบ" },
+];
