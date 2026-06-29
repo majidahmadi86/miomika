@@ -250,6 +250,24 @@ export async function PATCH(req: NextRequest) {
       console.error("[api/speaking/scenario] progress update failed:", upErr.message);
       return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
     }
+
+    // Keep the session row canonical: a finished scenario is marked completed on
+    // the row itself (not only on course progress), so the sessions list shows
+    // the true status and the summary view has something real to read.
+    if (goalsDone >= 3) {
+      const finishedAt = new Date().toISOString();
+      await supabase
+        .from("speaking_sessions")
+        .update({
+          status: "completed",
+          completed_at: finishedAt,
+          results: { goals_done: goalsDone, completed_at: finishedAt },
+        })
+        .eq("user_id", profile.id)
+        .eq("course_position", coursePos)
+        .eq("scenario_position", scenarioPos);
+    }
+
     return NextResponse.json({ ok: true, completed: goalsDone >= 3 }, { status: 200 });
   } catch (err) {
     console.error("[api/speaking/scenario] progress failed:", err);
