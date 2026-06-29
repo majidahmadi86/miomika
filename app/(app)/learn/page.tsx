@@ -1064,9 +1064,52 @@ export default function LearnPage() {
           ) : (
             /* ---------- COURSE LIST + ESP + YOUR SESSIONS ---------- */
             <>
-              <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: MUTED, margin: "0 2px 12px", lineHeight: 1.55 }}>
-                <b style={{ color: INK_STRONG }}>Your private speaking room.</b> Warm-up to exit ticket, Miomi leading every step
-              </p>
+              {/* Status header — purpose + your monthly session balance */}
+              {(() => {
+                const allowance = profile?.tier === "pro" ? 1 : profile?.tier === "pro_max" ? 3 : 0;
+                const mStart = new Date();
+                mStart.setDate(1);
+                mStart.setHours(0, 0, 0, 0);
+                const usedThisMonth = sessions.filter((s) => s.created_at && new Date(s.created_at) >= mStart).length;
+                const remaining = Math.max(0, allowance - usedThisMonth);
+                return (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
+                    background: isPro ? "#FFFFFF" : "linear-gradient(135deg,#E9F8F4,#F1EEFE)",
+                    border: isPro ? `1px solid ${BORDER}` : "1px solid #D9EBE4",
+                    borderRadius: 18, boxShadow: CARD_SHADOW, padding: "13px 15px",
+                  }}>
+                    <span style={{ width: 38, height: 38, borderRadius: "50%", background: "#E4F6F0", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 38px" }}>
+                      <Mic style={{ width: 18, height: 18, color: "#2C8E76" }} strokeWidth={2.2} aria-hidden />
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ ...font, display: "block", fontSize: 14, fontWeight: 700, color: INK_STRONG }}>Live Speaking</span>
+                      <span style={{ ...font, display: "block", fontSize: 11.5, fontWeight: 600, color: MUTED, marginTop: 1 }}>
+                        {!isPro
+                          ? "Practice out loud with Miomi — a Pro feature"
+                          : remaining > 0
+                            ? `${remaining} of ${allowance} session${allowance > 1 ? "s" : ""} left this month`
+                            : `You've used all ${allowance} this month`}
+                      </span>
+                    </span>
+                    {!isPro ? (
+                      <button onClick={() => openPaywall("rooms")} style={{
+                        ...font, fontSize: 12, fontWeight: 700, padding: "8px 16px", borderRadius: 99,
+                        border: "none", cursor: "pointer", background: CTA, color: "#fff", boxShadow: CTA_SHADOW, flexShrink: 0,
+                      }}>
+                        Unlock
+                      </button>
+                    ) : remaining === 0 ? (
+                      <button onClick={() => openPaywall("rooms")} style={{
+                        ...font, fontSize: 12, fontWeight: 700, padding: "8px 16px", borderRadius: 99,
+                        border: `1px solid ${BORDER}`, cursor: "pointer", background: "transparent", color: "#2C8E76", flexShrink: 0,
+                      }}>
+                        Top up
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })()}
 
               {/* Continue banner — an unfinished room is one tap away (Pro only) */}
               {unfinished && isPro ? (
