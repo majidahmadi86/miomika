@@ -64,6 +64,22 @@ const HEADERS: Record<PaywallReason, { title: Bilingual; subtitle: Bilingual }> 
   },
 };
 
+// Rooms upsell — the experience pitch shown when the paywall opens for live sessions.
+// Sells what a session *feels* like, not just that it's gated.
+const ROOMS_PITCH: Bilingual[] = [
+  { en: "Talk out loud, in real time — not typing, actually speaking", th: "พูดออกเสียงแบบเรียลไทม์ ไม่ใช่พิมพ์ แต่พูดจริง ๆ" },
+  { en: "Real scenes: order street food, ace an interview, make a friend", th: "สถานการณ์จริง: สั่งอาหารริมทาง สัมภาษณ์งาน หาเพื่อนใหม่" },
+  { en: "Miomi plays the other person — patient, in character, all yours", th: "มีโอมิรับบทอีกฝ่าย ใจเย็น อินบท เป็นของคุณคนเดียว" },
+  { en: "Build real speaking confidence, one session at a time", th: "สร้างความมั่นใจในการพูดจริง ทีละห้อง" },
+];
+
+// Session top-up packs beyond the monthly plan allowance. DISPLAY-ONLY for now —
+// purchase (one-time checkout) + counting are wired when live voice (Gemini) returns.
+const SESSION_PACKS: { count: number; price: number; tag?: Bilingual }[] = [
+  { count: 10, price: 499 },
+  { count: 30, price: 1399, tag: { en: "Best value", th: "คุ้มสุด" } },
+];
+
 export function PaywallProvider({ children }: { children: ReactNode }) {
   const [reason, setReason] = useState<PaywallReason | null>(null);
   const open = useCallback((r: PaywallReason = "generic") => setReason(r), []);
@@ -197,6 +213,31 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
             </p>
           </div>
 
+          {/* rooms: sell the experience before the plans */}
+          {reason === "rooms" ? (
+            <div style={{ maxWidth: 460, margin: "0 auto 18px", display: "grid", gap: 9 }}>
+              {ROOMS_PITCH.map((line, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 99,
+                      background: "rgba(52,169,143,0.14)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Check style={{ width: 13, height: 13, color: "#1F7A68" }} />
+                  </span>
+                  <span style={{ ...sans, fontSize: 14, color: "var(--mk-ink, #2A2A28)" }}>{t(line)}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {/* billing toggle */}
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
             <div
@@ -252,6 +293,65 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
               />
             ))}
           </div>
+
+          {/* rooms: top-up packs preview (display-only until live sessions return) */}
+          {reason === "rooms" ? (
+            <div style={{ maxWidth: 460, margin: "20px auto 0" }}>
+              <p style={{ ...sans, textAlign: "center", fontSize: 13, fontWeight: 700, color: "var(--mk-ink, #2A2A28)", margin: "0 0 3px" }}>
+                {lang === "th" ? "ต้องการห้องเพิ่ม?" : "Need more sessions?"}
+              </p>
+              <p style={{ ...sans, textAlign: "center", fontSize: 12.5, color: "var(--mk-ink-muted, #9A8B73)", margin: "0 0 12px" }}>
+                {lang === "th" ? "เติมเซสชันเพิ่มได้ทุกเมื่อ ทุกแพ็กเกจ" : "Top up anytime, on any plan"}
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {SESSION_PACKS.map((pack) => (
+                  <div
+                    key={pack.count}
+                    style={{
+                      position: "relative",
+                      padding: "14px 12px",
+                      borderRadius: 14,
+                      border: pack.tag
+                        ? "1.5px solid rgba(52,169,143,0.5)"
+                        : "1px solid var(--mk-border, #EDE8E0)",
+                      background: "var(--mk-surface, #fff)",
+                      textAlign: "center",
+                    }}
+                  >
+                    {pack.tag ? (
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: -9,
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          ...sans,
+                          fontSize: 10,
+                          fontWeight: 800,
+                          padding: "2px 8px",
+                          borderRadius: 99,
+                          background: ACCENT_GRAD,
+                          color: "#fff",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {t(pack.tag)}
+                      </span>
+                    ) : null}
+                    <div style={{ ...sans, fontSize: 22, fontWeight: 800, color: "var(--mk-ink, #2A2A28)", lineHeight: 1.1 }}>
+                      {pack.count}
+                    </div>
+                    <div style={{ ...sans, fontSize: 11.5, color: "var(--mk-ink-muted, #9A8B73)", marginBottom: 6 }}>
+                      {lang === "th" ? "เซสชัน" : "sessions"}
+                    </div>
+                    <div style={{ ...sans, fontSize: 15, fontWeight: 700, color: "#2C8E76" }}>
+                      ฿{pack.price.toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {/* checkout error (if any) */}
           {error ? (
