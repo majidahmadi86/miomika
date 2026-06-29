@@ -40,6 +40,63 @@ const ACCENT_GRAD = "linear-gradient(135deg,#6ECDB8 0%,#34A98F 100%)";
 const t = (b: Bilingual, lang: Lang) => (lang === "th" ? b.th : b.en);
 const baht = (n: number) => `฿${n.toLocaleString()}`;
 
+/** Shared Monthly/Yearly toggle — the sharp "Save 17%" badge, used by page + sheet. */
+export function PricingToggle({
+  billing,
+  onChange,
+  lang,
+}: {
+  billing: Billing;
+  onChange: (b: Billing) => void;
+  lang: Lang;
+}) {
+  const seg = (b: Billing, label: string, badge?: string) => {
+    const active = billing === b;
+    return (
+      <button
+        onClick={() => onChange(b)}
+        style={{
+          ...sans,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 12.5,
+          fontWeight: 700,
+          padding: "6px 14px",
+          borderRadius: 99,
+          border: "none",
+          cursor: "pointer",
+          color: active ? TEAL_INK : MUTED,
+          background: active ? "#fff" : "transparent",
+          boxShadow: active ? "0 1px 3px rgba(0,0,0,.08)" : "none",
+        }}
+      >
+        {label}
+        {badge ? (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              padding: "2px 7px",
+              borderRadius: 99,
+              background: active ? ACCENT_GRAD : "#E9F8F4",
+              color: active ? "#fff" : TEAL_INK,
+            }}
+          >
+            {badge}
+          </span>
+        ) : null}
+      </button>
+    );
+  };
+  return (
+    <div style={{ display: "inline-flex", gap: 3, background: "#EFece3", borderRadius: 99, padding: 3 }}>
+      {seg("monthly", lang === "th" ? "รายเดือน" : "Monthly")}
+      {seg("yearly", lang === "th" ? "รายปี" : "Yearly", lang === "th" ? `ประหยัด ${ANNUAL_SAVING_PCT}%` : `Save ${ANNUAL_SAVING_PCT}%`)}
+    </div>
+  );
+}
+
 /** The mint "what's inside a room" block shared by plan + pack cards. */
 function RoomInside({
   lang,
@@ -55,16 +112,16 @@ function RoomInside({
       style={{
         background: "#E8F7F0",
         border: "1px solid #C9EBDD",
-        borderRadius: 11,
-        padding: "9px 10px",
-        marginTop: 10,
+        borderRadius: 10,
+        padding: "7px 9px",
+        marginTop: 8,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
-        <Mic style={{ width: 14, height: 14, color: TEAL_INK }} strokeWidth={2.3} aria-hidden />
-        <span style={{ ...sans, fontSize: 11.5, fontWeight: 800, color: TEAL_DEEP }}>{heading}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+        <Mic style={{ width: 13, height: 13, color: TEAL_INK }} strokeWidth={2.3} aria-hidden />
+        <span style={{ ...sans, fontSize: 11, fontWeight: 800, color: TEAL_DEEP }}>{heading}</span>
       </div>
-      <div style={{ ...sans, fontSize: 11, fontWeight: 600, color: "#46544e", lineHeight: 1.5 }}>
+      <div style={{ ...sans, fontSize: 11, fontWeight: 600, color: "#46544e", lineHeight: 1.4 }}>
         {lines.map((l, i) => (
           <div key={i}>{t(l, lang)}</div>
         ))}
@@ -80,9 +137,9 @@ function RoomLocked({ lang }: { lang: Lang }) {
       style={{
         background: "#F7F5F0",
         border: "1px dashed #DDD6CC",
-        borderRadius: 11,
-        padding: "9px 10px",
-        marginTop: 10,
+        borderRadius: 10,
+        padding: "7px 9px",
+        marginTop: 8,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -91,7 +148,7 @@ function RoomLocked({ lang }: { lang: Lang }) {
           {lang === "th" ? "ห้องพูดสด" : "Confident Speaking"}
         </span>
       </div>
-      <div style={{ ...sans, fontSize: 11, fontWeight: 600, color: MUTED, marginTop: 3, lineHeight: 1.45 }}>
+      <div style={{ ...sans, fontSize: 11, fontWeight: 600, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>
         {lang === "th" ? "ล็อกอยู่ — อัปเกรดเพื่อพูดสดกับมีโอมิ" : "Locked — upgrade to talk live with Miomi"}
       </div>
     </div>
@@ -148,7 +205,7 @@ export function PlanCard({
         background: featured ? "linear-gradient(180deg,#F0FAF6,#fff 45%)" : "#fff",
         border: featured ? `2px solid ${TEAL}` : `1px solid ${BORDER}`,
         borderRadius: 14,
-        padding: "13px 12px",
+        padding: "12px 11px",
         boxShadow: featured ? "0 5px 16px rgba(52,169,143,.13)" : "none",
         display: "flex",
         flexDirection: "column",
@@ -191,13 +248,15 @@ export function PlanCard({
 
       <div style={{ height: 1, background: featured ? "#E1F0EA" : "#F0EBE3", margin: "9px 0" }} />
 
-      <div style={{ ...sans, fontSize: 11.5, color: isFree ? "#5a5550" : INK_SOFT, lineHeight: 1.75 }}>
-        {plan.features.map((f, i) => (
-          <div key={i}>
-            <Check style={{ width: 13, height: 13, color: TEAL_INK, verticalAlign: -1, marginRight: 5 }} strokeWidth={2.6} aria-hidden />
-            {t(f, lang)}
-          </div>
-        ))}
+      <div style={{ ...sans, fontSize: 11.5, color: isFree ? "#5a5550" : INK_SOFT, lineHeight: 1.55 }}>
+        {plan.features
+          .filter((f) => !/live speaking room|ห้องพูดสด/i.test(f.en + f.th))
+          .map((f, i) => (
+            <div key={i}>
+              <Check style={{ width: 13, height: 13, color: TEAL_INK, verticalAlign: -1, marginRight: 5 }} strokeWidth={2.6} aria-hidden />
+              {t(f, lang)}
+            </div>
+          ))}
       </div>
 
       {rooms > 0 ? (
@@ -215,9 +274,9 @@ export function PlanCard({
           disabled={loading}
           style={{
             ...sans,
-            marginTop: 12,
+            marginTop: 10,
             width: "100%",
-            padding: "10px 12px",
+            padding: "9px 12px",
             borderRadius: 11,
             border: featured ? "none" : `1.5px solid ${TEAL}`,
             background: featured ? ACCENT_GRAD : "transparent",
@@ -257,7 +316,7 @@ export function RoomPackCard({
         background: featured ? "linear-gradient(180deg,#F0FAF6,#fff 45%)" : "#fff",
         border: featured ? `2px solid ${TEAL}` : `1px solid ${BORDER}`,
         borderRadius: 14,
-        padding: "13px 13px",
+        padding: "12px 11px",
         boxShadow: featured ? "0 5px 16px rgba(52,169,143,.13)" : "none",
         display: "flex",
         flexDirection: "column",
@@ -308,9 +367,9 @@ export function RoomPackCard({
           disabled={loading}
           style={{
             ...sans,
-            marginTop: 12,
+            marginTop: 10,
             width: "100%",
-            padding: "10px 12px",
+            padding: "9px 12px",
             borderRadius: 11,
             border: featured ? "none" : `1.5px solid ${TEAL}`,
             background: featured ? ACCENT_GRAD : "transparent",

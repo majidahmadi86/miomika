@@ -18,7 +18,7 @@ import {
   ROOM_PACKS,
   type TierId,
 } from "@/lib/billing/tiers";
-import { PlanCard, RoomPackCard, PricingSectionLabel } from "@/components/billing/PricingCards";
+import { PlanCard, RoomPackCard, PricingSectionLabel, PricingToggle } from "@/components/billing/PricingCards";
 
 type Billing = "monthly" | "yearly";
 
@@ -28,8 +28,6 @@ const COPY = {
   en: {
     title: "Speak from day one",
     sub: "Start free. Upgrade when you're ready to talk out loud with Miomi.",
-    monthly: "Monthly",
-    annual: "Annual · save 2 mo",
     plans: "Plans",
     packs: "Room packs · top up any plan",
     note: "Prices in Thai baht. Cancel anytime — you keep access to the end of your paid period.",
@@ -37,8 +35,6 @@ const COPY = {
   th: {
     title: "พูดได้ตั้งแต่วันแรก",
     sub: "เริ่มฟรี อัปเกรดเมื่อพร้อมพูดออกเสียงกับมีโอมิ",
-    monthly: "รายเดือน",
-    annual: "รายปี · ประหยัด 2 เดือน",
     plans: "แพ็กเกจ",
     packs: "แพ็กห้องพูดสด · เติมได้ทุกแพ็ก",
     note: "ราคาเป็นเงินบาท ยกเลิกได้ทุกเมื่อ ใช้งานได้จนจบรอบที่ชำระไว้",
@@ -88,41 +84,19 @@ export default function PricingPage() {
   }
 
   return (
-    <main style={{ ...sans, background: "#FBFAF6", minHeight: "100vh", padding: "28px 16px 40px" }}>
+    <main style={{ ...sans, background: "#FBFAF6", minHeight: "100vh", padding: "18px 16px 22px" }}>
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
 
-        <header style={{ textAlign: "center", marginBottom: 18 }}>
-          <h1 style={{ ...sans, fontSize: 24, fontWeight: 800, color: "#2A2A28", margin: 0 }}>{c.title}</h1>
-          <p style={{ ...sans, fontSize: 13, fontWeight: 600, color: "#9A8B73", margin: "5px auto 0", maxWidth: 460, lineHeight: 1.5 }}>{c.sub}</p>
-
-          <div style={{ display: "inline-flex", gap: 3, background: "#EFece3", borderRadius: 99, padding: 3, marginTop: 14 }}>
-            <button
-              onClick={() => setBilling("monthly")}
-              style={{
-                ...sans, fontSize: 12, fontWeight: 700, padding: "6px 16px", borderRadius: 99, border: "none", cursor: "pointer",
-                color: billing === "monthly" ? "#2C8E76" : "#9A8B73",
-                background: billing === "monthly" ? "#fff" : "transparent",
-                boxShadow: billing === "monthly" ? "0 1px 3px rgba(0,0,0,.08)" : "none",
-              }}
-            >
-              {c.monthly}
-            </button>
-            <button
-              onClick={() => setBilling("yearly")}
-              style={{
-                ...sans, fontSize: 12, fontWeight: 700, padding: "6px 16px", borderRadius: 99, border: "none", cursor: "pointer",
-                color: billing === "yearly" ? "#2C8E76" : "#9A8B73",
-                background: billing === "yearly" ? "#fff" : "transparent",
-                boxShadow: billing === "yearly" ? "0 1px 3px rgba(0,0,0,.08)" : "none",
-              }}
-            >
-              {c.annual}
-            </button>
+        <header style={{ textAlign: "center", marginBottom: 12 }}>
+          <h1 style={{ ...sans, fontSize: 21, fontWeight: 800, color: "#2A2A28", margin: 0 }}>{c.title}</h1>
+          <p style={{ ...sans, fontSize: 12.5, fontWeight: 600, color: "#9A8B73", margin: "4px auto 0", maxWidth: 460, lineHeight: 1.45 }}>{c.sub}</p>
+          <div style={{ marginTop: 11 }}>
+            <PricingToggle billing={billing} onChange={setBilling} lang={lang} />
           </div>
         </header>
 
         <PricingSectionLabel>{c.plans}</PricingSectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 11, alignItems: "stretch", marginBottom: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10, alignItems: "stretch", marginBottom: 13 }}>
           <PlanCard plan={freePlan} lang={lang} billing={billing} onSelect={() => startCheckout("free")} />
           {UPGRADE_PLANS.map((plan) => (
             <PlanCard
@@ -137,17 +111,17 @@ export default function PricingPage() {
         </div>
 
         <PricingSectionLabel>{c.packs}</PricingSectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 11, alignItems: "stretch" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10, alignItems: "stretch" }}>
           {ROOM_PACKS.map((pack) => (
             <RoomPackCard key={pack.count} pack={pack} lang={lang} />
           ))}
         </div>
 
         {err ? (
-          <p style={{ ...sans, fontSize: 12.5, fontWeight: 600, color: "#C0392B", textAlign: "center", marginTop: 14 }}>{err}</p>
+          <p style={{ ...sans, fontSize: 12.5, fontWeight: 600, color: "#C0392B", textAlign: "center", marginTop: 12 }}>{err}</p>
         ) : null}
 
-        <p style={{ ...sans, fontSize: 11, fontWeight: 600, color: "#B0A488", textAlign: "center", marginTop: 18, lineHeight: 1.5 }}>{c.note}</p>
+        <p style={{ ...sans, fontSize: 10.5, fontWeight: 600, color: "#B0A488", textAlign: "center", marginTop: 12, lineHeight: 1.45 }}>{c.note}</p>
 
       </div>
     </main>

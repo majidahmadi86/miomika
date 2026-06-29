@@ -13,11 +13,10 @@ import { useUILanguage } from "@/lib/i18n/client";
 import {
   UPGRADE_PLANS,
   ROOM_PACKS,
-  ANNUAL_SAVING_PCT,
   type Bilingual,
   type TierId,
 } from "@/lib/billing/tiers";
-import { PlanCard, RoomPackCard } from "@/components/billing/PricingCards";
+import { PlanCard, RoomPackCard, PricingToggle } from "@/components/billing/PricingCards";
 
 export type PaywallReason = "daily_limit" | "custom_course" | "rooms" | "generic";
 type Billing = "monthly" | "yearly";
@@ -232,38 +231,9 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
             </div>
           ) : null}
 
-          {/* billing toggle */}
+          {/* billing toggle — shared with the /pricing page */}
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
-            <div
-              style={{
-                display: "inline-flex",
-                gap: 3,
-                padding: 4,
-                borderRadius: 99,
-                background: "var(--mk-surface-2, #F7F4EE)",
-                border: "1px solid var(--mk-border, #EDE8E0)",
-              }}
-            >
-              <SegBtn active={billing === "monthly"} onClick={() => setBilling("monthly")}>
-                {lang === "th" ? "รายเดือน" : "Monthly"}
-              </SegBtn>
-              <SegBtn active={billing === "yearly"} onClick={() => setBilling("yearly")}>
-                {lang === "th" ? "รายปี" : "Yearly"}
-                <span
-                  style={{
-                    marginLeft: 6,
-                    fontSize: 10.5,
-                    fontWeight: 800,
-                    padding: "2px 6px",
-                    borderRadius: 99,
-                    background: billing === "yearly" ? "rgba(255,255,255,0.26)" : "#E9F8F4",
-                    color: billing === "yearly" ? "#fff" : "#2C8E76",
-                  }}
-                >
-                  {lang === "th" ? `ประหยัด ${ANNUAL_SAVING_PCT}%` : `Save ${ANNUAL_SAVING_PCT}%`}
-                </span>
-              </SegBtn>
-            </div>
+            <PricingToggle billing={billing} onChange={setBilling} lang={lang} />
           </div>
 
           {/* plan cards — shared with the /pricing page; 2-up on desktop, stacks on mobile */}
@@ -341,28 +311,4 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
   );
 }
 
-function SegBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        ...sans,
-        display: "inline-flex",
-        alignItems: "center",
-        border: "none",
-        borderRadius: 99,
-        padding: "8px 16px",
-        fontSize: 13.5,
-        fontWeight: 700,
-        cursor: "pointer",
-        background: active ? ACCENT_GRAD : "transparent",
-        color: active ? "#fff" : "var(--mk-ink-muted, #9A8B73)",
-        boxShadow: active ? "0 3px 10px -3px rgba(52,169,143,0.5)" : "none",
-        transition: "color 120ms ease",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
 
