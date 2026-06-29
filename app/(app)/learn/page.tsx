@@ -1132,91 +1132,8 @@ export default function LearnPage() {
                 </div>
               ) : null}
 
-              {/* ESP — create your own session */}
-              <div style={{
-                border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: csOpen ? 16 : 0,
-                background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)", marginBottom: 12, overflow: "hidden",
-              }}>
-                {!csOpen ? (
-                  <button onClick={() => setCsOpen(true)} style={{
-                    display: "flex", alignItems: "center", gap: 11, width: "100%", padding: "13px 14px",
-                    background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
-                  }}>
-                    <span style={{ width: 34, height: 34, borderRadius: 11, background: CTA, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px", boxShadow: CTA_SHADOW }}>
-                      <Mic style={{ width: 16, height: 16 }} strokeWidth={2.2} aria-hidden />
-                    </span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Create your own session</span>
-                      <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
-                        Interview prep, business meetings, anything — your topic, your style
-                      </span>
-                    </span>
-                    <ProChip />
-                  </button>
-                ) : (
-                  <div>
-                    <p style={{ ...font, fontSize: 14, fontWeight: 700, color: INK_STRONG, margin: 0, textAlign: "center" }}>
-                      What do you want to speak about?
-                    </p>
-                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 12 }}>
-                      {PRESET_TOPICS.map((t) => (
-                        <button key={t} onClick={() => setCsTopic(t)} disabled={roomStarting} style={{
-                          ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer",
-                          border: `1px solid ${csTopic === t ? "#F9A8D4" : BORDER}`,
-                          background: csTopic === t ? "#FDEAF4" : "#FFFFFF",
-                          color: csTopic === t ? "#C2497E" : MUTED,
-                        }}>{t}</button>
-                      ))}
-                    </div>
-                    <input
-                      value={csTopic}
-                      onChange={(e) => setCsTopic(e.target.value)}
-                      placeholder="…or type your own"
-                      disabled={roomStarting}
-                      style={{
-                        ...font, width: "100%", fontSize: 13.5, padding: "11px 14px", marginTop: 12,
-                        borderRadius: 12, border: `1px solid ${BORDER}`, color: INK,
-                        background: "#FFFFFF", outline: "none", boxSizing: "border-box",
-                      }}
-                    />
-                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 10 }}>
-                      {REGISTER_OPTIONS.map((o) => {
-                        const locked = myRank < o.minRank;
-                        return (
-                          <button key={o.v} onClick={() => !locked && setCsRegister(o.v)} disabled={roomStarting || locked}
-                            title={locked ? "Unlocks from B1" : undefined}
-                            style={{
-                              ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
-                              cursor: locked ? "default" : "pointer", opacity: locked ? 0.4 : 1,
-                              border: `1px solid ${csRegister === o.v ? "#7DD3C0" : BORDER}`,
-                              background: csRegister === o.v ? "#E9F8F4" : "#FFFFFF",
-                              color: csRegister === o.v ? "#3E9C82" : MUTED,
-                              display: "inline-flex", alignItems: "center", gap: 4,
-                            }}>
-                            {locked ? <Lock style={{ width: 10, height: 10 }} aria-hidden /> : null}
-                            {o.t}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <button onClick={() => { if (csTopic.trim()) void enterRoom({ topic: csTopic.trim(), register: csRegister, showDoor: true }); }} disabled={roomStarting || !csTopic.trim()} style={{
-                      ...font, width: "100%", marginTop: 10, fontSize: 14, fontWeight: 700,
-                      padding: "13px 20px", borderRadius: 99, border: "none",
-                      cursor: roomStarting || !csTopic.trim() ? "default" : "pointer",
-                      background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: roomStarting || !csTopic.trim() ? 0.7 : 1,
-                    }}>
-                      {roomStarting ? "Miomi is planning…" : "Plan my session"}
-                    </button>
-                    <button onClick={() => { if (!roomStarting) setCsOpen(false); }} style={{
-                      ...font, width: "100%", marginTop: 6, fontSize: 12, fontWeight: 700, padding: "8px 0",
-                      borderRadius: 99, border: "none", cursor: "pointer", background: "transparent", color: MUTED,
-                    }}>
-                      Close
-                    </button>
-                  </div>
-                )}
-              </div>
-
+              {/* --- Structured practice --- */}
+              <SectionHeader icon={Compass} bg="#E4F6F0" fg="#2C8E76" title="Guided practice" meta={`${courses.length} ${courses.length === 1 ? "course" : "courses"}`} />
               {courses.map((c) => {
                 const tc = TOPIC_HEX[c.color] ?? TOPIC_HEX.peach;
                 const deep = TOPIC_DEEP[c.color] ?? TOPIC_DEEP.peach;
@@ -1304,6 +1221,91 @@ export default function LearnPage() {
                   </div>
                 );
               })}
+
+              {/* ESP — create your own session */}
+              <div style={{
+                border: "1.5px dashed #D9EBE4", borderRadius: 18, padding: csOpen ? 16 : 0,
+                background: "linear-gradient(135deg,#E9F8F4,#F1EEFE)", marginBottom: 12, overflow: "hidden",
+              }}>
+                {!csOpen ? (
+                  <button onClick={() => setCsOpen(true)} style={{
+                    display: "flex", alignItems: "center", gap: 11, width: "100%", padding: "13px 14px",
+                    background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+                  }}>
+                    <span style={{ width: 34, height: 34, borderRadius: 11, background: CTA, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px", boxShadow: CTA_SHADOW }}>
+                      <Mic style={{ width: 16, height: 16 }} strokeWidth={2.2} aria-hidden />
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ ...font, display: "block", fontSize: 13.5, fontWeight: 700, color: INK_STRONG }}>Create your own session</span>
+                      <span style={{ ...font, display: "block", fontSize: 11, fontWeight: 600, color: MUTED, lineHeight: 1.4 }}>
+                        Interview prep, business meetings, anything — your topic, your style
+                      </span>
+                    </span>
+                    <ProChip />
+                  </button>
+                ) : (
+                  <div>
+                    <p style={{ ...font, fontSize: 14, fontWeight: 700, color: INK_STRONG, margin: 0, textAlign: "center" }}>
+                      What do you want to speak about?
+                    </p>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 12 }}>
+                      {PRESET_TOPICS.map((t) => (
+                        <button key={t} onClick={() => setCsTopic(t)} disabled={roomStarting} style={{
+                          ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer",
+                          border: `1px solid ${csTopic === t ? "#F9A8D4" : BORDER}`,
+                          background: csTopic === t ? "#FDEAF4" : "#FFFFFF",
+                          color: csTopic === t ? "#C2497E" : MUTED,
+                        }}>{t}</button>
+                      ))}
+                    </div>
+                    <input
+                      value={csTopic}
+                      onChange={(e) => setCsTopic(e.target.value)}
+                      placeholder="…or type your own"
+                      disabled={roomStarting}
+                      style={{
+                        ...font, width: "100%", fontSize: 13.5, padding: "11px 14px", marginTop: 12,
+                        borderRadius: 12, border: `1px solid ${BORDER}`, color: INK,
+                        background: "#FFFFFF", outline: "none", boxSizing: "border-box",
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", marginTop: 10 }}>
+                      {REGISTER_OPTIONS.map((o) => {
+                        const locked = myRank < o.minRank;
+                        return (
+                          <button key={o.v} onClick={() => !locked && setCsRegister(o.v)} disabled={roomStarting || locked}
+                            title={locked ? "Unlocks from B1" : undefined}
+                            style={{
+                              ...font, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 99,
+                              cursor: locked ? "default" : "pointer", opacity: locked ? 0.4 : 1,
+                              border: `1px solid ${csRegister === o.v ? "#7DD3C0" : BORDER}`,
+                              background: csRegister === o.v ? "#E9F8F4" : "#FFFFFF",
+                              color: csRegister === o.v ? "#3E9C82" : MUTED,
+                              display: "inline-flex", alignItems: "center", gap: 4,
+                            }}>
+                            {locked ? <Lock style={{ width: 10, height: 10 }} aria-hidden /> : null}
+                            {o.t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button onClick={() => { if (csTopic.trim()) void enterRoom({ topic: csTopic.trim(), register: csRegister, showDoor: true }); }} disabled={roomStarting || !csTopic.trim()} style={{
+                      ...font, width: "100%", marginTop: 10, fontSize: 14, fontWeight: 700,
+                      padding: "13px 20px", borderRadius: 99, border: "none",
+                      cursor: roomStarting || !csTopic.trim() ? "default" : "pointer",
+                      background: CTA, color: "#fff", boxShadow: CTA_SHADOW, opacity: roomStarting || !csTopic.trim() ? 0.7 : 1,
+                    }}>
+                      {roomStarting ? "Miomi is planning…" : "Plan my session"}
+                    </button>
+                    <button onClick={() => { if (!roomStarting) setCsOpen(false); }} style={{
+                      ...font, width: "100%", marginTop: 6, fontSize: 12, fontWeight: 700, padding: "8px 0",
+                      borderRadius: 99, border: "none", cursor: "pointer", background: "transparent", color: MUTED,
+                    }}>
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {sessions.length ? (
                 <>
