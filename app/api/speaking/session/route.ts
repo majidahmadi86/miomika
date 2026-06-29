@@ -21,9 +21,10 @@ const VALID_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
 // clamp to everyday. Decent, level-gated, never slang-dumped on beginners.
 const REGISTERS = ["polite", "everyday", "casual", "genz", "social"] as const;
 const ADVANCED_REGISTERS = new Set(["genz", "social"]);
-// CONFIDENT SPEAKING: scenario 1 of a course is the free demo; custom (ESP)
-// sessions are Pro-only.
-const FREE_SCENARIOS_PER_COURSE = 1;
+// CONFIDENT SPEAKING is a PAID feature — live Gemini sessions cost ~฿3/min, so
+// free users get ZERO live sessions (they'd cost us with no revenue). All
+// scenarios + custom (ESP) sessions are Pro-only; free users hit the paywall.
+const FREE_SCENARIOS_PER_COURSE = 0;
 const STAGE_IDS = ["warmup", "phrases", "activity", "practice", "assessment", "exit"] as const;
 const ACTIVITY_LIBRARY =
   "roleplay, storytelling, debate (B1+ only), interview simulation, describe-and-guess, summarize-back, opinion round, register switch, shadowing, pronunciation drill, minimal pairs, tongue twisters";

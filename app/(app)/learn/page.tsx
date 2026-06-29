@@ -770,7 +770,7 @@ export default function LearnPage() {
                 {courses.length ? `${scenesDone} of ${scenesTotal} sessions spoken` : "Your private speaking room with Miomi"}
               </span>
               <span style={{ ...font, display: "block", fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,.85)", marginTop: 1 }}>
-                The first session of every course is free
+                Live speaking practice, led by Miomi
               </span>
             </span>
           </button>
@@ -899,7 +899,7 @@ export default function LearnPage() {
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#FFFFFF", border: "1px solid #C9A96E", borderRadius: 16, padding: "10px 13px", marginBottom: 11 }}>
                 <p style={{ ...font, fontSize: 11, fontWeight: 600, color: INK, lineHeight: 1.45, margin: 0 }}>
-                  <b>Share this session</b> — your friend gets their first room free, you earn 30฿
+                  <b>Share this session</b> — earn ฿30 when a friend joins Miomika
                 </p>
                 <button onClick={() => { try { void navigator.share?.({ title: "Miomika", text: `I just finished a Confident Speaking session with Miomi ${resultsSession.library?.title_en ?? ""}`, url: "https://miomika.com" }); } catch { /* share sheet optional */ } }} style={{
                   ...font, display: "inline-flex", alignItems: "center", gap: 5, border: "1.5px solid #34A98F", background: "#FFFFFF",
@@ -1048,7 +1048,7 @@ export default function LearnPage() {
             /* ---------- COURSE LIST + ESP + YOUR SESSIONS ---------- */
             <>
               <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: MUTED, margin: "0 2px 12px", lineHeight: 1.55 }}>
-                <b style={{ color: INK_STRONG }}>Your private speaking room.</b> Warm-up to exit ticket, Miomi leading every step — the first session of every course is free
+                <b style={{ color: INK_STRONG }}>Your private speaking room.</b> Warm-up to exit ticket, Miomi leading every step
               </p>
 
               {/* Continue banner — an unfinished room is one tap away */}

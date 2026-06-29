@@ -34,7 +34,6 @@ export const PLANS: Plan[] = [
       { en: "25 chats a day with Miomi", th: "คุยกับมีโอมิ 25 ครั้งต่อวัน" },
       { en: "The full A1–C1 course library", th: "คอร์สเรียนครบ A1–C1" },
       { en: "Bonding, memory & streaks", th: "ความผูกพัน ความทรงจำ และสตรีค" },
-      { en: "One free live session to try", th: "ทดลองห้องพูดสดได้ 1 ครั้ง" },
     ],
   },
   {

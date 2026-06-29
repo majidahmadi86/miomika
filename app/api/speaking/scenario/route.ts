@@ -17,8 +17,9 @@ import {
 
 const LEVEL_COOKIE = "miomika.teach_level";
 const VALID_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
-// CONFIDENT SPEAKING: the FIRST scenario of every course is free — the demo.
-const FREE_SCENARIOS_PER_COURSE = 1;
+// CONFIDENT SPEAKING is PAID — live sessions cost real money per minute, so free
+// users get ZERO. Every scenario is Pro-gated; free users hit the paywall.
+const FREE_SCENARIOS_PER_COURSE = 0;
 
 type Scenario = {
   position: number;
