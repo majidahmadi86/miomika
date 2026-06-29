@@ -204,6 +204,85 @@ export async function POST(req: NextRequest) {
     if (!(REGISTERS as readonly string[]).includes(register)) register = "everyday";
     if (ADVANCED_REGISTERS.has(register) && levelRank < 2) register = "everyday";
 
+    // ──────────────────────────────────────────────────────────────────────
+    // SESSION LIFECYCLE (all tiers, incl. pack buyers): a scenario is entered
+    // ONCE. Re-entry resumes the same session or shows its summary — it never
+    // re-runs a live session, because live minutes cost real money. New rooms
+    // are capped by a monthly budget (Pro 1, Pro Max 3; free is blocked above).
+    // ──────────────────────────────────────────────────────────────────────
+    if (coursePos > 0 && scenarioPos > 0) {
+      // Finished already? (goals_done >= 3, tracked on the course progress.)
+      const { data: courseRow } = await supabase
+        .from("speaking_courses")
+        .select("progress")
+        .eq("user_id", profile.id)
+        .eq("cefr_level", level)
+        .eq("learning_target", learningTarget)
+        .maybeSingle();
+      const completedMap =
+        ((courseRow?.progress ?? {}) as {
+          completed?: Record<string, { completed_at?: string | null }>;
+        }).completed ?? {};
+      const alreadyDone = !!completedMap[`${coursePos}-${scenarioPos}`]?.completed_at;
+
+      // Newest session row for this exact scenario, if any.
+      const { data: prior } = await supabase
+        .from("speaking_sessions")
+        .select("id, plan_snapshot")
+        .eq("user_id", profile.id)
+        .eq("course_position", coursePos)
+        .eq("scenario_position", scenarioPos)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (alreadyDone) {
+        // Summary-only: never re-run a finished scenario (no cost, all tiers).
+        return NextResponse.json(
+          { ok: true, completed: true, sessionId: (prior?.id as string) ?? null },
+          { status: 200 },
+        );
+      }
+      if (prior) {
+        // In progress: resume the SAME session — no new row, no budget burn.
+        const snap = (prior.plan_snapshot ?? {}) as {
+          plan?: SessionPlan;
+          title_en?: string;
+          cefr_level?: string;
+          learning_target?: string;
+          register?: string;
+        };
+        if (snap.plan) {
+          return NextResponse.json({
+            ok: true,
+            sessionId: prior.id as string,
+            title_en: snap.title_en ?? topic,
+            level: snap.cefr_level ?? level,
+            learningTarget: snap.learning_target ?? learningTarget,
+            register: snap.register ?? register,
+            plan: snap.plan,
+          });
+        }
+        // Snapshot missing (legacy row) → fall through and (re)create below.
+      }
+    }
+
+    // New room → enforce the monthly budget before spending anything.
+    {
+      const allowance = profile.tier === "pro" ? 1 : profile.tier === "pro_max" ? 3 : 0;
+      const monthStart = new Date();
+      monthStart.setUTCDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from("speaking_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .gte("created_at", monthStart.toISOString());
+      if ((count ?? 0) >= allowance) {
+        return NextResponse.json({ ok: false, reason: "rooms_limit" }, { status: 200 });
+      }
+    }
+
     // SMART LIBRARY: bank-first, generate once, share with everyone.
     const slug = slugify(topic);
     let libraryId: string | null = null;
@@ -335,6 +414,13 @@ export async function GET(req: NextRequest) {
     const supabase = await createServiceClient();
     const id = (req.nextUrl.searchParams.get("id") ?? "").trim();
     if (id) {
+      // Re-entering a LIVE room (run=1) requires a current paid plan — a
+      // downgraded account can't walk back into a room it opened while Pro.
+      // (Plain summary views omit run=1 and stay open to every tier.)
+      const forRun = req.nextUrl.searchParams.get("run") === "1";
+      if (forRun && profile.tier !== "pro" && profile.tier !== "pro_max") {
+        return NextResponse.json({ session: null, reason: "pro_required" });
+      }
       const { data, error } = await supabase
         .from("speaking_sessions")
         .select("id, library_id, course_position, scenario_position, status, results, created_at, completed_at, plan_snapshot")

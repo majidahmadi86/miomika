@@ -561,6 +561,7 @@ export default function LearnPage() {
     try {
       type SessionResp = {
         ok?: boolean;
+        completed?: boolean;
         reason?: string;
         sessionId?: string;
         title_en?: string;
@@ -588,7 +589,18 @@ export default function LearnPage() {
           setSpeakMsg("Almost ready — Miomi is trying once more");
         }
       }
-      if (j.ok && j.sessionId && j.plan) {
+      if (j.completed) {
+        // Finished already — show the saved summary, never re-run the room.
+        setSpeakMsg(null);
+        if (j.sessionId) {
+          try {
+            const sr = await fetch(`/api/speaking/session?id=${encodeURIComponent(j.sessionId)}`);
+            const sj = (await sr.json()) as { session?: SessionDetail | null };
+            if (sj.session?.library) { setResultsSession(sj.session); return; }
+          } catch { /* fall through to a gentle message */ }
+        }
+        setSpeakMsg("You've finished this scene — open it from your sessions to see the summary.");
+      } else if (j.ok && j.sessionId && j.plan) {
         const handoff: RoomHandoff = {
           sessionId: j.sessionId,
           title_en: j.title_en ?? "Speaking session",
@@ -604,7 +616,7 @@ export default function LearnPage() {
           walkIn(handoff);
           return;
         }
-      } else if (j.reason === "pro_required") {
+      } else if (j.reason === "pro_required" || j.reason === "rooms_limit") {
         setSpeakMsg(null);
         openPaywall("rooms");
       } else {
@@ -623,8 +635,13 @@ export default function LearnPage() {
     setRoomStarting(true);
     setSpeakMsg("Opening your room again — one moment…");
     try {
-      const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(id)}`);
-      const j = (await r.json()) as { session?: SessionDetail | null };
+      const r = await fetch(`/api/speaking/session?id=${encodeURIComponent(id)}&run=1`);
+      const j = (await r.json()) as { session?: SessionDetail | null; reason?: string };
+      if (j.reason === "pro_required") {
+        setSpeakMsg(null);
+        openPaywall("rooms");
+        return;
+      }
       const lib = j.session?.library;
       if (j.session && lib) {
         setSpeakMsg(null);
@@ -644,7 +661,7 @@ export default function LearnPage() {
     } finally {
       setRoomStarting(false);
     }
-  }, [roomStarting, walkIn]);
+  }, [roomStarting, walkIn, openPaywall]);
 
   const myRank = Math.max(0, (LADDER as readonly string[]).indexOf(myLevel));
   const targetName = profile?.learning_target_language === "en" ? "English" : "Thai";
