@@ -78,6 +78,67 @@ export async function createCheckoutSession(params: {
 }
 
 /**
+ * Read a subscription's single line item — the bits needed to change its plan:
+ * the item id (si_…), the current price id, and the billing interval. Returns
+ * null if the subscription has no usable item.
+ */
+export async function getSubscriptionItem(subscriptionId: string): Promise<{
+  itemId: string;
+  priceId: string;
+  interval: BillingInterval | null;
+} | null> {
+  const res = await fetch(`${STRIPE_API}/subscriptions/${subscriptionId}`, {
+    headers: { Authorization: `Bearer ${secretKey()}` },
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Stripe subscription fetch failed (${res.status}): ${detail}`);
+  }
+  const json = (await res.json()) as {
+    items?: {
+      data?: Array<{ id?: string; price?: { id?: string; recurring?: { interval?: string } } }>;
+    };
+  };
+  const item = json.items?.data?.[0];
+  if (!item?.id || !item.price?.id) return null;
+  const rec = item.price.recurring?.interval;
+  const interval: BillingInterval | null =
+    rec === "year" ? "yearly" : rec === "month" ? "monthly" : null;
+  return { itemId: item.id, priceId: item.price.id, interval };
+}
+
+/**
+ * Switch a subscription to a new price (the in-app upgrade). Bills the prorated
+ * difference immediately against the card on file. payment_behavior is
+ * error_if_incomplete so that if the charge can't complete (declined / needs
+ * authentication) the call FAILS and the subscription is left untouched — no
+ * tier change without a successful payment, and no broken "incomplete" state.
+ */
+export async function changeSubscriptionPrice(params: {
+  subscriptionId: string;
+  itemId: string;
+  newPriceId: string;
+}): Promise<void> {
+  const form = new URLSearchParams();
+  form.set("items[0][id]", params.itemId);
+  form.set("items[0][price]", params.newPriceId);
+  form.set("proration_behavior", "always_invoice");
+  form.set("payment_behavior", "error_if_incomplete");
+  const res = await fetch(`${STRIPE_API}/subscriptions/${params.subscriptionId}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secretKey()}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form.toString(),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Stripe subscription update failed (${res.status}): ${detail}`);
+  }
+}
+
+/**
  * Create a Stripe Billing Portal session so the customer can update payment,
  * view invoices, and CANCEL their subscription on Stripe's hosted page. Stripe's
  * Services Agreement requires subscription merchants to give customers a clear way

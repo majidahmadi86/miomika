@@ -72,8 +72,13 @@ const COPY = {
     currentPlan: "แพ็กเกจปัจจุบัน",
     stars: "ดาว Miomi",
     upgrade: "อัปเกรดเป็น Pro",
+    upgradeProMax: "อัปเกรดเป็น Pro Max",
+    upgradeProMaxSub: "คุยกับ Miomi ได้มากขึ้น เสียงนานขึ้น และห้องสนทนาเพิ่มขึ้น",
+    upgradeBusy: "กำลังอัปเกรด…",
+    upgradeDone: "ยินดีด้วย ตอนนี้คุณคือ Pro Max แล้ว!",
+    upgradeFail: "อัปเกรดไม่สำเร็จ ลองที่จัดการการเรียกเก็บเงินดูนะ",
     manageBilling: "จัดการการเรียกเก็บเงิน",
-    manageBillingSub: "อัปเดตการชำระเงินหรือยกเลิกได้ทุกเมื่อ",
+    manageBillingSub: "อัปเดตการชำระเงิน แพ็กเกจ หรือใบเสร็จ",
     inviteFriend: "ชวนเพื่อน",
     account: "บัญชี",
     email: "อีเมล",
@@ -108,8 +113,13 @@ const COPY = {
     currentPlan: "Current plan",
     stars: "Miomi stars",
     upgrade: "Upgrade to Pro",
+    upgradeProMax: "Upgrade to Pro Max",
+    upgradeProMaxSub: "More chat, longer voice, and more conversation rooms",
+    upgradeBusy: "Upgrading…",
+    upgradeDone: "You're on Pro Max now — enjoy!",
+    upgradeFail: "Couldn't upgrade — try Manage billing",
     manageBilling: "Manage billing",
-    manageBillingSub: "Update payment or cancel anytime",
+    manageBillingSub: "Update payment, plan, or invoices",
     inviteFriend: "Invite friends",
     account: "Account",
     email: "Email",
@@ -309,6 +319,26 @@ export default function MePage() {
 
   const [levelOpen, setLevelOpen] = useState(false);
   const [billingBusy, setBillingBusy] = useState(false);
+  const [upgradeBusy, setUpgradeBusy] = useState(false);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const upgradeToProMax = useCallback(async () => {
+    if (upgradeBusy) return;
+    setUpgradeBusy(true);
+    setUpgradeMsg(null);
+    try {
+      const r = await fetch("/api/billing/upgrade", { method: "POST" });
+      const j = (await r.json()) as { ok?: boolean; error?: string };
+      if (r.ok && j.ok) {
+        setUpgradeMsg(t.upgradeDone);
+        setTimeout(() => window.location.reload(), 1500);
+        return; // reloading
+      }
+      setUpgradeMsg(j.error ?? t.upgradeFail);
+    } catch {
+      setUpgradeMsg(t.upgradeFail);
+    }
+    setUpgradeBusy(false);
+  }, [upgradeBusy, t]);
   const openBillingPortal = useCallback(async () => {
     if (billingBusy) return;
     setBillingBusy(true);
@@ -627,14 +657,28 @@ export default function MePage() {
             right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
           />
         ) : (
-          <Row
-            icon={<CreditCard className="h-[18px] w-[18px]" />}
-            label={t.manageBilling}
-            sub={t.manageBillingSub}
-            onClick={openBillingPortal}
-            right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
-          />
+          <>
+            {profile.tier === "pro" ? (
+              <Row
+                icon={<Sparkles className="h-[18px] w-[18px]" />}
+                label={t.upgradeProMax}
+                sub={upgradeBusy ? t.upgradeBusy : t.upgradeProMaxSub}
+                onClick={upgradeToProMax}
+                right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+              />
+            ) : null}
+            <Row
+              icon={<CreditCard className="h-[18px] w-[18px]" />}
+              label={t.manageBilling}
+              sub={t.manageBillingSub}
+              onClick={openBillingPortal}
+              right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+            />
+          </>
         )}
+        {upgradeMsg ? (
+          <p className="px-4 pb-1 pt-2 text-[12px] text-ink-subtle">{upgradeMsg}</p>
+        ) : null}
         <Row
           icon={<Gift className="h-[18px] w-[18px]" />}
           label={t.inviteFriend}
