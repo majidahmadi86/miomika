@@ -8,16 +8,16 @@ import {
   type ReactNode,
 } from "react";
 import Image from "next/image";
-import { X, Check, Crown } from "lucide-react";
+import { X, Check } from "lucide-react";
 import { useUILanguage } from "@/lib/i18n/client";
 import {
   UPGRADE_PLANS,
+  ROOM_PACKS,
   ANNUAL_SAVING_PCT,
-  yearlyPriceTHB,
   type Bilingual,
-  type Plan,
   type TierId,
 } from "@/lib/billing/tiers";
+import { PlanCard, RoomPackCard } from "@/components/billing/PricingCards";
 
 export type PaywallReason = "daily_limit" | "custom_course" | "rooms" | "generic";
 type Billing = "monthly" | "yearly";
@@ -73,12 +73,6 @@ const ROOMS_PITCH: Bilingual[] = [
   { en: "Build real speaking confidence, one session at a time", th: "สร้างความมั่นใจในการพูดจริง ทีละห้อง" },
 ];
 
-// Session top-up packs beyond the monthly plan allowance. DISPLAY-ONLY for now —
-// purchase (one-time checkout) + counting are wired when live voice (Gemini) returns.
-const SESSION_PACKS: { count: number; price: number; tag?: Bilingual }[] = [
-  { count: 10, price: 499 },
-  { count: 30, price: 1399, tag: { en: "Best value", th: "คุ้มสุด" } },
-];
 
 export function PaywallProvider({ children }: { children: ReactNode }) {
   const [reason, setReason] = useState<PaywallReason | null>(null);
@@ -272,13 +266,13 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
             </div>
           </div>
 
-          {/* plan cards — 2-up on desktop, stacks on mobile */}
+          {/* plan cards — shared with the /pricing page; 2-up on desktop, stacks on mobile */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
-              gap: 14,
-              alignItems: "start",
+              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gap: 12,
+              alignItems: "stretch",
             }}
           >
             {UPGRADE_PLANS.map((plan) => (
@@ -286,7 +280,6 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
                 key={plan.id}
                 plan={plan}
                 lang={lang}
-                t={t}
                 billing={billing}
                 loading={loadingPlan === plan.id}
                 onSelect={() => startCheckout(plan.id)}
@@ -294,73 +287,19 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
             ))}
           </div>
 
-          {/* rooms: top-up packs preview (display-only until live sessions return) */}
+          {/* rooms: top-up packs — shared cards, matches the /pricing page */}
           {reason === "rooms" ? (
             <div style={{ maxWidth: 460, margin: "20px auto 0" }}>
               <p style={{ ...sans, textAlign: "center", fontSize: 13, fontWeight: 700, color: "var(--mk-ink, #2A2A28)", margin: "0 0 3px" }}>
-                {lang === "th" ? "ต้องการห้องเพิ่ม?" : "Need more sessions?"}
+                {lang === "th" ? "ต้องการห้องเพิ่ม?" : "Need more rooms?"}
               </p>
               <p style={{ ...sans, textAlign: "center", fontSize: 12.5, color: "var(--mk-ink-muted, #9A8B73)", margin: "0 0 12px" }}>
-                {lang === "th" ? "เติมเซสชันเพิ่มได้ทุกเมื่อ ทุกแพ็กเกจ" : "Top up anytime, on any plan"}
+                {lang === "th" ? "เติมห้องเพิ่มได้ทุกเมื่อ ทุกแพ็กเกจ" : "Top up anytime, on any plan"}
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
-                {SESSION_PACKS.map((pack) => {
-                  const perSession = Math.round(pack.price / pack.count);
-                  const featured = !!pack.tag;
-                  return (
-                    <div
-                      key={pack.count}
-                      style={{
-                        position: "relative",
-                        padding: featured ? "18px 12px 15px" : "16px 12px 15px",
-                        borderRadius: 16,
-                        border: featured
-                          ? "1.5px solid rgba(52,169,143,0.55)"
-                          : "1px solid var(--mk-border, #EDE8E0)",
-                        background: featured
-                          ? "linear-gradient(180deg, rgba(52,169,143,0.08), var(--mk-surface, #fff) 62%)"
-                          : "var(--mk-surface, #fff)",
-                        boxShadow: featured ? "0 6px 18px rgba(52,169,143,0.13)" : "0 2px 8px rgba(0,0,0,0.03)",
-                        textAlign: "center",
-                      }}
-                    >
-                      {pack.tag ? (
-                        <span
-                          style={{
-                            position: "absolute",
-                            top: -9,
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                            ...sans,
-                            fontSize: 9.5,
-                            fontWeight: 800,
-                            letterSpacing: ".04em",
-                            textTransform: "uppercase",
-                            padding: "3px 10px",
-                            borderRadius: 99,
-                            background: ACCENT_GRAD,
-                            color: "#fff",
-                            whiteSpace: "nowrap",
-                            boxShadow: "0 2px 6px rgba(52,169,143,0.3)",
-                          }}
-                        >
-                          {t(pack.tag)}
-                        </span>
-                      ) : null}
-                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 5 }}>
-                        <span style={{ ...sans, fontSize: 30, fontWeight: 800, color: "var(--mk-ink, #2A2A28)", lineHeight: 1 }}>{pack.count}</span>
-                        <span style={{ ...sans, fontSize: 12.5, fontWeight: 700, color: "var(--mk-ink-muted, #9A8B73)" }}>{lang === "th" ? "เซสชัน" : "sessions"}</span>
-                      </div>
-                      <div style={{ ...sans, fontSize: 11, fontWeight: 600, color: "var(--mk-ink-muted, #9A8B73)", marginTop: 4 }}>
-                        {lang === "th" ? `฿${perSession} / เซสชัน` : `฿${perSession} each`}
-                      </div>
-                      <div style={{ height: 1, background: "var(--mk-border, #EDE8E0)", margin: "11px 8px" }} />
-                      <div style={{ ...sans, fontSize: 18, fontWeight: 800, color: "#2C8E76", lineHeight: 1 }}>
-                        ฿{pack.price.toLocaleString()}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11, alignItems: "stretch" }}>
+                {ROOM_PACKS.map((pack) => (
+                  <RoomPackCard key={pack.count} pack={pack} lang={lang} />
+                ))}
               </div>
             </div>
           ) : null}
@@ -427,133 +366,3 @@ function SegBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   );
 }
 
-function PlanCard({
-  plan,
-  lang,
-  t,
-  billing,
-  loading,
-  onSelect,
-}: {
-  plan: Plan;
-  lang: "th" | "en";
-  t: (b: Bilingual) => string;
-  billing: Billing;
-  loading: boolean;
-  onSelect: () => void;
-}) {
-  const featured = !!plan.highlighted;
-  const accent = "#34A98F";
-  const yearly = yearlyPriceTHB(plan);
-  const showYearly = billing === "yearly" && yearly != null && plan.priceTHB != null;
-  const perMonth = showYearly ? Math.round((yearly as number) / 12) : plan.priceTHB;
-  const saved = showYearly ? (plan.priceTHB as number) * 12 - (yearly as number) : 0;
-
-  return (
-    <div
-      style={{
-        position: "relative",
-        background: "var(--mk-surface, #fff)",
-        border: featured ? `2px solid ${accent}` : "1px solid var(--mk-border, #EDE8E0)",
-        borderRadius: 18,
-        padding: "18px 16px 16px",
-        boxShadow: featured
-          ? "0 10px 26px -10px rgba(52,169,143,0.30)"
-          : "0 1px 2px rgba(74,65,54,.05), 0 8px 20px rgba(74,65,54,.05)",
-      }}
-    >
-      {featured ? (
-        <span
-          style={{
-            position: "absolute",
-            top: -11,
-            left: 16,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            background: ACCENT_GRAD,
-            color: "#fff",
-            ...sans,
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: 0.2,
-            padding: "3px 10px",
-            borderRadius: 99,
-          }}
-        >
-          <Crown style={{ width: 12, height: 12 }} strokeWidth={2.5} />
-          {lang === "th" ? "ยอดนิยม" : "Most popular"}
-        </span>
-      ) : null}
-
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
-        <span style={{ ...sans, fontSize: 16, fontWeight: 800, color: "var(--mk-ink, #2A2A28)" }}>{t(plan.name)}</span>
-        <span style={{ ...sans, color: "var(--mk-ink, #2A2A28)", textAlign: "right" }}>
-          <span style={{ fontSize: 22, fontWeight: 800 }}>฿{perMonth}</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--mk-ink-muted, #9A8B73)" }}>{lang === "th" ? "/เดือน" : "/mo"}</span>
-        </span>
-      </div>
-
-      {showYearly ? (
-        <p style={{ ...sans, fontSize: 11.5, color: "#2C8E76", fontWeight: 700, textAlign: "right", margin: "0 0 10px" }}>
-          {lang === "th"
-            ? `฿${(yearly as number).toLocaleString()}/ปี · ประหยัด ฿${saved.toLocaleString()}`
-            : `฿${(yearly as number).toLocaleString()}/yr · save ฿${saved.toLocaleString()}`}
-        </p>
-      ) : (
-        <p style={{ ...sans, fontSize: 12.5, color: "var(--mk-ink-muted, #9A8B73)", margin: "0 0 12px" }}>{t(plan.tagline)}</p>
-      )}
-
-      <ul style={{ listStyle: "none", margin: "0 0 14px", padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-        {plan.features.map((f, i) => (
-          <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
-            <span
-              aria-hidden
-              style={{
-                flex: "0 0 18px",
-                width: 18,
-                height: 18,
-                borderRadius: 99,
-                background: "#E9F8F4",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: 1,
-              }}
-            >
-              <Check style={{ width: 12, height: 12, color: "#2C8E76" }} strokeWidth={3} />
-            </span>
-            <span style={{ ...sans, fontSize: 13, lineHeight: 1.4, color: "var(--mk-ink, #2A2A28)" }}>{t(f)}</span>
-          </li>
-        ))}
-      </ul>
-
-      <button
-        onClick={onSelect}
-        disabled={loading}
-        style={{
-          ...sans,
-          width: "100%",
-          padding: "12px 14px",
-          borderRadius: 13,
-          border: featured ? "none" : `1.5px solid ${accent}`,
-          background: featured ? ACCENT_GRAD : "transparent",
-          color: featured ? "#fff" : "#1F7A68",
-          fontSize: 14.5,
-          fontWeight: 800,
-          cursor: loading ? "default" : "pointer",
-          opacity: loading ? 0.7 : 1,
-          boxShadow: featured ? "0 4px 16px -4px rgba(52,169,143,0.45)" : "none",
-        }}
-      >
-        {loading
-          ? lang === "th"
-            ? "กำลังพาไป…"
-            : "Redirecting…"
-          : lang === "th"
-            ? `เลือก ${t(plan.name)}`
-            : `Choose ${t(plan.name)}`}
-      </button>
-    </div>
-  );
-}

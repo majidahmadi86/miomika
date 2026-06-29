@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Compass,
   CreditCard,
+  Tag,
   Download,
   FileText,
   Gift,
@@ -81,6 +82,8 @@ const COPY = {
     upgradeFail: "อัปเกรดไม่สำเร็จ ลองที่จัดการการเรียกเก็บเงินดูนะ",
     manageBilling: "จัดการการเรียกเก็บเงิน",
     manageBillingSub: "อัปเดตการชำระเงิน แพ็กเกจ หรือใบเสร็จ",
+    pricing: "แพ็กเกจและราคา",
+    pricingSub: "เปรียบเทียบแพ็กเกจและแพ็กห้องพูดสด",
     cancelsOn: (d: string) => `จะสิ้นสุดวันที่ ${d}`,
     resume: "กลับมาใช้ต่อ",
     resumeSub: "ยกเลิกการสิ้นสุด — ใช้งานต่อได้เลย",
@@ -127,6 +130,8 @@ const COPY = {
     upgradeFail: "Couldn't upgrade — try Manage billing",
     manageBilling: "Manage billing",
     manageBillingSub: "Update payment, plan, or invoices",
+    pricing: "Plans & pricing",
+    pricingSub: "Compare plans and room packs",
     cancelsOn: (d: string) => `Cancels on ${d}`,
     resume: "Resume subscription",
     resumeSub: "Undo the cancellation — keep your plan",
@@ -726,6 +731,13 @@ export default function MePage() {
             ) : null}
           </>
         )}
+        <Row
+          icon={<Tag className="h-[18px] w-[18px]" />}
+          label={t.pricing}
+          sub={t.pricingSub}
+          onClick={() => router.push("/pricing")}
+          right={<ChevronRight className="h-4 w-4 text-ink-subtle" />}
+        />
         <Row
           icon={<Gift className="h-[18px] w-[18px]" />}
           label={t.inviteFriend}
