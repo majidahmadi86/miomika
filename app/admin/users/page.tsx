@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -147,8 +148,10 @@ export default async function AdminUsersPage({
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td style={td}>
-                    <div style={{ fontWeight: 700 }}>{r.display_name || "—"}</div>
-                    <div style={{ fontSize: 11, color: "#9A8B73" }}>{r.email || r.id.slice(0, 8)}</div>
+                    <Link href={`/admin/users/${r.id}`} style={{ textDecoration: "none" }}>
+                      <div style={{ fontWeight: 700, color: "#2C8E76" }}>{r.display_name || "—"}</div>
+                      <div style={{ fontSize: 11, color: "#9A8B73" }}>{r.email || r.id.slice(0, 8)}</div>
+                    </Link>
                   </td>
                   <td style={td}>{tierPill(r.tier)}</td>
                   <td style={td}>{r.subscription_status || "—"}</td>

@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
@@ -138,7 +139,7 @@ export default async function AdminOverviewPage() {
         <div style={section}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Quick links</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5 }}>
-            <a href="/admin/users" style={{ color: "#2C8E76", fontWeight: 600 }}>Browse + manage users →</a>
+            <Link href="/admin/users" style={{ color: "#2C8E76", fontWeight: 600 }}>Browse + manage users →</Link>
             <a href="/admin/usage" style={{ color: "#2C8E76", fontWeight: 600 }}>AI cost &amp; usage breakdown →</a>
             <span style={{ color: "#B0A488" }}>Revenue &amp; Audit tabs — coming in the next pass.</span>
           </div>
