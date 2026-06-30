@@ -57,6 +57,36 @@ export async function POST(req: Request) {
           })
           .eq("id", userId);
         log("billing", `granted ${plan} to ${userId}`);
+      } else if (userId && obj.metadata?.kind === "room_pack") {
+        // One-time room-pack purchase. Grant exactly room_count credits + an
+        // audit row. Idempotent on the Stripe session id so a webhook retry
+        // can't double-grant.
+        const count = Number(obj.metadata?.room_count);
+        const ref = obj.id ?? null;
+        if (Number.isFinite(count) && count > 0) {
+          const already = ref
+            ? await supabase
+                .from("room_credit_ledger")
+                .select("id")
+                .eq("ref", ref)
+                .eq("reason", "purchase")
+                .maybeSingle()
+            : { data: null };
+          if (!already.data) {
+            const { error: ledgerErr } = await supabase
+              .from("room_credit_ledger")
+              .insert({ user_id: userId, delta: count, reason: "purchase", ref });
+            if (ledgerErr) throw ledgerErr;
+            const { data: prof } = await supabase
+              .from("profiles")
+              .select("room_credits")
+              .eq("id", userId)
+              .maybeSingle();
+            const next = (prof?.room_credits ?? 0) + count;
+            await supabase.from("profiles").update({ room_credits: next }).eq("id", userId);
+            log("billing", `granted ${count} room credits to ${userId} (now ${next})`);
+          }
+        }
       }
     } else if (type === "customer.subscription.created" || type === "customer.subscription.updated") {
       // Renewals, plan changes, lapses. Tier follows the live price + status.

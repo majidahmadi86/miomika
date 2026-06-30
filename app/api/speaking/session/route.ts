@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // New room → enforce the monthly budget before spending anything.
+    // New room → monthly allowance first (it refills), then a bought pack credit.
     {
       const allowance = profile.tier === "pro" ? 1 : profile.tier === "pro_max" ? 3 : 0;
       const monthStart = new Date();
@@ -278,8 +278,34 @@ export async function POST(req: NextRequest) {
         .select("id", { count: "exact", head: true })
         .eq("user_id", profile.id)
         .gte("created_at", monthStart.toISOString());
+
       if ((count ?? 0) >= allowance) {
-        return NextResponse.json({ ok: false, reason: "rooms_limit" }, { status: 200 });
+        // Monthly allowance spent. Fall back to purchased room credits, if any.
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("room_credits")
+          .eq("id", profile.id)
+          .maybeSingle();
+        const credits = prof?.room_credits ?? 0;
+        if (credits <= 0) {
+          return NextResponse.json({ ok: false, reason: "rooms_limit" }, { status: 200 });
+        }
+        // Consume exactly one — guarded so it can't drop below zero under a race —
+        // and record the spend. Only a brand-new room reaches here (resume returns
+        // earlier), so an N-pack yields exactly N rooms.
+        const { data: spent } = await supabase
+          .from("profiles")
+          .update({ room_credits: credits - 1 })
+          .eq("id", profile.id)
+          .eq("room_credits", credits)
+          .select("id")
+          .maybeSingle();
+        if (!spent) {
+          return NextResponse.json({ ok: false, reason: "rooms_limit" }, { status: 200 });
+        }
+        await supabase
+          .from("room_credit_ledger")
+          .insert({ user_id: profile.id, delta: -1, reason: "consume", ref: null });
       }
     }
 

@@ -16,7 +16,7 @@ import {
   type Bilingual,
   type TierId,
 } from "@/lib/billing/tiers";
-import { PlanCard, RoomPackCard, PricingToggle } from "@/components/billing/PricingCards";
+import { PlanCard, RoomPackCard, PlanRow, PricingToggle } from "@/components/billing/PricingCards";
 
 export type PaywallReason = "daily_limit" | "custom_course" | "rooms" | "generic";
 type Billing = "monthly" | "yearly";
@@ -96,6 +96,7 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
   const lang = useUILanguage();
   const t = (b: Bilingual) => (lang === "th" ? b.th : b.en);
   const [loadingPlan, setLoadingPlan] = useState<TierId | null>(null);
+  const [loadingPack, setLoadingPack] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [billing, setBilling] = useState<Billing>("monthly");
   const header = HEADERS[reason] ?? HEADERS.generic;
@@ -122,6 +123,31 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
     } catch {
       setError(fallback);
       setLoadingPlan(null);
+    }
+  };
+
+  const buyPack = async (count: number) => {
+    if (loadingPack !== null) return;
+    setError(null);
+    setLoadingPack(count);
+    const fallback =
+      lang === "th" ? "เริ่มการชำระเงินไม่สำเร็จ ลองอีกครั้งนะคะ" : "Couldn't start checkout. Please try again.";
+    try {
+      const res = await fetch("/api/billing/checkout-pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count }),
+      });
+      const json = (await res.json()) as { url?: string; error?: string };
+      if (res.ok && json.url) {
+        window.location.assign(json.url); // leaving the page — keep the spinner
+        return;
+      }
+      setError(json.error ?? fallback);
+      setLoadingPack(null);
+    } catch {
+      setError(fallback);
+      setLoadingPack(null);
     }
   };
 
@@ -231,48 +257,70 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
             </div>
           ) : null}
 
-          {/* billing toggle — shared with the /pricing page */}
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
-            <PricingToggle billing={billing} onChange={setBilling} lang={lang} />
-          </div>
-
-          {/* plan cards — shared with the /pricing page; 2-up on desktop, stacks on mobile */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-              gap: 12,
-              alignItems: "stretch",
-            }}
-          >
-            {UPGRADE_PLANS.map((plan) => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                lang={lang}
-                billing={billing}
-                loading={loadingPlan === plan.id}
-                onSelect={() => startCheckout(plan.id)}
-              />
-            ))}
-          </div>
-
-          {/* rooms: top-up packs — shared cards, matches the /pricing page */}
           {reason === "rooms" ? (
-            <div style={{ maxWidth: 460, margin: "20px auto 0" }}>
-              <p style={{ ...sans, textAlign: "center", fontSize: 13, fontWeight: 700, color: "var(--mk-ink, #2A2A28)", margin: "0 0 3px" }}>
-                {lang === "th" ? "ต้องการห้องเพิ่ม?" : "Need more rooms?"}
-              </p>
-              <p style={{ ...sans, textAlign: "center", fontSize: 12.5, color: "var(--mk-ink-muted, #9A8B73)", margin: "0 0 12px" }}>
-                {lang === "th" ? "เติมห้องเพิ่มได้ทุกเมื่อ ทุกแพ็กเกจ" : "Top up anytime, on any plan"}
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11, alignItems: "stretch" }}>
+            /* ROOMS CONTEXT — the user wants a room now. Packs are the hero;
+               subscriptions collapse to compact rows as the "or ongoing" path. */
+            <>
+              {/* primary: room packs, with working buy buttons */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 11, alignItems: "stretch", marginBottom: 18 }}>
                 {ROOM_PACKS.map((pack) => (
-                  <RoomPackCard key={pack.count} pack={pack} lang={lang} />
+                  <RoomPackCard
+                    key={pack.count}
+                    pack={pack}
+                    lang={lang}
+                    loading={loadingPack === pack.count}
+                    onSelect={() => buyPack(pack.count)}
+                  />
                 ))}
               </div>
-            </div>
-          ) : null}
+
+              {/* secondary: subscriptions, compact one-line rows */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 9 }}>
+                <span style={{ ...sans, fontSize: 11, fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--mk-ink-muted, #B0A488)" }}>
+                  {lang === "th" ? "หรือสมัครสมาชิก · ห้องทุกเดือน + ทุกอย่าง" : "Or go Pro · rooms every month + all of Miomi"}
+                </span>
+                <PricingToggle billing={billing} onChange={setBilling} lang={lang} />
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {UPGRADE_PLANS.map((plan) => (
+                  <PlanRow
+                    key={plan.id}
+                    plan={plan}
+                    lang={lang}
+                    billing={billing}
+                    loading={loadingPlan === plan.id}
+                    onSelect={() => startCheckout(plan.id)}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            /* SUBSCRIPTION CONTEXT — plans are the answer; no packs. */
+            <>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+                <PricingToggle billing={billing} onChange={setBilling} lang={lang} />
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                  gap: 12,
+                  alignItems: "stretch",
+                }}
+              >
+                {UPGRADE_PLANS.map((plan) => (
+                  <PlanCard
+                    key={plan.id}
+                    plan={plan}
+                    lang={lang}
+                    billing={billing}
+                    loading={loadingPlan === plan.id}
+                    onSelect={() => startCheckout(plan.id)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
 
           {/* checkout error (if any) */}
           {error ? (

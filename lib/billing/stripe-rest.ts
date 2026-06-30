@@ -77,6 +77,56 @@ export async function createCheckoutSession(params: {
   return { id: json.id, url: json.url };
 }
 
+/** Stripe one-time price id for a room pack of the given size (env-configured). */
+export function packPriceId(count: number): string | null {
+  return process.env[`STRIPE_PRICE_PACK_${count}`] ?? null;
+}
+
+/**
+ * Create a one-time (payment mode) Checkout Session for a room pack. The room
+ * count is carried in metadata so the webhook grants exactly that many credits.
+ */
+export async function createPackCheckoutSession(params: {
+  priceId: string;
+  count: number;
+  customerEmail: string | null;
+  userId: string;
+  successUrl: string;
+  cancelUrl: string;
+}): Promise<{ id: string; url: string | null }> {
+  const form = new URLSearchParams();
+  form.set("mode", "payment");
+  form.set("line_items[0][price]", params.priceId);
+  form.set("line_items[0][quantity]", "1");
+  form.set("success_url", params.successUrl);
+  form.set("cancel_url", params.cancelUrl);
+  form.set("client_reference_id", params.userId);
+  if (params.customerEmail) form.set("customer_email", params.customerEmail);
+  form.set("allow_promotion_codes", "true");
+  // The webhook reads these off the completed session to grant room credits.
+  form.set("metadata[user_id]", params.userId);
+  form.set("metadata[kind]", "room_pack");
+  form.set("metadata[room_count]", String(params.count));
+  form.set("payment_intent_data[metadata][user_id]", params.userId);
+  form.set("payment_intent_data[metadata][kind]", "room_pack");
+  form.set("payment_intent_data[metadata][room_count]", String(params.count));
+
+  const res = await fetch(`${STRIPE_API}/checkout/sessions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secretKey()}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form.toString(),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Stripe pack checkout failed (${res.status}): ${detail}`);
+  }
+  const json = (await res.json()) as { id: string; url: string | null };
+  return { id: json.id, url: json.url };
+}
+
 /**
  * Read a subscription's single line item — the bits needed to change its plan:
  * the item id (si_…), the current price id, and the billing interval. Returns

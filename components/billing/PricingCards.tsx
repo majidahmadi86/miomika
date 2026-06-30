@@ -388,6 +388,82 @@ export function RoomPackCard({
   );
 }
 
+/** Compact one-line plan row — the secondary "or subscribe" option in the rooms paywall. */
+export function PlanRow({
+  plan,
+  lang,
+  billing,
+  loading,
+  onSelect,
+}: {
+  plan: Plan;
+  lang: Lang;
+  billing: Billing;
+  loading?: boolean;
+  onSelect?: () => void;
+}) {
+  const featured = !!plan.highlighted;
+  const yearly = yearlyPriceTHB(plan);
+  const showYearly = billing === "yearly" && yearly != null;
+  // Inline summary: drop the rooms line (implicit here) and "everything in X", keep the meaty bits.
+  const summary = plan.features
+    .filter((f) => !/live speaking room|ห้องพูดสด|everything in|ทุกอย่างใน/i.test(f.en + f.th))
+    .map((f) => t(f, lang))
+    .join(" · ");
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 11,
+        background: "#fff",
+        border: featured ? `2px solid ${TEAL}` : `1px solid ${BORDER}`,
+        borderRadius: 13,
+        padding: "11px 13px",
+        boxShadow: featured ? "0 4px 12px rgba(52,169,143,.1)" : "none",
+      }}
+    >
+      <span style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 5 }}>
+        <span style={{ ...sans, fontSize: 13.5, fontWeight: featured ? 800 : 700, color: featured ? TEAL_DEEP : INK }}>{t(plan.name, lang)}</span>
+        {featured ? (
+          <span style={{ ...sans, fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: "#fff", background: TEAL, borderRadius: 99, padding: "2px 7px" }}>
+            {lang === "th" ? "ยอดนิยม" : "Popular"}
+          </span>
+        ) : null}
+      </span>
+      <span style={{ flex: 1, minWidth: 0, ...sans, fontSize: 11.5, fontWeight: 600, color: "#5a5550", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {summary}
+      </span>
+      <span style={{ flex: "0 0 auto", textAlign: "right" }}>
+        <b style={{ ...sans, fontSize: 15, fontWeight: 800, color: INK }}>
+          ฿{(showYearly ? yearly! : plan.priceTHB!).toLocaleString()}
+        </b>
+        <span style={{ ...sans, fontSize: 10, color: MUTED, fontWeight: 600 }}>{showYearly ? (lang === "th" ? "/ปี" : "/yr") : (lang === "th" ? "/เดือน" : "/mo")}</span>
+      </span>
+      <button
+        onClick={onSelect}
+        disabled={loading}
+        style={{
+          ...sans,
+          flex: "0 0 auto",
+          padding: "8px 14px",
+          borderRadius: 10,
+          border: featured ? "none" : `1.5px solid ${TEAL}`,
+          background: featured ? ACCENT_GRAD : "#fff",
+          color: featured ? "#fff" : TEAL_INK,
+          fontSize: 12,
+          fontWeight: 800,
+          cursor: loading ? "default" : "pointer",
+          opacity: loading ? 0.7 : 1,
+        }}
+      >
+        {loading ? (lang === "th" ? "…" : "…") : lang === "th" ? "เลือก" : "Choose"}
+      </button>
+    </div>
+  );
+}
+
 /** Small uppercase section label ("Plans", "Room packs"). */
 export function PricingSectionLabel({ children }: { children: ReactNodeText }) {
   return (
