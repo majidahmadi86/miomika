@@ -11,7 +11,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <div style={{ fontFamily: "'Quicksand', system-ui, sans-serif", background: "#FBFAF6", minHeight: "100vh", color: "#2A2A28" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "0.5px solid #EDE8E0", background: "#fff" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600 }}>Miomika admin</div>
-        <a href="/home" style={{ fontSize: 12.5, color: "#9A8B73", textDecoration: "none" }}>← back to app</a>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <form method="get" action="/admin/users">
+            <input name="q" placeholder="Search anyone…" style={{ padding: "5px 10px", border: "0.5px solid #D9D3C8", borderRadius: 99, fontSize: 12.5, fontFamily: "inherit", width: 180, background: "#FBFAF6" }} />
+          </form>
+          <a href="/home" style={{ fontSize: 12.5, color: "#9A8B73", textDecoration: "none" }}>← back to app</a>
+        </div>
       </div>
       <AdminNav />
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>{children}</div>

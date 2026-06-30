@@ -17,7 +17,21 @@ type StripeObject = {
   current_period_end?: number;
   items?: { data?: Array<{ price?: { id?: string } }> };
 };
-type StripeEvent = { type?: string; data?: { object?: StripeObject } };
+type StripeEvent = { id?: string; type?: string; data?: { object?: StripeObject } };
+
+// Best-effort log of a received webhook event (after signature verify). Never throws —
+// a logging failure must not affect billing. Idempotent on event_id (Stripe retries).
+async function logWebhookEvent(eventId: string | undefined, type: string, ok: boolean, detail?: string) {
+  try {
+    const supabase = await createServiceClient();
+    await supabase.from("webhook_events").upsert(
+      { event_id: eventId ?? null, type, ok, detail: detail ?? null },
+      { onConflict: "event_id", ignoreDuplicates: true },
+    );
+  } catch (e) {
+    logError("billing", "webhook event log failed", e);
+  }
+}
 
 export async function POST(req: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -172,8 +186,10 @@ export async function POST(req: Request) {
   } catch (e) {
     // Return 500 so Stripe retries — the event was authentic but we failed to apply it.
     logError("billing", "webhook handler error", e);
+    await logWebhookEvent(event.id, type, false, e instanceof Error ? e.message : "handler error");
     return NextResponse.json({ error: "handler error" }, { status: 500 });
   }
 
+  await logWebhookEvent(event.id, type, true);
   return NextResponse.json({ received: true });
 }

@@ -61,7 +61,19 @@ export default async function AdminUsersPage({
     .select("id, email, display_name, tier, subscription_status, room_credits, referral_credit_baht, onboarding_completed_at, last_seen_at")
     .order("last_seen_at", { ascending: false, nullsFirst: false })
     .limit(500);
-  if (q) query = query.or(`email.ilike.%${q}%,display_name.ilike.%${q}%`);
+  if (q) {
+    // Universal search: email / name / referral code / Stripe customer + subscription id,
+    // plus an exact match if the query looks like a user id (uuid).
+    const ors = [
+      `email.ilike.%${q}%`,
+      `display_name.ilike.%${q}%`,
+      `referral_code.ilike.%${q}%`,
+      `stripe_customer_id.ilike.%${q}%`,
+      `stripe_subscription_id.ilike.%${q}%`,
+    ];
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q)) ors.push(`id.eq.${q}`);
+    query = query.or(ors.join(","));
+  }
   if (tierFilter) query = query.eq("tier", tierFilter);
   const { data, error } = await query;
   const rows = (data ?? []) as ProfileRow[];
@@ -114,7 +126,7 @@ export default async function AdminUsersPage({
           type="text"
           name="q"
           defaultValue={q}
-          placeholder="Search email or name"
+          placeholder="Search email, name, referral code, Stripe id, or user id"
           style={{ flex: "1 1 220px", fontFamily: "inherit", fontSize: 13, padding: "9px 12px", borderRadius: 10, border: "1px solid #EDE8E0", outline: "none" }}
         />
         <select name="tier" defaultValue={tierFilter} style={{ fontFamily: "inherit", fontSize: 13, padding: "9px 12px", borderRadius: 10, border: "1px solid #EDE8E0", background: "#fff" }}>

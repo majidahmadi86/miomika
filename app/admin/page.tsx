@@ -10,6 +10,17 @@ const MONTHLY_THB: Record<string, number> = { pro: 299, pro_max: 699 };
 // Stripe statuses that mean "this subscription isn't healthy".
 const BAD_STATUS = ["past_due", "unpaid", "incomplete", "incomplete_expired"];
 
+function ago(d: string | null | undefined): string {
+  if (!d) return "—";
+  const ms = Date.now() - new Date(d).getTime();
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 type Flagged = { id: string; email: string | null; display_name: string | null; tier: string | null; subscription_status: string | null };
 
 async function loadOverviewData() {
@@ -81,11 +92,42 @@ async function loadOverviewData() {
     failed: (failedPay ?? []) as Flagged[],
     drifted: (drift ?? []) as Flagged[],
     hotUsers,
+    ...(await loadPipelineHealth(supabase)),
   };
 }
 
+async function loadPipelineHealth(supabase: Awaited<ReturnType<typeof createServiceClient>>) {
+  const since24 = new Date(Date.now() - 864e5).toISOString();
+  // Provider health from the last 24h of AI calls (real signal, not a synthetic ping).
+  const provider = new Map<string, { calls: number; fails: number }>();
+  let calls24 = 0, fails24 = 0;
+  {
+    const { data } = await supabase.from("llm_usage").select("provider, ok").gte("created_at", since24).limit(50000);
+    for (const r of (data ?? []) as { provider: string | null; ok: boolean }[]) {
+      const p = r.provider || "unknown";
+      const cur = provider.get(p) ?? { calls: 0, fails: 0 };
+      cur.calls++; calls24++;
+      if (r.ok === false) { cur.fails++; fails24++; }
+      provider.set(p, cur);
+    }
+  }
+  const providers = [...provider.entries()].map(([name, s]) => ({ name, calls: s.calls, okPct: s.calls ? Math.round(((s.calls - s.fails) / s.calls) * 100) : null })).sort((a, b) => b.calls - a.calls);
+  const errorRate24 = calls24 ? Math.round((fails24 / calls24) * 100) : 0;
+
+  // Stripe webhook log (may not exist yet until the SQL is run — fail soft).
+  let lastWebhook: { created_at: string; type: string | null; ok: boolean } | null = null;
+  let recentEvents: { created_at: string; type: string | null; ok: boolean }[] = [];
+  try {
+    const { data } = await supabase.from("webhook_events").select("created_at, type, ok").order("created_at", { ascending: false }).limit(8);
+    recentEvents = (data ?? []) as typeof recentEvents;
+    lastWebhook = recentEvents[0] ?? null;
+  } catch { /* table not created yet */ }
+
+  return { providers, calls24, errorRate24, lastWebhook, recentEvents };
+}
+
 export default async function AdminOverviewPage() {
-  const { total, proCount, proMaxCount, activeToday, signups7, paid, free, mrr, conversion, cost7, cost7Thb, failed, drifted, hotUsers } = await loadOverviewData();
+  const { total, proCount, proMaxCount, activeToday, signups7, paid, free, mrr, conversion, cost7, cost7Thb, failed, drifted, hotUsers, providers, calls24, errorRate24, lastWebhook, recentEvents } = await loadOverviewData();
 
   const card: CSSProperties = { background: "#fff", borderRadius: 8, padding: "12px 14px" };
   const lbl: CSSProperties = { fontSize: 12, color: "#9A8B73" };
@@ -114,6 +156,45 @@ export default async function AdminOverviewPage() {
         <div style={card}><div style={lbl}>MRR (est.)</div><div style={big}>฿{mrr.toLocaleString()}</div><div style={{ ...sub, color: "#9A8B73" }}>monthly-equiv</div></div>
         <div style={card}><div style={lbl}>AI cost 7d</div><div style={big}>฿{cost7Thb.toLocaleString()}</div><div style={{ ...sub, color: "#9A8B73" }}>≈ ${cost7.toFixed(2)}</div></div>
         <div style={card}><div style={lbl}>Active today</div><div style={big}>{activeToday.toLocaleString()}</div><div style={{ ...sub, color: "#9A8B73" }}>{total > 0 ? Math.round((activeToday / total) * 100) : 0}% of base</div></div>
+      </div>
+
+      <div style={{ ...section, marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>Pipeline health</span>
+          <span style={{ fontSize: 11, color: "#9A8B73" }}>last 24h · {calls24.toLocaleString()} AI calls</span>
+        </div>
+        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+          {providers.length === 0 ? <span style={{ fontSize: 12.5, color: "#B0A488" }}>No AI calls in the last 24h.</span> : providers.map((p) => {
+            const up = p.okPct !== null && p.okPct >= 80;
+            return (
+              <span key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: up ? "#1D9E75" : "#D8533D" }} />
+                <b style={{ fontWeight: 600 }}>{p.name}</b>
+                <span style={{ color: "#9A8B73" }}>{p.okPct}% ok · {p.calls}</span>
+              </span>
+            );
+          })}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+            <span style={{ color: "#6b675f" }}>error rate</span>
+            <b style={{ fontWeight: 600, color: errorRate24 > 10 ? "#A32D2D" : "#2A2A28" }}>{errorRate24}%</b>
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+            <span style={{ color: "#6b675f" }}>last Stripe webhook</span>
+            {lastWebhook ? (
+              <b style={{ fontWeight: 600, color: lastWebhook.ok ? "#2A2A28" : "#A32D2D" }}>{ago(lastWebhook.created_at)}{lastWebhook.ok ? "" : " · failed"}</b>
+            ) : <span style={{ color: "#B0A488" }}>none yet</span>}
+          </span>
+        </div>
+        {recentEvents.length > 0 && (
+          <div style={{ marginTop: 10, borderTop: "0.5px solid #F2EEE7", paddingTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+            {recentEvents.map((e, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
+                <span style={{ color: "#6b675f" }}><span style={{ color: e.ok ? "#1D9E75" : "#D8533D" }}>{e.ok ? "●" : "○"}</span> {e.type || "—"}</span>
+                <span style={{ color: "#B0A488" }}>{ago(e.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ ...section, marginBottom: 12 }}>
