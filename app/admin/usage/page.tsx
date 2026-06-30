@@ -1,7 +1,9 @@
 import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
+import { COST_ALERT_THB_7D } from "@/lib/admin/cost";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -128,7 +130,7 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
       <div style={{ ...card, marginBottom: 18 }}>
         <h2 style={h2}>Per user</h2>
         <table style={table}><thead><tr><th style={th}>User</th><th style={th}>Email</th><th style={thN}>Calls</th><th style={thN}>Fails</th><th style={thN}>Tokens</th><th style={thN}>Cost</th></tr></thead>
-          <tbody>{byUser.map((u) => { const w = who(u.rs[0].user_id); return (<tr key={u.k}><td style={td}>{w.label}</td><td style={{ ...td, color: "#888", fontSize: 11 }}>{w.sub}</td><td style={tdN}>{u.calls}</td><td style={{ ...tdN, color: failC(u.fails, u.calls) }}>{u.fails}</td><td style={tdN}>{u.tok.toLocaleString()}</td><td style={tdN}>{baht(u.cost)}</td></tr>); })}</tbody></table>
+          <tbody>{byUser.map((u) => { const w = who(u.rs[0].user_id); const thb = Math.round(u.cost * THB_PER_USD); const hot = thb >= COST_ALERT_THB_7D; const id = u.rs[0].user_id; return (<tr key={u.k}><td style={td}>{id ? <Link href={`/admin/users/${id}`} style={{ color: "#1f7a68" }}>{w.label}</Link> : w.label}{hot ? <span style={{ marginLeft: 6, fontSize: 10, background: "#FAEEDA", color: "#854F0B", padding: "1px 6px", borderRadius: 99 }}>hot</span> : null}</td><td style={{ ...td, color: "#888", fontSize: 11 }}>{w.sub}</td><td style={tdN}>{u.calls}</td><td style={{ ...tdN, color: failC(u.fails, u.calls) }}>{u.fails}</td><td style={tdN}>{u.tok.toLocaleString()}</td><td style={{ ...tdN, color: hot ? "#854F0B" : undefined }}>{baht(u.cost)}</td></tr>); })}</tbody></table>
       </div>
 
       <div style={grid}>

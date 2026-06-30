@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/service";
 import UserActions from "@/components/admin/UserActions";
+import { THB_PER_USD, COST_ALERT_THB_7D } from "@/lib/admin/cost";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const THB_PER_USD = 36;
 const BAD_STATUS = ["past_due", "unpaid", "incomplete", "incomplete_expired"];
-const HIGH_COST_THB_7D = 200;
 
 function fmt(d: string | null | undefined) {
   if (!d) return "—";
@@ -62,7 +61,7 @@ export default async function UserCockpitPage({ params }: { params: Promise<{ id
   if (BAD_STATUS.includes(u.subscription_status ?? "")) flags.push({ sev: "danger", text: `Payment ${u.subscription_status} — last charge failed. Check Stripe; manual set-tier if needed.` });
   if ((u.tier ?? "free") === "free" && ["active", "trialing", "past_due"].includes(u.subscription_status ?? "")) flags.push({ sev: "danger", text: "Subscription looks active but tier is free — webhook drift. Set the correct tier below." });
   if (pendingReferral) flags.push({ sev: "warning", text: "Referral unrewarded — this user paid but the ฿30 reward never fired. Use \u201cReward\u201d below." });
-  if (costThb > HIGH_COST_THB_7D) flags.push({ sev: "warning", text: `High AI cost: \u0e3f${costThb} in 7 days. Worth a look for abuse or a loop.` });
+  if (costThb > COST_ALERT_THB_7D) flags.push({ sev: "warning", text: `High AI cost: \u0e3f${costThb} in 7 days. Worth a look for abuse or a loop.` });
 
   const card: React.CSSProperties = { background: "#fff", border: "0.5px solid #EDE8E0", borderRadius: 12, padding: 14 };
   const kv = (k: string, v: React.ReactNode) => (
@@ -116,7 +115,7 @@ export default async function UserCockpitPage({ params }: { params: Promise<{ id
         </div>
         <div style={card}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Last 7 days</div>
-          {kv("AI cost", <span style={{ color: costThb > HIGH_COST_THB_7D ? "#854F0B" : "#2A2A28" }}>฿{costThb} (${cost.toFixed(2)})</span>)}
+          {kv("AI cost", <span style={{ color: costThb > COST_ALERT_THB_7D ? "#854F0B" : "#2A2A28" }}>฿{costThb} (${cost.toFixed(2)})</span>)}
           {kv("AI calls", usage.length)}
           {kv("Failed calls", fails)}
           {kv("Rooms this month", roomsThisMonth)}

@@ -1,11 +1,11 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/service";
+import { THB_PER_USD, COST_ALERT_THB_7D } from "@/lib/admin/cost";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const THB_PER_USD = 36;
 const MONTHLY_THB: Record<string, number> = { pro: 299, pro_max: 699 };
 // Stripe statuses that mean "this subscription isn't healthy".
 const BAD_STATUS = ["past_due", "unpaid", "incomplete", "incomplete_expired"];
@@ -34,16 +34,32 @@ async function loadOverviewData() {
   const mrr = proCount * MONTHLY_THB.pro + proMaxCount * MONTHLY_THB.pro_max;
   const conversion = total > 0 ? ((paid / total) * 100).toFixed(1) : "0";
 
-  // AI cost, last 7 days (same source as the cost tab).
+  // AI cost, last 7 days (same source as the cost tab) — totals + per-user, in one pass.
   let cost7 = 0;
+  const perUser = new Map<string, number>();
   {
-    const { data } = await supabase.from("llm_usage").select("est_cost_usd").gte("created_at", since7).limit(50000);
-    for (const r of (data ?? []) as { est_cost_usd: number | string }[]) {
+    const { data } = await supabase.from("llm_usage").select("est_cost_usd, user_id").gte("created_at", since7).limit(50000);
+    for (const r of (data ?? []) as { est_cost_usd: number | string; user_id: string | null }[]) {
       const v = typeof r.est_cost_usd === "string" ? parseFloat(r.est_cost_usd) : r.est_cost_usd;
-      if (Number.isFinite(v)) cost7 += v;
+      if (!Number.isFinite(v)) continue;
+      cost7 += v;
+      if (r.user_id) perUser.set(r.user_id, (perUser.get(r.user_id) ?? 0) + v);
     }
   }
   const cost7Thb = Math.round(cost7 * THB_PER_USD);
+
+  // (c) High AI cost: any user over the alert threshold in the window (catch money-burn early).
+  const hot = [...perUser.entries()]
+    .map(([id, usd]) => ({ id, thb: Math.round(usd * THB_PER_USD) }))
+    .filter((u) => u.thb >= COST_ALERT_THB_7D)
+    .sort((a, b) => b.thb - a.thb)
+    .slice(0, 20);
+  let hotUsers: { id: string; email: string | null; display_name: string | null; thb: number }[] = [];
+  if (hot.length) {
+    const { data: hp } = await supabase.from("profiles").select("id, email, display_name").in("id", hot.map((h) => h.id));
+    const byId = new Map((((hp ?? []) as { id: string; email: string | null; display_name: string | null }[]).map((p) => [p.id, p])));
+    hotUsers = hot.map((h) => ({ id: h.id, email: byId.get(h.id)?.email ?? null, display_name: byId.get(h.id)?.display_name ?? null, thb: h.thb }));
+  }
 
   // NEEDS ATTENTION — cheaply + reliably detectable problems.
   // (a) Failed payments: a paid tier with an unhealthy subscription status.
@@ -64,11 +80,12 @@ async function loadOverviewData() {
     total, proCount, proMaxCount, activeToday, signups7, paid, free, mrr, conversion, cost7, cost7Thb,
     failed: (failedPay ?? []) as Flagged[],
     drifted: (drift ?? []) as Flagged[],
+    hotUsers,
   };
 }
 
 export default async function AdminOverviewPage() {
-  const { total, proCount, proMaxCount, activeToday, signups7, paid, free, mrr, conversion, cost7, cost7Thb, failed, drifted } = await loadOverviewData();
+  const { total, proCount, proMaxCount, activeToday, signups7, paid, free, mrr, conversion, cost7, cost7Thb, failed, drifted, hotUsers } = await loadOverviewData();
 
   const card: CSSProperties = { background: "#fff", borderRadius: 8, padding: "12px 14px" };
   const lbl: CSSProperties = { fontSize: 12, color: "#9A8B73" };
@@ -102,10 +119,10 @@ export default async function AdminOverviewPage() {
       <div style={{ ...section, marginBottom: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 700 }}>Needs attention</span>
-          <span style={{ fontSize: 11, color: "#9A8B73" }}>{failed.length + drifted.length} item{failed.length + drifted.length === 1 ? "" : "s"}</span>
+          <span style={{ fontSize: 11, color: "#9A8B73" }}>{failed.length + drifted.length + hotUsers.length} item{failed.length + drifted.length + hotUsers.length === 1 ? "" : "s"}</span>
         </div>
 
-        {failed.length === 0 && drifted.length === 0 ? (
+        {failed.length === 0 && drifted.length === 0 && hotUsers.length === 0 ? (
           <div style={{ fontSize: 12.5, color: "#1F7A68", padding: "6px 0" }}>All clear — no payment failures or tier drift.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -114,7 +131,7 @@ export default async function AdminOverviewPage() {
                 <span style={{ flex: 1, fontSize: 12.5, color: "#A32D2D" }}>
                   <b>{who(f)}</b> — payment {f.subscription_status} ({f.tier})
                 </span>
-                <a href={`/admin/users?q=${encodeURIComponent(f.email ?? "")}`} style={{ fontSize: 12, color: "#A32D2D", fontWeight: 600 }}>Open →</a>
+                <Link href={`/admin/users?q=${encodeURIComponent(f.email ?? "")}`} style={{ fontSize: 12, color: "#A32D2D", fontWeight: 600 }}>Open →</Link>
               </div>
             ))}
             {drifted.map((f) => (
@@ -122,7 +139,15 @@ export default async function AdminOverviewPage() {
                 <span style={{ flex: 1, fontSize: 12.5, color: "#854F0B" }}>
                   <b>{who(f)}</b> — sub {f.subscription_status} but tier is free (webhook drift)
                 </span>
-                <a href={`/admin/users?q=${encodeURIComponent(f.email ?? "")}`} style={{ fontSize: 12, color: "#854F0B", fontWeight: 600 }}>Open →</a>
+                <Link href={`/admin/users?q=${encodeURIComponent(f.email ?? "")}`} style={{ fontSize: 12, color: "#854F0B", fontWeight: 600 }}>Open →</Link>
+              </div>
+            ))}
+            {hotUsers.map((h) => (
+              <div key={`h-${h.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#FAEEDA", borderRadius: 8 }}>
+                <span style={{ flex: 1, fontSize: 12.5, color: "#854F0B" }}>
+                  <b>{h.display_name || h.email || h.id.slice(0, 8)}</b> — high AI cost ฿{h.thb} in 7d
+                </span>
+                <Link href={`/admin/users/${h.id}`} style={{ fontSize: 12, color: "#854F0B", fontWeight: 600 }}>Open →</Link>
               </div>
             ))}
           </div>
@@ -140,7 +165,7 @@ export default async function AdminOverviewPage() {
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Quick links</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5 }}>
             <Link href="/admin/users" style={{ color: "#2C8E76", fontWeight: 600 }}>Browse + manage users →</Link>
-            <a href="/admin/usage" style={{ color: "#2C8E76", fontWeight: 600 }}>AI cost &amp; usage breakdown →</a>
+            <Link href="/admin/usage" style={{ color: "#2C8E76", fontWeight: 600 }}>AI cost &amp; usage breakdown →</Link>
             <span style={{ color: "#B0A488" }}>Revenue &amp; Audit tabs — coming in the next pass.</span>
           </div>
         </div>
