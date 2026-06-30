@@ -14,7 +14,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("referral_code")
+    .select("referral_code, referral_credit_baht")
     .eq("id", user.id)
     .single();
 
@@ -26,5 +26,6 @@ export async function GET() {
   return NextResponse.json({
     code: profile?.referral_code ?? null,
     invitedCount: count ?? 0,
+    creditBaht: profile?.referral_credit_baht ?? 0,
   });
 }

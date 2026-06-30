@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createPackCheckoutSession, packPriceId } from "@/lib/billing/stripe-rest";
+import { resolveReferralDiscount } from "@/lib/billing/referral-discount";
 import { ROOM_PACKS } from "@/lib/billing/tiers";
 import { log, logError } from "@/lib/debug/log";
 
@@ -40,6 +41,9 @@ export async function POST(req: Request) {
     req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
 
   try {
+    const priceBaht = ROOM_PACKS.find((p) => p.count === count)?.priceTHB ?? 0;
+    const discount = priceBaht > 0 ? await resolveReferralDiscount(profile.id, priceBaht) : null;
+
     const session = await createPackCheckoutSession({
       priceId,
       count,
@@ -47,6 +51,7 @@ export async function POST(req: Request) {
       userId: profile.id,
       successUrl: `${base}/learn?pack=${count}`,
       cancelUrl: `${base}/learn`,
+      discount,
     });
     if (!session.url) {
       return NextResponse.json({ error: "Could not start checkout." }, { status: 502 });

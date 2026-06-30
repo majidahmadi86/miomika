@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifyStripeEvent, tierForPriceId } from "@/lib/billing/stripe-rest";
+import { REFERRAL_REWARD_BAHT } from "@/lib/billing/tiers";
 import { log, logError } from "@/lib/debug/log";
 
 // Minimal shape of the Stripe objects we read — enough to stay off `any`.
@@ -86,6 +87,52 @@ export async function POST(req: Request) {
             await supabase.from("profiles").update({ room_credits: next }).eq("id", userId);
             log("billing", `granted ${count} room credits to ${userId} (now ${next})`);
           }
+        }
+      }
+
+      // ---- Referral credit, on ANY completed checkout (subscription or pack) ----
+      const sessionId = obj.id ?? null;
+
+      // (a) Spend: this checkout applied the buyer's own referral credit → decrement.
+      const applied = Number(obj.metadata?.referral_credit_applied ?? 0);
+      if (userId && Number.isFinite(applied) && applied > 0 && sessionId) {
+        const alreadySpent = await supabase
+          .from("credit_ledger").select("id").eq("ref", sessionId).eq("reason", "spent").maybeSingle();
+        if (!alreadySpent.data) {
+          const { error: spendErr } = await supabase
+            .from("credit_ledger").insert({ user_id: userId, delta: -applied, reason: "spent", ref: sessionId });
+          if (spendErr) throw spendErr;
+          const { data: pr } = await supabase
+            .from("profiles").select("referral_credit_baht").eq("id", userId).maybeSingle();
+          const left = Math.max(0, (pr?.referral_credit_baht ?? 0) - applied);
+          await supabase.from("profiles").update({ referral_credit_baht: left }).eq("id", userId);
+          log("billing", `spent ${applied} referral baht for ${userId} (now ${left})`);
+        }
+      }
+
+      // (b) Earn: a referred friend's FIRST payment rewards BOTH people, exactly once.
+      // The rewarded flag flips false->true atomically, so only one webhook grants.
+      if (userId) {
+        const { data: conv } = await supabase
+          .from("referral_conversions")
+          .update({ rewarded: true, rewarded_at: new Date().toISOString() })
+          .eq("referred_id", userId)
+          .eq("rewarded", false)
+          .select("referrer_id, referred_id")
+          .maybeSingle();
+        if (conv?.referrer_id) {
+          for (const uid of [conv.referrer_id as string, conv.referred_id as string]) {
+            await supabase
+              .from("credit_ledger")
+              .insert({ user_id: uid, delta: REFERRAL_REWARD_BAHT, reason: "referral_earned", ref: sessionId });
+            const { data: p } = await supabase
+              .from("profiles").select("referral_credit_baht").eq("id", uid).maybeSingle();
+            await supabase
+              .from("profiles")
+              .update({ referral_credit_baht: (p?.referral_credit_baht ?? 0) + REFERRAL_REWARD_BAHT })
+              .eq("id", uid);
+          }
+          log("billing", `referral reward +${REFERRAL_REWARD_BAHT} to ${conv.referrer_id} & ${conv.referred_id}`);
         }
       }
     } else if (type === "customer.subscription.created" || type === "customer.subscription.updated") {

@@ -83,6 +83,9 @@ export const ANNUAL_MONTHS_CHARGED = 10;
 /** Whole-percent saving vs paying monthly for twelve months. */
 export const ANNUAL_SAVING_PCT = Math.round((1 - ANNUAL_MONTHS_CHARGED / 12) * 100);
 
+/** Referral reward: both people get this many baht when the referred friend first pays. */
+export const REFERRAL_REWARD_BAHT = 30;
+
 /** Annual total in THB for a plan (null for free). */
 export function yearlyPriceTHB(plan: Plan): number | null {
   return plan.priceTHB == null ? null : plan.priceTHB * ANNUAL_MONTHS_CHARGED;

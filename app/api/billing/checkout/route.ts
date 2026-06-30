@@ -3,6 +3,8 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createCheckoutSession, priceIdFor, type BillingPlan, type BillingInterval } from "@/lib/billing/stripe-rest";
+import { resolveReferralDiscount } from "@/lib/billing/referral-discount";
+import { UPGRADE_PLANS, yearlyPriceTHB } from "@/lib/billing/tiers";
 import { log, logError } from "@/lib/debug/log";
 
 export async function POST(req: Request) {
@@ -40,6 +42,11 @@ export async function POST(req: Request) {
     req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
 
   try {
+    const planObj = UPGRADE_PLANS.find((p) => p.id === plan);
+    const priceBaht =
+      interval === "yearly" ? yearlyPriceTHB(planObj!) ?? 0 : planObj?.priceTHB ?? 0;
+    const discount = priceBaht > 0 ? await resolveReferralDiscount(profile.id, priceBaht) : null;
+
     const session = await createCheckoutSession({
       priceId,
       customerEmail: profile.email,
@@ -48,6 +55,7 @@ export async function POST(req: Request) {
       interval,
       successUrl: `${base}/learn?upgraded=1`,
       cancelUrl: `${base}/learn`,
+      discount,
     });
     if (!session.url) {
       return NextResponse.json({ error: "Could not start checkout." }, { status: 502 });

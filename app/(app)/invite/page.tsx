@@ -10,6 +10,7 @@ export default function InvitePage() {
   const isThai = useUILanguage() === "th";
   const [code, setCode] = useState<string | null>(null);
   const [invitedCount, setInvitedCount] = useState(0);
+  const [creditBaht, setCreditBaht] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "guest">("loading");
   const [copied, setCopied] = useState(false);
 
@@ -26,6 +27,7 @@ export default function InvitePage() {
         if (!active) return;
         setCode(data.code ?? null);
         setInvitedCount(data.invitedCount ?? 0);
+        setCreditBaht(data.creditBaht ?? 0);
         setStatus("ready");
       } catch {
         if (active) setStatus("guest");
@@ -51,6 +53,7 @@ export default function InvitePage() {
         share: "แชร์",
         invited: (n: number) =>
           n === 0 ? "ยังไม่มีเพื่อนเข้าร่วม" : `เพื่อนเข้าร่วมแล้ว ${n} คน`,
+        credit: (n: number) => `เครดิตของคุณ ฿${n}`,
         scan: "ให้เพื่อนสแกนเพื่อเข้าร่วม",
         guestTitle: "เข้าสู่ระบบเพื่อรับลิงก์ชวนเพื่อน",
         login: "เข้าสู่ระบบ",
@@ -66,6 +69,7 @@ export default function InvitePage() {
         share: "Share",
         invited: (n: number) =>
           n === 0 ? "No friends joined yet" : `${n} friend${n === 1 ? "" : "s"} joined`,
+        credit: (n: number) => `Your credit ฿${n}`,
         scan: "Friends can scan this to join",
         guestTitle: "Log in to get your invite link",
         login: "Log in",
@@ -159,6 +163,11 @@ export default function InvitePage() {
             <p className="mt-5 text-sm font-medium text-earned-strong">
               {t.invited(invitedCount)}
             </p>
+            {creditBaht > 0 ? (
+              <p className="mt-1.5 inline-block rounded-full bg-earned-soft px-3 py-1 text-sm font-semibold text-earned-strong">
+                {t.credit(creditBaht)}
+              </p>
+            ) : null}
           </div>
         )}
       </div>

@@ -35,6 +35,35 @@ export function tierForPriceId(priceId: string): { tier: BillingPlan; interval: 
   return null;
 }
 
+/**
+ * Create a single-use amount-off coupon for a referral-credit discount.
+ * `amountBaht` is whole baht; Stripe wants the smallest unit (satang), so x100.
+ * Expires in 24h so an abandoned checkout doesn't leave a live coupon around.
+ */
+export async function createDiscountCoupon(amountBaht: number): Promise<string> {
+  const form = new URLSearchParams();
+  form.set("amount_off", String(Math.round(amountBaht * 100)));
+  form.set("currency", "thb");
+  form.set("duration", "once");
+  form.set("max_redemptions", "1");
+  form.set("redeem_by", String(Math.floor(Date.now() / 1000) + 24 * 60 * 60));
+  form.set("name", "Referral credit");
+  const res = await fetch(`${STRIPE_API}/coupons`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secretKey()}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form.toString(),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Stripe coupon create failed (${res.status}): ${detail}`);
+  }
+  const json = (await res.json()) as { id: string };
+  return json.id;
+}
+
 /** Create a Stripe Checkout Session (subscription mode) and return its hosted URL. */
 export async function createCheckoutSession(params: {
   priceId: string;
@@ -44,6 +73,7 @@ export async function createCheckoutSession(params: {
   interval: BillingInterval;
   successUrl: string;
   cancelUrl: string;
+  discount?: { couponId: string; appliedBaht: number } | null;
 }): Promise<{ id: string; url: string | null }> {
   const form = new URLSearchParams();
   form.set("mode", "subscription");
@@ -53,7 +83,14 @@ export async function createCheckoutSession(params: {
   form.set("cancel_url", params.cancelUrl);
   form.set("client_reference_id", params.userId);
   if (params.customerEmail) form.set("customer_email", params.customerEmail);
-  form.set("allow_promotion_codes", "true");
+  // A coupon and promo-code entry are mutually exclusive in Checkout — when we
+  // auto-apply referral credit, use the coupon; otherwise let users enter codes.
+  if (params.discount) {
+    form.set("discounts[0][coupon]", params.discount.couponId);
+    form.set("metadata[referral_credit_applied]", String(params.discount.appliedBaht));
+  } else {
+    form.set("allow_promotion_codes", "true");
+  }
   // Carried back to us on the session + the subscription so the webhook knows who paid.
   form.set("metadata[user_id]", params.userId);
   form.set("metadata[plan]", params.plan);
@@ -93,6 +130,7 @@ export async function createPackCheckoutSession(params: {
   userId: string;
   successUrl: string;
   cancelUrl: string;
+  discount?: { couponId: string; appliedBaht: number } | null;
 }): Promise<{ id: string; url: string | null }> {
   const form = new URLSearchParams();
   form.set("mode", "payment");
@@ -102,7 +140,12 @@ export async function createPackCheckoutSession(params: {
   form.set("cancel_url", params.cancelUrl);
   form.set("client_reference_id", params.userId);
   if (params.customerEmail) form.set("customer_email", params.customerEmail);
-  form.set("allow_promotion_codes", "true");
+  if (params.discount) {
+    form.set("discounts[0][coupon]", params.discount.couponId);
+    form.set("metadata[referral_credit_applied]", String(params.discount.appliedBaht));
+  } else {
+    form.set("allow_promotion_codes", "true");
+  }
   // The webhook reads these off the completed session to grant room credits.
   form.set("metadata[user_id]", params.userId);
   form.set("metadata[kind]", "room_pack");
