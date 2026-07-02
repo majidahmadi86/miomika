@@ -66,11 +66,11 @@ function resolve(w: CanonicalWord, target: Target) {
 function PlayBtn({ onClick, size = 46, soft = false, label }: { onClick: () => void; size?: number; soft?: boolean; label: string }) {
   return (
     <button aria-label={label} onClick={onClick} style={{
-      width: size, height: size, borderRadius: "50%", border: soft ? `0.5px solid #D7E8E1` : "none",
-      background: soft ? "#FFFFFF" : MINT, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flex: "0 0 auto",
+      width: size, height: size, borderRadius: "50%", border: "none",
+      background: soft ? MINT_SOFT : MINT, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flex: "0 0 auto",
     }}>
-      <svg width={size * 0.42} height={size * 0.42} viewBox="0 0 24 24" fill={soft ? MINT_DEEP : "#fff"} aria-hidden="true">
-        <path d="M8 5.5v13l11-6.5z" />
+      <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill={soft ? MINT_DEEP : "#fff"} aria-hidden="true">
+        <path d="M8.6 5.4 L19.2 12 L8.6 18.6 Z" />
       </svg>
     </button>
   );
@@ -88,8 +88,8 @@ function Star({ saved, onToggle }: { saved?: boolean; onToggle?: () => void }) {
 }
 
 // ---------- FULL CARD ----------
-export function WordCardFull({ word, target, onSpeak, saved, onToggleSave }: {
-  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void;
+export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCollapse }: {
+  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void; onCollapse?: () => void;
 }) {
   const r = resolve(word, target);
   const [showMore, setShowMore] = useState(false);
@@ -101,6 +101,11 @@ export function WordCardFull({ word, target, onSpeak, saved, onToggleSave }: {
         {word.cefr_level ? <span style={{ background: LAV_SOFT, color: LAV_DEEP, fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 99 }}>{word.cefr_level}</span> : null}
         <span style={{ flex: 1 }} />
         <Star saved={saved} onToggle={onToggleSave} />
+        {onCollapse ? (
+          <button aria-label="Collapse" onClick={onCollapse} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, lineHeight: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B9C7C0" strokeWidth="2.2" aria-hidden="true"><path d="M6 14l6-6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        ) : null}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -164,9 +169,7 @@ export function WordRow({ word, target, onSpeak, saved, onToggleSave, defaultOpe
   if (open) {
     return (
       <div style={{ marginBottom: 10 }}>
-        <div onClick={() => setOpen(false)} style={{ cursor: "pointer" }}>
-          <WordCardFull word={word} target={target} onSpeak={onSpeak} saved={saved} onToggleSave={onToggleSave} />
-        </div>
+        <WordCardFull word={word} target={target} onSpeak={onSpeak} saved={saved} onToggleSave={onToggleSave} onCollapse={() => setOpen(false)} />
       </div>
     );
   }
