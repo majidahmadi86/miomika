@@ -74,6 +74,13 @@ export async function POST(request: NextRequest) {
   if (!text) {
     return NextResponse.json({ error: "text_required" }, { status: 400 });
   }
+  // Hard cap: this endpoint is reachable by guests (voice is the conversion
+  // funnel), so bound the cost of any single request. Miomi's spoken replies
+  // are short; 1200 chars is generous headroom for Thai + transliteration. Longer is
+  // not a legitimate product request.
+  if (text.length > 1200) {
+    return NextResponse.json({ error: "text_too_long" }, { status: 400 });
+  }
 
   const lang = body.lang;
   if (lang !== "th" && lang !== "en") {
