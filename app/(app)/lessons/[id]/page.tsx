@@ -32,14 +32,6 @@ const HEAD_HAPPY = "/miomi/head-happy.png";
 const HEAD_THINKING = "/miomi/head-thinking.png";
 const CELEBRATION = "/characters/miomi/companion/companion-celebration.png";
 
-const TOPIC_HEX: Record<string, { edge: string; soft: string }> = {
-  peach: { edge: "#FDBA74", soft: "#FEF1E3" },
-  pink: { edge: "#F9A8D4", soft: "#FDEAF4" },
-  lavender: { edge: "#C4B5FD", soft: "#F1EEFE" },
-  mint: { edge: "#A7F3D0", soft: "#EBFBF4" },
-  teal: { edge: "#7DD3C0", soft: "#E9F8F4" },
-  coral: { edge: "#FCA5A5", soft: "#FEEFEF" },
-};
 const INK = "#4A4136", INK_STRONG = "#3C352B", MUTED = "#9A8B73",
   BORDER = "#EDE8E0", TEAL = "#7DD3C0", TEAL_DEEP = "#3E9C82",
   TEAL_SOFT = "#E9F8F4", CORAL_SOFT = "#FEEFEF", CORAL = "#FCA5A5",
@@ -136,7 +128,8 @@ export default function LessonPlayerPage() {
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [missing, setMissing] = useState(false);
   const [step, setStep] = useState(0);
-  const [maxVisited, setMaxVisited] = useState(0);
+  // Highest step reached — write-only here (persisted via patch); no longer displayed since the dotted trail was removed.
+  const [, setMaxVisited] = useState(0);
   const [games, setGames] = useState<Record<string, boolean>>({});
   const [result, setResult] = useState<{ kind: "gold" | "silver" | "almost"; score: number; total: number } | null>(null);
   const [attempt, setAttempt] = useState(1);
@@ -195,7 +188,6 @@ export default function LessonPlayerPage() {
   const phrases = useMemo(() => lesson?.content?.phrases ?? [], [lesson]);
   const candos = useMemo(() => lesson?.content?.candos ?? [], [lesson]);
   const target = lesson?.learning_target ?? "th";
-  const tcol = TOPIC_HEX[lesson?.color ?? "peach"] ?? TOPIC_HEX.peach;
 
   const say = useCallback((text: string) => {
     try { void speak(text, detectLang(text)); } catch { /* audio is best-effort */ }
@@ -219,9 +211,9 @@ export default function LessonPlayerPage() {
   return (
     <div style={{ position: "relative", height: "100%", overflow: "hidden", background: "transparent" }}>
       <div style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", padding: "22px 18px 96px" }}>
-        <div style={{ maxWidth: 768, margin: "0 auto", width: "100%" }}>
+        <div style={{ background: "#FAF8F2", borderRadius: 16, padding: "22px 26px", maxWidth: 640, margin: "0 auto" }}>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ background: "#fff", border: "0.5px solid #EBE6DC", borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14 }}>
           <button
             onClick={() => { if (step > 0 && step < 5) go(step - 1); else router.push("/lessons"); }}
             aria-label={step > 0 && step < 5 ? "Back one step" : "Back to lessons"}
@@ -232,48 +224,24 @@ export default function LessonPlayerPage() {
           >
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke={INK} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
           </button>
-          <div>
-            <div style={{ ...font, fontSize: 14, fontWeight: 700, color: INK_STRONG, lineHeight: 1.2 }}>{lesson.title_en}</div>
-            <div style={{ ...font, fontSize: 11, fontWeight: 600, color: MUTED, marginTop: 1 }}>
-              {lesson.cefr_level} · {target === "en" ? "English" : "Thai"} · {lesson.topic}
+          <span aria-hidden style={{ width: 34, height: 34, borderRadius: 12, background: "#E7F3EF", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px" }}>
+            <BookOpen style={{ width: 17, height: 17, color: "#1F7A68" }} strokeWidth={2} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ ...font, fontSize: 14.5, fontWeight: 600, color: "#1B4F43", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {lesson.title_en} <span style={{ fontWeight: 500, color: "#B4A88E", fontSize: 11.5 }}>· {lesson.cefr_level} · {target === "en" ? "English" : "Thai"}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+              {TRAIL.map((t, i) => (
+                <span key={t} style={{ height: 5, flex: 1, borderRadius: 99, background: i <= trailPos ? "#2C8E76" : "#EDE7DA" }} />
+              ))}
             </div>
           </div>
+          <span style={{ ...font, fontSize: 11.5, fontWeight: 600, color: "#8A857A", background: "#F4F0E6", borderRadius: 99, padding: "3px 11px", whiteSpace: "nowrap" }}>
+            {TRAIL[trailPos]} · {trailPos + 1} of 5
+          </span>
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", margin: "16px 2px 4px" }}>
-          {TRAIL.map((label, i) => {
-            const reachable = i <= maxVisited || step === 5;
-            return (
-              <span key={label} style={{ display: "contents" }}>
-                <button
-                  onClick={() => reachable && step !== 5 && go(i)}
-                  aria-label={`Go to ${label}`}
-                  style={{
-                    width: 13, height: 13, borderRadius: "50%", flex: "0 0 13px", padding: 0,
-                    cursor: reachable && step !== 5 ? "pointer" : "default",
-                    background: i < trailPos || step === 5 ? TEAL : i === trailPos && step < 5 ? tcol.edge : "#fff",
-                    border: `2px solid ${i < trailPos || step === 5 ? TEAL : i === trailPos && step < 5 ? tcol.edge : reachable ? "#CFC8BC" : BORDER}`,
-                    transform: i === trailPos && step < 5 ? "scale(1.25)" : "none",
-                    transition: "all .25s ease",
-                  }}
-                />
-                {i < TRAIL.length - 1 ? (
-                  <span style={{ flex: 1, borderTop: `2px dotted ${i < trailPos || step === 5 ? TEAL : "#E0D8C8"}`, margin: "0 3px" }} />
-                ) : null}
-              </span>
-            );
-          })}
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", margin: "0 0 6px" }}>
-          {TRAIL.map((t) => (
-            <span key={t} style={{ ...font, fontSize: 9, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C4BDB5" }}>{t}</span>
-          ))}
-        </div>
-        {step > 0 && step < 5 ? (
-          <button onClick={() => go(step - 1)} style={{ ...font, fontSize: 12, fontWeight: 700, color: MUTED, background: "none", border: "none", cursor: "pointer", padding: "4px 0 10px" }}>
-            ← Back to {TRAIL[step - 1]}
-          </button>
-        ) : <span style={{ display: "block", height: 12 }} />}
+        <div style={{ height: 18 }} />
 
         {step === 0 ? <IntroStep lesson={lesson} review={lesson.status === "completed"} onNext={() => go(1)} /> : null}
         {step === 1 ? <WordsStep words={words} target={target} say={say} onExtend={extend} onNext={() => go(2)} /> : null}
@@ -375,13 +343,13 @@ function WordsStep({ words, target, say, onExtend, onNext }: { words: WordItem[]
   const [focusIdx, setFocusIdx] = useState(0);
   return (
     <div>
-      <SectionIntro icon={BookOpen} bg={TEAL_SOFT} fg={TEAL_DEEP}
-        title={`${words.length} words to know`}
-        subtitle="Tap any sound — hear Miomi, then say it."
-      />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "0 2px 10px" }}>
+        <span style={{ ...font, fontSize: 16, fontWeight: 600, color: "#1B4F43" }}>{words.length} words to know</span>
+        <span style={{ ...font, fontSize: 12, color: "#9A8B73" }}>tap any word — hear Miomi, then say it</span>
+      </div>
       {words.length ? (
         <div style={{ marginBottom: 10 }}>
-          <WordCardFull word={fromLessonWord(words[Math.min(focusIdx, words.length - 1)])} target={target === "en" ? "en" : "th"} onSpeak={(t) => say(t)} />
+          <WordCardFull word={fromLessonWord(words[Math.min(focusIdx, words.length - 1)])} target={target === "en" ? "en" : "th"} onSpeak={(t) => say(t)} layout="wide" />
         </div>
       ) : null}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8, marginBottom: 10 }}>
@@ -404,7 +372,11 @@ function WordsStep({ words, target, say, onExtend, onNext }: { words: WordItem[]
       ) : (
         <p style={{ ...font, fontSize: 12, fontWeight: 700, color: "#3E7A66", textAlign: "center", margin: "4px 0 14px" }}>Added — chosen for this topic, verified before shown.</p>
       )}
-      <PrimaryBtn label="Got them — phrases next" onClick={onNext} />
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 2 }}>
+        <button onClick={onNext} style={{ ...font, background: "#2C8E76", color: "#fff", fontSize: 13, fontWeight: 600, borderRadius: 99, padding: "10px 22px", border: "none", cursor: "pointer" }}>
+          Got them — phrases next
+        </button>
+      </div>
     </div>
   );
 }

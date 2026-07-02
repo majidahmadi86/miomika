@@ -69,8 +69,9 @@ function PlayBtn({ onClick, size = 46, soft = false, label }: { onClick: () => v
       width: size, height: size, borderRadius: "50%", border: "none",
       background: soft ? MINT_SOFT : MINT, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flex: "0 0 auto",
     }}>
-      <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill="none" stroke={soft ? MINT_DEEP : "#fff"} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true">
-        <path d="M8.5 5.3 L18.8 12 L8.5 18.7 Z" />
+      <svg width={size * 0.52} height={size * 0.52} viewBox="0 0 24 24" fill="none" stroke={soft ? MINT_DEEP : "#fff"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M15 8a5 5 0 0 1 0 8" />
+        <path d="M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l3.5 -4.5a.8 .8 0 0 1 1.5 .5v14a.8 .8 0 0 1 -1.5 .5z" />
       </svg>
     </button>
   );
@@ -88,13 +89,14 @@ function Star({ saved, onToggle }: { saved?: boolean; onToggle?: () => void }) {
 }
 
 // ---------- FULL CARD ----------
-export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCollapse }: {
-  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void; onCollapse?: () => void;
+export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCollapse, layout }: {
+  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void; onCollapse?: () => void; layout?: "wide";
 }) {
   const r = resolve(word, target);
   const [showMore, setShowMore] = useState(false);
+  const wide = layout === "wide";
   return (
-    <div style={{ fontFamily: Q, background: "#fff", border: `0.5px solid ${CARD_BORDER}`, borderRadius: 16, padding: "16px 16px 13px", color: INK }}>
+    <div style={{ fontFamily: Q, background: "#fff", border: wide ? "1.5px solid #BFE0D5" : `0.5px solid ${CARD_BORDER}`, borderRadius: 16, padding: "16px 16px 13px", color: INK }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 11 }}>
         {word.pos ? <span style={{ fontFamily: r.tipThai ? TH_FONT : Q, background: MINT_SOFT, color: MINT_DEEP, fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 99 }}>{word.pos}</span> : null}
         {word.register ? <span style={{ fontFamily: r.tipThai ? TH_FONT : Q, background: PINK_SOFT, color: PINK_DEEP, fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 99 }}>{word.register}</span> : null}
@@ -108,16 +110,40 @@ export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCol
         ) : null}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: r.headThai ? TH_FONT : Q, fontSize: r.headThai ? 33 : 30, fontWeight: 600, lineHeight: 1.15, color: HEAD }}>{r.head}</div>
-          {r.pron ? <div style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 15, color: MINT, fontWeight: 600, marginTop: 2 }}>{r.pron}</div> : null}
-          <div style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 14.5, color: INK, marginTop: 5 }}>{r.meaning}</div>
+      {wide ? (
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div style={{ flex: "0 0 auto" }}>
+            <div style={{ fontFamily: r.headThai ? TH_FONT : Q, fontSize: 32, fontWeight: 600, lineHeight: 1.1, color: HEAD }}>{r.head}</div>
+            {r.pron ? <div style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 14, color: MINT, fontWeight: 600, marginTop: 2 }}>{r.pron}</div> : null}
+          </div>
+          <div style={{ flex: 1, minWidth: 220, borderLeft: "0.5px solid #EDE7DA", paddingLeft: 16 }}>
+            <div style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 14, color: INK }}>{r.meaning}</div>
+            {r.ex ? (
+              <>
+                <div style={{ fontFamily: r.exThai ? TH_FONT : Q, fontSize: 13.5, color: "#22443B", marginTop: 6 }}>
+                  {r.ex}{" "}
+                  <span style={{ display: "inline-block", verticalAlign: "-7px", lineHeight: 0 }}>
+                    <PlayBtn onClick={() => onSpeak(r.ex!, r.exLang)} size={24} soft label="Play example" />
+                  </span>
+                </div>
+                {r.exTrans ? <div style={{ fontFamily: r.exThai ? Q : TH_FONT, fontSize: 11.5, color: MUTED }}>{r.exTrans}</div> : null}
+              </>
+            ) : null}
+          </div>
+          <PlayBtn onClick={() => onSpeak(r.head, r.headLang)} size={46} label="Play audio" />
         </div>
-        <PlayBtn onClick={() => onSpeak(r.head, r.headLang)} label="Play audio" />
-      </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: r.headThai ? TH_FONT : Q, fontSize: r.headThai ? 33 : 30, fontWeight: 600, lineHeight: 1.15, color: HEAD }}>{r.head}</div>
+            {r.pron ? <div style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 15, color: MINT, fontWeight: 600, marginTop: 2 }}>{r.pron}</div> : null}
+            <div style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 14.5, color: INK, marginTop: 5 }}>{r.meaning}</div>
+          </div>
+          <PlayBtn onClick={() => onSpeak(r.head, r.headLang)} label="Play audio" />
+        </div>
+      )}
 
-      {r.ex ? (
+      {!wide && r.ex ? (
         <div style={{ background: EX_BG, border: `0.5px solid ${EX_BORDER}`, borderRadius: 12, padding: "10px 12px", marginTop: 13 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -203,7 +229,10 @@ export function WordChip({ word, target, onSpeak, onOpen }: {
   const r = resolve(word, target);
   return (
     <button onClick={onOpen ?? (() => onSpeak(r.head, r.headLang))} style={{ fontFamily: Q, display: "inline-flex", alignItems: "center", gap: 7, background: "#fff", border: "0.5px solid #CFE7DF", borderRadius: 99, padding: "5px 13px 5px 9px", cursor: "pointer" }}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill={MINT_DEEP} aria-hidden="true"><path d="M8 5.5v13l11-6.5z" /></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={MINT_DEEP} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M15 8a5 5 0 0 1 0 8" />
+        <path d="M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l3.5 -4.5a.8 .8 0 0 1 1.5 .5v14a.8 .8 0 0 1 -1.5 .5z" />
+      </svg>
       <span style={{ fontFamily: r.headThai ? TH_FONT : Q, fontSize: 14, color: HEAD, fontWeight: 600 }}>{r.head}</span>
       {r.pron ? <span style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 11.5, color: MINT, fontWeight: 600 }}>{r.pron}</span> : null}
     </button>
