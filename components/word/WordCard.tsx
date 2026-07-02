@@ -168,21 +168,23 @@ export function WordRow({ word, target, onSpeak, saved, onToggleSave, defaultOpe
   const r = resolve(word, target);
   if (open) {
     return (
-      <div style={{ marginBottom: 10 }}>
+      <div style={{ gridColumn: "1 / -1", marginBottom: 2 }}>
         <WordCardFull word={word} target={target} onSpeak={onSpeak} saved={saved} onToggleSave={onToggleSave} onCollapse={() => setOpen(false)} />
       </div>
     );
   }
   return (
-    <div onClick={() => setOpen(true)} style={{ fontFamily: Q, display: "flex", alignItems: "center", gap: 11, background: "#fff", border: `0.5px solid ${CARD_BORDER}`, borderRadius: 12, padding: "9px 13px", marginBottom: 8, cursor: "pointer", color: INK }}>
-      <span onClick={(e) => e.stopPropagation()}>
+    <div onClick={() => setOpen(true)} style={{ fontFamily: Q, display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `0.5px solid ${CARD_BORDER}`, borderRadius: 12, padding: "9px 12px", cursor: "pointer", color: INK, minWidth: 0 }}>
+      <span onClick={(e) => e.stopPropagation()} style={{ lineHeight: 0 }}>
         <PlayBtn onClick={() => onSpeak(r.head, r.headLang)} size={30} soft label="Play audio" />
       </span>
-      <span style={{ fontFamily: r.headThai ? TH_FONT : Q, fontSize: r.headThai ? 16.5 : 15.5, color: HEAD, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "38%" }}>{r.head}</span>
-      {r.pron ? <span style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 12.5, color: MINT, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.pron}</span> : null}
-      <span style={{ flex: 1, fontFamily: r.headThai ? Q : TH_FONT, fontSize: 12.5, color: MUTED, textAlign: "right", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.meaning}</span>
-      <span onClick={(e) => e.stopPropagation()} style={{ lineHeight: 0 }}><Star saved={saved} onToggle={onToggleSave} /></span>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B9C7C0" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontFamily: r.headThai ? TH_FONT : Q, fontSize: r.headThai ? 16 : 15, color: HEAD, fontWeight: 600 }}>{r.head}</span>
+          {r.pron ? <span style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 12, color: MINT, fontWeight: 600, marginLeft: 7 }}>{r.pron}</span> : null}
+        </span>
+        <span style={{ display: "block", fontFamily: r.headThai ? Q : TH_FONT, fontSize: 11.5, color: MUTED, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.meaning}</span>
+      </span>
     </div>
   );
 }

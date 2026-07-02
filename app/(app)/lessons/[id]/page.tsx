@@ -378,9 +378,11 @@ function WordsStep({ words, target, say, onExtend, onNext }: { words: WordItem[]
         title={`${words.length} words to know`}
         subtitle="Tap any sound — hear Miomi, then say it."
       />
-      {words.map((w, i) => (
-        <WordRow key={i} word={fromLessonWord(w)} target={target === "en" ? "en" : "th"} onSpeak={(t) => say(t)} defaultOpen={i === 0} />
-      ))}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8, marginBottom: 10 }}>
+        {words.map((w, i) => (
+          <WordRow key={i} word={fromLessonWord(w)} target={target === "en" ? "en" : "th"} onSpeak={(t) => say(t)} defaultOpen={i === 0} />
+        ))}
+      </div>
       {extState !== "done" ? (
         <button
           onClick={async () => {
