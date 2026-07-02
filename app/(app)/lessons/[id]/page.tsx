@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { BookOpen, MessagesSquare, Gamepad2, Target, type LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { WordRow, fromLessonWord } from "@/components/word/WordCard";
 import { useParams, useRouter } from "next/navigation";
 import { detectLang, speak } from "@/lib/voice/tts";
 import { sfxAlmost, sfxGold, sfxPop, sfxSilver, sfxSuccess, sfxWrong } from "@/lib/sound/sfx";
@@ -275,7 +276,7 @@ export default function LessonPlayerPage() {
         ) : <span style={{ display: "block", height: 12 }} />}
 
         {step === 0 ? <IntroStep lesson={lesson} review={lesson.status === "completed"} onNext={() => go(1)} /> : null}
-        {step === 1 ? <WordsStep words={words} target={target} soft={tcol.soft} say={say} onExtend={extend} onNext={() => go(2)} /> : null}
+        {step === 1 ? <WordsStep words={words} target={target} say={say} onExtend={extend} onNext={() => go(2)} /> : null}
         {step === 2 ? <PhrasesStep phrases={phrases} target={target} say={say} onNext={() => go(3)} /> : null}
         {step === 3 ? (
           <GamesStep
@@ -369,8 +370,7 @@ function IntroStep({ lesson, review, onNext }: { lesson: Lesson; review: boolean
   );
 }
 
-function WordsStep({ words, target, soft, say, onExtend, onNext }: { words: WordItem[]; target: string; soft: string; say: (t: string) => void; onExtend: () => Promise<number>; onNext: () => void }) {
-  const [open, setOpen] = useState<number | null>(null);
+function WordsStep({ words, target, say, onExtend, onNext }: { words: WordItem[]; target: string; say: (t: string) => void; onExtend: () => Promise<number>; onNext: () => void }) {
   const [extState, setExtState] = useState<"idle" | "busy" | "done" | "none">("idle");
   return (
     <div>
@@ -379,55 +379,7 @@ function WordsStep({ words, target, soft, say, onExtend, onNext }: { words: Word
         subtitle="Tap any sound — hear Miomi, then say it."
       />
       {words.map((w, i) => (
-        <div key={i} style={{ position: "relative", background: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${PEACH}`, borderRadius: 14, boxShadow: CARD_SHADOW, padding: "12px 13px", marginBottom: 10 }}>
-          <span style={{ position: "absolute", top: 10, right: 10 }}>
-            <SoundBtn onClick={() => say(targetText(w, target))} bg={PEACH_SOFT} color={PEACH_DEEP} />
-          </span>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", paddingRight: 40 }}>
-            <WordTile w={w} target={target} soft={soft} />
-            <div>
-              <div style={{ ...(target === "en" ? font : thai), fontSize: 20, fontWeight: 600, color: INK_STRONG, lineHeight: 1.25 }}>{targetText(w, target)}</div>
-              <div style={{ ...(target === "en" ? thai : font), fontSize: 14, fontWeight: 700, color: INK, marginTop: 3 }}>
-                {target === "en" ? w.word_th : w.word_en}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6, flexWrap: "wrap" }}>
-                {w.cefr_level ? <span style={{ ...font, fontSize: 10.5, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: LAV_SOFT, color: LAV_DEEP }}>{w.cefr_level}</span> : null}
-                {(target === "en" ? w.ipa : w.romanization) ? (
-                  <span style={{ ...font, fontSize: 11.5, fontWeight: 700, background: PEACH_SOFT, borderRadius: 99, padding: "3px 9px", color: PEACH_DEEP }}>
-                    {target === "en" ? w.ipa : w.romanization}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-          {w.example_th && w.example_en ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAF6", borderRadius: 10, padding: "9px 11px", marginTop: 11 }}>
-              <span style={{ flex: 1, fontSize: 12.5, lineHeight: 1.5, color: INK }}>
-                <span style={font}>“{w.example_en}”</span><br />
-                <span style={{ ...thai, color: MUTED }}>“{w.example_th}”</span>
-              </span>
-              <SoundBtn onClick={() => say(target === "en" ? w.example_en! : w.example_th!)} bg="#fff" color={PEACH_DEEP} size={28} />
-            </div>
-          ) : null}
-          {w.meanings?.length ? (
-            <>
-              <button onClick={() => setOpen(open === i ? null : i)} style={{ ...font, fontSize: 11, fontWeight: 700, color: LAV_DEEP, background: "none", border: "none", cursor: "pointer", padding: "7px 0 0" }}>
-                {open === i ? "Hide meanings" : "More meanings"}
-              </button>
-              {open === i ? (
-                <div style={{ marginTop: 9, background: LAV_SOFT, borderRadius: 10, padding: "9px 11px" }}>
-                  {w.meanings.map((m, k) => (
-                    <p key={k} style={{ ...font, fontSize: 12.5, lineHeight: 1.5, color: INK, margin: k ? "8px 0 0" : 0 }}>
-                      <b style={{ color: INK_STRONG }}>{m.sense}</b>
-                      {m.example_en ? <><br />{m.example_en}</> : null}
-                      {m.example_th ? <><br /><span style={{ ...thai, color: MUTED }}>{m.example_th}</span></> : null}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </div>
+        <WordRow key={i} word={fromLessonWord(w)} target={target === "en" ? "en" : "th"} onSpeak={(t) => say(t)} />
       ))}
       {extState !== "done" ? (
         <button
