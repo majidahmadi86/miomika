@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { BookOpen, MessagesSquare, Gamepad2, Target, type LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { WordRow, fromLessonWord } from "@/components/word/WordCard";
+import { WordCardFull, WordTile as WordGridTile, fromLessonWord } from "@/components/word/WordCard";
 import { useParams, useRouter } from "next/navigation";
 import { detectLang, speak } from "@/lib/voice/tts";
 import { sfxAlmost, sfxGold, sfxPop, sfxSilver, sfxSuccess, sfxWrong } from "@/lib/sound/sfx";
@@ -372,16 +372,22 @@ function IntroStep({ lesson, review, onNext }: { lesson: Lesson; review: boolean
 
 function WordsStep({ words, target, say, onExtend, onNext }: { words: WordItem[]; target: string; say: (t: string) => void; onExtend: () => Promise<number>; onNext: () => void }) {
   const [extState, setExtState] = useState<"idle" | "busy" | "done" | "none">("idle");
+  const [focusIdx, setFocusIdx] = useState(0);
   return (
     <div>
       <SectionIntro icon={BookOpen} bg={TEAL_SOFT} fg={TEAL_DEEP}
         title={`${words.length} words to know`}
         subtitle="Tap any sound — hear Miomi, then say it."
       />
+      {words.length ? (
+        <div style={{ marginBottom: 10 }}>
+          <WordCardFull word={fromLessonWord(words[Math.min(focusIdx, words.length - 1)])} target={target === "en" ? "en" : "th"} onSpeak={(t) => say(t)} />
+        </div>
+      ) : null}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8, marginBottom: 10 }}>
-        {words.map((w, i) => (
-          <WordRow key={i} word={fromLessonWord(w)} target={target === "en" ? "en" : "th"} onSpeak={(t) => say(t)} defaultOpen={i === 0} />
-        ))}
+        {words.map((w, i) => (i === Math.min(focusIdx, words.length - 1) ? null : (
+          <WordGridTile key={i} word={fromLessonWord(w)} target={target === "en" ? "en" : "th"} onSpeak={(t) => say(t)} onOpen={() => setFocusIdx(i)} />
+        )))}
       </div>
       {extState !== "done" ? (
         <button

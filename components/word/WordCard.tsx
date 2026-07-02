@@ -69,8 +69,8 @@ function PlayBtn({ onClick, size = 46, soft = false, label }: { onClick: () => v
       width: size, height: size, borderRadius: "50%", border: "none",
       background: soft ? MINT_SOFT : MINT, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flex: "0 0 auto",
     }}>
-      <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill={soft ? MINT_DEEP : "#fff"} aria-hidden="true">
-        <path d="M8.6 5.4 L19.2 12 L8.6 18.6 Z" />
+      <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill="none" stroke={soft ? MINT_DEEP : "#fff"} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true">
+        <path d="M8.5 5.3 L18.8 12 L8.5 18.7 Z" />
       </svg>
     </button>
   );
@@ -160,21 +160,13 @@ export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCol
   );
 }
 
-// ---------- COMPACT ROW (expands into the full card) ----------
-export function WordRow({ word, target, onSpeak, saved, onToggleSave, defaultOpen }: {
-  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void; defaultOpen?: boolean;
+// ---------- TILE (collapsed, single-line summary) ----------
+export function WordTile({ word, target, onSpeak, onOpen }: {
+  word: CanonicalWord; target: Target; onSpeak: SpeakFn; onOpen?: () => void;
 }) {
-  const [open, setOpen] = useState(!!defaultOpen);
   const r = resolve(word, target);
-  if (open) {
-    return (
-      <div style={{ gridColumn: "1 / -1", marginBottom: 2 }}>
-        <WordCardFull word={word} target={target} onSpeak={onSpeak} saved={saved} onToggleSave={onToggleSave} onCollapse={() => setOpen(false)} />
-      </div>
-    );
-  }
   return (
-    <div onClick={() => setOpen(true)} style={{ fontFamily: Q, display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `0.5px solid ${CARD_BORDER}`, borderRadius: 12, padding: "9px 12px", cursor: "pointer", color: INK, minWidth: 0 }}>
+    <div onClick={onOpen} style={{ fontFamily: Q, display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `0.5px solid ${CARD_BORDER}`, borderRadius: 12, padding: "9px 12px", cursor: onOpen ? "pointer" : "default", color: INK, minWidth: 0 }}>
       <span onClick={(e) => e.stopPropagation()} style={{ lineHeight: 0 }}>
         <PlayBtn onClick={() => onSpeak(r.head, r.headLang)} size={30} soft label="Play audio" />
       </span>
@@ -187,6 +179,21 @@ export function WordRow({ word, target, onSpeak, saved, onToggleSave, defaultOpe
       </span>
     </div>
   );
+}
+
+// ---------- COMPACT ROW (expands into the full card) ----------
+export function WordRow({ word, target, onSpeak, saved, onToggleSave, defaultOpen }: {
+  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  if (open) {
+    return (
+      <div style={{ gridColumn: "1 / -1", marginBottom: 2 }}>
+        <WordCardFull word={word} target={target} onSpeak={onSpeak} saved={saved} onToggleSave={onToggleSave} onCollapse={() => setOpen(false)} />
+      </div>
+    );
+  }
+  return <WordTile word={word} target={target} onSpeak={onSpeak} onOpen={() => setOpen(true)} />;
 }
 
 // ---------- CHIP (inline in chat; tap = open) ----------
