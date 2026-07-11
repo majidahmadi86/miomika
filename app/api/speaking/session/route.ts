@@ -146,6 +146,24 @@ export async function POST(req: NextRequest) {
   if (!profile) {
     return NextResponse.json({ ok: false, reason: "signin_required" }, { status: 401 });
   }
+  // Tracks whether we already debited a purchased room credit THIS request.
+  // If the room then fails to get delivered for any reason below, that credit
+  // is automatically returned — the user shouldn't lose money to our bug.
+  // Never a user-initiated refund path: only fires on a system-side failure
+  // after a real debit, so there's no "just ask and get credits back" surface.
+  let packCreditSpent = false;
+  async function refundPackCreditIfSpent() {
+    if (!packCreditSpent) return;
+    try {
+      const supabase = await createServiceClient();
+      const { data: prof } = await supabase.from("profiles").select("room_credits").eq("id", profile!.id).maybeSingle();
+      const credits = prof?.room_credits ?? 0;
+      await supabase.from("profiles").update({ room_credits: credits + 1 }).eq("id", profile!.id).eq("room_credits", credits);
+      await supabase.from("room_credit_ledger").insert({ user_id: profile!.id, delta: 1, reason: "refund", ref: `session-fail:${profile!.id}:${Date.now()}` });
+    } catch (e) {
+      console.error("[api/speaking/session] auto-refund failed — needs manual credit via admin console:", e);
+    }
+  }
   try {
     const body = (await req.json().catch(() => ({}))) as {
       level?: string;
@@ -306,6 +324,7 @@ export async function POST(req: NextRequest) {
         await supabase
           .from("room_credit_ledger")
           .insert({ user_id: profile.id, delta: -1, reason: "consume", ref: null });
+        packCreditSpent = true;
       }
     }
 
@@ -331,7 +350,10 @@ export async function POST(req: NextRequest) {
       const generated = await withBudget("session.plan", profile.id, profile.tier, () =>
         generatePlan(level, targetName, topic, register),
       );
-      if (!generated) return NextResponse.json({ ok: false, reason: "plan_failed" }, { status: 200 });
+      if (!generated) {
+        await refundPackCreditIfSpent();
+        return NextResponse.json({ ok: false, reason: "plan_failed" }, { status: 200 });
+      }
       // Helper phrases pass the SAME accuracy gate as lessons.
       let phrases = await withBudget("session.phrases", profile.id, profile.tier, () =>
         buildExtraPhrases({
@@ -356,6 +378,7 @@ export async function POST(req: NextRequest) {
         phrases = [...phrases, ...more].slice(0, 5);
       }
       if (phrases.length < 4) {
+        await refundPackCreditIfSpent();
         return NextResponse.json({ ok: false, reason: "content_incomplete" }, { status: 200 });
       }
       plan = { ...generated.plan, phrases };
@@ -384,6 +407,7 @@ export async function POST(req: NextRequest) {
           .maybeSingle();
         if (!again) {
           console.error("[api/speaking/session] library insert failed:", insErr?.message);
+          await refundPackCreditIfSpent();
           return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
         }
         libraryId = again.id as string;
@@ -393,7 +417,10 @@ export async function POST(req: NextRequest) {
         libraryId = inserted.id as string;
       }
     }
-    if (!libraryId || !plan) return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
+    if (!libraryId || !plan) {
+      await refundPackCreditIfSpent();
+      return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
+    }
 
     const { data: session, error: sesErr } = await supabase
       .from("speaking_sessions")
@@ -416,6 +443,7 @@ export async function POST(req: NextRequest) {
       .single();
     if (sesErr || !session) {
       console.error("[api/speaking/session] session insert failed:", sesErr?.message);
+      await refundPackCreditIfSpent();
       return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
     }
     return NextResponse.json({
@@ -429,6 +457,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[api/speaking/session] failed:", err);
+    await refundPackCreditIfSpent();
     return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
   }
 }
