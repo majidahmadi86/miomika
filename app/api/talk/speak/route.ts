@@ -9,6 +9,7 @@ import * as Sentry from "@sentry/nextjs";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 import { createServiceClient } from "@/lib/supabase/service";
 import { log, logError } from "@/lib/debug/log";
+import { checkRateLimit, identityFromRequest } from "@/lib/security/rate-limit";
 
 type Lang = "th" | "en";
 type VoicePref = "female" | "male";
@@ -49,6 +50,13 @@ function buildCacheKey(
  */
 export async function POST(request: NextRequest) {
   Sentry.setTag("flow", "voice");
+
+  // Real conversation turns pace out naturally; 40/min per IP is generous
+  // for legitimate use and blocks scripted hammering of Google's API.
+  const rl = await checkRateLimit("speak", identityFromRequest(request), 40);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } });
+  }
 
   const credentialsJson = process.env.GOOGLE_TTS_CREDENTIALS;
   if (!credentialsJson) {

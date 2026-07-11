@@ -10,6 +10,7 @@ import type { protos } from "@google-cloud/speech";
 import Groq from "groq-sdk";
 import { createServerClient } from "@supabase/ssr";
 import { log, logError } from "@/lib/debug/log";
+import { checkRateLimit, identityFromRequest } from "@/lib/security/rate-limit";
 
 const PROJECT_ID = "miomika";
 /** Chirp 2 GA in asia-southeast1 (~1.1s vs ~2.3s Chirp 3 in us). */
@@ -322,6 +323,13 @@ async function transcribeWithGroq(
 export async function POST(request: NextRequest) {
   Sentry.setTag("flow", "voice");
   const handlerEnteredAt = Date.now();
+
+  // Same defense as /api/talk/speak — bound request FREQUENCY, not just
+  // per-request cost, on the endpoint that calls Google's STT directly.
+  const rl = await checkRateLimit("transcribe", identityFromRequest(request), 40);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } });
+  }
 
   const groqKey = process.env.GROQ_API_KEY;
   const googleCredsJson = process.env.GOOGLE_TTS_CREDENTIALS;

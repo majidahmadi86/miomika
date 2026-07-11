@@ -1541,6 +1541,7 @@ Nightly promotion cron, weekly degradation cron, Mike-only admin UI. Trigger: Ph
 ## 10. State Log (update at end of every session)
 
 | Date | Session | Phase | Shipped | Broken | Next |
+| 2026-07-11 | Cursor — rate-limit Google voice | Infra | **Rate limit** on `/api/talk/speak` + `/api/talk/transcribe` (40/min/IP) via `lib/security/rate-limit.ts` + `supabase-rate-limits.sql` (`rate_limit_hits` + `increment_rate_limit` RPC). Fails open on DB errors. tsc + lint PASS (0 errors / 32 warnings). | Run `supabase-rate-limits.sql` in Supabase before prod traffic hits the new RPC. | Mike: apply SQL in Supabase; hammer speak/transcribe → 429 + Retry-After. |
 |------|---------|-------|---------|--------|------|
 | 2026-06-22 | Cursor Composer — voiceModeRef mic gate | Voice / 3B | **Pushed `8b312d8`** — `voiceModeRef` on `/talk`: mic opens only after explicit orb tap; texting clears voice mode; `startContinuousMic` + `onStartMic` + `onLiveUi` gated at page boundary. turn-runtime untouched. tsc + lint PASS (0 errors). | — | Mike: /talk — type text → no mic/listening UI; tap orb → mic opens; tap stop → mic closes. |
 | 2026-06-20 | Cursor Composer — tilde (~) source fix | Voice / Copy | **Pushed `d1d611a`** — `pickPhrase` funnel strips `~` at getter; warmth + library conversion phrases restored real punctuation; persona forbids `~` in spoken output + cleaned examples; talk page EN separators repaired. `npm run predeploy` PASS. TTS/transcript safety nets unchanged. | — | Mike: /talk + guest CTA — no `~` in bubbles; voice unchanged. |
