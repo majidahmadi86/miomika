@@ -3,6 +3,9 @@
  * feature lines the paywall renders. Kept in sync with lib/ai/limits.ts
  * (DAILY_EXCHANGE_CAPS) and lib/live/voice-allowance.ts. Prices are config — adjust
  * here and the paywall follows. Stripe price IDs land in #4 on `stripePriceId`.
+ * Voice minutes below are a MONTHLY pool (VOICE_PRO_MONTHLY_SECONDS /
+ * VOICE_PRO_MAX_MONTHLY_SECONDS in voice-allowance.ts), not a daily reset —
+ * keep this copy matching that file's real numbers, not a "per day" framing.
  */
 
 export type TierId = "free" | "pro" | "pro_max";
@@ -44,7 +47,7 @@ export const PLANS: Plan[] = [
     highlighted: true,
     features: [
       { en: "200 chats a day", th: "คุยได้ 200 ครั้งต่อวัน" },
-      { en: "10 minutes of voice a day", th: "เสียง 10 นาทีต่อวัน" },
+      { en: "~200 minutes of voice a month", th: "เสียงประมาณ 200 นาทีต่อเดือน" },
       { en: "1 live speaking room a month", th: "ห้องพูดสด 1 ครั้งต่อเดือน" },
       { en: "Create your own courses", th: "สร้างคอร์สของคุณเองได้" },
       { en: "Everything in Free", th: "ทุกอย่างในแพ็กฟรี" },
@@ -57,7 +60,7 @@ export const PLANS: Plan[] = [
     tagline: { en: "The fullest Miomi experience", th: "ประสบการณ์มีโอมิแบบเต็มที่สุด" },
     features: [
       { en: "400 chats a day", th: "คุยได้ 400 ครั้งต่อวัน" },
-      { en: "30 minutes of voice a day", th: "เสียง 30 นาทีต่อวัน" },
+      { en: "~400 minutes of voice a month", th: "เสียงประมาณ 400 นาทีต่อเดือน" },
       { en: "3 live speaking rooms a month", th: "ห้องพูดสด 3 ครั้งต่อเดือน" },
       { en: "Create your own courses", th: "สร้างคอร์สของคุณเองได้" },
       { en: "Everything in Pro", th: "ทุกอย่างในแพ็กโปร" },
