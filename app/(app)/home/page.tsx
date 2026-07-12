@@ -25,6 +25,8 @@ import { detectLang, speak } from "@/lib/voice/tts";
 import type { Language } from "@/lib/i18n/server";
 import { useUILanguage } from "@/lib/i18n/client";
 import { awardDailyBond, deriveBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
+import { pickFeatureMoment, markFeatureMomentSeen } from "@/lib/companion/feature-moments";
+import { InviteFriendCard } from "@/components/home/InviteFriendCard";
 import { ClosenessCard } from "@/components/home/ClosenessCard";
 import { RemembersCard } from "@/components/home/RemembersCard";
 import { MemoryLine } from "@/components/home/MemoryLine";
@@ -570,6 +572,18 @@ export default function HomePage() {
           window.setTimeout(() => {
             if (!cancelled) showBubble(line.th, { th: line.th, en: line.en, autoHideMs: 5000 });
           }, 1400);
+        } else if (profile) {
+          // Only reachable when nothing bigger (a stage-up) is already
+          // happening — a feature moment never competes for her voice.
+          const moment = pickFeatureMoment({ tier: profile.tier, streak: profile.streak ?? 0 });
+          if (moment) {
+            window.setTimeout(() => {
+              if (!cancelled) {
+                showBubble(moment.line.th, { th: moment.line.th, en: moment.line.en, autoHideMs: 5600 });
+                markFeatureMomentSeen();
+              }
+            }, 1800);
+          }
         }
       } catch {
         /* non-fatal */
@@ -1174,6 +1188,8 @@ export default function HomePage() {
                   <ClosenessCard points={profile?.bond_points ?? 0} lang={lang} active={revealReady} />
 
                   <RemembersCard lang={lang} />
+
+                  <InviteFriendCard lang={lang} />
 
                   <div className="rounded-card border border-line bg-surface p-4 shadow-card">
                     <div className="flex items-center justify-between">
