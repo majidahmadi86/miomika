@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLeft, Compass, Sparkles, type LucideIcon } from "lucide-react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { usePaywall } from "@/components/billing/Paywall";
@@ -247,6 +247,7 @@ function ArcStrip() {
 
 export default function LearnPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isGuest, authReady } = useGuestExploration();
   const { open: openPaywall } = usePaywall();
   const { profile } = useProfile();
@@ -267,7 +268,10 @@ export default function LearnPage() {
   const [goldCount, setGoldCount] = useState(0);
   const [silverCount, setSilverCount] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const [surface, setSurface] = useState<Surface>("Course");
+  const [surface, setSurface] = useState<Surface>(() => {
+    const requested = searchParams.get("surface");
+    return requested === "Speak" ? "Speak" : "Course";
+  });
   const [courseTab, setCourseTab] = useState<"journey" | "mine">("journey");
   const [expandedUnit, setExpandedUnit] = useState<number | null>(null);
   const [expandedCourse, setExpandedCourse] = useState<number | null>(null);

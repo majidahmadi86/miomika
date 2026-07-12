@@ -1541,6 +1541,7 @@ Nightly promotion cron, weekly degradation cron, Mike-only admin UI. Trigger: Ph
 ## 10. State Log (update at end of every session)
 
 | Date | Session | Phase | Shipped | Broken | Next |
+| 2026-07-12 | Cursor — live-rooms discovery card | Home / Learn | **LiveRoomsCard** on `/home` (between Remembers + InviteFriend) deep-links to `/learn?surface=Speak`; Learn reads `surface` search param and opens Speak tab. tsc + lint PASS (0 errors / 32 warnings). | — | Mike: Home → Live rooms card → lands on Learn Speak tab. |
 | 2026-07-11 | Cursor — room credit auto-refund | Rooms / Billing | **Auto-refund** on `/api/speaking/session`: if a purchased room credit was debited and the room then fails to start (plan/content/store/exception), credit is restored + ledger `refund` row. System-side only. tsc + lint PASS (0 errors / 32 warnings). | — | Mike: buy pack → force session fail → credit returns; successful start still consumes. |
 | 2026-07-11 | Cursor — rate-limit Google voice | Infra | **Rate limit** on `/api/talk/speak` + `/api/talk/transcribe` (40/min/IP) via `lib/security/rate-limit.ts` + `supabase-rate-limits.sql` (`rate_limit_hits` + `increment_rate_limit` RPC). Fails open on DB errors. tsc + lint PASS (0 errors / 32 warnings). | Run `supabase-rate-limits.sql` in Supabase before prod traffic hits the new RPC. | Mike: apply SQL in Supabase; hammer speak/transcribe → 429 + Retry-After. |
 |------|---------|-------|---------|--------|------|

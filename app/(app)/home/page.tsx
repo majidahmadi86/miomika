@@ -27,6 +27,7 @@ import { useUILanguage } from "@/lib/i18n/client";
 import { awardDailyBond, deriveBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
 import { pickFeatureMoment, markFeatureMomentSeen } from "@/lib/companion/feature-moments";
 import { InviteFriendCard } from "@/components/home/InviteFriendCard";
+import { LiveRoomsCard } from "@/components/home/LiveRoomsCard";
 import { ClosenessCard } from "@/components/home/ClosenessCard";
 import { RemembersCard } from "@/components/home/RemembersCard";
 import { MemoryLine } from "@/components/home/MemoryLine";
@@ -1188,6 +1189,8 @@ export default function HomePage() {
                   <ClosenessCard points={profile?.bond_points ?? 0} lang={lang} active={revealReady} />
 
                   <RemembersCard lang={lang} />
+
+                  <LiveRoomsCard lang={lang} />
 
                   <InviteFriendCard lang={lang} />
 
