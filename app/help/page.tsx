@@ -34,7 +34,7 @@ const HELP_EN: Cat[] = [
       { q: "What's the difference between guest, Free, Pro, and Pro Max?", a: "As a guest you can sample a few turns. A free account lets you start learning with a taste of voice conversation. Pro and Pro Max unlock higher levels and more talking time. Hour packs add prepaid talking time on top. The exact limits and prices for each are always shown in the app at checkout." },
       { q: "How does the free trial work?", a: "Your free account includes a starter amount of voice time so you can experience talking with Miomi. When it's used up, a plan or an hour pack keeps you going. The current trial amount is shown in the app." },
       { q: "What are hour packs?", a: "Hour packs are prepaid blocks of voice time you buy once — handy if you'd rather top up than subscribe." },
-      { q: "How do I manage, cancel, or get a refund?", a: "Manage everything from billing.", steps: ["Open Me → Manage billing.", "Cancel anytime — you keep access until the end of your paid period.", "During beta, email support@miomika.com within 14 days of a charge for a refund."], link: { href: "/me/billing", label: "Manage billing" } },
+      { q: "How do I manage, cancel, or get a refund?", a: "Manage everything from billing.", steps: ["Open Me → Manage billing.", "Cancel anytime — you keep access until the end of your paid period.", "Fees are non-refundable except billing errors (duplicate or unauthorized charges) — see our Terms for details."], link: { href: "/me/billing", label: "Manage billing" } },
     ],
   },
   {
@@ -99,7 +99,7 @@ const HELP_TH: Cat[] = [
       { q: "ผู้เยี่ยมชม, ฟรี, Pro และ Pro Max ต่างกันอย่างไร?", a: "ในฐานะผู้เยี่ยมชมคุณลองได้สองสามครั้ง บัญชีฟรีให้คุณเริ่มเรียนพร้อมลิ้มลองการสนทนาด้วยเสียง Pro และ Pro Max ปลดล็อกระดับที่สูงขึ้นและเวลาคุยมากขึ้น แพ็กชั่วโมงเพิ่มเวลาคุยแบบจ่ายล่วงหน้า ขีดจำกัดและราคาที่แน่นอนของแต่ละแบบจะแสดงในแอปตอนชำระเงินเสมอ" },
       { q: "ทดลองใช้ฟรีทำงานอย่างไร?", a: "บัญชีฟรีมีเวลาพูดเริ่มต้นให้คุณได้ลองคุยกับ Miomi เมื่อใช้หมด สมัครแพ็กเกจหรือซื้อแพ็กชั่วโมงเพื่อคุยต่อ จำนวนเวลาทดลองปัจจุบันแสดงอยู่ในแอป" },
       { q: "แพ็กชั่วโมงคืออะไร?", a: "แพ็กชั่วโมงคือเวลาพูดแบบจ่ายล่วงหน้าที่ซื้อครั้งเดียว เหมาะถ้าคุณอยากเติมมากกว่าสมัครสมาชิก" },
-      { q: "จัดการ ยกเลิก หรือขอคืนเงินอย่างไร?", a: "จัดการทุกอย่างได้จากการเรียกเก็บเงิน", steps: ["เปิด ฉัน → จัดการการเรียกเก็บเงิน", "ยกเลิกได้ตลอดเวลา — ใช้งานได้จนสิ้นรอบที่จ่ายไว้", "ในช่วงเบต้า อีเมล support@miomika.com ภายใน 14 วันนับจากการเรียกเก็บเพื่อขอคืนเงิน"], link: { href: "/me/billing", label: "จัดการการเรียกเก็บเงิน" } },
+      { q: "จัดการ ยกเลิก หรือขอคืนเงินอย่างไร?", a: "จัดการทุกอย่างได้จากการเรียกเก็บเงิน", steps: ["เปิด ฉัน → จัดการการเรียกเก็บเงิน", "ยกเลิกได้ตลอดเวลา — ใช้งานได้จนสิ้นรอบที่จ่ายไว้", "ค่าบริการไม่สามารถขอคืนได้ ยกเว้นข้อผิดพลาดในการเรียกเก็บเงิน (เรียกเก็บซ้ำหรือไม่ได้รับอนุญาต) — ดูรายละเอียดในข้อกำหนดการใช้งาน"], link: { href: "/me/billing", label: "จัดการการเรียกเก็บเงิน" } },
     ],
   },
   {

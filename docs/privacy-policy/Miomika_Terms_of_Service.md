@@ -28,7 +28,7 @@ Miomika helps you learn a language by talking with Miomi, an AI companion. **Mio
 - **Payment.** Payments are processed by our payment providers (Stripe and Omise). We do not store your full card details.
 - **Auto-renewal.** Subscriptions renew automatically each month until you cancel. We will charge the payment method on file at each renewal.
 - **Cancellation.** You can cancel anytime. Cancellation takes effect at the end of your current paid period; you keep access until then.
-- **Refunds (beta policy).** Because Miomika is in beta, if you are unhappy you may request a refund within **14 days** of a charge by emailing support@miomika.com, and we will refund that charge. Prepaid hour packs are refundable in proportion to unused time within the same 14-day window.
+- **Refunds.** Except where required by Thai law, fees are non-refundable. Because Miomika has a free guest mode and a free plan so you can try it fully before paying, we do not refund fees or usage already consumed. We will, of course, refund genuine billing errors — duplicate charges, unauthorized charges, or amounts charged in error. If a room session fails to start due to a technical error on our side, the room credit is automatically returned to your account. To stop future renewals, see Cancellation above.
 
 ## 6. Acceptable use
 
