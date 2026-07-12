@@ -11,6 +11,7 @@ import { DesktopHoldBanner } from "@/components/layout/DesktopHoldBanner";
 import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { Rail } from "@/components/layout/Rail";
 import { PaywallProvider } from "@/components/billing/Paywall";
+import { TierUpgradeBadge } from "@/components/layout/TierUpgradeBadge";
 import { useRef, useCallback, useEffect } from "react";
 
 const AmbientBackground = dynamic(
@@ -192,6 +193,7 @@ function AppLayoutInner({
       <Rail />
 
       <div className="relative z-10 flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-transparent md:h-full md:max-h-none md:min-h-0 md:overflow-hidden">
+        <TierUpgradeBadge />
         <DesktopHoldBanner />
         <SwipeNavigator pathname={pathname}>
           {children}
