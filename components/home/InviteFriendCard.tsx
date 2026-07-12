@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Gift } from "lucide-react";
 
 const T = {
-  th: { title: "ชวนเพื่อนมาด้วยกัน", body: "คุณและเพื่อนได้เครดิต ฿30 ทั้งคู่", cta: "ชวนเลย" },
-  en: { title: "Invite a friend", body: "You both get ฿30 credit", cta: "Invite" },
+  th: { title: "ชวนเพื่อนมาด้วยกัน", pre: "คุณและเพื่อนได้เครดิต ", amount: "฿30", post: " ทั้งคู่", cta: "ชวนเลย" },
+  en: { title: "Invite a friend", pre: "You both get ", amount: "฿30", post: " credit", cta: "Invite" },
 };
 
 export function InviteFriendCard({ lang }: { lang: "th" | "en" }) {
@@ -24,7 +24,9 @@ export function InviteFriendCard({ lang }: { lang: "th" | "en" }) {
         </span>
         <span className="text-[12.5px] font-semibold" style={{ color: "#2C8E76" }}>{t.cta} →</span>
       </div>
-      <p className="mt-2 text-[11.5px] text-ink-muted">{t.body}</p>
+      <p className="mt-2 text-[11.5px] text-ink-muted">
+        {t.pre}<span className="font-semibold text-earned-strong">{t.amount}</span>{t.post}
+      </p>
     </Link>
   );
 }
