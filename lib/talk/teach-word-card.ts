@@ -27,15 +27,18 @@ function humanGloss(word_en: string, word_th: string, prefer: "en" | "th"): stri
   return "";
 }
 
-function humanTargetSurface(word_en: string, word_th: string, target: "th" | "en"): string {
+function humanTargetSurface(word_en: string, word_th: string, target: "th" | "en"): { text: string; lang: "th" | "en" } {
   if (target === "th") {
-    if (word_th.trim() && !isVocabularySlug(word_th)) return word_th.trim();
-    if (word_en.trim() && !isVocabularySlug(word_en)) return word_en.trim();
-    return "";
+    if (word_th.trim() && !isVocabularySlug(word_th)) return { text: word_th.trim(), lang: "th" };
+    // Content gap (word_th missing/placeholder) — fall back to English, but
+    // say so, so the caller sends it to the EN voice, not the TH one. A
+    // Thai voice reading raw English/Latin text is a guaranteed mispronunciation.
+    if (word_en.trim() && !isVocabularySlug(word_en)) return { text: word_en.trim(), lang: "en" };
+    return { text: "", lang: target };
   }
-  if (word_en.trim() && !isVocabularySlug(word_en)) return word_en.trim();
-  if (word_th.trim() && !isVocabularySlug(word_th)) return word_th.trim();
-  return "";
+  if (word_en.trim() && !isVocabularySlug(word_en)) return { text: word_en.trim(), lang: "en" };
+  if (word_th.trim() && !isVocabularySlug(word_th)) return { text: word_th.trim(), lang: "th" };
+  return { text: "", lang: target };
 }
 
 export type TeachWordResult = {
@@ -95,9 +98,7 @@ export function replayTextForWord(
   targetLanguage: "th" | "en" | null,
 ): { text: string; lang: "th" | "en" } {
   const target = targetLanguage ?? "th";
-  const text = humanTargetSurface(word.word_en, word.word_th, target);
-  if (!text) return { text: "", lang: target };
-  return { text, lang: target };
+  return humanTargetSurface(word.word_en, word.word_th, target);
 }
 
 export type PracticeWord = {

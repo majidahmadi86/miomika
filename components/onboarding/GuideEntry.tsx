@@ -60,6 +60,7 @@ export function GuideEntry({ lang }: { lang: Language }) {
   return (
     <button
       type="button"
+      id="mk-guide-entry"
       onClick={openTour}
       aria-label={LABEL[lang]}
       className="pointer-events-auto absolute right-3 top-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-[14px] transition active:scale-[0.94]"
