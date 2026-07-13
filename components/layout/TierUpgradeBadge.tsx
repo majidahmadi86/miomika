@@ -33,17 +33,22 @@ export function TierUpgradeBadge() {
   const lang = profile?.ui_language === "en" ? "en" : "th";
 
   // GuideEntry (the "?" Smart Guide tour button) renders ONLY on /home, at
-  // right-3 top-3 z-40, ~36px wide. Sit to its left there, same top edge,
-  // so the two never overlap — GuideEntry itself isn't touched.
-  const rightOffset = pathname === "/home" ? 56 : 12;
+  // right-3 top-3, ~40px tall including its notification dot. A horizontal
+  // pixel offset turned out too fragile across real devices/zoom levels —
+  // vertical stacking tolerates far more drift, so sit BELOW it on Home
+  // instead of beside it. z-50 (above GuideEntry's z-40) so this button
+  // never loses a tap silently even at the very edge of the two boxes.
+  const topOffset = pathname === "/home"
+    ? "calc(env(safe-area-inset-top, 0px) + 54px)"
+    : "calc(env(safe-area-inset-top, 0px) + 10px)";
 
   if (isGuest) {
     return (
       <button
         onClick={openSoftSignupPrompt}
         aria-label={COPY.guest.en}
-        className="fixed z-30 flex items-center gap-1 rounded-full border border-line bg-surface/95 px-2.5 py-1.5 text-[11px] font-semibold text-ink shadow-sm backdrop-blur-sm"
-        style={{ fontFamily: "'Quicksand', sans-serif", top: "calc(env(safe-area-inset-top, 0px) + 10px)", right: rightOffset }}
+        className="fixed z-50 flex items-center gap-1 rounded-full border border-line bg-surface/95 px-2.5 py-1.5 text-[11px] font-semibold text-ink shadow-sm backdrop-blur-sm"
+        style={{ fontFamily: "'Quicksand', sans-serif", top: topOffset, right: 12, pointerEvents: "auto" }}
       >
         <UserPlus className="h-3.5 w-3.5" style={{ color: "#2C8E76" }} strokeWidth={2} />
         {COPY.guest[lang]}
@@ -59,11 +64,12 @@ export function TierUpgradeBadge() {
     <button
       onClick={() => open("generic")}
       aria-label={text}
-      className="fixed z-30 flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur-sm"
+      className="fixed z-50 flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur-sm"
       style={{
         fontFamily: "'Quicksand', sans-serif",
-        top: "calc(env(safe-area-inset-top, 0px) + 10px)",
-        right: rightOffset,
+        top: topOffset,
+        right: 12,
+        pointerEvents: "auto",
         borderColor: "#E8D8A8",
         background: "rgba(251, 243, 220, 0.95)",
         color: "#8A6D1F",
