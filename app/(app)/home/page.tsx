@@ -17,6 +17,7 @@ import { useGuestExploration } from "@/components/guest/GuestExplorationContext"
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { SmartGuide } from "@/components/onboarding/SmartGuide";
 import { GuideEntry } from "@/components/onboarding/GuideEntry";
+import { TierUpgradeChip } from "@/components/layout/TierUpgradeChip";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
 import { useProfile } from "@/lib/auth/use-profile";
 import { cn } from "@/lib/utils";
@@ -907,6 +908,7 @@ export default function HomePage() {
               ) : null}
 
               {authReady ? <GuideEntry lang={lang} /> : null}
+              {authReady ? <TierUpgradeChip tier={profile?.tier} lang={lang} /> : null}
 
               <motion.div
                 className="absolute inset-x-0 z-10 px-2"
@@ -1133,6 +1135,7 @@ export default function HomePage() {
           <div className="hidden h-full md:flex md:flex-col md:overflow-hidden">
             <div className="relative mx-auto flex h-full w-full max-w-[1120px] flex-col px-8 py-6">
               {authReady ? <GuideEntry lang={lang} /> : null}
+              {authReady ? <TierUpgradeChip tier={profile?.tier} lang={lang} /> : null}
 
               <div className="mb-6">
                 <h1 className="text-[23px] font-medium leading-snug text-ink">{greeting}</h1>
@@ -1183,7 +1186,7 @@ export default function HomePage() {
                   </Link>
                 </section>
 
-                <section className="flex flex-col gap-3">
+                <section className="flex min-h-0 flex-col gap-3 overflow-y-auto pb-4">
                   <p className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle" style={{ fontFamily: "'Quicksand', sans-serif" }}>{HOME_T[lang].today}</p>
 
                   <ClosenessCard points={profile?.bond_points ?? 0} lang={lang} active={revealReady} />
