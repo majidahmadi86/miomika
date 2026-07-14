@@ -1135,7 +1135,19 @@ export default function HomePage() {
           <div className="hidden h-full md:flex md:flex-col md:overflow-hidden">
             <div className="relative mx-auto flex h-full w-full max-w-[1120px] flex-col px-8 py-6">
               {authReady ? <GuideEntry lang={lang} /> : null}
-              {authReady ? <TierUpgradeChip tier={profile?.tier} lang={lang} /> : null}
+              {authReady && isGuest ? (
+                <Link
+                  href="/signup"
+                  className={cn(
+                    "absolute right-3 top-14 z-40 rounded-full border border-[#EDE8E0] px-3 py-1.5 text-[11px] font-semibold backdrop-blur-[14px]",
+                    tapFeedback,
+                  )}
+                  style={{ background: "rgba(255,255,255,0.92)", color: "#1A1A18", fontFamily: uiLang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif" }}
+                >
+                  {home.guest.pill(uiLang)}
+                </Link>
+              ) : null}
+              {authReady && !isGuest ? <TierUpgradeChip tier={profile?.tier} lang={lang} /> : null}
 
               <div className="mb-6">
                 <h1 className="text-[23px] font-medium leading-snug text-ink">{greeting}</h1>
