@@ -78,13 +78,29 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (signInError) {
         setError(t.errCreds);
         return;
+      }
+      // Safety net: an account that never completed onboarding (e.g. an email
+      // signup from before the confirm-route fix) is routed through /onboarding
+      // first. Do NOT clear the stored redirect — /onboarding honors it after
+      // completing.
+      if (signInData.user) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("onboarding_completed_at")
+          .eq("id", signInData.user.id)
+          .maybeSingle();
+        if (prof && !prof.onboarding_completed_at) {
+          router.push("/onboarding");
+          router.refresh();
+          return;
+        }
       }
       const destination = getPostLoginPath();
       clearRedirectTo();

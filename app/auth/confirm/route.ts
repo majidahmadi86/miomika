@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
       }
       // IMPORTANT: use next/navigation redirect (not NextResponse.redirect) so the
       // session cookies set by verifyOtp are flushed to the browser before redirecting.
-      redirect(next);
+      // New email signups go through /onboarding (profile stamp + Miomi's welcome),
+      // exactly like the OAuth callback routes new users. /onboarding itself honors
+      // any stored redirect-to after completing, so deep-link intent is preserved.
+      redirect(type === "signup" ? "/onboarding" : next);
     }
   }
 
