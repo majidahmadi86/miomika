@@ -4,7 +4,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createServiceClient } from "@/lib/supabase/service";
 
-export type UsageProvider = "groq" | "gemini" | "google_tts" | "groq_whisper";
+export type UsageProvider = "groq" | "gemini" | "google_tts" | "groq_whisper" | "google_stt";
 export type UsageKind = "llm" | "tts" | "stt";
 
 // PUBLIC LIST PRICES (USD), verified Jun 2026 — confirm against your billing.
@@ -14,6 +14,7 @@ const PRICING: Record<string, { inPerM?: number; outPerM?: number; perMChars?: n
   "gemini:gemini-2.5-flash": { inPerM: 0.30, outPerM: 2.50 },
   "groq_whisper:whisper-large-v3-turbo": { perHour: 0.04 },
   "google_tts:chirp3-hd": { perMChars: 16.0 }, // TODO confirm region price
+  "google_stt:chirp_2": { perHour: 0.96 }, // STT v2 ~$0.016/min — TODO confirm region price
 };
 
 function costFor(provider: UsageProvider, model: string, u: { promptTokens?: number; completionTokens?: number; chars?: number; audioSeconds?: number }): number {

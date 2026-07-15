@@ -7,7 +7,9 @@ import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
+import { createServerClient } from "@supabase/ssr";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withUsage, recordUsage } from "@/lib/usage/ledger";
 import { log, logError } from "@/lib/debug/log";
 import { checkRateLimit, identityFromRequest } from "@/lib/security/rate-limit";
 
@@ -150,6 +152,30 @@ export async function POST(request: NextRequest) {
   }
 
   // --- Cache miss (no row, or row without audio yet) — synthesize via Google ---
+  // Identify the user if logged in — attribution for the usage ledger only.
+  // Never blocks guests; resolved only on cache misses (hits cost nothing).
+  let userId: string | null = null;
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (supabaseUrl && supabaseKey) {
+      const authClient = createServerClient(supabaseUrl, supabaseKey, {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll() {
+            /* no-op */
+          },
+        },
+      });
+      const { data: { user } } = await authClient.auth.getUser();
+      if (user) userId = user.id;
+    }
+  } catch {
+    /* guest */
+  }
+  const synthStart = Date.now();
   let audioBase64: string;
   try {
     const credentials = JSON.parse(credentialsJson) as Record<string, unknown>;
@@ -182,6 +208,11 @@ export async function POST(request: NextRequest) {
     if (!audioBase64) {
       throw new Error("Google TTS returned empty base64 audio");
     }
+    // Usage ledger: TTS synthesis is a paid call — record it (kind "tts") so
+    // voice usage is visible per user in llm_usage and the admin cost tab.
+    await withUsage("talk.speak", userId, async () => {
+      recordUsage({ provider: "google_tts", kind: "tts", model: "chirp3-hd", chars: text.length, latencyMs: Date.now() - synthStart, meta: { voiceName, cached: false } });
+    });
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     if (detail === "synth_timeout") {

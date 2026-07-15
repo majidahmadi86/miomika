@@ -11,6 +11,7 @@ import Groq from "groq-sdk";
 import { createServerClient } from "@supabase/ssr";
 import { log, logError } from "@/lib/debug/log";
 import { checkRateLimit, identityFromRequest } from "@/lib/security/rate-limit";
+import { withUsage, recordUsage } from "@/lib/usage/ledger";
 
 const PROJECT_ID = "miomika";
 /** Chirp 2 GA in asia-southeast1 (~1.1s vs ~2.3s Chirp 3 in us). */
@@ -415,6 +416,8 @@ export async function POST(request: NextRequest) {
 
   const start = Date.now();
   const audioBytes = Buffer.from(await audioBlob.arrayBuffer());
+  // 16 kHz mono Int16 WAV → seconds (44-byte header). Used for STT cost estimates.
+  const audioSeconds = Math.max(0, (audioBytes.length - 44) / 32000);
 
   // SILENCE GATE: if the clip has no real speech energy, the mic was open on a
   // quiet room. Return "nothing said" now — never send silence to Whisper/Google,
@@ -440,6 +443,11 @@ export async function POST(request: NextRequest) {
       const recognizeStart = Date.now();
       const text = await transcribeWithGroq(audioBlob, explicitLang);
       const recognizeMs = Date.now() - recognizeStart;
+      // Usage ledger: STT is a paid call — record it (kind "stt") so voice usage
+      // is visible per user in llm_usage and the admin cost tab.
+      await withUsage("talk.transcribe", userId, async () => {
+        recordUsage({ provider: "groq_whisper", kind: "stt", model: "whisper-large-v3-turbo", audioSeconds, latencyMs: recognizeMs, meta: { path: "talk" } });
+      });
       log("voice.transcribe", "asr-split", { uploadReadMs, recognizeMs });
       const latency = Date.now() - start;
       log("voice.transcribe", "transcribed", {
@@ -478,6 +486,11 @@ export async function POST(request: NextRequest) {
       const recognizeStart = Date.now();
       const google = await transcribeWithGoogle(audioBytes);
       const recognizeMs = Date.now() - recognizeStart;
+      // Usage ledger: STT is a paid call — record it (kind "stt") so voice usage
+      // is visible per user in llm_usage and the admin cost tab.
+      await withUsage("talk.transcribe", userId, async () => {
+        recordUsage({ provider: "google_stt", kind: "stt", model: google.model, audioSeconds, latencyMs: recognizeMs, meta: { path: "talk", location: google.location } });
+      });
       log("voice.transcribe", "asr-split", { uploadReadMs, recognizeMs });
       const latency = Date.now() - start;
       log("voice.transcribe", "transcribed", {
