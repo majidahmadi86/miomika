@@ -11,7 +11,7 @@
  * a grid (page) or a stacked column (sheet) and they fill their column.
  */
 
-import { Check, Lock, Mic } from "lucide-react";
+import { Check, Mic } from "lucide-react";
 import {
   perRoomTHB,
   yearlyPriceTHB,
@@ -130,7 +130,7 @@ function RoomInside({
   );
 }
 
-/** Locked variant of the room block — shown on Free to create upgrade pull. */
+/** Free-tier variant of the room block: an invitation, never a wall. */
 function RoomLocked({ lang }: { lang: Lang }) {
   return (
     <div
@@ -143,13 +143,13 @@ function RoomLocked({ lang }: { lang: Lang }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <Lock style={{ width: 13, height: 13, color: "#B0A488" }} strokeWidth={2.3} aria-hidden />
+        <Mic style={{ width: 13, height: 13, color: "#B0A488" }} strokeWidth={2.3} aria-hidden />
         <span style={{ ...sans, fontSize: 11, fontWeight: 700, color: MUTED }}>
           {lang === "th" ? "ห้องพูดสด" : "Confident Speaking"}
         </span>
       </div>
       <div style={{ ...sans, fontSize: 11, fontWeight: 600, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>
-        {lang === "th" ? "ล็อกอยู่ — อัปเกรดเพื่อพูดสดกับมีโอมิ" : "Locked — upgrade to talk live with Miomi"}
+        {lang === "th" ? "ห้องพูดสดกับมีโอมิรอคุณอยู่ในแพ็กโปรนะคะ" : "Live rooms with Miomi are waiting for you on Pro."}
       </div>
     </div>
   );

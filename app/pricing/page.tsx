@@ -30,7 +30,7 @@ const COPY = {
     sub: "Start free. Upgrade when you're ready to talk out loud with Miomi.",
     plans: "Plans",
     packs: "Room packs · top up any plan",
-    note: "Prices in Thai baht. Cancel anytime — you keep access to the end of your paid period.",
+    note: "Prices in Thai baht. Cancel anytime · you keep access to the end of your paid period.",
   },
   th: {
     title: "พูดได้ตั้งแต่วันแรก",
