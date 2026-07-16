@@ -1,6 +1,6 @@
-/* Miomika service worker — generated 2026-06-14T11:52:58.152Z */
+/* Miomika service worker — generated 2026-07-16T05:55:40.134Z */
 const CACHE_PREFIX = "miomika";
-const BUILD_ID = "12f5581668af";
+const BUILD_ID = "b92dc37d1b91";
 
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
@@ -112,4 +112,38 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(staleWhileRevalidate(request));
     return;
   }
+});
+
+/* --- Miomi care notifications (web push) --- */
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Miomika", {
+      body: data.body || "",
+      icon: "/manifest-icon-192.png",
+      badge: "/manifest-icon-192.png",
+      data: { url: data.url || "/talk" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/talk";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if ("focus" in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
 });

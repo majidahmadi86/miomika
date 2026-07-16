@@ -1,7 +1,8 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { composeCareEmail } from "@/lib/care/moments";
+import { composeCareEmail, composeCarePush } from "@/lib/care/moments";
+import { sendCarePush, type PushRow } from "@/lib/care/push";
 
 /**
  * Miomi's care-note dispatcher. Runs once a day via Vercel Cron (see
@@ -107,6 +108,32 @@ export async function GET(request: Request) {
       }
 
       const lang = p.ui_language === "th" ? "th" : "en";
+
+      // Channel: push first when a device is subscribed (more intimate,
+      // free); email otherwise. Never both, one ping is care, two is noise.
+      const { data: subs } = await supabase
+        .from("push_subscriptions")
+        .select("endpoint, p256dh, auth")
+        .eq("user_id", p.id);
+      if (subs && subs.length > 0) {
+        const push = composeCarePush({ lang, daysAway, memoryFact });
+        let delivered = 0;
+        for (const s of subs) {
+          const r = await sendCarePush(s as PushRow, push);
+          if (r.ok) delivered++;
+          else if (r.gone) {
+            await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+          }
+        }
+        if (delivered > 0) {
+          await supabase
+            .from("care_notifications")
+            .insert({ user_id: p.id, moment: push.moment, channel: "push" });
+          sent++;
+          continue;
+        }
+      }
+
       const note = composeCareEmail({ lang, daysAway, memoryFact });
       const unsub = unsubscribeUrl(p.id as string);
       const html = note.html.replaceAll("%%UNSUB%%", unsub);

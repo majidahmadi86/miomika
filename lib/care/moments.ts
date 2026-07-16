@@ -116,22 +116,55 @@ const FOOTER = {
  * moment is EN-UI only in v1: stored facts are English free text, and Miomi
  * never mixes an English fact into a Thai note.
  */
+/**
+ * Moment choice, shared by email + push: long absence wins; a remembered
+ * fact beats the generic meal note on alternating days so neither goes stale.
+ */
+export function chooseCareMoment(opts: {
+  lang: CareLang;
+  daysAway: number;
+  memoryFact?: string | null;
+}): CareMoment {
+  return opts.daysAway >= 3
+    ? "miss_you"
+    : opts.lang === "en" && opts.memoryFact && daySeed() % 2 === 0
+      ? "memory"
+      : "meal";
+}
+
+/** The push variant of a care note: title + short body + tap destination. */
+export function composeCarePush(opts: {
+  lang: CareLang;
+  daysAway: number;
+  memoryFact?: string | null;
+}): { moment: CareMoment; title: string; body: string; url: string } {
+  const { lang, memoryFact } = opts;
+  const moment = chooseCareMoment(opts);
+  const url = "/talk";
+
+  if (moment === "miss_you") {
+    return lang === "en"
+      ? { moment, url, title: "หนูคิดถึงนะคะ", body: "nu kit teung na ka · I miss you. Whenever you are ready, I am right here." }
+      : { moment, url, title: "หนูคิดถึงนะคะ เมี้ยว~", body: "หายไปหลายวันเลย พร้อมเมื่อไหร่หนูอยู่ตรงนี้เสมอค่ะ" };
+  }
+  if (moment === "memory") {
+    const fact = humanize(String(memoryFact).trim()).slice(0, 90);
+    return { moment, url, title: "I was thinking about you", body: `You told me once: ${fact}. How is it going?` };
+  }
+  return lang === "en"
+    ? { moment, url, title: "กินข้าวหรือยังคะ เมี้ยว~", body: "gin khao rue yang · Have you eaten yet? It is how Thais say I care." }
+    : { moment, url, title: "กินข้าวหรือยังคะ เมี้ยว~", body: "แวะมาถามเฉยๆ ค่ะ ดูแลตัวเองด้วยนะคะ" };
+}
+
 export function composeCareEmail(opts: {
   lang: CareLang;
   daysAway: number;
   memoryFact?: string | null;
 }): CareEmail {
-  const { lang, daysAway, memoryFact } = opts;
+  const { lang, memoryFact } = opts;
   const f = FOOTER[lang];
 
-  // Moment choice: long absence wins; a remembered fact beats the generic
-  // meal note on alternating days so neither goes stale.
-  const moment: CareMoment =
-    daysAway >= 3
-      ? "miss_you"
-      : lang === "en" && memoryFact && daySeed() % 2 === 0
-        ? "memory"
-        : "meal";
+  const moment = chooseCareMoment(opts);
 
   const base = { cta: f.cta, footerSettings: f.settings, footerUnsub: f.unsub };
 
