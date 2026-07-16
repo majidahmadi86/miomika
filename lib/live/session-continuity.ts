@@ -21,8 +21,8 @@ export function classifyLiveClose(intentionalClose: boolean): LiveCloseKind {
 
 /** Ignore callbacks from a superseded MiomiLiveClient instance. */
 export function shouldIgnoreClientEpoch(
-  eventEpoch: string,
-  currentEpoch: string | null,
+  eventEpoch: string | number,
+  currentEpoch: string | number | null,
 ): boolean {
   if (!currentEpoch) return true;
   return eventEpoch !== currentEpoch;

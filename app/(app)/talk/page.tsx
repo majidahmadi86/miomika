@@ -33,7 +33,7 @@ import { GUIDANCE_GUEST_LIMIT_HIT, pickPhrase } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
-import { MiomiLiveClient, type LiveClientCloseDetail, type LiveClientErrorDetail, type LiveClientMessage, type LiveSessionSnapshot } from "@/lib/live/miomi-client";
+import type { LiveClientCloseDetail, LiveClientErrorDetail, LiveClientMessage, LiveSessionSnapshot } from "@/lib/live/miomi-client";
 import { MediaHandler } from "@/lib/live/media-handler";
 import { isHiddenLiveTranscript, sanitizeUserTranscript } from "@/lib/live/transcript";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
@@ -81,9 +81,13 @@ import { replayWordAudio } from "@/lib/talk/word-replay";
 import type { VocabularyEntry } from "@/components/talk/WordCardV3";
 
 /**
- * LOCKED 2026-06-05 — /talk is audio-native Gemini Live (MiomiLiveClient + /api/live-token
- * ephemeral mint). Legacy ASR → LLM → TTS pipeline is NOT used on this route. Do not re-wire
- * transcribe/miomi/speak here without re-verifying the full /talk + guest flow end-to-end.
+ * ENGINE TRUTH (corrected 2026-07-16; the old header here claimed audio-native
+ * Gemini Live and misled a full debugging round — never trust it again):
+ * /talk is the TURN-BASED pipeline BY DESIGN, for cost control with per-tier
+ * rates: mic → /api/talk/transcribe (STT) → /api/miomi (brain) → TTS playback,
+ * all driven by MiomiTurnClient. Audio-native Gemini Live is used ONLY in
+ * CS-rooms, never here. Consequence: Miomi's /talk voice is Google TTS, so
+ * pronunciation IS shapeable from our side (SSML/phoneme work is fair game).
  */
 
 type CanvasItem =
@@ -150,7 +154,7 @@ export default function TalkPage() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const hydratedRef = useRef(false);
   const titleTapsRef = useRef<{ count: number; last: number }>({ count: 0, last: 0 });
-  const clientRef = useRef<MiomiLiveClient | null>(null);
+  const clientRef = useRef<MiomiTurnClient | null>(null);
   const mediaRef = useRef<MediaHandler | null>(null);
   const turnRuntimeRef = useRef<TurnRuntime | null>(null);
   const currentUserItemIdRef = useRef<string | null>(null);
@@ -167,7 +171,7 @@ export default function TalkPage() {
   const sessionTargetLangRef = useRef<"th" | "en">("en");
   const browserUiLangRef = useRef<"th" | "en">("th");
   const itemsRef = useRef<CanvasItem[]>([]);
-  const liveClientEpochRef = useRef<string | null>(null);
+  const liveClientEpochRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectInFlightRef = useRef(false);
   const wasListeningBeforeDropRef = useRef(false);
@@ -535,12 +539,12 @@ export default function TalkPage() {
     [ensureTurnRuntime],
   );
 
-  const wireLiveClient = useCallback((client: MiomiLiveClient) => {
+  const wireLiveClient = useCallback((client: MiomiTurnClient) => {
     liveClientEpochRef.current = client.epochId;
     clientRef.current = client;
   }, []);
 
-  const createLiveClient = useCallback((): MiomiLiveClient => {
+  const createLiveClient = useCallback((): MiomiTurnClient => {
     return new MiomiTurnClient({
       onOpen: () => {
         logEvent({ kind: "state", level: "info", message: "live connected" });
@@ -562,7 +566,7 @@ export default function TalkPage() {
           setLiveUiState("error");
         }
       },
-    }) as unknown as MiomiLiveClient;
+    });
   }, [ensureTurnRuntime, openPaywall]);
 
   const primeAudio = useCallback(() => {

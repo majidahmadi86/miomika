@@ -38,7 +38,8 @@ import { speakReply, killAllAudio, isSpeakingNow } from "@/lib/voice/tts";
 // `... as unknown as MiomiLiveClient` at the construction site needs no other
 // page type changes. onStatus is already part of those callbacks.
 import { MiomiLiveClient } from "@/lib/live/miomi-client";
-import type { LiveClientMessage } from "@/lib/live/miomi-client";
+import type { LiveClientMessage, LiveSessionSnapshot } from "@/lib/live/miomi-client";
+import type { MemberContextBundle } from "@/lib/live/member-context";
 
 type Callbacks = ConstructorParameters<typeof MiomiLiveClient>[0];
 type ConnectOpts = Parameters<MiomiLiveClient["connect"]>[0];
@@ -356,7 +357,7 @@ export class MiomiTurnClient {
     );
   }
 
-  sendSessionKickoff(): void {
+  sendSessionKickoff(_lang?: "th" | "en"): void {
     this.sendKickoff(this.uiLanguage, "returning");
   }
 
@@ -391,7 +392,7 @@ export class MiomiTurnClient {
   sendRoomPace(_v?: unknown): void {
     /* PASS2 */
   }
-  sendPaceChange(_v?: unknown): void {
+  sendPaceChange(_lang?: "th" | "en", _slow?: boolean): void {
     /* PASS2 */
   }
   sendRoomWrapUp(_v?: unknown): void {
@@ -403,10 +404,10 @@ export class MiomiTurnClient {
   sendRoomTimeUp(_v?: unknown): void {
     /* PASS2 */
   }
-  sendSessionResume(_v?: unknown): void {
+  sendSessionResume(_lang?: "th" | "en", _stageId?: string): void {
     /* PASS2 — no reconnect in turn mode */
   }
-  sendResume(_v?: unknown): void {
+  sendResume(_lang?: "th" | "en", _nextWord?: string | null): void {
     /* PASS2 */
   }
   setTeachWordContext(_v?: unknown): void {
@@ -415,13 +416,13 @@ export class MiomiTurnClient {
   applyTeachWordResponse(_v?: unknown): void {
     /* PASS2 */
   }
-  getMemberContext(): unknown {
+  getMemberContext(): MemberContextBundle | null {
     return null; // PASS2
   }
-  getVoiceBudget(): unknown {
+  getVoiceBudget(): { usedSeconds: number; budgetSeconds: number } | null {
     return null; // PASS2 — metering was Live-era
   }
-  getSessionSnapshot(): unknown {
+  getSessionSnapshot(): LiveSessionSnapshot {
     // The page reads getSessionSnapshot().teachWord WITHOUT a null guard in
     // several spots, so this must NEVER be null. Mirror the page's own
     // "no snapshot" fallback shape exactly. Turn mode has no real resume, so
@@ -440,7 +441,7 @@ export class MiomiTurnClient {
       reviewServed: [],
     };
   }
-  restoreSessionSnapshot(_v?: unknown): void {
+  restoreSessionSnapshot(_v?: LiveSessionSnapshot): void {
     /* PASS2 */
   }
   clearResumeHandle(): void {

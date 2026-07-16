@@ -1,6 +1,6 @@
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
 import { TurnRuntime } from "@/lib/live/turn-runtime";
-import type { MiomiLiveClient } from "@/lib/live/miomi-client";
+import type { MiomiTurnClient } from "@/lib/live/miomi-turn-client";
 import type { MediaHandler } from "@/lib/live/media-handler";
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -23,7 +23,7 @@ export async function simulateGuestCtaViaTurnRuntime(): Promise<{
       invitationCueCount += 1;
     },
     isConnected: () => true,
-  } as unknown as MiomiLiveClient;
+  } as unknown as MiomiTurnClient;
 
   const mockMedia = {
     deferUntilPlaybackIdle: (fn: () => void) => {

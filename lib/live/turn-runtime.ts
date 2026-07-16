@@ -3,7 +3,7 @@
  */
 
 import { logEvent } from "@/lib/debug/event-bus";
-import type { MiomiLiveClient } from "@/lib/live/miomi-client";
+import type { MiomiTurnClient } from "@/lib/live/miomi-turn-client";
 import type { MediaHandler } from "@/lib/live/media-handler";
 import {
   createTurnController,
@@ -31,7 +31,7 @@ export type TurnRuntimeCallbacks = {
 };
 
 export type TurnRuntimeDeps = TurnRuntimeCallbacks & {
-  getClient: () => MiomiLiveClient | null;
+  getClient: () => MiomiTurnClient | null;
   getMedia: () => MediaHandler | null;
   getUiLang: () => "th" | "en";
   getKickoffAudience?: () => "first_time" | "returning";
