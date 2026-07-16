@@ -57,6 +57,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Mikaro Studio" }],
   metadataBase: new URL("https://miomika.com"),
+  alternates: { canonical: "https://miomika.com" },
   manifest: "/manifest.json",
 
   openGraph: {
