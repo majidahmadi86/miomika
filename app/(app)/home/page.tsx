@@ -1139,7 +1139,7 @@ export default function HomePage() {
                 <Link
                   href="/signup"
                   className={cn(
-                    "absolute right-3 top-14 z-40 rounded-full border border-[#EDE8E0] px-3 py-1.5 text-[11px] font-semibold backdrop-blur-[14px]",
+                    "absolute right-14 top-3 z-40 flex h-9 items-center rounded-full border border-[#EDE8E0] px-3 text-[11px] font-semibold backdrop-blur-[14px]",
                     tapFeedback,
                   )}
                   style={{ background: "rgba(255,255,255,0.92)", color: "#1A1A18", fontFamily: uiLang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif" }}
@@ -1149,7 +1149,7 @@ export default function HomePage() {
               ) : null}
               {authReady && !isGuest ? <TierUpgradeChip tier={profile?.tier} lang={lang} /> : null}
 
-              <div className="mb-6">
+              <div className="mb-6 pr-52">
                 <h1 className="text-[23px] font-medium leading-snug text-ink">{greeting}</h1>
               </div>
 

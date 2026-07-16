@@ -10,12 +10,12 @@ const COPY = {
 
 /**
  * Home-only. GuideEntry (the "?" button) already positions itself reliably
- * with `absolute right-3 top-3` inside Home's own layout — two earlier
+ * with `absolute right-3 top-3` inside Home's own layout. Two earlier
  * attempts to coexist with it via position:fixed + runtime measurement both
  * failed on real devices. This mirrors GuideEntry's own proven scheme
- * exactly instead: a plain sibling, same `absolute right-3` positioning,
- * just lower, inheriting the same positioned ancestor GuideEntry already
- * uses correctly. No portal, no polling, nothing to get out of sync.
+ * exactly instead: a plain sibling with the same absolute positioning,
+ * sitting BESIDE the "?" (right-14 clears its 36px + gap) so the top band
+ * is one calm row, not a stack. No portal, no polling, nothing to sync.
  */
 export function TierUpgradeChip({ tier, lang }: { tier: "free" | "pro" | "pro_max" | "guest" | undefined; lang: "th" | "en" }) {
   const { open } = usePaywall();
@@ -26,7 +26,7 @@ export function TierUpgradeChip({ tier, lang }: { tier: "free" | "pro" | "pro_ma
     <button
       onClick={() => open("generic")}
       aria-label={text}
-      className="pointer-events-auto absolute right-3 top-14 z-40 flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur-[14px] transition active:scale-[0.96]"
+      className="pointer-events-auto absolute right-14 top-3 z-40 flex h-9 items-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold shadow-sm backdrop-blur-[14px] transition active:scale-[0.96]"
       style={{ fontFamily: "'Quicksand', sans-serif", borderColor: "#E8D8A8", background: "rgba(251, 243, 220, 0.92)", color: "#8A6D1F" }}
     >
       <Crown className="h-3.5 w-3.5" style={{ color: "#B8860B" }} strokeWidth={2} />
