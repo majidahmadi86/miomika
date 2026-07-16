@@ -1198,7 +1198,7 @@ export default function HomePage() {
                   </Link>
                 </section>
 
-                <section className="flex min-h-0 flex-col gap-3 overflow-y-auto pb-4">
+                <section className="flex min-h-0 flex-col gap-3 overflow-y-auto pb-4 [&>*]:shrink-0">
                   <p className="px-1 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle" style={{ fontFamily: "'Quicksand', sans-serif" }}>{HOME_T[lang].today}</p>
 
                   <ClosenessCard points={profile?.bond_points ?? 0} lang={lang} active={revealReady} />
