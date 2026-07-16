@@ -44,7 +44,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Miomika — Learn languages with Miomi, your AI companion",
+  title: "Miomika · Learn languages with Miomi, your AI companion",
   description:
     "A friend who remembers you. Learn Thai and English with Miomi, an AI companion that grows with you. เพื่อนที่จำคุณได้และโตไปพร้อมกับคุณ",
   keywords: [
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 
   openGraph: {
-    title: "Miomika — A friend who remembers you",
+    title: "Miomika · A friend who remembers you",
     description:
       "Learn Thai and English with Miomi, your AI companion. เพื่อนที่จำคุณได้",
     url: "https://miomika.com",
@@ -70,7 +70,7 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Miomi — your AI companion",
+        alt: "Miomi · your AI companion",
       },
     ],
     locale: "th_TH",
@@ -79,7 +79,7 @@ export const metadata: Metadata = {
 
   twitter: {
     card: "summary_large_image",
-    title: "Miomika — A friend who remembers you",
+    title: "Miomika · A friend who remembers you",
     description:
       "Learn Thai and English with Miomi, your AI companion.",
     images: ["/twitter-card.png"],
