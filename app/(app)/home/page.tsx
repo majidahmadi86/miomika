@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
-import { Flame, Heart, Sparkles } from "lucide-react";
+import { Flame, Gift, Heart, Mic, Sparkles } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -27,14 +27,12 @@ import type { Language } from "@/lib/i18n/server";
 import { useUILanguage } from "@/lib/i18n/client";
 import { awardDailyBond, deriveBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
 import { pickFeatureMoment, markFeatureMomentSeen } from "@/lib/companion/feature-moments";
-import { InviteFriendCard } from "@/components/home/InviteFriendCard";
-import { LiveRoomsCard } from "@/components/home/LiveRoomsCard";
 import { ClosenessCard } from "@/components/home/ClosenessCard";
 import { RemembersCard } from "@/components/home/RemembersCard";
 import { MemoryLine } from "@/components/home/MemoryLine";
 const HOME_T = {
-  th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน" },
-  en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review" },
+  th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน", rooms: "ห้องสนทนาสดกับมิโอมิ", roomsSub: "ฝึกพูดคุยจริงด้วยเสียง แบบมีเป้าหมาย", invite: "ชวนเพื่อนมาด้วยกัน", invitePre: "คุณและเพื่อนได้เครดิต ", inviteAmount: "฿30", invitePost: " ทั้งคู่" },
+  en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review", rooms: "Live rooms with Miomi", roomsSub: "Practice a real conversation, out loud, with a goal", invite: "Invite a friend", invitePre: "You both get ", inviteAmount: "฿30", invitePost: " credit" },
 } as const;
 
 function buildHomeGreeting(
@@ -1205,35 +1203,61 @@ export default function HomePage() {
 
                   <RemembersCard lang={lang} />
 
-                  <LiveRoomsCard lang={lang} />
-
-                  <InviteFriendCard lang={lang} />
-
-                  <div className="rounded-card border border-line bg-surface p-4 shadow-card">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#B8860B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3c1 3-1 4-1 6a3 3 0 0 0 6 0c0-1 0-2-.5-3 2 1.5 3.5 4 3.5 7a7 7 0 0 1-14 0c0-4 3-6 6-10z" /></svg>
-                        <span className="text-[14px] font-semibold text-earned-strong" style={{ fontFamily: "'Quicksand', sans-serif" }}>{profile?.streak ?? 0}</span>
-                        <span className="text-[12px] text-ink-muted">{HOME_T[lang].streakUnit}</span>
+                  {/* Two doors, one card: live rooms + invite. Merged so the
+                      whole rail fits on screen without scrolling. */}
+                  <div className="rounded-card border border-line bg-surface shadow-card">
+                    <Link href="/learn?surface=Speak" className={cn("flex items-center gap-3 p-3.5", tapFeedback)}>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]" style={{ background: "#E8F7F0" }}>
+                        <Mic className="h-[18px] w-[18px]" style={{ color: "#2C8E76" }} strokeWidth={2} />
                       </span>
-                      <span className="text-[12.5px] font-medium text-ink-muted">{HOME_T[lang].level} {pet.level}</span>
-                    </div>
-                    <div className="mt-3 h-[7px] overflow-hidden rounded-full" style={{ background: "#F1EAD9" }}>
-                      <div className="h-full rounded-full" style={{ width: `${pet.xp}%`, background: "linear-gradient(90deg, #E3C98B, var(--mk-earned))" }} />
-                    </div>
-                    <p className="mt-2 text-[11px] text-ink-muted">{lang === "en" ? `${Math.max(0, 100 - Math.round(pet.xp))} XP to next level` : `อีก ${Math.max(0, 100 - Math.round(pet.xp))} XP ถึงเลเวลถัดไป`}</p>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-medium text-ink">{HOME_T[lang].rooms}</span>
+                        <span className="block truncate text-[11.5px] text-ink-muted">{HOME_T[lang].roomsSub}</span>
+                      </span>
+                      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-ink-subtle"><path d="M9 6l6 6-6 6" /></svg>
+                    </Link>
+                    <div className="mx-3.5 border-t border-line" />
+                    <Link href="/invite" className={cn("flex items-center gap-3 p-3.5", tapFeedback)}>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]" style={{ background: "#FBF3DC" }}>
+                        <Gift className="h-[18px] w-[18px]" style={{ color: "#B8860B" }} strokeWidth={2} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-medium text-ink">{HOME_T[lang].invite}</span>
+                        <span className="block truncate text-[11.5px] text-ink-muted">{HOME_T[lang].invitePre}<span className="font-semibold text-earned-strong">{HOME_T[lang].inviteAmount}</span>{HOME_T[lang].invitePost}</span>
+                      </span>
+                      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-ink-subtle"><path d="M9 6l6 6-6 6" /></svg>
+                    </Link>
                   </div>
 
-                  <Link href="/learn" className={cn("flex items-center gap-3 rounded-card border border-line bg-surface p-3.5 shadow-card", tapFeedback)}>
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]" style={{ background: "var(--mk-warm-soft)" }}>
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#993556" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13.5px] font-medium text-ink">{HOME_T[lang].review}</span>
-                      <span className="block text-[11.5px] text-ink-muted">{HOME_T[lang].reviewSub}</span>
-                    </span>
-                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink-subtle"><path d="M9 6l6 6-6 6" /></svg>
-                  </Link>
+                  {/* Progress, one card: streak + level + XP with the review
+                      row inside. Merged so the whole rail fits on screen. */}
+                  <div className="rounded-card border border-line bg-surface shadow-card">
+                    <div className="p-4 pb-3.5">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#B8860B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3c1 3-1 4-1 6a3 3 0 0 0 6 0c0-1 0-2-.5-3 2 1.5 3.5 4 3.5 7a7 7 0 0 1-14 0c0-4 3-6 6-10z" /></svg>
+                          <span className="text-[14px] font-semibold text-earned-strong" style={{ fontFamily: "'Quicksand', sans-serif" }}>{profile?.streak ?? 0}</span>
+                          <span className="text-[12px] text-ink-muted">{HOME_T[lang].streakUnit}</span>
+                        </span>
+                        <span className="text-[12.5px] font-medium text-ink-muted">{HOME_T[lang].level} {pet.level}</span>
+                      </div>
+                      <div className="mt-3 h-[7px] overflow-hidden rounded-full" style={{ background: "#F1EAD9" }}>
+                        <div className="h-full rounded-full" style={{ width: `${pet.xp}%`, background: "linear-gradient(90deg, #E3C98B, var(--mk-earned))" }} />
+                      </div>
+                      <p className="mt-2 text-[11px] text-ink-muted">{lang === "en" ? `${Math.max(0, 100 - Math.round(pet.xp))} XP to next level` : `อีก ${Math.max(0, 100 - Math.round(pet.xp))} XP ถึงเลเวลถัดไป`}</p>
+                    </div>
+                    <div className="mx-3.5 border-t border-line" />
+                    <Link href="/learn" className={cn("flex items-center gap-3 p-3.5", tapFeedback)}>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]" style={{ background: "var(--mk-warm-soft)" }}>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#993556" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-medium text-ink">{HOME_T[lang].review}</span>
+                        <span className="block text-[11.5px] text-ink-muted">{HOME_T[lang].reviewSub}</span>
+                      </span>
+                      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-ink-subtle"><path d="M9 6l6 6-6 6" /></svg>
+                    </Link>
+                  </div>
                 </section>
               </div>
             </div>
