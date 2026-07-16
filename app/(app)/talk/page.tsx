@@ -18,7 +18,8 @@ import { MiomiTurnClient } from "@/lib/live/miomi-turn-client";
 import { PersistentMiomi, type MiomiMood } from "@/components/talk/PersistentMiomi";
 import { MicRow } from "@/components/talk/MicRow";
 import { MiniCatRow } from "@/components/talk/MiniCatRow";
-import { WordCardV3 } from "@/components/talk/WordCardV3";
+import { WordCardFull, fromVocabularyEntry } from "@/components/word/WordCard";
+import { speakReply } from "@/lib/voice/tts";
 import { AdjustSheet } from "@/components/talk/AdjustSheet";
 import { type TalkConfig, loadTalkConfig, saveTalkConfig, DEFAULT_TALK_CONFIG } from "@/lib/talk/modes";
 import {
@@ -77,7 +78,6 @@ import {
 import { ROOM_MAX_SECONDS, ROOM_WARN_SECONDS } from "@/lib/live/voice-allowance";
 import { TurnRuntime, isReplaySuspended } from "@/lib/live/turn-runtime";
 import type { LiveUiPhase } from "@/lib/live/turn-controller";
-import { replayWordAudio } from "@/lib/talk/word-replay";
 import type { VocabularyEntry } from "@/components/talk/WordCardV3";
 
 /**
@@ -1633,12 +1633,17 @@ export default function TalkPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const handleWordReplay = useCallback(async (word: VocabularyEntry) => {
+  // Card audio (any part of the word card) keeps the SAME mic choreography the
+  // old whole-word replay had: suspend the mic while she speaks so her own
+  // voice is never transcribed as the user's input.
+  const handleCardSpeak = useCallback(async (text: string, lang: "th" | "en") => {
     dispatchTurn({ type: "replay_suspend", suspended: true });
     mediaRef.current?.suspendMicSend(true);
     discardSuspendedModelTurn();
     try {
-      await replayWordAudio(word, sessionTargetLangRef.current);
+      await new Promise<void>((resolve) => {
+        void speakReply(text, lang, { onEnd: resolve, onError: resolve });
+      });
     } finally {
       mediaRef.current?.suspendMicSend(false);
       void mediaRef.current?.endModelTurnWhenDrained();
@@ -2114,14 +2119,15 @@ export default function TalkPage() {
             }
             if (item.kind === "word_card") {
               return (
-                <WordCardV3
-                  key={item.id}
-                  word={item.word}
-                  direction={item.direction}
-                  onReplayAudio={() => handleWordReplay(item.word)}
-                  saveState={isGuest ? "guest_prompt" : "saved"}
-                  onSaveTap={isGuest ? () => openGuestSignupSheet("save") : undefined}
-                />
+                <div key={item.id} className="w-full max-w-[440px]">
+                  <WordCardFull
+                    word={fromVocabularyEntry(item.word)}
+                    target={item.direction === "th_to_en" ? "en" : "th"}
+                    onSpeak={(text, lang) => void handleCardSpeak(text, lang)}
+                    saved={!isGuest}
+                    onToggleSave={isGuest ? () => openGuestSignupSheet("save") : undefined}
+                  />
+                </div>
               );
             }
             return null;
