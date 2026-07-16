@@ -72,6 +72,7 @@ const T = {
     aboutBody:
       "Miomika is built by Mikaro Studio, an independent creative technology studio in Bangkok, Thailand. We believe the warmest way to learn a language is not flashcards but a friend, so we built Miomi: a companion who talks with you, teaches you, and genuinely remembers you.",
     aboutContact: "Questions? Write to us at",
+    backToTop: "Back to top",
     footerTagline: "Learn Thai and English with Miomi, your AI companion.",
     footerLinks: { pricing: "Pricing", help: "Help center", terms: "Terms", privacy: "Privacy" },
     langSwitch: "ไทย",
@@ -129,6 +130,7 @@ const T = {
     aboutBody:
       "Miomika พัฒนาโดย Mikaro Studio สตูดิโอเทคโนโลยีสร้างสรรค์อิสระในกรุงเทพฯ ประเทศไทย เราเชื่อว่าวิธีเรียนภาษาที่อบอุ่นที่สุดไม่ใช่บัตรคำศัพท์ แต่คือเพื่อนสักคน เราจึงสร้างมีโอมิ เพื่อนที่คุยกับคุณ สอนคุณ และจำคุณได้จริงๆ",
     aboutContact: "มีคำถาม? เขียนหาเราได้ที่",
+    backToTop: "กลับขึ้นด้านบน",
     footerTagline: "เรียนภาษาไทยและอังกฤษกับมีโอมิ เพื่อน AI ของคุณ",
     footerLinks: { pricing: "ราคา", help: "ศูนย์ช่วยเหลือ", terms: "ข้อกำหนด", privacy: "ความเป็นส่วนตัว" },
     langSwitch: "EN",
@@ -183,6 +185,7 @@ export default async function Page({
 
   return (
     <div
+      id="mk-scroll"
       lang={lang}
       className={`h-dvh overflow-y-auto bg-canvas text-ink ${
         thaiBody ? "[font-family:var(--font-sarabun),system-ui,sans-serif]" : ""
@@ -195,6 +198,13 @@ export default async function Page({
         @media (prefers-reduced-motion: reduce) {
           .mk-drift, .mk-float { animation: none !important; }
         }
+        /* Scroll reveals: applied ONLY when the tiny script below adds
+           .mk-motion, so crawlers and no-JS visitors always see everything. */
+        .mk-motion [data-reveal] { opacity: 0; transform: translateY(16px); transition: opacity .6s ease, transform .6s ease; }
+        .mk-motion [data-reveal].mk-in { opacity: 1; transform: none; }
+        /* Quick-access dock: hidden until the visitor scrolls past the hero. */
+        #mk-dock { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; align-items: center; gap: 8px; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .3s ease, transform .3s ease; }
+        #mk-dock.mk-dock-show { opacity: 1; pointer-events: auto; transform: none; }
       `}</style>
 
       <div className="relative min-h-full">
@@ -289,7 +299,7 @@ export default async function Page({
           </section>
 
           {/* ── Conversation demo (signature) ── */}
-          <section aria-label={t.demoEyebrow} className="py-8">
+          <section aria-label={t.demoEyebrow} data-reveal className="py-8">
             <p className="text-sm font-medium uppercase tracking-wide text-accent">{t.demoEyebrow}</p>
             <div className="mt-4 rounded-tile bg-surface p-5 shadow-card sm:p-7">
               <div className="flex flex-col gap-3">
@@ -312,7 +322,7 @@ export default async function Page({
           </section>
 
           {/* ── How it works ── */}
-          <section id="how" className="py-12">
+          <section id="how" data-reveal className="py-12">
             <p className="text-sm font-medium uppercase tracking-wide text-accent">{t.howEyebrow}</p>
             <div className="mt-5 grid gap-4 md:grid-cols-3">
               {t.how.map((step, i) => (
@@ -332,7 +342,7 @@ export default async function Page({
           </section>
 
           {/* ── Inside Miomika ── */}
-          <section className="py-6">
+          <section data-reveal className="py-6">
             <p className="text-sm font-medium uppercase tracking-wide text-accent">{t.insideEyebrow}</p>
             <ul className="mt-5 flex flex-wrap gap-2.5">
               {t.inside.map((item) => (
@@ -347,7 +357,7 @@ export default async function Page({
           </section>
 
           {/* ── Pricing (live data from lib/billing/tiers) ── */}
-          <section id="pricing" className="py-12">
+          <section id="pricing" data-reveal className="py-12">
             <p className="text-sm font-medium uppercase tracking-wide text-accent">{t.pricingEyebrow}</p>
             <div className="mt-5 grid gap-4 md:grid-cols-3">
               {PLANS.map((plan) => (
@@ -395,7 +405,7 @@ export default async function Page({
           </section>
 
           {/* ── About (the paragraph reviewers need) ── */}
-          <section className="py-12">
+          <section data-reveal className="py-12">
             <p className="text-sm font-medium uppercase tracking-wide text-accent">{t.aboutEyebrow}</p>
             <h2 className="mt-3 text-2xl font-semibold [font-family:var(--font-kanit),sans-serif]">
               {t.aboutTitle}
@@ -431,6 +441,32 @@ export default async function Page({
           </footer>
         </div>
       </div>
+
+      {/* Quick-access dock: the app is never more than one tap away, and
+          long pages never strand the visitor at the bottom. */}
+      <div id="mk-dock">
+        <Link
+          href="/home"
+          className="rounded-full bg-accent px-5 py-3 text-sm font-medium text-accent-contrast shadow-cta hover:bg-accent-hover"
+        >
+          {t.heroCta}
+        </Link>
+        <button
+          id="mk-top"
+          type="button"
+          aria-label={t.backToTop}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-lg text-ink shadow-card"
+        >
+          ↑
+        </button>
+      </div>
+
+      {/* Progressive enhancement only: reveals + dock. No JS, no problem. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){var root=document.getElementById('mk-scroll');if(!root)return;var reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(!reduce&&'IntersectionObserver' in window){root.classList.add('mk-motion');var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('mk-in');io.unobserve(e.target);}});},{root:root,rootMargin:'0px 0px -8% 0px'});document.querySelectorAll('[data-reveal]').forEach(function(el){io.observe(el);});}var dock=document.getElementById('mk-dock');if(dock){var toggle=function(){dock.classList.toggle('mk-dock-show',root.scrollTop>420);};root.addEventListener('scroll',toggle,{passive:true});toggle();var top=document.getElementById('mk-top');if(top){top.addEventListener('click',function(){root.scrollTo({top:0,behavior:reduce?'auto':'smooth'});});}}})();`,
+        }}
+      />
     </div>
   );
 }
