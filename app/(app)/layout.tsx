@@ -24,6 +24,15 @@ export default function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Mark this browser as having been inside the app, so the public landing
+  // page (app/page.tsx) sends returning visitors straight back to /home.
+  useEffect(() => {
+    try {
+      document.cookie = "mk_seen_app=1; path=/; max-age=31536000; SameSite=Lax";
+    } catch {
+      /* non-fatal */
+    }
+  }, []);
   return (
     <GuestExplorationProvider>
       <PaywallProvider>

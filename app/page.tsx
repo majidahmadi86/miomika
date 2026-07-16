@@ -161,19 +161,25 @@ const DEMO_TH = [
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ lang?: string }>;
+  searchParams: Promise<{ lang?: string; welcome?: string }>;
 }) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) {
+  const { lang: langParam, welcome } = await searchParams;
+  const cookieStore = await cookies();
+
+  // The landing is for strangers and crawlers. Anyone signed in, and anyone
+  // who has already been inside the app (mk_seen_app, set by the app shell),
+  // goes straight to /home so the front door never feels like a wall.
+  // ?welcome=1 forces the landing for previews and sharing.
+  if (user || (cookieStore.get("mk_seen_app") && welcome !== "1")) {
     redirect("/home");
   }
 
-  const { lang: langParam } = await searchParams;
-  const cookieLang = (await cookies()).get("ui-language")?.value;
+  const cookieLang = cookieStore.get("ui-language")?.value;
   const lang: Lang =
     langParam === "th" || langParam === "en"
       ? langParam
