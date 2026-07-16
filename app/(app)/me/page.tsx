@@ -17,6 +17,7 @@ import {
   HelpCircle,
   Lock,
   LogOut,
+  Mail,
   Palette,
   Pencil,
   RotateCcw,
@@ -69,6 +70,7 @@ const COPY = {
     theme: "ธีม",
     sound: "เสียง",
     notifications: "การแจ้งเตือน",
+    emailNotes: "โน้ตเล็กๆ ทางอีเมล",
     thingsLearned: "สิ่งที่ฉันเรียนรู้แล้ว",
     words: "คำ",
     plan: "แพ็กเกจ",
@@ -117,6 +119,7 @@ const COPY = {
     theme: "Theme",
     sound: "Sound",
     notifications: "Notifications",
+    emailNotes: "Little notes by email",
     thingsLearned: "Things I've learned",
     words: "words",
     plan: "Plan",
@@ -309,6 +312,7 @@ export default function MePage() {
   // ---- local prefs ----
   const [soundsOn, setSoundsOn] = useState(true);
   const [notifyOn, setNotifyOn] = useState(false);
+  const [emailNotesOn, setEmailNotesOn] = useState(true);
   const [theme, setThemeState] = useState<ThemeId>("warm");
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -321,6 +325,49 @@ export default function MePage() {
     }
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // True push state beats the localStorage guess: on if (and only if) this
+  // browser holds a live subscription AND permission is still granted.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!("serviceWorker" in navigator) || typeof Notification === "undefined") return;
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (!cancelled) setNotifyOn(Boolean(sub) && Notification.permission === "granted");
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Email care notes: server-backed flag on profiles.
+  useEffect(() => {
+    if (!profileId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("care_emails_enabled")
+          .eq("id", profileId)
+          .maybeSingle();
+        if (!cancelled && data && typeof data.care_emails_enabled === "boolean") {
+          setEmailNotesOn(data.care_emails_enabled);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId]);
 
   // ---- optimistic mirrors of server-backed fields ----
   const [learningTarget, setLearningTarget] = useState<string | null>(null);
@@ -413,25 +460,71 @@ export default function MePage() {
   };
 
   const handleNotify = async (on: boolean) => {
-    if (on && typeof Notification !== "undefined") {
+    const mirror = (v: boolean) => {
+      setNotifyOn(v);
       try {
-        const perm = await Notification.requestPermission();
-        if (perm !== "granted") {
-          setNotifyOn(false);
-          try {
-            localStorage.setItem("miomika.notifications_on", "false");
-          } catch {
-            /* ignore */
-          }
-          return;
-        }
+        localStorage.setItem("miomika.notifications_on", v ? "true" : "false");
       } catch {
         /* ignore */
       }
+    };
+
+    if (on) {
+      try {
+        const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!vapid || typeof Notification === "undefined" || !("serviceWorker" in navigator)) {
+          mirror(false);
+          return;
+        }
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") {
+          mirror(false);
+          return;
+        }
+        const reg = await navigator.serviceWorker.ready;
+        const pad = "=".repeat((4 - (vapid.length % 4)) % 4);
+        const b64 = (vapid + pad).replace(/-/g, "+").replace(/_/g, "/");
+        const raw = window.atob(b64);
+        const key = Uint8Array.from(Array.from(raw, (c) => c.charCodeAt(0)));
+        const sub =
+          (await reg.pushManager.getSubscription()) ??
+          (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }));
+        const res = await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sub.toJSON()),
+        });
+        mirror(res.ok);
+      } catch {
+        mirror(false);
+      }
+      return;
     }
-    setNotifyOn(on);
+
     try {
-      localStorage.setItem("miomika.notifications_on", on ? "true" : "false");
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch("/api/push/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+      }
+    } catch {
+      /* best-effort */
+    }
+    mirror(false);
+  };
+
+  const handleEmailNotes = async (on: boolean) => {
+    setEmailNotesOn(on);
+    if (!profileId) return;
+    try {
+      await supabase.from("profiles").update({ care_emails_enabled: on }).eq("id", profileId);
     } catch {
       /* ignore */
     }
@@ -660,6 +753,13 @@ export default function MePage() {
           label={t.notifications}
           right={<Switch on={notifyOn} onChange={handleNotify} label={t.notifications} />}
         />
+        {profileId ? (
+          <Row
+            icon={<Mail className="h-[18px] w-[18px]" />}
+            label={t.emailNotes}
+            right={<Switch on={emailNotesOn} onChange={handleEmailNotes} label={t.emailNotes} />}
+          />
+        ) : null}
       </Group>
 
       {/* Things learned */}
