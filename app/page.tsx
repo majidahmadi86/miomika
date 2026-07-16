@@ -51,6 +51,7 @@ const T = {
         body: "Miomi keeps what you tell her: your name, your week, the words you struggle with. Come back tomorrow and she picks up right where you left off.",
       },
     ],
+    howTry: "Try it now →",
     insideEyebrow: "Inside Miomika",
     inside: [
       "Voice conversations in Thai and English",
@@ -107,6 +108,7 @@ const T = {
         body: "มีโอมิจำสิ่งที่คุณเล่าให้ฟัง ทั้งชื่อของคุณ เรื่องราวในสัปดาห์ และคำที่คุณยังไม่คล่อง กลับมาพรุ่งนี้แล้วคุยต่อจากเดิมได้เลย",
       },
     ],
+    howTry: "ลองเลย →",
     insideEyebrow: "ใน Miomika มีอะไรบ้าง",
     inside: [
       "สนทนาด้วยเสียงทั้งภาษาไทยและอังกฤษ",
@@ -144,6 +146,9 @@ const DEMO_EN = [
   { who: "you", main: "Not yet! How do I say that I am hungry?", caption: "ยังเลย! ถ้าจะบอกว่าหิวต้องพูดว่าอะไร" },
   { who: "miomi", main: "หิวข้าว ค่ะ ลองพูดดูนะคะ หนูฟังอยู่", caption: "hiw khao · Try saying it, I am listening." },
 ] as const;
+
+/** Deep links for the three "How it works" cards: Talk, Learn, She remembers. */
+const HOW_HREFS = ["/talk", "/learn", "/home"] as const;
 
 const DEMO_TH = [
   { who: "miomi", main: "กินข้าวหรือยังคะ เมี้ยว~", caption: "ภาษาอังกฤษพูดว่า Have you eaten yet?" },
@@ -310,13 +315,18 @@ export default async function Page({
           <section id="how" className="py-12">
             <p className="text-sm font-medium uppercase tracking-wide text-accent">{t.howEyebrow}</p>
             <div className="mt-5 grid gap-4 md:grid-cols-3">
-              {t.how.map((step) => (
-                <div key={step.title} className="rounded-card bg-surface p-6 shadow-card">
+              {t.how.map((step, i) => (
+                <Link
+                  key={step.title}
+                  href={HOW_HREFS[i]}
+                  className="group rounded-card bg-surface p-6 shadow-card transition-shadow hover:shadow-float"
+                >
                   <h2 className="text-lg font-semibold [font-family:var(--font-kanit),sans-serif]">
                     {step.title}
                   </h2>
                   <p className="mt-2 leading-relaxed text-ink-muted">{step.body}</p>
-                </div>
+                  <p className="mt-3 text-sm font-medium text-accent group-hover:underline">{t.howTry}</p>
+                </Link>
               ))}
             </div>
           </section>
