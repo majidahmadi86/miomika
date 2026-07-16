@@ -126,7 +126,7 @@ export function MicRow({ current, orbState, uiLang, showModes = false, onModeCha
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "14px 14px 12px",
+        padding: "8px 14px 6px",
         gap: "8px",
         background: "transparent",
         touchAction: "pan-y",
