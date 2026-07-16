@@ -69,29 +69,29 @@ function buildHomeGreeting(
       tod === "morning" ? "Good morning" : tod === "afternoon" ? "Good afternoon" : tod === "evening" ? "Good evening" : "Up late";
     const bodies: Record<Situation, string[]> = {
       first: [
-        `Welcome! I'm so happy you're here — want to start with a little ${topic}?`,
-        `Hi shall we get to know each other over some ${topic}?`,
-        `You made it let's take your first step into ${topic} together.`,
+        `Welcome! I'm so happy you're here. Want to start with a little ${topic}?`,
+        `Hi! Shall we get to know each other over some ${topic}?`,
+        `You made it! Let's take your first step into ${topic} together.`,
       ],
       today: [
         `${tw}! Ready for a little ${topic}?`,
         `${tw}! Got a few minutes for some ${topic}?`,
-        `${tw}! Let's pick up where we left off — ${topic}?`,
+        `${tw}! Shall we pick up where we left off with ${topic}?`,
       ],
       back: [
-        `${tw}! Good to see you back — more ${topic}?`,
-        `${tw}! It's been a couple of days — shall we get back to ${topic}?`,
-        `${tw}! Missed you ready to ease back into ${topic}?`,
+        `${tw}! Good to see you back. More ${topic}?`,
+        `${tw}! It's been a couple of days. Shall we get back to ${topic}?`,
+        `${tw}! Missed you! Ready to ease back into ${topic}?`,
       ],
       long_away: [
-        `${tw}! It's been a while — I really missed you. Want to start gently with ${topic}?`,
-        `${tw}! You're back! Let's dust off your ${topic}, no rush`,
-        `${tw}! So glad you came back — shall we pick ${topic} up again together?`,
+        `${tw}! It's been a while and I really missed you. Want to start gently with ${topic}?`,
+        `${tw}! You're back! Let's dust off your ${topic}, no rush.`,
+        `${tw}! So glad you came back. Shall we pick ${topic} up again together?`,
       ],
       streak: [
-        `${tw}! Day ${streak} — let's keep it going!`,
-        `${tw}! ${streak} days strong I'm proud of you. More ${topic}?`,
-        `${tw}! ${streak} days in a row — let's not break it now!`,
+        `${tw}! Day ${streak}, let's keep it going!`,
+        `${tw}! ${streak} days strong, I'm proud of you. More ${topic}?`,
+        `${tw}! ${streak} days in a row, let's not break it now!`,
       ],
     };
     return pick(bodies[situation]);
@@ -135,7 +135,7 @@ const tapFeedback =
 
 const TAP_BUBBLE_CYCLE = [
   { th: "วันนี้โพสต์อะไรดีคะ คิดถึงเลยค่า", en: "What are we posting today? I missed you" },
-  { th: "อยากให้หนูช่วยอะไร บอกได้เลยนะคะ", en: "Tell me what you need — I'm all ears" },
+  { th: "อยากให้หนูช่วยอะไร บอกได้เลยนะคะ", en: "Tell me what you need, I'm all ears" },
   { th: "มาอยู่ข้างๆ แบบนี้ก็อบอุ่นดีนะคะ", en: "Having you here with me feels warm" },
   { th: "หนูพร้อมฟังทุกเรื่องของคุณเลยค่า", en: "I'm ready to hear everything" },
   { th: "พักสายตาแล้วมาคุยกับหนูหน่อยไหมคะ", en: "Rest your eyes and chat with me a bit" },
@@ -145,7 +145,7 @@ const SLEEP_BUBBLE = { th: "Zzz...", en: "Shhh... sweet dreams" };
 const PLAY_BUBBLE = { th: "เย้ สนุกจัง!", en: "Yay, so fun!" };
 const GUEST_SIGNUP_STORAGE_KEY = "miomika-guest-signup-moment-v1";
 const LEVEL_UP_LINES: { th: string; en: string }[] = [
-  { th: "เลเวล {level} แล้วนะคะ หนูรู้เลยว่าคุณเก่งขึ้นเรื่อยๆ", en: "Level {level} together I can tell you're getting it." },
+  { th: "เลเวล {level} แล้วนะคะ หนูรู้เลยว่าคุณเก่งขึ้นเรื่อยๆ", en: "Level {level} together! I can tell you're getting it." },
   { th: "ถึงเลเวล {level} แล้ว! ทุกวันที่อยู่ด้วยกัน เราโตขึ้นทีละนิดเลยค่ะ", en: "That's level {level}! Every day with you, we grow a little." },
   { th: "เลเวล {level} แล้วค่า หนูภูมิใจในตัวคุณมากเลยนะคะ", en: "Level {level} I'm so proud of how far you've come." },
   { th: "เราขึ้นเลเวล {level} แล้ว! ขอบคุณที่อยู่เป็นเพื่อนหนูนะคะ", en: "We hit level {level}! Thanks for keeping me company" },
