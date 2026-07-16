@@ -4,6 +4,7 @@
 import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
 import { log } from "@/lib/debug/log";
+import { isSaneReply } from "@/lib/ai/output-guard";
 import { recordUsage } from "@/lib/usage/ledger";
 import { assertBudget, estimateLlmUsd, BudgetExceededError } from "@/lib/usage/gate";
 import { getFailoverResponse } from "./session";
@@ -137,7 +138,19 @@ export async function getAIResponse(
         engine === "groq"
           ? await withTimeout(callGroq(recent, systemPrompt), GROQ_TIMEOUT_MS, "groq")
           : await withTimeout(callGemini(recent, systemPrompt), GEMINI_TIMEOUT_MS, "gemini");
-      if (content) return { content, engine, wasFailover: false };
+      if (content) {
+        // OUTPUT GUARD — a garbage reply (mojibake, language flip, repetition
+        // loop) is treated exactly like a provider failure: the next engine in
+        // the order is the silent retry, and the library failover below is the
+        // warm net. A user never sees garbage and never sees an error.
+        const sane = isSaneReply(content);
+        if (sane.ok) return { content, engine, wasFailover: false };
+        log("ai.router", `${engine} reply rejected by output guard`, {
+          reason: sane.reason,
+          sample: content.slice(0, 80),
+        });
+        continue;
+      }
     } catch (error) {
       const { message, status } = aiErrorFields(error);
       log("ai.router", `${engine} failed`, { message, status });
