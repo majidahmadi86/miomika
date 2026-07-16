@@ -2092,6 +2092,9 @@ export default function TalkPage() {
               flexDirection: "column",
               alignItems: "stretch",
               gap: "12px",
+              width: "100%",
+              maxWidth: "720px",
+              margin: "0 auto",
             }}
           >
           {sortedCanvasItems.map((item) => {
