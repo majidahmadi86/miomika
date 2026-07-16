@@ -84,7 +84,7 @@ export default function PricingPage() {
   }
 
   return (
-    <main style={{ ...sans, background: "#FBFAF6", minHeight: "100vh", padding: "18px 16px 22px" }}>
+    <main style={{ ...sans, background: "#FBFAF6", height: "100dvh", overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "18px 16px 22px" }}>
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
 
         <header style={{ textAlign: "center", marginBottom: 12 }}>
