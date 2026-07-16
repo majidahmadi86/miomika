@@ -1,3 +1,5 @@
+import { speak, unlockTtsPlayback } from "@/lib/voice/tts";
+
 let currentUtterance: SpeechSynthesisUtterance | null = null;
 
 export function stopSpeech() {
@@ -34,6 +36,10 @@ export function playWordAudio(
   word: string,
   lang: "th-TH" | "en-US"
 ): Promise<void> {
-  // Phase 1: always use TTS (Phase 3 will add pre-recorded audio from Supabase storage)
-  return speakText(word, lang);
+  // Phase 3: one-voice policy — same cached Chirp3-HD server voice as every
+  // other surface (lib/voice/tts speak + tts_cache). Browser speechSynthesis
+  // is gone here: desktop browsers often ship NO Thai voice, which made Thai
+  // examples silently voiceless, and when a voice existed it wasn't Leda.
+  unlockTtsPlayback();
+  return speak(word, lang === "th-TH" ? "th" : "en");
 }
