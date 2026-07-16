@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { GraduationCap, Languages, Heart, Mic, AudioWaveform, type LucideIcon } from "lucide-react";
+import { GraduationCap, Heart, Mic, AudioWaveform, Wand2, type LucideIcon } from "lucide-react";
 import type { TalkMode } from "@/lib/talk/modes";
 import type { OrbState } from "@/components/talk/VoiceOrb";
 
@@ -18,9 +18,9 @@ interface MicRowProps {
 }
 
 const MODES: { key: TalkMode; Icon: LucideIcon; labelTh: string; labelEn: string }[] = [
+  { key: "auto", Icon: Wand2, labelTh: "อัตโนมัติ", labelEn: "Auto" },
   { key: "chat", Icon: Heart, labelTh: "คุย", labelEn: "Chat" },
   { key: "teach", Icon: GraduationCap, labelTh: "สอน", labelEn: "Teach" },
-  { key: "translate", Icon: Languages, labelTh: "แปล", labelEn: "Translate" },
 ];
 
 // Miomi's head reacts to live state. No dedicated "listening" art yet —

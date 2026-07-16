@@ -1800,64 +1800,6 @@ export default function TalkPage() {
     openGuestSignupSheet,
   ]);
 
-  const handleMiomiHelp = useCallback(
-    (topic: "pillars" | "niche" | "voice") => {
-      setAdjustOpen(false);
-      primeAudio();
-      if (isLocked) {
-        openGuestSignupSheet("talk");
-        return;
-      }
-      const text =
-        topic === "pillars"
-          ? uiLang === "en"
-            ? "Help me define content pillars for my social presence."
-            : "ช่วยหนูกำหนดเสาหลักของเนื้อหาให้หน่อยค่ะ"
-          : topic === "niche"
-            ? uiLang === "en"
-              ? "Help me build my social creator profile — channel, niche, pillars, and audience."
-              : "ช่วยหนูสร้างโปรไฟล์ครีเอเตอร์ให้หน่อยค่ะ — ช่อง นิช เสาหลัก และกลุ่มเป้าหมาย"
-            : uiLang === "en"
-              ? "Help me define my brand voice."
-              : "ช่วยหนูกำหนดเสียงแบรนด์ให้หน่อยค่ะ";
-      dispatchTurn({ type: "guest_text_turn", isGuest: isGuestRef.current });
-      currentTurnSeqRef.current = ++turnSeqRef.current;
-      const id = crypto.randomUUID();
-      currentUserItemIdRef.current = id;
-      setItems((prev) => [
-        ...prev,
-        {
-          id,
-          kind: "user_said",
-          text,
-          turnSeq: currentTurnSeqRef.current,
-          roleOrder: TRANSCRIPT_USER_ORDER,
-        },
-      ]);
-      if (!ensureTurnRuntime().state.sessionActive) {
-        void (async () => {
-          await ensurePlaybackUnlocked();
-          await startLiveSession();
-          if (ensureTurnRuntime().state.sessionActive) {
-            clientRef.current?.sendText(text);
-          }
-        })();
-      } else {
-        clientRef.current?.sendText(text);
-      }
-    },
-    [
-      isLocked,
-      uiLang,
-      primeAudio,
-      ensurePlaybackUnlocked,
-      dispatchTurn,
-      ensureTurnRuntime,
-      startLiveSession,
-      openGuestSignupSheet,
-    ],
-  );
-
   const orbState: OrbState = (() => {
     if (isLocked) return "locked";
     if (liveUiState === "thinking") return "thinking";
@@ -2285,7 +2227,6 @@ export default function TalkPage() {
         uiLang={uiLang}
         onSave={handleAdjustSave}
         onClose={() => setAdjustOpen(false)}
-        onMiomiHelp={handleMiomiHelp}
       />
 
       {showGuestSheet && (

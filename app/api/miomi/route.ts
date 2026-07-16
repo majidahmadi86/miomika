@@ -97,7 +97,10 @@ export async function POST(req: NextRequest) {
       sessionId,
       sessionContext: clientSessionContext,
     } = body;
-    const mode = body?.mode as "auto" | "teach" | "social" | "translate" | "chat" | undefined;
+    const rawMode = body?.mode as string | undefined;
+    // Retired modes ("social", "translate") from old clients collapse to auto.
+    const mode: "auto" | "teach" | "chat" =
+      rawMode === "teach" || rawMode === "chat" ? rawMode : "auto";
     const clientUiLanguage = body?.uiLanguage === "en" || body?.uiLanguage === "th" ? body.uiLanguage : null;
     const clientTargetLanguage = body?.targetLanguage === "en" || body?.targetLanguage === "th" ? body.targetLanguage : null;
 

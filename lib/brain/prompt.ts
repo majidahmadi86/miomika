@@ -3,7 +3,7 @@ import type { BrainState } from "@/lib/brain/state";
 export function buildBrainPrompt(args: {
   state: BrainState;
   userInput: string;
-  mode?: "auto" | "teach" | "social" | "translate" | "chat";
+  mode?: "auto" | "teach" | "chat";
 }): string {
   const { state, mode = "auto" } = args;
   const ui = state.uiLanguage;
@@ -21,12 +21,6 @@ export function buildBrainPrompt(args: {
     if (mode === "auto") return "";
     if (mode === "teach") {
       return "Mode: teach — weave in one new word naturally, like a gift, not a quiz.";
-    }
-    if (mode === "social") {
-      return "Mode: social — sharp creative partner for hooks, captions, or next steps.";
-    }
-    if (mode === "translate") {
-      return "Mode: translate — give the translation, romanization if needed, one usage note; no chit-chat.";
     }
     if (mode === "chat") {
       return "Mode: chat — warm friend only; no vocabulary unless they ask.";

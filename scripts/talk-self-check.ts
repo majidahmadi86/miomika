@@ -299,14 +299,6 @@ assert(
     chatInstruction.includes("Converse naturally and warmly"),
   "chat-mode instruction is the warm companion persona",
 );
-const translateInstruction = buildSystemInstruction("en", "th", null, "translate");
-assert(
-  translateInstruction.includes("live interpreter") &&
-    !translateInstruction.includes("TEACHING MODE v1") &&
-    !translateInstruction.includes("get_word_to_review"),
-  "translate-mode instruction is the interpreter persona with no teaching",
-);
-
 assert(
   resolveProfileUiAnchor({
     profileUiLang: null,
@@ -1045,11 +1037,6 @@ assert(
   "chat persona exists and is tool-free",
 );
 assert(
-  liveConfigSrc.includes("PERSONA_TRANSLATE") &&
-    liveConfigSrc.includes('mode === "translate"'),
-  "translate mode is wired as its own persona branch",
-);
-assert(
   buildTeachingModeContract("en", "th").includes("weave") &&
     buildTeachingModeContract("en", "th").includes("little gifts"),
   "teaching contract mandates in-context weave + cards as gifts",
@@ -1633,10 +1620,6 @@ assert(
 assert(
   !buildSystemInstruction("en", "th", null, "chat", "B2").includes("LEARNER LEVEL"),
   "chat-mode instruction ignores CEFR level",
-);
-assert(
-  !buildSystemInstruction("en", "th", null, "translate", "B2").includes("LEARNER LEVEL"),
-  "translate-mode instruction ignores CEFR level",
 );
 assert(
   buildTeachingModeContract("en", "th", "C1").includes("adapt to the level they actually show"),

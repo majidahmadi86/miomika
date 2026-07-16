@@ -6,7 +6,6 @@ import {
   X,
   Wand2,
   GraduationCap,
-  Sparkles,
   Languages,
   Heart,
   Check,
@@ -14,7 +13,7 @@ import {
   Smile,
   Brain,
 } from "lucide-react";
-import type { TalkConfig, TalkMode, GameType, ContentChannel } from "@/lib/talk/modes";
+import type { TalkConfig, TalkMode, GameType } from "@/lib/talk/modes";
 import { GAME_LABELS } from "@/lib/talk/modes";
 import { updateUiLanguage, useProfile } from "@/lib/auth/use-profile";
 
@@ -24,10 +23,9 @@ interface AdjustSheetProps {
   uiLang: "th" | "en";
   onSave: (config: TalkConfig) => void;
   onClose: () => void;
-  onMiomiHelp: (topic: "pillars" | "niche" | "voice") => void;
 }
 
-export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp }: AdjustSheetProps) {
+export function AdjustSheet({ open, config, uiLang, onSave, onClose }: AdjustSheetProps) {
   const { profile } = useProfile();
   const [draft, setDraft] = useState<TalkConfig>(config);
   const [optimisticReplyLang, setOptimisticReplyLang] = useState<"th" | "en" | null>(null);
@@ -49,15 +47,6 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp
       }
     };
   }, [open, onClose]);
-
-  const socialNeeds = (() => {
-    let count = 0;
-    if (!draft.social.channel) count++;
-    if (!draft.social.niche) count++;
-    if (draft.social.pillars.length === 0) count++;
-    if (draft.social.brandVoice.length === 0) count++;
-    return count;
-  })();
 
   return (
     <AnimatePresence>
@@ -217,80 +206,6 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose, onMiomiHelp
                 </Section>
               )}
 
-              {(draft.mode === "auto" || draft.mode === "social") && (
-                <Section icon={Sparkles} title={uiLang === "en" ? "If social mode" : "ถ้าโหมดโซเชียล"} badge={socialNeeds > 0 ? `${socialNeeds} ${uiLang === "en" ? "to fill" : "ต้องเติม"}` : undefined}>
-                  <DoubleRow>
-                    <Field label={uiLang === "en" ? "Channel" : "ช่อง"}>
-                      <select
-                        value={draft.social.channel ?? ""}
-                        onChange={(e) => setDraft({ ...draft, social: { ...draft.social, channel: (e.target.value || null) as ContentChannel | null } })}
-                        style={selectStyle}
-                      >
-                        <option value="">— choose —</option>
-                        <option value="tiktok">TikTok</option>
-                        <option value="instagram">Instagram</option>
-                        <option value="youtube">YouTube</option>
-                        <option value="facebook">Facebook</option>
-                        <option value="line">LINE</option>
-                      </select>
-                    </Field>
-                    <Field label={uiLang === "en" ? "Niche" : "นิช"}>
-                      <input
-                        value={draft.social.niche}
-                        onChange={(e) => setDraft({ ...draft, social: { ...draft.social, niche: e.target.value } })}
-                        placeholder={uiLang === "en" ? "e.g. coffee shop" : "เช่น ร้านกาแฟ"}
-                        style={selectStyle}
-                      />
-                    </Field>
-                  </DoubleRow>
-                  <MiniLabel label={uiLang === "en" ? "Content pillars" : "เสาหลักของเนื้อหา"} />
-                  <ChipsGrid>
-                    {draft.social.pillars.map((p) => (
-                      <span key={p} style={chipStaticStyle}>{p}</span>
-                    ))}
-                    <button type="button" onClick={() => onMiomiHelp("pillars")} style={chipAddStyle}>
-                      + {uiLang === "en" ? "add pillar" : "เพิ่ม"}
-                    </button>
-                  </ChipsGrid>
-                  <MiniLabel label={uiLang === "en" ? "Audience" : "กลุ่มเป้าหมาย"} mt />
-                  <input
-                    value={draft.social.audience}
-                    onChange={(e) => setDraft({ ...draft, social: { ...draft.social, audience: e.target.value } })}
-                    placeholder={uiLang === "en" ? "Bangkok 25-40 expats" : "ชาวต่างชาติในกรุงเทพ 25-40"}
-                    style={selectStyle}
-                  />
-                  {socialNeeds > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => onMiomiHelp("niche")}
-                      style={ghostCtaStyle}
-                    >
-                      <Sparkles size={14} strokeWidth={2} />
-                      {uiLang === "en" ? "Let Miomi help me build these" : "ให้หนูช่วยสร้างให้ค่า~"}
-                    </button>
-                  )}
-                </Section>
-              )}
-
-              {(draft.mode === "auto" || draft.mode === "translate") && (
-                <Section icon={Languages} title={uiLang === "en" ? "If translating" : "ถ้าแปลภาษา"}>
-                  <MiniLabel label={uiLang === "en" ? "Mode" : "โหมด"} />
-                  <PillRow>
-                    <Pill active={draft.translate.mode === "solo"} onClick={() => setDraft({ ...draft, translate: { ...draft.translate, mode: "solo" } })}>
-                      {uiLang === "en" ? "Solo" : "คนเดียว"}
-                    </Pill>
-                    <Pill active={draft.translate.mode === "between_us"} onClick={() => setDraft({ ...draft, translate: { ...draft.translate, mode: "between_us" } })}>
-                      {uiLang === "en" ? "Between two people" : "ระหว่างสองคน"}
-                    </Pill>
-                  </PillRow>
-                  <ToggleRow
-                    label={uiLang === "en" ? "Save words I learn while translating" : "บันทึกคำที่เรียนตอนแปล"}
-                    value={draft.translate.saveWords}
-                    onToggle={() => setDraft({ ...draft, translate: { ...draft.translate, saveWords: !draft.translate.saveWords } })}
-                  />
-                </Section>
-              )}
-
               <Section icon={Smile} title={uiLang === "en" ? "Her personality" : "บุคลิกของหนู"}>
                 <MiniLabel label={uiLang === "en" ? "Tone" : "โทน"} />
                 <PillRow>
@@ -395,45 +310,6 @@ const selectStyle: React.CSSProperties = {
   color: "#1A1A18",
   outline: "none",
 };
-const chipStaticStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  padding: "6px 10px",
-  background: "rgba(110,205,184,0.12)",
-  border: "0.5px solid rgba(52,169,143,0.3)",
-  borderRadius: "999px",
-  fontFamily: "'Quicksand', sans-serif",
-  fontSize: "11.5px",
-  color: "#34A98F",
-};
-const chipAddStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "0.5px dashed #34A98F",
-  color: "#34A98F",
-  fontFamily: "'Quicksand', sans-serif",
-  fontSize: "11.5px",
-  padding: "5px 10px",
-  borderRadius: "999px",
-  cursor: "pointer",
-};
-const ghostCtaStyle: React.CSSProperties = {
-  width: "100%",
-  marginTop: "10px",
-  padding: "9px",
-  background: "rgba(125,211,192,0.1)",
-  border: "0.5px solid rgba(125,211,192,0.3)",
-  borderRadius: "12px",
-  fontFamily: "'Quicksand', sans-serif",
-  fontSize: "12px",
-  color: "#5BBFA8",
-  fontWeight: 500,
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "6px",
-};
-
 function Group({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: "18px" }}>
@@ -461,11 +337,9 @@ function Section({ icon: Icon, title, badge, children }: { icon: React.Component
 
 function ModeGrid({ value, onChange, uiLang }: { value: TalkMode; onChange: (m: TalkMode) => void; uiLang: "th" | "en" }) {
   const modes: { key: TalkMode; icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; th: string; en: string; descTh: string; descEn: string; span?: number }[] = [
-    { key: "auto", icon: Wand2, th: "อัตโนมัติ", en: "Auto", descTh: "หนูอ่านคุณ", descEn: "she reads you" },
+    { key: "auto", icon: Wand2, th: "อัตโนมัติ", en: "Auto", descTh: "หนูอ่านคุณ", descEn: "she reads you", span: 2 },
+    { key: "chat", icon: Heart, th: "แค่คุย", en: "Just chat", descTh: "อยู่กับหนู", descEn: "be with me" },
     { key: "teach", icon: GraduationCap, th: "สอนภาษา", en: "Teach", descTh: "ภาษาเท่านั้น", descEn: "language only" },
-    { key: "social", icon: Sparkles, th: "โซเชียล", en: "Social", descTh: "โหมดคอนเทนต์", descEn: "content mode" },
-    { key: "translate", icon: Languages, th: "แปลภาษา", en: "Translate", descTh: "ระหว่างเรา", descEn: "between us" },
-    { key: "chat", icon: Heart, th: "แค่คุย", en: "Just chat", descTh: "อยู่กับหนู", descEn: "be with me", span: 2 },
   ];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
