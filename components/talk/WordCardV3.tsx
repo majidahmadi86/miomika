@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Volume2, Lightbulb, AlertCircle, ChevronDown, ChevronUp, Mic, BookmarkCheck } from "lucide-react";
+import { Volume2, Lightbulb, AlertCircle, ChevronDown, ChevronUp, Mic, BookmarkCheck, Sparkles, CheckCircle2 } from "lucide-react";
 import { getIconForCategory } from "@/lib/talk/imageCategoryMap";
 import { cardMeaningForWord } from "@/lib/talk/teach-word-card";
 import { playWordAudio } from "@/lib/talk/speech";
@@ -62,6 +62,7 @@ export function WordCardV3({
   compact,
 }: WordCardV3Props) {
   const [expanded, setExpanded] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [examplePlaying, setExamplePlaying] = useState(false);
 
@@ -103,24 +104,26 @@ export function WordCardV3({
   };
 
   if (compact) {
+    const compactMeaning = meaningWord && meaningWord.trim() !== primaryWord.trim() ? meaningWord : null;
+    const stripLabel = isThaiLearner ? "จำได้ไหมคะ แตะเพื่อดูคำตอบ" : "Do you remember? Tap to reveal";
     return (
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-        style={{ width: "100%", background: "#FFFFFF", border: `1px solid ${LINE}`, borderRadius: "14px", padding: "12px 14px" }}
+        style={{ width: "100%", background: "#FFFFFF", border: "1px solid #DCEDE6", borderRadius: "16px", padding: "13px 15px" }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ width: "34px", height: "34px", flexShrink: 0, borderRadius: "10px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: word.image_url ? undefined : "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "11px" }}>
+          <div style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: word.image_url ? undefined : "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)" }}>
             {word.image_url ? (
               <div style={{ width: "100%", height: "100%", backgroundImage: `url(${word.image_url})`, backgroundSize: "cover", backgroundPosition: "center" }} />
             ) : (
-              <span style={{ fontFamily: primaryFont, fontSize: glyphText.length > 1 ? "13px" : "16px", fontWeight: 700, color: "#FFFFFF", lineHeight: 1 }}>{glyphText}</span>
+              <span style={{ fontFamily: primaryFont, fontSize: glyphText.length > 1 ? "15px" : "18px", fontWeight: 700, color: "#FFFFFF", lineHeight: 1 }}>{glyphText}</span>
             )}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0 }}>
-              <p style={{ fontFamily: primaryFont, fontSize: "16px", fontWeight: 600, color: INK, lineHeight: 1.15, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{primaryWord}</p>
+              <span style={{ fontFamily: primaryFont, fontSize: "18px", fontWeight: 600, color: INK, lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{primaryWord}</span>
               <motion.button
                 type="button"
                 onClick={handleAudio}
@@ -128,43 +131,58 @@ export function WordCardV3({
                 animate={audioPlaying ? { scale: [1, 1.12, 1] } : {}}
                 transition={{ duration: 0.24 }}
                 aria-label="Play audio"
-                style={{ flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", background: "rgba(52,169,143,0.10)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                style={{ flexShrink: 0, width: "26px", height: "26px", borderRadius: "50%", background: "#E7F3EF", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
-                <Volume2 style={{ width: "13px", height: "13px", color: audioPlaying ? GOLD : "#C4BDB5" }} strokeWidth={1.9} />
+                <Volume2 style={{ width: "14px", height: "14px", color: "#2C8E76" }} strokeWidth={1.9} />
               </motion.button>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px", minWidth: 0, overflow: "hidden" }}>
-              {pronunciation && (
-                <span style={{ fontFamily: FONT_LATIN, fontSize: "11.5px", fontWeight: 600, color: GOLD, whiteSpace: "nowrap" }}>{pronunciation}</span>
-              )}
-              {pronunciation && meaningWord && <span style={{ color: "#C4BDB5", fontSize: "11px" }}>&middot;</span>}
-              {meaningWord && (
-                <span style={{ fontFamily: meaningFont, fontSize: "12.5px", fontWeight: 500, color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meaningWord}</span>
-              )}
-              {word.cefr_level && (
-                <>
-                  <span style={{ color: "#C4BDB5", fontSize: "11px" }}>&middot;</span>
-                  <span style={{ fontFamily: FONT_LATIN, fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: MUTE, whiteSpace: "nowrap" }}>{word.cefr_level}</span>
-                </>
-              )}
-            </div>
+            {pronunciation && (
+              <span style={{ display: "inline-block", marginTop: "3px", background: "#E7F3EF", color: "#1F7A68", borderRadius: "999px", padding: "2px 9px", fontFamily: FONT_LATIN, fontSize: "11px", fontWeight: 600, maxWidth: "100%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pronunciation}</span>
+            )}
           </div>
+          {word.cefr_level && (
+            <span style={{ flexShrink: 0, fontFamily: FONT_LATIN, fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", color: "#B08A1E", background: "#FBF3DF", borderRadius: "6px", padding: "3px 7px" }}>{word.cefr_level}</span>
+          )}
         </div>
-        {exampleAudioText && (
-          <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
-            <motion.button
-              type="button"
-              onClick={handleExampleAudio}
-              whileTap={{ scale: 0.9 }}
-              animate={examplePlaying ? { scale: [1, 1.12, 1] } : {}}
-              transition={{ duration: 0.24 }}
-              aria-label="Play example audio"
-              style={{ flexShrink: 0, width: "20px", height: "20px", borderRadius: "50%", background: "rgba(52,169,143,0.10)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
-              <Volume2 style={{ width: "11px", height: "11px", color: examplePlaying ? GOLD : "#C4BDB5" }} strokeWidth={1.9} />
-            </motion.button>
-            <p style={{ fontFamily: isThaiLearner ? FONT_LATIN : FONT_THAI, fontSize: "12px", fontStyle: "italic", color: MUTE, lineHeight: 1.4, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>&ldquo;{exampleAudioText}&rdquo;</p>
-          </div>
+
+        {!revealed ? (
+          <motion.button
+            type="button"
+            onClick={() => setRevealed(true)}
+            whileTap={{ scale: 0.98 }}
+            style={{ width: "100%", marginTop: "11px", border: "1.5px dashed #E3D5B8", background: "#FCF8EE", borderRadius: "12px", padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer", minHeight: "40px" }}
+          >
+            <Sparkles style={{ width: "15px", height: "15px", color: "#B08A1E", flexShrink: 0 }} strokeWidth={1.9} />
+            <span style={{ fontFamily: uiFont, fontSize: "12.5px", fontWeight: 500, color: "#8A6D1F" }}>{stripLabel}</span>
+          </motion.button>
+        ) : (
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
+            {compactMeaning && (
+              <div style={{ marginTop: "11px", display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                <CheckCircle2 style={{ width: "16px", height: "16px", color: "#2C8E76", flexShrink: 0 }} strokeWidth={1.9} />
+                <span style={{ fontFamily: meaningFont, fontSize: "15px", fontWeight: 600, color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{compactMeaning}</span>
+              </div>
+            )}
+            {exampleAudioText && (
+              <div style={{ marginTop: "8px", background: "#FCF8EE", borderRadius: "10px", padding: "8px 11px", display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                <motion.button
+                  type="button"
+                  onClick={handleExampleAudio}
+                  whileTap={{ scale: 0.9 }}
+                  animate={examplePlaying ? { scale: [1, 1.12, 1] } : {}}
+                  transition={{ duration: 0.24 }}
+                  aria-label="Play example audio"
+                  style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#F2E9D4", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <Volume2 style={{ width: "12px", height: "12px", color: examplePlaying ? "#B08A1E" : "#C7B98F" }} strokeWidth={1.9} />
+                </motion.button>
+                <span style={{ fontFamily: isThaiLearner ? FONT_LATIN : FONT_THAI, fontSize: "12.5px", fontStyle: "italic", color: "#6B655B", lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>&ldquo;{exampleAudioText}&rdquo;</span>
+              </div>
+            )}
+            {!compactMeaning && !exampleAudioText && (
+              <p style={{ fontFamily: uiFont, fontSize: "12px", color: MUTE, margin: "11px 0 0" }}>{isThaiLearner ? "ยังไม่มีคำอธิบายเพิ่มเติมค่ะ" : "More details coming to this word soon."}</p>
+            )}
+          </motion.div>
         )}
       </motion.div>
     );
