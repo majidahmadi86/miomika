@@ -54,10 +54,13 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 // thread (raised from 8 → she was losing the conversation past a few turns and reading
 // as forgetful). Cost is bounded by the daily caps, not by starving her memory.
 const MAX_HISTORY_MESSAGES = 16;
-// Ceiling on reply length. She should answer naturally — as long as the thought needs,
-// not clipped to a fragment. This is a safety cap against a runaway reply, not a target;
-// the prompt no longer tells her "short is always better". (Raised 200 → 600.)
-const MAX_REPLY_TOKENS = 600;
+// Ceiling on reply length. TURN ECONOMY is law: replies are 1–2 short sentences, and
+// TTS bills per character — long replies are the #1 cost driver (61% of daily spend was
+// TTS on 7/16). This cap ENFORCES the prompt, since llama follows soft rules loosely.
+// 240 still fits a full teaching turn (word + phonetics + example); pure chat lands far
+// below it. Also the cap for memory-extraction + comprehension-router (tiny JSON, safe).
+// (Lowered 600 → 240.)
+const MAX_REPLY_TOKENS = 240;
 // Hard per-engine timeouts. A turn must NEVER hang the mic. We saw a 52-SECOND Gemini
 // call freeze the whole turn; with these, a slow engine is abandoned fast and we fall
 // through to the next option (or the instant library failover) instead of locking up.
