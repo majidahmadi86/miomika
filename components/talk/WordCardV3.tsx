@@ -40,6 +40,8 @@ interface WordCardV3Props {
   onReplayAudio?: () => void | Promise<void>;
   saveState?: WordCardSaveState;
   onSaveTap?: () => void;
+  /** Dashboard density: one-glance row card, no save pill (bank words are saved by definition). */
+  compact?: boolean;
 }
 
 const FONT_LATIN = "'Quicksand', sans-serif";
@@ -57,6 +59,7 @@ export function WordCardV3({
   onReplayAudio,
   saveState,
   onSaveTap,
+  compact,
 }: WordCardV3Props) {
   const [expanded, setExpanded] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
@@ -98,6 +101,74 @@ export function WordCardV3({
     await playWordAudio(undefined, exampleAudioText, audioLang);
     setExamplePlaying(false);
   };
+
+  if (compact) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+        style={{ width: "100%", background: "#FFFFFF", border: `1px solid ${LINE}`, borderRadius: "14px", padding: "12px 14px" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ width: "34px", height: "34px", flexShrink: 0, borderRadius: "10px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: word.image_url ? undefined : "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)" }}>
+            {word.image_url ? (
+              <div style={{ width: "100%", height: "100%", backgroundImage: `url(${word.image_url})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+            ) : (
+              <span style={{ fontFamily: primaryFont, fontSize: glyphText.length > 1 ? "13px" : "16px", fontWeight: 700, color: "#FFFFFF", lineHeight: 1 }}>{glyphText}</span>
+            )}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0 }}>
+              <p style={{ fontFamily: primaryFont, fontSize: "16px", fontWeight: 600, color: INK, lineHeight: 1.15, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{primaryWord}</p>
+              <motion.button
+                type="button"
+                onClick={handleAudio}
+                whileTap={{ scale: 0.9 }}
+                animate={audioPlaying ? { scale: [1, 1.12, 1] } : {}}
+                transition={{ duration: 0.24 }}
+                aria-label="Play audio"
+                style={{ flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", background: "rgba(52,169,143,0.10)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <Volume2 style={{ width: "13px", height: "13px", color: audioPlaying ? GOLD : "#C4BDB5" }} strokeWidth={1.9} />
+              </motion.button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px", minWidth: 0, overflow: "hidden" }}>
+              {pronunciation && (
+                <span style={{ fontFamily: FONT_LATIN, fontSize: "11.5px", fontWeight: 600, color: GOLD, whiteSpace: "nowrap" }}>{pronunciation}</span>
+              )}
+              {pronunciation && meaningWord && <span style={{ color: "#C4BDB5", fontSize: "11px" }}>&middot;</span>}
+              {meaningWord && (
+                <span style={{ fontFamily: meaningFont, fontSize: "12.5px", fontWeight: 500, color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meaningWord}</span>
+              )}
+              {word.cefr_level && (
+                <>
+                  <span style={{ color: "#C4BDB5", fontSize: "11px" }}>&middot;</span>
+                  <span style={{ fontFamily: FONT_LATIN, fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: MUTE, whiteSpace: "nowrap" }}>{word.cefr_level}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {exampleAudioText && (
+          <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+            <motion.button
+              type="button"
+              onClick={handleExampleAudio}
+              whileTap={{ scale: 0.9 }}
+              animate={examplePlaying ? { scale: [1, 1.12, 1] } : {}}
+              transition={{ duration: 0.24 }}
+              aria-label="Play example audio"
+              style={{ flexShrink: 0, width: "20px", height: "20px", borderRadius: "50%", background: "rgba(52,169,143,0.10)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <Volume2 style={{ width: "11px", height: "11px", color: examplePlaying ? GOLD : "#C4BDB5" }} strokeWidth={1.9} />
+            </motion.button>
+            <p style={{ fontFamily: isThaiLearner ? FONT_LATIN : FONT_THAI, fontSize: "12px", fontStyle: "italic", color: MUTE, lineHeight: 1.4, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>&ldquo;{exampleAudioText}&rdquo;</p>
+          </div>
+        )}
+      </motion.div>
+    );
+  }
 
   const hasNote = !!(word.miomi_note_th || word.miomi_note_en);
   const hasExample = !!(word.example_en || word.example_th);

@@ -339,9 +339,9 @@ export default function DashboardPage() {
                 </div>
                 {reviewList.length > 0 ? (
                   <>
-                    <div className="mt-3 flex flex-col gap-2">
+                    <div className="mt-3 grid grid-cols-1 gap-2 xl:grid-cols-2">
                       {shownWords.map((w) => (
-                        <WordCardV3 key={w.word_en} word={practiceWordToVocabularyEntry(w)} direction={cardDirection} saveState="saved" onReplayAudio={() => handlePracticeReplay(w)} />
+                        <WordCardV3 key={w.word_en} word={practiceWordToVocabularyEntry(w)} direction={cardDirection} compact onReplayAudio={() => handlePracticeReplay(w)} />
                       ))}
                     </div>
                     {reviewList.length > 6 ? (
