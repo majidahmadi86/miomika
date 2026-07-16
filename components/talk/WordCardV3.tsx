@@ -105,6 +105,7 @@ export function WordCardV3({
 
   if (compact) {
     const compactMeaning = meaningWord && meaningWord.trim() !== primaryWord.trim() ? meaningWord : null;
+    const exampleTranslation = (isThaiLearner ? word.example_th : word.example_en)?.trim() || null;
     const stripLabel = isThaiLearner ? "จำได้ไหมคะ แตะเพื่อดูคำตอบ" : "Do you remember? Tap to reveal";
     return (
       <motion.div
@@ -164,19 +165,24 @@ export function WordCardV3({
               </div>
             )}
             {exampleAudioText && (
-              <div style={{ marginTop: "8px", background: "#FCF8EE", borderRadius: "10px", padding: "8px 11px", display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-                <motion.button
-                  type="button"
-                  onClick={handleExampleAudio}
-                  whileTap={{ scale: 0.9 }}
-                  animate={examplePlaying ? { scale: [1, 1.12, 1] } : {}}
-                  transition={{ duration: 0.24 }}
-                  aria-label="Play example audio"
-                  style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#F2E9D4", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                >
-                  <Volume2 style={{ width: "12px", height: "12px", color: examplePlaying ? "#B08A1E" : "#C7B98F" }} strokeWidth={1.9} />
-                </motion.button>
-                <span style={{ fontFamily: isThaiLearner ? FONT_LATIN : FONT_THAI, fontSize: "12.5px", fontStyle: "italic", color: "#6B655B", lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>&ldquo;{exampleAudioText}&rdquo;</span>
+              <div style={{ marginTop: "8px", background: "#FCF8EE", borderRadius: "10px", padding: "8px 11px", minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                  <motion.button
+                    type="button"
+                    onClick={handleExampleAudio}
+                    whileTap={{ scale: 0.9 }}
+                    animate={examplePlaying ? { scale: [1, 1.12, 1] } : {}}
+                    transition={{ duration: 0.24 }}
+                    aria-label="Play example audio"
+                    style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#F2E9D4", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
+                    <Volume2 style={{ width: "12px", height: "12px", color: examplePlaying ? "#B08A1E" : "#C7B98F" }} strokeWidth={1.9} />
+                  </motion.button>
+                  <span style={{ fontFamily: isThaiLearner ? FONT_LATIN : FONT_THAI, fontSize: "12.5px", fontStyle: "italic", color: "#6B655B", lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>&ldquo;{exampleAudioText}&rdquo;</span>
+                </div>
+                {exampleTranslation && (
+                  <p style={{ fontFamily: isThaiLearner ? FONT_THAI : FONT_LATIN, fontSize: "11.5px", color: "#9A8B73", lineHeight: 1.4, margin: "4px 0 0 30px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{exampleTranslation}</p>
+                )}
               </div>
             )}
             {!compactMeaning && !exampleAudioText && (
