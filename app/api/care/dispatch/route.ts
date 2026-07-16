@@ -78,13 +78,15 @@ export async function GET(request: Request) {
         continue;
       }
 
-      // One note per day, and auto-quiet after 3 unanswered notes.
+      // One note per day, auto-quiet after 3 unanswered notes, and the
+      // recent rows also feed the variety engine (no repeated variant,
+      // prefer a different moment than the last two notes).
       const { data: recent } = await supabase
         .from("care_notifications")
-        .select("sent_at")
+        .select("sent_at, moment, variant")
         .eq("user_id", p.id)
         .order("sent_at", { ascending: false })
-        .limit(3);
+        .limit(6);
       const today = new Date().toISOString().slice(0, 10);
       const sentToday = (recent ?? []).some((r) => String(r.sent_at).slice(0, 10) === today);
       const unanswered = (recent ?? []).filter(
@@ -94,6 +96,13 @@ export async function GET(request: Request) {
         skipped++;
         continue;
       }
+
+      const excludeVariants = (recent ?? [])
+        .map((r) => (r.variant ? String(r.variant) : null))
+        .filter((v): v is string => Boolean(v));
+      const recentMoments = (recent ?? [])
+        .slice(0, 2)
+        .map((r) => String(r.moment));
 
       // The moat moment: the newest thing Miomi remembers about them.
       let memoryFact: string | null = null;
@@ -109,6 +118,34 @@ export async function GET(request: Request) {
 
       const lang = p.ui_language === "th" ? "th" : "en";
 
+      // Word-recall moment: the word they most recently started learning,
+      // joined to the bank for its pair + romanization. Best-effort.
+      let recallWord: { en: string; th: string; roman: string | null } | null = null;
+      const { data: vw } = await supabase
+        .from("vocabulary_user_state")
+        .select("word_en")
+        .eq("user_id", p.id)
+        .is("mastered_at", null)
+        .order("last_introduced_at", { ascending: false })
+        .limit(1);
+      const recallEn = vw?.[0]?.word_en ? String(vw[0].word_en) : null;
+      if (recallEn) {
+        const { data: bank } = await supabase
+          .from("vocabulary_bank")
+          .select("word_en, word_th, th_romanization")
+          .in("word_en", Array.from(new Set([recallEn, recallEn.toLowerCase()])))
+          .limit(1);
+        if (bank?.[0]?.word_th) {
+          recallWord = {
+            en: String(bank[0].word_en),
+            th: String(bank[0].word_th),
+            roman: bank[0].th_romanization ? String(bank[0].th_romanization) : null,
+          };
+        }
+      }
+
+      const careOpts = { lang: lang as "th" | "en", daysAway, memoryFact, recallWord, userSeed: String(p.id), excludeVariants, recentMoments };
+
       // Channel: push first when a device is subscribed (more intimate,
       // free); email otherwise. Never both, one ping is care, two is noise.
       const { data: subs } = await supabase
@@ -116,7 +153,7 @@ export async function GET(request: Request) {
         .select("endpoint, p256dh, auth")
         .eq("user_id", p.id);
       if (subs && subs.length > 0) {
-        const push = composeCarePush({ lang, daysAway, memoryFact });
+        const push = composeCarePush(careOpts);
         let delivered = 0;
         for (const s of subs) {
           const r = await sendCarePush(s as PushRow, push);
@@ -128,13 +165,13 @@ export async function GET(request: Request) {
         if (delivered > 0) {
           await supabase
             .from("care_notifications")
-            .insert({ user_id: p.id, moment: push.moment, channel: "push" });
+            .insert({ user_id: p.id, moment: push.moment, variant: push.variantKey, channel: "push" });
           sent++;
           continue;
         }
       }
 
-      const note = composeCareEmail({ lang, daysAway, memoryFact });
+      const note = composeCareEmail(careOpts);
       const unsub = unsubscribeUrl(p.id as string);
       const html = note.html.replaceAll("%%UNSUB%%", unsub);
 
@@ -160,7 +197,7 @@ export async function GET(request: Request) {
 
       await supabase
         .from("care_notifications")
-        .insert({ user_id: p.id, moment: note.moment, channel: "email" });
+        .insert({ user_id: p.id, moment: note.moment, variant: note.variantKey, channel: "email" });
       sent++;
     } catch (err) {
       errors.push(`${String(p.id).slice(0, 8)}: ${err instanceof Error ? err.message : "unknown"}`);
