@@ -6,6 +6,7 @@
 // degrades gracefully instead of breaking layout.
 
 import { useState } from "react";
+import { SayItCheck } from "@/components/word/SayItCheck";
 
 export type CanonicalWord = {
   id?: string;
@@ -31,7 +32,7 @@ export type SpeakFn = (text: string, lang: Target) => void;
 // ---- brand tokens (Miomika kawaii palette) ----
 const MINT = "#2C8E76", MINT_DEEP = "#1F7A68", MINT_SOFT = "#E7F3EF";
 const HEAD = "#1B4F43", INK = "#57534A", MUTED = "#8A857A";
-const CARD_BORDER = "#E5EFEA", EX_BG = "#F6FBF9", EX_BORDER = "#E1EFE9";
+const CARD_BORDER = "#E5EFEA";
 const GOLD_BG = "#FBF3DC", GOLD = "#8A6D1F";
 const PINK_SOFT = "#FBEAF0", PINK_DEEP = "#993556";
 const LAV_SOFT = "#EEEDFE", LAV_DEEP = "#3C3489";
@@ -89,46 +90,57 @@ function Star({ saved, onToggle }: { saved?: boolean; onToggle?: () => void }) {
 }
 
 // ---------- FULL CARD ----------
-export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCollapse }: {
-  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void; onCollapse?: () => void;
+export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCollapse, sayIt }: {
+  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void; onCollapse?: () => void; sayIt?: boolean;
 }) {
   const r = resolve(word, target);
   const [showMore, setShowMore] = useState(false);
   return (
-    <div style={{ fontFamily: Q, background: "#fff", border: `0.5px solid ${CARD_BORDER}`, borderRadius: 16, padding: "16px 16px 13px", color: INK }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 11 }}>
-        {word.pos ? <span style={{ fontFamily: r.tipThai ? TH_FONT : Q, background: MINT_SOFT, color: MINT_DEEP, fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 99 }}>{word.pos}</span> : null}
-        {word.register ? <span style={{ fontFamily: r.tipThai ? TH_FONT : Q, background: PINK_SOFT, color: PINK_DEEP, fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 99 }}>{word.register}</span> : null}
-        {word.cefr_level ? <span style={{ background: LAV_SOFT, color: LAV_DEEP, fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 99 }}>{word.cefr_level}</span> : null}
-        <span style={{ flex: 1 }} />
+    <div style={{ fontFamily: Q, background: "#fff", border: `0.5px solid ${CARD_BORDER}`, borderRadius: 16, padding: "14px 15px 12px", color: INK }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+        <div style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 12, background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontFamily: r.headThai ? TH_FONT : Q, fontSize: 18, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{r.head.trim().charAt(0)}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+            <span style={{ fontFamily: r.headThai ? TH_FONT : Q, fontSize: r.headThai ? 20 : 19, fontWeight: 600, lineHeight: 1.15, color: HEAD, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.head}</span>
+            <PlayBtn onClick={() => onSpeak(r.head, r.headLang)} size={26} soft label="Play audio" />
+          </div>
+          {r.pron ? <span style={{ display: "inline-block", marginTop: 3, background: MINT_SOFT, color: MINT_DEEP, borderRadius: 99, padding: "2px 9px", fontFamily: r.headThai ? Q : TH_FONT, fontSize: 11, fontWeight: 600, maxWidth: "100%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.pron}</span> : null}
+        </div>
+        {word.cefr_level ? <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", color: GOLD, background: GOLD_BG, borderRadius: 6, padding: "3px 7px" }}>{word.cefr_level}</span> : null}
         <Star saved={saved} onToggle={onToggleSave} />
         {onCollapse ? (
-          <button aria-label="Collapse" onClick={onCollapse} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, lineHeight: 0 }}>
+          <button aria-label="Collapse" onClick={onCollapse} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, lineHeight: 0, flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B9C7C0" strokeWidth="2.2" aria-hidden="true"><path d="M6 14l6-6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         ) : null}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: r.headThai ? TH_FONT : Q, fontSize: r.headThai ? 33 : 30, fontWeight: 600, lineHeight: 1.15, color: HEAD }}>{r.head}</div>
-          {r.pron ? <div style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 15, color: MINT, fontWeight: 600, marginTop: 2 }}>{r.pron}</div> : null}
-          <div style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 14.5, color: INK, marginTop: 5 }}>{r.meaning}</div>
-        </div>
-        <PlayBtn onClick={() => onSpeak(r.head, r.headLang)} label="Play audio" />
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={MINT} strokeWidth="1.9" style={{ flexShrink: 0 }} aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <span style={{ fontFamily: r.headThai ? Q : TH_FONT, fontSize: 15, fontWeight: 600, color: HEAD, minWidth: 0 }}>{r.meaning}</span>
       </div>
+      {(word.pos || word.register) ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 7 }}>
+          {word.pos ? <span style={{ fontFamily: r.tipThai ? TH_FONT : Q, background: MINT_SOFT, color: MINT_DEEP, fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 99 }}>{word.pos}</span> : null}
+          {word.register ? <span style={{ fontFamily: r.tipThai ? TH_FONT : Q, background: PINK_SOFT, color: PINK_DEEP, fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 99 }}>{word.register}</span> : null}
+        </div>
+      ) : null}
 
       {r.ex ? (
-        <div style={{ background: EX_BG, border: `0.5px solid ${EX_BORDER}`, borderRadius: 12, padding: "10px 12px", marginTop: 13 }}>
+        <div style={{ background: "#FCF8EE", borderRadius: 10, padding: "9px 11px", marginTop: 10 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: r.exThai ? TH_FONT : Q, fontSize: r.exThai ? 16.5 : 15.5, color: "#22443B", fontWeight: 500 }}>{r.ex}</div>
-              {r.exTrans ? <div style={{ fontFamily: r.exThai ? Q : TH_FONT, fontSize: 12.5, color: MUTED, marginTop: 3 }}>{r.exTrans}</div> : null}
+              <div style={{ fontFamily: r.exThai ? TH_FONT : Q, fontSize: r.exThai ? 15.5 : 14.5, fontStyle: "italic", color: "#5A5348", fontWeight: 500 }}>{r.ex}</div>
+              {r.exTrans ? <div style={{ fontFamily: r.exThai ? Q : TH_FONT, fontSize: 12, color: "#9A8B73", marginTop: 3 }}>{r.exTrans}</div> : null}
             </div>
-            <PlayBtn onClick={() => onSpeak(r.ex!, r.exLang)} size={30} soft label="Play example" />
+            <PlayBtn onClick={() => onSpeak(r.ex!, r.exLang)} size={26} soft label="Play example" />
           </div>
         </div>
       ) : null}
+
+      {sayIt ? <SayItCheck text={r.head} lang={r.headLang} uiThai={!r.headThai} /> : null}
 
       {r.tip ? (
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: GOLD_BG, borderRadius: 10, padding: "8px 11px", marginTop: 10 }}>

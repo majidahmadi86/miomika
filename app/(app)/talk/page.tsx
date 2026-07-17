@@ -2129,6 +2129,7 @@ export default function TalkPage() {
                     onSpeak={(text, lang) => void handleCardSpeak(text, lang)}
                     saved={!isGuest}
                     onToggleSave={isGuest ? () => openGuestSignupSheet("save") : undefined}
+                    sayIt
                   />
                 </div>
               );
