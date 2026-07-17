@@ -129,6 +129,9 @@ export default function TalkPage() {
   const { profile, authReady: profileAuthReady } = useProfile();
   const browserUi = useUILanguage();
   const { open: openPaywall } = usePaywall();
+  // Daily limit reached: soft, tappable status line instead of an auto-opening
+  // paywall sheet (Mike 7/17: "soft popup or a link, not a harsh wall").
+  const [dailyLimitHit, setDailyLimitHit] = useState(false);
   /** Members must wait for profile row — guest auth alone is not enough (entryStartedRef race). */
   const canUseLive =
     guestAuthReady && (isGuest || (profileAuthReady && !!profile));
@@ -550,7 +553,7 @@ export default function TalkPage() {
         logEvent({ kind: "state", level: "info", message: "live connected" });
       },
       onMessage: (msg) => handleLiveMessageRef.current(msg),
-      onLimitReached: () => openPaywall("daily_limit"),
+      onLimitReached: () => setDailyLimitHit(true),
       onStatus: (status) => {
         if ((status as { phase?: string } | null)?.phase === "thinking") {
           setLiveUiState("thinking");
@@ -1857,6 +1860,11 @@ export default function TalkPage() {
     if (isLocked) {
       return guestSignupPrompt;
     }
+    if (dailyLimitHit) {
+      return uiLang === "th"
+        ? "โควต้าแชทฟรีวันนี้หมดแล้วค่ะ แตะตรงนี้เพื่อปลดล็อกไม่จำกัด หรือพรุ่งนี้มาคุยกันต่อนะคะ"
+        : "Today's free chats are done. Tap here to unlock unlimited, or come back tomorrow";
+    }
     if (!audioUnlocked) {
       return uiLang === "th" ? "แตะเพื่อเริ่มค่า" : "tap anywhere to begin";
     }
@@ -2207,12 +2215,15 @@ export default function TalkPage() {
         </div>
         {stateLabel ? (
           <p
+            onClick={dailyLimitHit ? () => openPaywall("daily_limit") : undefined}
             style={{
               margin: "2px 0 0",
               fontFamily: "'Quicksand', sans-serif",
               fontSize: "12px",
-              color: "#9A8B73",
-              opacity: 0.7,
+              color: dailyLimitHit ? "#1F7A68" : "#9A8B73",
+              opacity: dailyLimitHit ? 1 : 0.7,
+              cursor: dailyLimitHit ? "pointer" : undefined,
+              fontWeight: dailyLimitHit ? 600 : undefined,
             }}
           >
             {stateLabel}
