@@ -127,12 +127,15 @@ export async function getAIResponse(
     throw err;
   }
   const geminiEnabled = process.env.ENABLE_GEMINI_FALLBACK === "true";
-  // LANGUAGE-AWARE ROUTING. Groq is fast but weak at Thai; Gemini (Vertex) is the
-  // accurate-Thai model. For THAI replies, lead with Gemini (quality where Groq is
-  // the problem), Groq as fast fallback. For ENGLISH replies, keep Groq primary —
-  // fast and good enough — so English turns do NOT get slower.
+  // GEMINI PRIMARY, GROQ BACKUP — Mike's standing decision, fully executed 7/17.
+  // The old "English replies keep Groq" split was wrong: EN-UI learners are
+  // LEARNING THAI, so their turns contain Thai constantly — and Groq invents
+  // Thai (เพด, บัวก, ดาหลา) and ignores soft prompt rules. Gemini is the
+  // accurate-Thai model at cost parity (฿0.028 vs ฿0.029/call, admin 7/17).
+  // Groq stays as the fast fallback on Gemini error/timeout; the output guard
+  // and library failover below are unchanged.
   const order: Array<"groq" | "gemini"> =
-    uiLanguage === "th" && geminiEnabled ? ["gemini", "groq"] : ["groq", "gemini"];
+    geminiEnabled ? ["gemini", "groq"] : ["groq", "gemini"];
 
   for (const engine of order) {
     if (engine === "gemini" && !geminiEnabled) continue;
