@@ -90,8 +90,8 @@ function Star({ saved, onToggle }: { saved?: boolean; onToggle?: () => void }) {
 }
 
 // ---------- FULL CARD ----------
-export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCollapse, sayIt }: {
-  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void; onCollapse?: () => void; sayIt?: boolean;
+export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCollapse, sayIt, onSayItRecording }: {
+  word: CanonicalWord; target: Target; onSpeak: SpeakFn; saved?: boolean; onToggleSave?: () => void; onCollapse?: () => void; sayIt?: boolean; onSayItRecording?: (active: boolean) => void;
 }) {
   const r = resolve(word, target);
   const [showMore, setShowMore] = useState(false);
@@ -140,7 +140,7 @@ export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCol
         </div>
       ) : null}
 
-      {sayIt ? <SayItCheck text={r.head} lang={r.headLang} uiThai={!r.headThai} /> : null}
+      {sayIt ? <SayItCheck text={r.head} lang={r.headLang} uiThai={!r.headThai} pron={r.pron} onRecordingActive={onSayItRecording} /> : null}
 
       {r.tip ? (
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: GOLD_BG, borderRadius: 10, padding: "8px 11px", marginTop: 10 }}>

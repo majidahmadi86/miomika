@@ -2152,6 +2152,7 @@ export default function TalkPage() {
                     saved={!isGuest}
                     onToggleSave={isGuest ? () => openGuestSignupSheet("save") : undefined}
                     sayIt
+                    onSayItRecording={(active) => mediaRef.current?.suspendMicSend(active)}
                   />
                 </div>
               );

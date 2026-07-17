@@ -43,6 +43,31 @@ const COPY_TH: Copy = {
   retry: "ลองอีกครั้ง",
 };
 
+/** Latin consonant skeleton — for matching STT's English-homophone guesses
+ * ("duck my") against a Thai word's romanization ("dok mai"): consonants carry
+ * the identity, vowel spelling is where STT and romanization disagree. */
+function skeleton(s: string): string {
+  return s.toLowerCase().replace(/[^a-z]/g, "").replace(/[aeiouy]/g, "");
+}
+
+function lev(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const d = new Array<number>(n + 1);
+  for (let j = 0; j <= n; j++) d[j] = j;
+  for (let i = 1; i <= m; i++) {
+    let prev = d[0];
+    d[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = d[j];
+      d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return d[n];
+}
+
 /** Strip everything that STT formatting can disagree on, keep the sounds. */
 function normalize(s: string, lang: "th" | "en"): string {
   const noPunct = s.replace(/[.,!?;:'"“”‘’…()\-–]/g, "");
@@ -97,7 +122,7 @@ function MicIcon({ color }: { color: string }) {
   );
 }
 
-export function SayItCheck({ text, lang, uiThai }: { text: string; lang: "th" | "en"; uiThai: boolean }) {
+export function SayItCheck({ text, lang, uiThai, pron, onRecordingActive }: { text: string; lang: "th" | "en"; uiThai: boolean; pron?: string | null; onRecordingActive?: (active: boolean) => void }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const c = uiThai ? COPY_TH : COPY_EN;
   const font = uiThai ? TH_FONT : Q;
@@ -136,9 +161,19 @@ export function SayItCheck({ text, lang, uiThai }: { text: string; lang: "th" | 
       if (!mountedRef.current) return;
       if (!res.ok) { setPhase("silent"); return; }
       const json = (await res.json()) as { text?: string };
-      const heard = normalize(json.text ?? "", lang);
+      const raw = json.text ?? "";
+      const heard = normalize(raw, lang);
       if (!heard) { setPhase("silent"); return; }
-      setPhase(heard.includes(normalize(text, lang)) ? "pass" : "almost");
+      // Direct match in the target script...
+      let ok = heard.includes(normalize(text, lang));
+      // ...or, for Thai targets, STT often returns English-homophone Latin
+      // ("Duck my" for ดอกไม้): match its consonant skeleton against the
+      // romanization with 1 edit of tolerance.
+      if (!ok && lang === "th" && pron && /[a-z]/i.test(raw)) {
+        const a = skeleton(raw), b = skeleton(pron);
+        ok = b.length > 0 && lev(a, b) <= 1;
+      }
+      setPhase(ok ? "pass" : "almost");
     } catch {
       if (mountedRef.current) setPhase("silent");
     }
@@ -160,8 +195,10 @@ export function SayItCheck({ text, lang, uiThai }: { text: string; lang: "th" | 
         try { proc.disconnect(); source.disconnect(); } catch { /* already gone */ }
         stream.getTracks().forEach((tr) => tr.stop());
         void ctx.close().catch(() => undefined);
+        onRecordingActive?.(false);
       };
       setPhase("listening");
+      onRecordingActive?.(true);
       timerRef.current = window.setTimeout(() => { void finishAndCheck(); }, MAX_MS);
     } catch {
       setPhase("silent");
