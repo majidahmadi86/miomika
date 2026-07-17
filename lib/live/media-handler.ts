@@ -20,6 +20,7 @@ export class MediaHandler {
   private turnCompleteReceived = false;
   private pendingAfterDrain: Array<() => void> = [];
   private micSendSuspended = false;
+  private focusSuspended = false;
   private lastMicForward: boolean | null = null;
   private modelTurnIdleSince: number | null = null;
   private watchdogTimer: ReturnType<typeof setInterval> | null = null;
@@ -41,6 +42,7 @@ export class MediaHandler {
         isRecording: this.isRecording,
         modelTurnActive: this.modelTurnActive,
         micSendSuspended: this.micSendSuspended,
+        focusSuspended: this.focusSuspended,
       },
     });
   }
@@ -92,7 +94,7 @@ export class MediaHandler {
 
   /** True when mic PCM may be forwarded to Gemini (harness + replay guard). */
   shouldForwardMicToGemini(): boolean {
-    return this.isRecording && !this.modelTurnActive && !this.micSendSuspended;
+    return this.isRecording && !this.modelTurnActive && !this.micSendSuspended && !this.focusSuspended;
   }
 
   isModelTurnActive(): boolean {
@@ -388,6 +390,11 @@ export class MediaHandler {
   }
 
   /** Suspend mic PCM to Gemini (card replay, speaker bleed guard). */
+  /** Window/tab focus gate — independent of turn suspension so the two flags never fight. */
+  suspendForFocus(suspended: boolean): void {
+    this.focusSuspended = suspended;
+  }
+
   suspendMicSend(suspended: boolean): void {
     this.micSendSuspended = suspended;
     if (this.inputGain) {

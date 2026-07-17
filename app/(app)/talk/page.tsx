@@ -1633,6 +1633,28 @@ export default function TalkPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // Background-audio guard: when the tab is hidden or the window loses focus
+  // (user typing elsewhere, media playing in another tab), stop forwarding mic
+  // audio — ambient speech from the room or another tab must never become a
+  // user turn. Independent focus flag, so it can't fight replay/say-it suspends.
+  useEffect(() => {
+    const apply = () => {
+      const away = document.visibilityState === "hidden" || !document.hasFocus();
+      mediaRef.current?.suspendForFocus(away);
+      if (away) logEvent({ kind: "mic", level: "info", message: "mic paused — window unfocused" });
+    };
+    apply();
+    window.addEventListener("focus", apply);
+    window.addEventListener("blur", apply);
+    document.addEventListener("visibilitychange", apply);
+    return () => {
+      window.removeEventListener("focus", apply);
+      window.removeEventListener("blur", apply);
+      document.removeEventListener("visibilitychange", apply);
+      mediaRef.current?.suspendForFocus(false);
+    };
+  }, []);
+
   // Card audio (any part of the word card) keeps the SAME mic choreography the
   // old whole-word replay had: suspend the mic while she speaks so her own
   // voice is never transcribed as the user's input.
