@@ -406,6 +406,7 @@ export async function POST(req: NextRequest) {
     let content: string;
     let servedVia: string;
     let wasFailover = false;
+    let budgetCappedDaily = false;
 
     let aiCostUsd = 0;
 
@@ -460,6 +461,13 @@ export async function POST(req: NextRequest) {
           : Promise.resolve(),
       ]);
       content = result.content;
+      // Budget daily cap: speak with the SAME warm varied voice + upgrade CTA
+      // as the member exchange cap (limitReached below), instead of the old
+      // static wall — walls-into-doors law. Turn-scope caps stay a normal reply.
+      budgetCappedDaily = result.cappedScope === "daily";
+      if (budgetCappedDaily) {
+        content = pickPhrase(GUIDANCE_DAILY_LIMIT_HIT, { lang: brainState.uiLanguage });
+      }
       // STAGE 10b: turn the model's [[CARD: th | roman | en]] tag into a verified card == exactly what
       // it taught, then strip the tag so it never leaks. Always strip; build the card only when teaching
       // is allowed and the tag is well-formed (resolve fills phonetics + example, same builder as before).
@@ -630,6 +638,7 @@ export async function POST(req: NextRequest) {
       replyLanguage,
       userSpeaksLanguage: brainState.userSpeaksLanguage,
       guestHandoff: isLastFreeGuestTurn,
+      limitReached: budgetCappedDaily ? ("daily" as const) : undefined,
     } satisfies MiomiResponse);
 
     });

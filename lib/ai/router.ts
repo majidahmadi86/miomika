@@ -94,11 +94,11 @@ function aiErrorFields(error: unknown): { message: string; status?: number } {
 // Warm fallback shown when a user hits their cost ceiling — never an error.
 // TODO Mike: replace the Thai copy with your own wording.
 const CAPPED_DAILY = {
-  en: "We've had so much fun today — that's all our free chats until tomorrow! I'll be right here when they refresh. Or if you'd rather not wait, you can unlock unlimited time with me anytime.",
-  th: "วันนี้เราคุยกันสนุกมากเลยน้า — โควต้าแชทฟรีของวันนี้หมดแล้ว! พรุ่งนี้พอรีเฟรชแล้วหนูจะรออยู่ตรงนี้นะ หรือถ้าไม่อยากรอ ก็ปลดล็อกคุยกับหนูได้ไม่จำกัดเลยน้า",
+  en: "We've had so much fun today! That's all our free chats until tomorrow. I'll be right here when they refresh, or you can unlock unlimited time with me anytime.",
+  th: "วันนี้เราคุยกันสนุกมากเลยน้า โควต้าแชทฟรีของวันนี้หมดแล้ว พรุ่งนี้พอรีเฟรชแล้วหนูจะรออยู่ตรงนี้นะ หรือถ้าไม่อยากรอ ก็ปลดล็อกคุยกับหนูได้ไม่จำกัดเลยน้า",
 };
 const CAPPED_TURN = {
-  en: "Ooh, that's a big one! Let's take it a little at a time — try me again in a moment?",
+  en: "Ooh, that's a big one! Let's take it a little at a time, try me again in a moment?",
   th: "โอ้ว อันนี้ยาวเลยน้า! ค่อยๆ เป็นค่อยๆ ไปนะ เดี๋ยวลองถามมิโอมิอีกทีนะ",
 };
 
@@ -106,7 +106,7 @@ export async function getAIResponse(
   messages: Message[],
   systemPrompt: string,
   uiLanguage: "th" | "en" = "en",
-): Promise<{ content: string; engine: string; wasFailover: boolean }> {
+): Promise<{ content: string; engine: string; wasFailover: boolean; cappedScope?: "daily" | "turn" }> {
   log("ai.router", "env keys", {
     GROQ_API_KEY: Boolean(process.env.GROQ_API_KEY),
     GCP_VERTEX: Boolean(process.env.GCP_SERVICE_ACCOUNT_JSON && process.env.GCP_PROJECT_ID),
@@ -122,7 +122,12 @@ export async function getAIResponse(
   } catch (err) {
     if (err instanceof BudgetExceededError) {
       const capped = err.scope === "turn" ? CAPPED_TURN : CAPPED_DAILY;
-      return { content: uiLanguage === "th" ? capped.th : capped.en, engine: "capped", wasFailover: true };
+      return {
+        content: uiLanguage === "th" ? capped.th : capped.en,
+        engine: "capped",
+        wasFailover: true,
+        cappedScope: err.scope === "turn" ? "turn" : "daily",
+      };
     }
     throw err;
   }
