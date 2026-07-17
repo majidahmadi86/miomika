@@ -50,6 +50,11 @@ function skeleton(s: string): string {
   return s.toLowerCase().replace(/[^a-z]/g, "").replace(/[aeiouy]/g, "");
 }
 
+/** Fold tone-marked romanization ("dòk-máai") and STT Latin to bare letters. */
+function foldLatin(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+}
+
 function lev(a: string, b: string): number {
   const m = a.length, n = b.length;
   if (!m) return n;
@@ -124,6 +129,7 @@ function MicIcon({ color }: { color: string }) {
 
 export function SayItCheck({ text, lang, uiThai, pron, onRecordingActive }: { text: string; lang: "th" | "en"; uiThai: boolean; pron?: string | null; onRecordingActive?: (active: boolean) => void }) {
   const [phase, setPhase] = useState<Phase>("idle");
+  const [heardText, setHeardText] = useState<string>("");
   const c = uiThai ? COPY_TH : COPY_EN;
   const font = uiThai ? TH_FONT : Q;
 
@@ -161,17 +167,27 @@ export function SayItCheck({ text, lang, uiThai, pron, onRecordingActive }: { te
       if (!mountedRef.current) return;
       if (!res.ok) { setPhase("silent"); return; }
       const json = (await res.json()) as { text?: string };
-      const raw = json.text ?? "";
+      const raw = (json.text ?? "").trim();
       const heard = normalize(raw, lang);
-      if (!heard) { setPhase("silent"); return; }
-      // Direct match in the target script...
-      let ok = heard.includes(normalize(text, lang));
-      // ...or, for Thai targets, STT often returns English-homophone Latin
-      // ("Duck my" for ดอกไม้): match its consonant skeleton against the
-      // romanization with 1 edit of tolerance.
+      if (!heard) { setHeardText(""); setPhase("silent"); return; }
+      setHeardText(raw);
+      const targetNorm = normalize(text, lang);
+      // 1) Direct containment in the target script.
+      let ok = heard.includes(targetNorm);
+      // 2) Near-miss in the same script (a missing tone mark or one slipped
+      //    letter must not fail an honest attempt).
+      if (!ok) {
+        const tol = Math.max(1, Math.floor(targetNorm.length / 6));
+        ok = lev(heard, targetNorm) <= tol;
+      }
+      // 3) Thai target but Latin transcript (STT returns English homophones):
+      //    fold tone marks and compare against the romanization, generously.
       if (!ok && lang === "th" && pron && /[a-z]/i.test(raw)) {
-        const a = skeleton(raw), b = skeleton(pron);
-        ok = b.length > 0 && lev(a, b) <= 1;
+        const a = foldLatin(raw), b = foldLatin(pron);
+        const tol = Math.max(1, Math.floor(b.length / 5));
+        ok =
+          (b.length > 0 && lev(a, b) <= tol) ||
+          (skeleton(raw).length > 0 && lev(skeleton(raw), skeleton(pron)) <= 1);
       }
       setPhase(ok ? "pass" : "almost");
     } catch {
@@ -214,11 +230,18 @@ export function SayItCheck({ text, lang, uiThai, pron, onRecordingActive }: { te
   if (phase === "pass" || phase === "almost" || phase === "silent") {
     const good = phase === "pass";
     return (
-      <div style={{ marginTop: 10, background: good ? GOLD_BG : PINK_SOFT, borderRadius: 11, padding: "9px 12px", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ flex: 1, fontFamily: font, fontSize: 12.5, fontWeight: 600, color: good ? GOLD : PINK_DEEP, lineHeight: 1.45 }}>{c[phase]}</span>
-        <button type="button" onClick={onTap} style={{ fontFamily: font, fontSize: 11.5, fontWeight: 700, color: MINT_DEEP, background: MINT_SOFT, border: "none", borderRadius: 99, padding: "6px 11px", cursor: "pointer", flexShrink: 0 }}>
-          {c.retry}
-        </button>
+      <div style={{ marginTop: 10, background: good ? GOLD_BG : PINK_SOFT, borderRadius: 11, padding: "9px 12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ flex: 1, fontFamily: font, fontSize: 12.5, fontWeight: 600, color: good ? GOLD : PINK_DEEP, lineHeight: 1.45 }}>{c[phase]}</span>
+          <button type="button" onClick={onTap} style={{ fontFamily: font, fontSize: 11.5, fontWeight: 700, color: MINT_DEEP, background: MINT_SOFT, border: "none", borderRadius: 99, padding: "6px 11px", cursor: "pointer", flexShrink: 0 }}>
+            {c.retry}
+          </button>
+        </div>
+        {heardText ? (
+          <p style={{ fontFamily: font, fontSize: 11, fontStyle: "italic", color: good ? "#A08428" : "#B06A85", margin: "4px 0 0" }}>
+            {(uiThai ? "หนูได้ยินว่า " : "I heard: ") + "\u201C" + heardText + "\u201D"}
+          </p>
+        ) : null}
       </div>
     );
   }
