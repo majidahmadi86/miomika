@@ -252,7 +252,9 @@ async function callGeminiWithModel(
     config: {
       systemInstruction: systemPrompt,
       maxOutputTokens: MAX_REPLY_TOKENS,
-      temperature: 0.85,
+      // 0.6: cooler than 0.85 — Gemini padded replies and drifted past the
+      // brevity laws at high temperature. Warmth survives; rambling does not.
+      temperature: 0.6,
       // CRITICAL COST CONTROL: Gemini 2.5 Flash enables "thinking" by default and
       // bills those hidden reasoning tokens at the high $2.50/M output rate. Our
       // replies are short chat turns that need no reasoning, so disable thinking.
