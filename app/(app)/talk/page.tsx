@@ -1673,6 +1673,17 @@ export default function TalkPage() {
     if (threadBootRef.current) return;
     if (isGuest || !profileAuthReady || !profile) return;
     threadBootRef.current = true;
+    // Suppress the kickoff SYNCHRONOUSLY: session connect takes ~16ms while this
+    // bootstrap takes two fetches — the greeting always won that race and spoke
+    // over restored history. Members greet only when the boot decides so below.
+    kickoffSentRef.current = true;
+    const greetFresh = (audience: "first_time" | "returning") => {
+      if (clientRef.current?.isConnected()) {
+        clientRef.current.sendKickoff(uiLang === "th" ? "th" : "en", audience);
+      } else {
+        kickoffSentRef.current = false; // connect-time kickoff will handle it
+      }
+    };
     void (async () => {
       try {
         const listRes = await fetch("/api/talk/threads", { credentials: "include", cache: "no-store" });
@@ -1687,41 +1698,70 @@ export default function TalkPage() {
             credentials: "include",
             cache: "no-store",
           });
-          if (histRes.ok) {
-            const histJson = (await histRes.json()) as { items?: Array<{ role: string; content: string }> };
-            const rows = (histJson.items ?? []).filter((r) => r.content && r.content.trim().length > 0);
-            if (rows.length > 0) {
-              let seq = -rows.length - 1;
-              const hist: CanvasItem[] = rows.map((r) => {
-                seq += 1;
-                return r.role === "user"
-                  ? {
-                      id: crypto.randomUUID(),
-                      kind: "user_said",
-                      text: r.content,
-                      turnSeq: seq,
-                      roleOrder: TRANSCRIPT_USER_ORDER,
-                    }
-                  : {
-                      id: crypto.randomUUID(),
-                      kind: "mini_cat",
-                      textTh: r.content,
-                      textEn: r.content,
-                      turnSeq: seq,
-                      roleOrder: TRANSCRIPT_GEMINI_ORDER,
-                    };
-              });
-              setItems((prev) => {
-                // Reference-app pattern: resuming a thread means no new hello.
-                // Drop the EMPTY opener shell only; a greeting that already
-                // spoke (rare race) keeps its bubble.
-                const withoutEmptyOpener = prev.filter(
-                  (i) => !(i.kind === "mini_cat" && i.turnSeq === 0 && !i.textTh && !i.textEn),
-                );
-                return sortTranscriptItems([...hist, ...withoutEmptyOpener]);
-              });
-              kickoffSentRef.current = true;
+          type HistRow = {
+            role: string;
+            content: string;
+            created_at: string;
+            language?: string | null;
+            session_id?: string | null;
+            exchange_number?: number;
+          };
+          const histJson = histRes.ok
+            ? ((await histRes.json()) as { items?: HistRow[] })
+            : { items: [] };
+          const rows = (histJson.items ?? []).filter((r) => r.content && r.content.trim().length > 0);
+          if (rows.length > 0) {
+            // Deterministic pair ordering: the two rows of one exchange are
+            // inserted concurrently, so created_at alone can flip them. Group
+            // by session+exchange, order groups by their earliest timestamp,
+            // and put the user's line before Miomi's inside each exchange.
+            const groups = new Map<string, HistRow[]>();
+            for (const r of rows) {
+              const key = `${r.session_id ?? "s"}:${r.exchange_number ?? 0}`;
+              const g = groups.get(key);
+              if (g) g.push(r);
+              else groups.set(key, [r]);
             }
+            const ordered = Array.from(groups.values())
+              .map((g) => ({
+                t: Math.min(...g.map((r) => Date.parse(r.created_at) || 0)),
+                g: [...g].sort((a, b) => (a.role === b.role ? 0 : a.role === "user" ? -1 : 1)),
+              }))
+              .sort((a, b) => a.t - b.t)
+              .flatMap((x) => x.g);
+            let seq = -ordered.length - 1;
+            const hist: CanvasItem[] = ordered.map((r) => {
+              seq += 1;
+              if (r.role === "user") {
+                return {
+                  id: crypto.randomUUID(),
+                  kind: "user_said",
+                  text: r.content,
+                  turnSeq: seq,
+                  roleOrder: TRANSCRIPT_USER_ORDER,
+                };
+              }
+              // One language field only — MiniCatRow JOINS both fields, so
+              // filling both doubled the text on screen.
+              const isThai = (r.language ?? (uiLang === "th" ? "th" : "en")) === "th";
+              return {
+                id: crypto.randomUUID(),
+                kind: "mini_cat",
+                textTh: isThai ? r.content : "",
+                textEn: isThai ? "" : r.content,
+                turnSeq: seq,
+                roleOrder: TRANSCRIPT_GEMINI_ORDER,
+              };
+            });
+            setItems((prev) => {
+              const withoutEmptyOpener = prev.filter(
+                (i) => !(i.kind === "mini_cat" && i.turnSeq === 0 && !i.textTh && !i.textEn),
+              );
+              return sortTranscriptItems([...hist, ...withoutEmptyOpener]);
+            });
+          } else {
+            // Resumed thread but nothing in it (fresh after New chat): greet.
+            greetFresh("returning");
           }
         } else {
           const createRes = await fetch("/api/talk/threads", {
@@ -1736,12 +1776,14 @@ export default function TalkPage() {
               clientRef.current?.setThreadId(createJson.thread.id);
             }
           }
+          greetFresh("first_time");
         }
       } catch {
-        /* thread binding is best-effort — talk works unthreaded (legacy) */
+        // Thread binding is best-effort — greet normally, talk works unthreaded.
+        greetFresh("returning");
       }
     })();
-  }, [isGuest, profileAuthReady, profile]);
+  }, [isGuest, profileAuthReady, profile, uiLang]);
 
   // Card audio (any part of the word card) keeps the SAME mic choreography the
   // old whole-word replay had: suspend the mic while she speaks so her own
@@ -2325,20 +2367,38 @@ export default function TalkPage() {
         />
         </div>
         {stateLabel ? (
-          <p
-            onClick={dailyLimitHit ? () => openPaywall("daily_limit") : undefined}
-            style={{
-              margin: "2px 0 0",
-              fontFamily: "'Quicksand', sans-serif",
-              fontSize: "12px",
-              color: dailyLimitHit ? "#1F7A68" : "#9A8B73",
-              opacity: dailyLimitHit ? 1 : 0.7,
-              cursor: dailyLimitHit ? "pointer" : undefined,
-              fontWeight: dailyLimitHit ? 600 : undefined,
-            }}
-          >
-            {stateLabel}
-          </p>
+          dailyLimitHit ? (
+            <button
+              type="button"
+              onClick={() => openPaywall("daily_limit")}
+              style={{
+                margin: "2px 0 0",
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "12px",
+                color: "#1F7A68",
+                fontWeight: 600,
+                textDecoration: "underline",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              {stateLabel}
+            </button>
+          ) : (
+            <p
+              style={{
+                margin: "2px 0 0",
+                fontFamily: "'Quicksand', sans-serif",
+                fontSize: "12px",
+                color: "#9A8B73",
+                opacity: 0.7,
+              }}
+            >
+              {stateLabel}
+            </p>
+          )
         ) : null}
       </div>
       <div style={{ flexShrink: 0, width: "100%", maxWidth: "720px", margin: "0 auto", padding: "4px 12px 20px", background: "transparent" }}>

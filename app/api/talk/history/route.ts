@@ -17,13 +17,20 @@ export async function GET(req: Request) {
     const supabase = await createServiceClient();
     const { data, error } = await supabase
       .from("conversations")
-      .select("role, content, created_at, thread_id, user_id")
+      .select("role, content, created_at, language, session_id, exchange_number, thread_id, user_id")
       .eq("user_id", profile.id)
       .eq("thread_id", thread)
       .order("created_at", { ascending: false })
       .limit(60);
     if (error) throw error;
-    const items = (data ?? []).reverse().map((r) => ({ role: r.role, content: r.content, created_at: r.created_at }));
+    const items = (data ?? []).reverse().map((r) => ({
+      role: r.role,
+      content: r.content,
+      created_at: r.created_at,
+      language: r.language,
+      session_id: r.session_id,
+      exchange_number: r.exchange_number,
+    }));
     return NextResponse.json({ items });
   } catch (error) {
     logError("talk_history", "failed to load thread history", error);
