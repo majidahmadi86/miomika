@@ -14,6 +14,7 @@ export async function saveExchange(params: {
   intent?: string | null;
   usedTargetWord?: boolean;
   aiCostUsd?: number;
+  threadId?: string | null;
 }): Promise<void> {
   try {
     const supabase = await createServiceClient();
@@ -29,6 +30,7 @@ export async function saveExchange(params: {
       intent: params.intent ?? null,
       used_target_word: params.usedTargetWord ?? false,
       ai_cost_usd: params.aiCostUsd ?? 0,
+      thread_id: params.threadId ?? null,
     });
     if (error) {
       console.error(
@@ -39,6 +41,34 @@ export async function saveExchange(params: {
     }
   } catch (err) {
     console.error("[memory.saveExchange] insert failed:", err);
+  }
+}
+
+/** Bump a thread's freshness and, on the first real user message, auto-title it
+ * from that message (free — no model call). Fire-and-forget from the miomi route. */
+export async function touchThread(params: {
+  threadId: string;
+  userId: string;
+  titleCandidate?: string | null;
+}): Promise<void> {
+  try {
+    const supabase = await createServiceClient();
+    const title = (params.titleCandidate ?? "").trim();
+    await supabase
+      .from("talk_threads")
+      .update({ last_message_at: new Date().toISOString() })
+      .eq("id", params.threadId)
+      .eq("user_id", params.userId);
+    if (title) {
+      await supabase
+        .from("talk_threads")
+        .update({ title: title.length > 48 ? `${title.slice(0, 48)}…` : title })
+        .eq("id", params.threadId)
+        .eq("user_id", params.userId)
+        .is("title", null);
+    }
+  } catch (err) {
+    console.error("[memory.touchThread] failed:", err);
   }
 }
 

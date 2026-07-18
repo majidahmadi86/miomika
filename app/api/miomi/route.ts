@@ -24,7 +24,7 @@ import {
   TALK_OPENERS,
 } from "@/lib/voice/warmth";
 import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
-import { saveExchange } from "@/lib/brain/memory";
+import { saveExchange, touchThread } from "@/lib/brain/memory";
 import { readBrainState, type BrainState } from "@/lib/brain/state";
 import { buildBrainPrompt } from "@/lib/brain/prompt";
 import { buildMemoryContext } from "@/lib/ai/memory-context";
@@ -102,6 +102,10 @@ export async function POST(req: NextRequest) {
     const mode: "auto" | "teach" | "chat" =
       rawMode === "teach" || rawMode === "chat" ? rawMode : "auto";
     const clientUiLanguage = body?.uiLanguage === "en" || body?.uiLanguage === "th" ? body.uiLanguage : null;
+    // Multi-thread chat: optional thread binding. Absent (guests, legacy
+    // clients) → rows keep thread_id null, exactly as before.
+    const threadId: string | null =
+      typeof body?.threadId === "string" && /^[0-9a-f-]{36}$/i.test(body.threadId) ? body.threadId : null;
     const clientTargetLanguage = body?.targetLanguage === "en" || body?.targetLanguage === "th" ? body.targetLanguage : null;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -164,7 +168,7 @@ export async function POST(req: NextRequest) {
         // in a hook), NOT a recycled lesson/care line. pickPhrase randomizes → varies every
         // open. Opening the talk screen and saying nothing costs ZERO tokens.
         const openerContent = pickPhrase(TALK_OPENERS, { lang: brainState.uiLanguage });
-        persistExchangePair({ userId: serverUserId, state, userInput, miomiContent: openerContent });
+        persistExchangePair({ userId: serverUserId, state, userInput, miomiContent: openerContent, threadId });
         return NextResponse.json({
           content: openerContent,
           wordCard: null,
@@ -225,6 +229,7 @@ export async function POST(req: NextRequest) {
         state,
         userInput,
         miomiContent: guestLimitContent,
+        threadId,
       });
       return NextResponse.json({
         content: guestLimitContent,
@@ -342,7 +347,7 @@ export async function POST(req: NextRequest) {
         brainState.uiLanguage === "th"
           ? "ขอโทษค่ะ หนูฟังไม่ค่อยชัดเลย ลองพูดอีกครั้งได้ไหมคะ~"
           : "Sorry, I didn't quite catch that — could you say it again?";
-      persistExchangePair({ userId: serverUserId, state, userInput, miomiContent: didntCatch });
+      persistExchangePair({ userId: serverUserId, state, userInput, miomiContent: didntCatch, threadId });
       return NextResponse.json({
         content: didntCatch,
         wordCard: null,
@@ -567,6 +572,7 @@ export async function POST(req: NextRequest) {
       state,
       userInput,
       miomiContent: content,
+      threadId,
       aiCostUsd,
       intent: intentResult.primary.intent,
     });
@@ -770,6 +776,7 @@ function persistExchangePair(params: {
   state: SessionState;
   userInput: string;
   miomiContent: string;
+  threadId?: string | null;
   aiCostUsd?: number;
   intent?: string | null;
   emotionalSignal?: string | null;
@@ -782,6 +789,7 @@ function persistExchangePair(params: {
     aiCostUsd,
     intent,
     emotionalSignal,
+    threadId,
   } = params;
 
   void saveExchange({
@@ -791,7 +799,16 @@ function persistExchangePair(params: {
     role: "user",
     content: userInput,
     language: state.primaryLanguage,
+    threadId,
   });
+  if (threadId && userId) {
+    const isKickoffInput = userInput.trim().startsWith("[kickoff]");
+    void touchThread({
+      threadId,
+      userId,
+      titleCandidate: isKickoffInput ? null : userInput,
+    });
+  }
   void saveExchange({
     userId,
     sessionId: state.sessionId,
@@ -799,6 +816,7 @@ function persistExchangePair(params: {
     role: "miomi",
     content: miomiContent,
     language: state.primaryLanguage,
+    threadId,
     aiCostUsd,
     intent: intent ?? null,
     emotionalSignal: emotionalSignal ?? null,
