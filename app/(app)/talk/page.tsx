@@ -50,6 +50,7 @@ import {
   sortTranscriptItems,
   TRANSCRIPT_CARD_ORDER,
   TRANSCRIPT_USER_ORDER,
+  TRANSCRIPT_GEMINI_ORDER,
 } from "@/lib/live/transcript-order";
 import {
   isLessonComplete,
@@ -132,6 +133,12 @@ export default function TalkPage() {
   // Daily limit reached: soft, tappable status line instead of an auto-opening
   // paywall sheet (Mike 7/17: "soft popup or a link, not a harsh wall").
   const [dailyLimitHit, setDailyLimitHit] = useState(false);
+
+  // Multi-thread chat (phase 2): the screen is bound to one talk_thread.
+  // Bootstrap resumes the latest thread (reference-app behavior: history shown,
+  // NO fresh greeting) or creates the first one (greeting flows normally).
+  const activeThreadIdRef = useRef<string | null>(null);
+  const threadBootRef = useRef(false);
   /** Members must wait for profile row — guest auth alone is not enough (entryStartedRef race). */
   const canUseLive =
     guestAuthReady && (isGuest || (profileAuthReady && !!profile));
@@ -545,6 +552,7 @@ export default function TalkPage() {
   const wireLiveClient = useCallback((client: MiomiTurnClient) => {
     liveClientEpochRef.current = client.epochId;
     clientRef.current = client;
+    client.setThreadId(activeThreadIdRef.current);
   }, []);
 
   const createLiveClient = useCallback((): MiomiTurnClient => {
@@ -554,6 +562,9 @@ export default function TalkPage() {
       },
       onMessage: (msg) => handleLiveMessageRef.current(msg),
       onLimitReached: () => setDailyLimitHit(true),
+      // Bind requests to the active thread from the first call on.
+      // (Set again by the bootstrap/new-chat flows whenever it changes.)
+
       onStatus: (status) => {
         if ((status as { phase?: string } | null)?.phase === "thinking") {
           setLiveUiState("thinking");
@@ -1658,6 +1669,80 @@ export default function TalkPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (threadBootRef.current) return;
+    if (isGuest || !profileAuthReady || !profile) return;
+    threadBootRef.current = true;
+    void (async () => {
+      try {
+        const listRes = await fetch("/api/talk/threads", { credentials: "include", cache: "no-store" });
+        const listJson = listRes.ok
+          ? ((await listRes.json()) as { threads?: Array<{ id: string }> })
+          : { threads: [] };
+        const latest = listJson.threads?.[0]?.id ?? null;
+        if (latest) {
+          activeThreadIdRef.current = latest;
+          clientRef.current?.setThreadId(latest);
+          const histRes = await fetch(`/api/talk/history?thread=${encodeURIComponent(latest)}`, {
+            credentials: "include",
+            cache: "no-store",
+          });
+          if (histRes.ok) {
+            const histJson = (await histRes.json()) as { items?: Array<{ role: string; content: string }> };
+            const rows = (histJson.items ?? []).filter((r) => r.content && r.content.trim().length > 0);
+            if (rows.length > 0) {
+              let seq = -rows.length - 1;
+              const hist: CanvasItem[] = rows.map((r) => {
+                seq += 1;
+                return r.role === "user"
+                  ? {
+                      id: crypto.randomUUID(),
+                      kind: "user_said",
+                      text: r.content,
+                      turnSeq: seq,
+                      roleOrder: TRANSCRIPT_USER_ORDER,
+                    }
+                  : {
+                      id: crypto.randomUUID(),
+                      kind: "mini_cat",
+                      textTh: r.content,
+                      textEn: r.content,
+                      turnSeq: seq,
+                      roleOrder: TRANSCRIPT_GEMINI_ORDER,
+                    };
+              });
+              setItems((prev) => {
+                // Reference-app pattern: resuming a thread means no new hello.
+                // Drop the EMPTY opener shell only; a greeting that already
+                // spoke (rare race) keeps its bubble.
+                const withoutEmptyOpener = prev.filter(
+                  (i) => !(i.kind === "mini_cat" && i.turnSeq === 0 && !i.textTh && !i.textEn),
+                );
+                return sortTranscriptItems([...hist, ...withoutEmptyOpener]);
+              });
+              kickoffSentRef.current = true;
+            }
+          }
+        } else {
+          const createRes = await fetch("/api/talk/threads", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+          });
+          if (createRes.ok) {
+            const createJson = (await createRes.json()) as { thread?: { id: string } };
+            if (createJson.thread?.id) {
+              activeThreadIdRef.current = createJson.thread.id;
+              clientRef.current?.setThreadId(createJson.thread.id);
+            }
+          }
+        }
+      } catch {
+        /* thread binding is best-effort — talk works unthreaded (legacy) */
+      }
+    })();
+  }, [isGuest, profileAuthReady, profile]);
+
   // Card audio (any part of the word card) keeps the SAME mic choreography the
   // old whole-word replay had: suspend the mic while she speaks so her own
   // voice is never transcribed as the user's input.
@@ -1685,10 +1770,36 @@ export default function TalkPage() {
     });
   }, []);
 
+  // Thread model: "Clear" IS "New chat" — fresh thread + fresh greeting; the
+  // old conversation lives on in history (phase 3 sidebar), nothing deleted.
   const handleClear = useCallback(() => {
     setItems([makeOpenerItem()]);
     setExpandedItems(new Set());
-  }, []);
+    void (async () => {
+      try {
+        const res = await fetch("/api/talk/threads", {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const json = (await res.json()) as { thread?: { id: string } };
+          if (json.thread?.id) {
+            activeThreadIdRef.current = json.thread.id;
+            clientRef.current?.setThreadId(json.thread.id);
+          }
+        }
+      } catch {
+        /* stay on the current thread if creation fails */
+      }
+      kickoffSentRef.current = false;
+      if (clientRef.current?.isConnected()) {
+        kickoffSentRef.current = true;
+        clientRef.current.sendKickoff(uiLang === "th" ? "th" : "en", "returning");
+      }
+    })();
+  }, [uiLang]);
+
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("a, button, input, textarea")) return;

@@ -89,6 +89,7 @@ export class MiomiTurnClient {
 
   // connect() config
   private uiLanguage: "th" | "en" = "en";
+  private threadId: string | null = null;
   private targetLanguage: "th" | "en" = "th";
   private mode: string = "chat";
   private level: string | null = null;
@@ -315,6 +316,11 @@ export class MiomiTurnClient {
   }
 
   // ---- kickoff / greeting -------------------------------------------------
+
+  /** Multi-thread chat: bind every /api/miomi call to the active thread. */
+  setThreadId(id: string | null): void {
+    this.threadId = id;
+  }
 
   sendKickoff(
     lang: "th" | "en",
@@ -581,6 +587,7 @@ export class MiomiTurnClient {
           targetLanguage: this.targetLanguage,
           level: this.level,
           sessionContext: this.sessionContext,
+          threadId: this.threadId,
         }),
       });
       if (!res.ok) {
