@@ -2,6 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Fragment } from "react";
 import { ThreadsPanel } from "@/components/talk/ThreadsPanel";
 import { useCallback, useState } from "react";
 import { BookOpen, Home, Sparkles, TrendingUp, User, type LucideIcon } from "lucide-react";
@@ -113,8 +114,8 @@ export function Rail() {
           const active = pathname === href || pathname.startsWith(href + "/");
           const label = lang === "en" ? labelEn : labelTh;
           return (
+            <Fragment key={href}>
             <Link
-              key={href}
               href={href}
               aria-label={labelEn}
               className={cn(
@@ -140,18 +141,17 @@ export function Rail() {
                 {label}
               </span>
             </Link>
+              {href === "/talk" && expanded ? (
+                <div className="mb-2 mt-1 flex min-h-0 flex-col pl-1" style={{ maxHeight: "38vh" }}>
+                  <ThreadsPanel lang={lang} variant="rail" />
+                </div>
+              ) : null}
+            </Fragment>
           );
         })}
       </nav>
 
-      {expanded ? (
-        <div className="mt-4 flex min-h-0 flex-1 flex-col">
-          <div className="mb-3 h-px bg-[#EFE9E0]" />
-          <ThreadsPanel lang={lang} variant="rail" />
-        </div>
-      ) : (
-        <div className="flex-1" />
-      )}
+      <div className="flex-1" />
 
       <div className={cn("pt-3", expanded ? "flex items-center justify-between gap-2 px-1" : "flex flex-col items-center gap-2.5")}>
         <div className={cn("flex items-center gap-2", expanded ? "" : "flex-col gap-2.5")}>

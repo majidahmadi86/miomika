@@ -20,6 +20,7 @@ export async function GET(req: Request) {
       .select("role, content, created_at, language, session_id, exchange_number, thread_id, user_id")
       .eq("user_id", profile.id)
       .eq("thread_id", thread)
+      .not("content", "like", "[kickoff]%")
       .order("created_at", { ascending: false })
       .limit(60);
     if (error) throw error;

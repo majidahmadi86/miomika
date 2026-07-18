@@ -42,7 +42,7 @@ export function TierUpgradeBadge() {
     <button
       onClick={() => open("generic")}
       aria-label={text}
-      className="fixed z-40 flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur-sm"
+      className="fixed z-40 flex items-center gap-1 rounded-full border p-1.5 text-[11px] font-semibold shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1.5"
       style={{
         fontFamily: "'Quicksand', sans-serif",
         top: "calc(env(safe-area-inset-top, 0px) + 10px)",
@@ -54,7 +54,7 @@ export function TierUpgradeBadge() {
       }}
     >
       <Crown className="h-3.5 w-3.5" style={{ color: "#B8860B" }} strokeWidth={2} />
-      {text}
+      <span className="hidden sm:inline">{text}</span>
     </button>
   );
 }

@@ -10,6 +10,7 @@ import { ArrowLeft, Menu } from "lucide-react";
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ThreadsPanel } from "@/components/talk/ThreadsPanel";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { usePaywall } from "@/components/billing/Paywall";
@@ -2544,11 +2545,11 @@ function TalkPageInner() {
         </button>
       )}
 
-      {threadsDrawerOpen ? (
+      {threadsDrawerOpen && typeof document !== "undefined" ? createPortal(
         <div
           role="dialog"
           aria-label="Chats"
-          style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex" }}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex" }}
         >
           <div
             style={{ position: "absolute", inset: 0, background: "rgba(43,40,34,0.28)" }}
@@ -2564,7 +2565,8 @@ function TalkPageInner() {
             </div>
             <ThreadsPanel lang={uiLang === "th" ? "th" : "en"} variant="drawer" onNavigate={() => setThreadsDrawerOpen(false)} />
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
 
       <AdjustSheet
