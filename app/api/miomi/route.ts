@@ -472,6 +472,8 @@ export async function POST(req: NextRequest) {
       budgetCappedDaily = result.cappedScope === "daily";
       if (budgetCappedDaily) {
         content = pickPhrase(GUIDANCE_DAILY_LIMIT_HIT, { lang: brainState.uiLanguage });
+      } else {
+        content = trimReply(content);
       }
       // STAGE 10b: turn the model's [[CARD: th | roman | en]] tag into a verified card == exactly what
       // it taught, then strip the tag so it never leaks. Always strip; build the card only when teaching
@@ -769,6 +771,28 @@ function detectPlatform(message: string): string {
   if (/(youtube|ยูทูบ)/.test(lower)) return "YouTube";
   if (/(line|ไลน์)/.test(lower)) return "LINE";
   return "general";
+}
+
+/** THE FAT-OUTPUT GUARD (Mike's go, 7/18). Prompt pressure hit its ceiling —
+ * temp 0.6 + few-shot narrowed but never killed padded replies, and every
+ * extra sentence is TTS money. This is the mechanical law: at most 3
+ * sentences; if the model buried its one question deeper, the question
+ * replaces sentence 3. The [[CARD: tag on the final line is detached first
+ * and re-attached untouched, so cards can never break. Thai-heavy lines
+ * without terminal punctuation pass through whole (never cut mid-Thai). */
+function trimReply(raw: string): string {
+  const tagMatch = raw.match(/\n?\s*(\[\[CARD:[^\]]*\]\])\s*$/);
+  const tag = tagMatch ? tagMatch[1] : null;
+  const prose = tag && tagMatch && tagMatch.index !== undefined ? raw.slice(0, tagMatch.index) : raw;
+  const parts = prose.split(/(?<=[.!?])\s+/).filter((p) => p.trim().length > 0);
+  if (parts.length <= 3) return raw;
+  const head = parts.slice(0, 3);
+  if (!head.some((sent) => sent.includes("?"))) {
+    const q = parts.slice(3).find((sent) => sent.trim().endsWith("?"));
+    if (q) head[2] = q;
+  }
+  const trimmed = head.join(" ").trim();
+  return tag ? `${trimmed}\n${tag}` : trimmed;
 }
 
 function persistExchangePair(params: {
