@@ -2177,8 +2177,8 @@ function TalkPageInner() {
             type="button"
             aria-label="Chats"
             onClick={() => setThreadsDrawerOpen(true)}
-            className="xl:hidden"
-            style={{ width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3D352B", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+            className="xl:hidden flex items-center justify-center"
+            style={{ width: "36px", height: "36px", borderRadius: "50%", color: "#3D352B", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
             <Menu size={21} strokeWidth={2} />
           </button>
