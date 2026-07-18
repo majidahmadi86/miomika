@@ -2,6 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ThreadsPanel } from "@/components/talk/ThreadsPanel";
 import { useCallback, useState } from "react";
 import { BookOpen, Home, Sparkles, TrendingUp, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -146,16 +147,7 @@ export function Rail() {
       {expanded ? (
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
           <div className="mb-3 h-px bg-[#EFE9E0]" />
-          <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#A89C88]" style={{ fontFamily: "'Quicksand', sans-serif" }}>
-            {lang === "en" ? "Recent with Miomi" : "คุยกับมิโอมิล่าสุด"}
-          </p>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <p className="px-2 text-[12px] leading-relaxed text-[#A89C88]" style={{ fontFamily: lang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif" }}>
-              {lang === "en"
-                ? "No chats yet — start talking with Miomi and they'll appear here"
-                : "ยังไม่มีบทสนทนา เริ่มคุยกับมิโอมิแล้วจะมาอยู่ตรงนี้ค่า"}
-            </p>
-          </div>
+          <ThreadsPanel lang={lang} variant="rail" />
         </div>
       ) : (
         <div className="flex-1" />

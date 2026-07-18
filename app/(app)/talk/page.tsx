@@ -6,7 +6,10 @@ import { Volume2 as RoomVolume } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Menu } from "lucide-react";
+import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ThreadsPanel } from "@/components/talk/ThreadsPanel";
 import { motion } from "framer-motion";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { usePaywall } from "@/components/billing/Paywall";
@@ -125,7 +128,7 @@ function makeOpenerItem(): CanvasItem {
   return makeSessionOpenerShell(crypto.randomUUID(), 0);
 }
 
-export default function TalkPage() {
+function TalkPageInner() {
   const { isGuest, authReady: guestAuthReady } = useGuestExploration();
   const { profile, authReady: profileAuthReady } = useProfile();
   const browserUi = useUILanguage();
@@ -139,6 +142,9 @@ export default function TalkPage() {
   // NO fresh greeting) or creates the first one (greeting flows normally).
   const activeThreadIdRef = useRef<string | null>(null);
   const threadBootRef = useRef(false);
+  const [threadsDrawerOpen, setThreadsDrawerOpen] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   /** Members must wait for profile row — guest auth alone is not enough (entryStartedRef race). */
   const canUseLive =
     guestAuthReady && (isGuest || (profileAuthReady && !!profile));
@@ -1785,6 +1791,79 @@ export default function TalkPage() {
     })();
   }, [isGuest, profileAuthReady, profile, uiLang]);
 
+  // Open a specific thread from the panel/drawer. Full transcript replace, no
+  // greeting over history; an empty thread greets fresh (reference behavior).
+  const loadThread = useCallback(
+    (threadId: string) => {
+      kickoffSentRef.current = true;
+      activeThreadIdRef.current = threadId;
+      clientRef.current?.setThreadId(threadId);
+      void (async () => {
+        try {
+          const res = await fetch(`/api/talk/history?thread=${encodeURIComponent(threadId)}`, {
+            credentials: "include",
+            cache: "no-store",
+          });
+          type HistRow = {
+            role: string;
+            content: string;
+            created_at: string;
+            language?: string | null;
+            session_id?: string | null;
+            exchange_number?: number;
+          };
+          const json = res.ok ? ((await res.json()) as { items?: HistRow[] }) : { items: [] };
+          const rows = (json.items ?? []).filter((r) => r.content && r.content.trim().length > 0);
+          if (rows.length === 0) {
+            setItems([makeOpenerItem()]);
+            setExpandedItems(new Set());
+            if (clientRef.current?.isConnected()) {
+              clientRef.current.sendKickoff(uiLang === "th" ? "th" : "en", "returning");
+            } else {
+              kickoffSentRef.current = false;
+            }
+            return;
+          }
+          const groups = new Map<string, HistRow[]>();
+          for (const r of rows) {
+            const key = `${r.session_id ?? "s"}:${r.exchange_number ?? 0}`;
+            const g = groups.get(key);
+            if (g) g.push(r);
+            else groups.set(key, [r]);
+          }
+          const ordered = Array.from(groups.values())
+            .map((g) => ({
+              t: Math.min(...g.map((r) => Date.parse(r.created_at) || 0)),
+              g: [...g].sort((a, b) => (a.role === b.role ? 0 : a.role === "user" ? -1 : 1)),
+            }))
+            .sort((a, b) => a.t - b.t)
+            .flatMap((x) => x.g);
+          let seq = -ordered.length - 1;
+          const hist: CanvasItem[] = ordered.map((r) => {
+            seq += 1;
+            if (r.role === "user") {
+              return { id: crypto.randomUUID(), kind: "user_said", text: r.content, turnSeq: seq, roleOrder: TRANSCRIPT_USER_ORDER };
+            }
+            const isThai = (r.language ?? (uiLang === "th" ? "th" : "en")) === "th";
+            return {
+              id: crypto.randomUUID(),
+              kind: "mini_cat",
+              textTh: isThai ? r.content : "",
+              textEn: isThai ? "" : r.content,
+              turnSeq: seq,
+              roleOrder: TRANSCRIPT_GEMINI_ORDER,
+            };
+          });
+          setItems(sortTranscriptItems(hist));
+          setExpandedItems(new Set());
+        } catch {
+          /* stay on current view */
+        }
+      })();
+    },
+    [uiLang],
+  );
+
   // Card audio (any part of the word card) keeps the SAME mic choreography the
   // old whole-word replay had: suspend the mic while she speaks so her own
   // voice is never transcribed as the user's input.
@@ -1839,9 +1918,23 @@ export default function TalkPage() {
         kickoffSentRef.current = true;
         clientRef.current.sendKickoff(uiLang === "th" ? "th" : "en", "returning");
       }
+      window.dispatchEvent(new CustomEvent("miomika:threads"));
     })();
   }, [uiLang]);
 
+  // URL is the selection bus: /talk?thread=… opens a chat, /talk?new=1 starts one.
+  useEffect(() => {
+    const t = searchParams.get("thread");
+    const isNew = searchParams.get("new");
+    if (isNew) {
+      router.replace("/talk");
+      window.setTimeout(() => handleClear(), 0);
+      return;
+    }
+    if (t && t !== activeThreadIdRef.current && threadBootRef.current) {
+      loadThread(t);
+    }
+  }, [searchParams, router, loadThread, handleClear]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("a, button, input, textarea")) return;
@@ -2078,9 +2171,20 @@ export default function TalkPage() {
             <ArrowLeft size={22} strokeWidth={2} />
           </button>
         ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+          <button
+            type="button"
+            aria-label="Chats"
+            onClick={() => setThreadsDrawerOpen(true)}
+            className="xl:hidden"
+            style={{ width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3D352B", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            <Menu size={21} strokeWidth={2} />
+          </button>
           <Link href="/home" aria-label="Back" style={{ width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3D352B", textDecoration: "none" }}>
             <ArrowLeft size={22} strokeWidth={2} />
           </Link>
+          </div>
         )}
 
         <div
@@ -2440,6 +2544,29 @@ export default function TalkPage() {
         </button>
       )}
 
+      {threadsDrawerOpen ? (
+        <div
+          role="dialog"
+          aria-label="Chats"
+          style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex" }}
+        >
+          <div
+            style={{ position: "absolute", inset: 0, background: "rgba(43,40,34,0.28)" }}
+            onClick={() => setThreadsDrawerOpen(false)}
+          />
+          <div
+            style={{ position: "relative", width: "78%", maxWidth: "300px", height: "100%", background: "#FBF7F0", borderRight: "0.5px solid #E5DDCE", padding: "16px 12px", display: "flex", flexDirection: "column" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: "6px" }}>
+              <button type="button" aria-label="Close" onClick={() => setThreadsDrawerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#A89C88" }}>
+                ✕
+              </button>
+            </div>
+            <ThreadsPanel lang={uiLang === "th" ? "th" : "en"} variant="drawer" onNavigate={() => setThreadsDrawerOpen(false)} />
+          </div>
+        </div>
+      ) : null}
+
       <AdjustSheet
         open={adjustOpen}
         config={config}
@@ -2497,5 +2624,13 @@ export default function TalkPage() {
       />
     </div>
     </TalkErrorBoundary>
+  );
+}
+
+export default function TalkPage() {
+  return (
+    <Suspense fallback={null}>
+      <TalkPageInner />
+    </Suspense>
   );
 }
