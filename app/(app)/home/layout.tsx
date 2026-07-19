@@ -38,14 +38,15 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
         }}
       >
         <Image
-          src="/miomi/happy.png"
+          src="/miomi/idle.png"
           alt="Miomi"
-          width={210}
-          height={210}
+          width={560}
+          height={560}
           priority
           fetchPriority="high"
-          quality={65}
-          style={{ objectFit: "contain" }}
+          sizes="(max-width: 640px) 92vw, 560px"
+          quality={70}
+          style={{ objectFit: "contain", width: "min(92vw, 560px)", height: "auto" }}
         />
       </div>
       <HeroGateRemover />
