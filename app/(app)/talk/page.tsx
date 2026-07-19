@@ -559,6 +559,14 @@ function TalkPageInner() {
   const wireLiveClient = useCallback((client: MiomiTurnClient) => {
     liveClientEpochRef.current = client.epochId;
     clientRef.current = client;
+    // Adjust-menu honesty (phase 4): current settings ride from the first call.
+    const tuningCfg = loadTalkConfig();
+    client.setTuning({
+      tone: tuningCfg.tone,
+      depth: tuningCfg.depth,
+      practice: tuningCfg.teach.games,
+      memory: tuningCfg.memory,
+    });
     client.setThreadId(activeThreadIdRef.current);
   }, []);
 
@@ -1599,6 +1607,13 @@ function TalkPageInner() {
     (c: TalkConfig) => {
       setConfig(c);
       saveTalkConfig(c);
+      // Adjust-menu honesty (phase 4): the saved settings reach the brain.
+      clientRef.current?.setTuning({
+        tone: c.tone,
+        depth: c.depth,
+        practice: c.teach.games,
+        memory: c.memory,
+      });
       const { uiLanguage, targetLanguage } = resolveLiveSessionLanguages({
         isGuest: isGuestRef.current,
         profileUiLang: profile?.ui_language ?? null,

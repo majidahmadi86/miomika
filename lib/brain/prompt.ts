@@ -4,8 +4,14 @@ export function buildBrainPrompt(args: {
   state: BrainState;
   userInput: string;
   mode?: "auto" | "teach" | "chat";
+  tuning?: {
+    tone?: string;
+    depth?: number;
+    practice?: string[];
+    memory?: { progress?: boolean; personal?: boolean };
+  } | null;
 }): string {
-  const { state, mode = "auto" } = args;
+  const { state, mode = "auto", tuning } = args;
   const ui = state.uiLanguage;
   const target = state.targetLanguage;
   const uiLabel = ui === "th" ? "Thai" : "English";
@@ -28,9 +34,28 @@ export function buildBrainPrompt(args: {
     return "";
   })();
 
+  const toneLine =
+    tuning?.tone === "focused"
+      ? "TONE SETTING (they chose this): a touch more structured and efficient — still warm, fewer tangents, get to the useful part sooner."
+      : tuning?.tone === "playful"
+        ? "TONE SETTING (they chose this): extra playful — more แซว energy, quicker teasing, lighter touch (all teasing rules still apply)."
+        : "";
+  const depthLine =
+    typeof tuning?.depth === "number" && tuning.depth <= 35
+      ? "DEPTH SETTING (they chose this): keep explanations minimal — word, meaning, done; skip nuance unless they ask."
+      : typeof tuning?.depth === "number" && tuning.depth >= 75
+        ? "DEPTH SETTING (they chose this): they like richer explanations — when teaching, add ONE extra nuance (usage, register, or culture) in a short clause."
+        : "";
+  const practiceLine =
+    tuning?.practice && tuning.practice.length > 0
+      ? `PRACTICE TASTE (they chose this): when choosing how to teach, lean toward: ${tuning.practice.join(", ").replace(/_/g, " ")}.`
+      : "";
   const whoBlock = [
     `WHO: ${studentName}. Mood: ${state.emotionalSignal}. Learning: ${targetLabel}. Words seen: ${introducedWords}.`,
     modeHint,
+    toneLine,
+    depthLine,
+    practiceLine,
   ]
     .filter(Boolean)
     .join("\n");

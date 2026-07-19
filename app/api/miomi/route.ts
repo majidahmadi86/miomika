@@ -106,6 +106,19 @@ export async function POST(req: NextRequest) {
     // clients) → rows keep thread_id null, exactly as before.
     const threadId: string | null =
       typeof body?.threadId === "string" && /^[0-9a-f-]{36}$/i.test(body.threadId) ? body.threadId : null;
+    // Adjust-menu honesty (phase 4): sanitized tuning from the sheet.
+    const rawTuning = body?.tuning ?? null;
+    const tuning = rawTuning
+      ? {
+          tone: ["warm", "focused", "playful"].includes(rawTuning.tone) ? (rawTuning.tone as string) : "warm",
+          depth: Number.isFinite(rawTuning.depth) ? Math.min(100, Math.max(0, Math.round(rawTuning.depth))) : 60,
+          practice: Array.isArray(rawTuning.practice) ? rawTuning.practice.filter((g: unknown) => typeof g === "string").slice(0, 6) : [],
+          memory: {
+            progress: rawTuning.memory?.progress !== false,
+            personal: rawTuning.memory?.personal !== false,
+          },
+        }
+      : null;
     const clientTargetLanguage = body?.targetLanguage === "en" || body?.targetLanguage === "th" ? body.targetLanguage : null;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -186,10 +199,14 @@ export async function POST(req: NextRequest) {
           userSpeaksLanguage: brainState.uiLanguage,
         } satisfies MiomiResponse);
       }
-      adaptivePrompt = buildBrainPrompt({ state: brainState, userInput, mode });
+      adaptivePrompt = buildBrainPrompt({ state: brainState, userInput, mode, tuning });
       adaptivePrompt += `\n\nNAME: Your name is Miomi. Never spell it out, never count its syllables, never write it in Thai script when speaking English. Just say "Miomi" naturally.`;
       userMemories = serverUserId ? await fetchUserMemories(serverUserId) : [];
-      adaptivePrompt += buildMemoryContext(profile, userMemories);
+      adaptivePrompt += buildMemoryContext(
+        profile,
+        tuning?.memory.personal === false ? [] : userMemories,
+        { progress: tuning?.memory.progress, personal: tuning?.memory.personal },
+      );
       if (!adaptivePrompt.trim()) {
         adaptivePrompt = BRAIN_PROMPT_FALLBACK;
       }

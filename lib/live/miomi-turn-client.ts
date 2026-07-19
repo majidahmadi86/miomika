@@ -90,6 +90,12 @@ export class MiomiTurnClient {
   // connect() config
   private uiLanguage: "th" | "en" = "en";
   private threadId: string | null = null;
+  private tuning: {
+    tone?: string;
+    depth?: number;
+    practice?: string[];
+    memory?: { progress?: boolean; personal?: boolean; topics?: boolean };
+  } | null = null;
   private targetLanguage: "th" | "en" = "th";
   private mode: string = "chat";
   private level: string | null = null;
@@ -320,6 +326,11 @@ export class MiomiTurnClient {
   /** Multi-thread chat: bind every /api/miomi call to the active thread. */
   setThreadId(id: string | null): void {
     this.threadId = id;
+  }
+
+  /** Adjust-menu honesty (phase 4): tone/depth/practice/memory ride every call. */
+  setTuning(t: { tone?: string; depth?: number; practice?: string[]; memory?: { progress?: boolean; personal?: boolean; topics?: boolean } } | null): void {
+    this.tuning = t;
   }
 
   sendKickoff(
@@ -588,6 +599,7 @@ export class MiomiTurnClient {
           level: this.level,
           sessionContext: this.sessionContext,
           threadId: this.threadId,
+          tuning: this.tuning,
         }),
       });
       if (!res.ok) {

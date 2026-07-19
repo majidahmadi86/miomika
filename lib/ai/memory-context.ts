@@ -6,8 +6,21 @@ import { deriveBond } from "@/lib/companion/bond-core";
  * Phase 1 facts (name/target/streak) + closeness stage + durable facts she's learned.
  * TRUE facts only, never invented; framed to weave in gently, never as a list. "" for guests.
  */
-export function buildMemoryContext(profile: ServerProfile | null, memories: string[] = []): string {
+export interface MemoryGates {
+  /** streak / bond / progress awareness */
+  progress?: boolean;
+  /** durable personal facts they've shared */
+  personal?: boolean;
+}
+
+export function buildMemoryContext(
+  profile: ServerProfile | null,
+  memories: string[] = [],
+  gates: MemoryGates = {},
+): string {
   if (!profile) return "";
+  const allowProgress = gates.progress !== false;
+  const allowPersonal = gates.personal !== false;
 
   const facts: string[] = [];
 
@@ -17,17 +30,17 @@ export function buildMemoryContext(profile: ServerProfile | null, memories: stri
   const target = profile.learning_target_language === "en" ? "English" : "Thai";
   facts.push(`They're learning ${target} with you.`);
 
-  if (profile.streak >= 2) {
+  if (allowProgress && profile.streak >= 2) {
     facts.push(`They've come back ${profile.streak} days in a row — you've quietly noticed how they keep showing up, and it warms you.`);
   }
 
   const bond = deriveBond(profile.bond_points ?? 0);
-  if (bond.hearts >= 1) {
+  if (allowProgress && bond.hearts >= 1) {
     const stage = profile.ui_language === "th" ? bond.label.th : bond.label.en;
     facts.push(`Your closeness so far: "${stage}", ${bond.hearts} heart${bond.hearts === 1 ? "" : "s"} earned together — you can feel the bond growing.`);
   }
 
-  const recalled = memories.map((m) => m.trim()).filter(Boolean).slice(0, 8);
+  const recalled = allowPersonal ? memories.map((m) => m.trim()).filter(Boolean).slice(0, 8) : [];
 
   if (facts.length === 0 && recalled.length === 0) return "";
 
