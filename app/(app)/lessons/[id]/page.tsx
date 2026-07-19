@@ -498,43 +498,18 @@ function GamesStep(props: {
 
 function SayGame({ phrase, target, say, done, onDone }: { phrase: PhraseItem; target: string; say: (t: string) => void; done: boolean; onDone: () => void }) {
   const text = target === "en" ? phrase.en : phrase.th;
-  const [recState, setRecState] = useState<"idle" | "recording" | "review" | "nomic">("idle");
-  const [myUrl, setMyUrl] = useState<string | null>(null);
-  const recRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  useEffect(() => () => {
-    if (myUrl) URL.revokeObjectURL(myUrl);
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-  }, [myUrl]);
-
-  const startRec = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const rec = new MediaRecorder(stream);
-      chunksRef.current = [];
-      rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      rec.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
-        setMyUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob); });
-        stream.getTracks().forEach((t) => t.stop());
-        setRecState("review");
-        if (!done) onDone();
-      };
-      recRef.current = rec;
-      rec.start();
-      setRecState("recording");
-      window.setTimeout(() => { if (recRef.current?.state === "recording") recRef.current.stop(); }, 8000);
-    } catch {
-      setRecState("nomic");
+  // Say-It now uses the SAME honest verdict as word cards & Talk (7/19 port).
+  // SayItCheck owns the mic end to end — the old dual MediaRecorder + separate
+  // SayItCheck mic collided (two getUserMedia sessions), which is why lessons
+  // "couldn't hear you": the second capture opened while the first still held
+  // the device. One recorder, one real judgement. onDone fires on first record.
+  const firedRef = useRef(false);
+  const handleActive = useCallback((active: boolean) => {
+    if (active && !firedRef.current) {
+      firedRef.current = true;
+      if (!done) onDone();
     }
   }, [done, onDone]);
-
-  const stopRec = useCallback(() => {
-    if (recRef.current?.state === "recording") recRef.current.stop();
-  }, []);
 
   return (
     <div style={{ textAlign: "center" }}>
@@ -546,51 +521,16 @@ function SayGame({ phrase, target, say, done, onDone }: { phrase: PhraseItem; ta
         {phrase.romanization && target !== "en" ? <div style={{ ...font, fontSize: 12.5, fontWeight: 700, color: MUTED, marginTop: 7, letterSpacing: ".02em" }}>{phrase.romanization}</div> : null}
       </div>
 
-      <button
-        onClick={recState === "recording" ? stopRec : () => void startRec()}
-        aria-label={recState === "recording" ? "Stop recording" : "Record your voice"}
-        style={{
-          width: 88, height: 88, borderRadius: "50%", cursor: "pointer",
-          border: `1px solid ${recState === "recording" ? PINK : BORDER}`,
-          margin: "0 auto 10px", display: "flex", alignItems: "center", justifyContent: "center",
-          background: "#fff", boxShadow: recState === "recording" ? `0 0 0 6px ${PINK_SOFT}` : CARD_SHADOW,
-          transition: "box-shadow .2s ease", overflow: "hidden",
-        }}
-      >
-        {recState === "recording" ? (
-          <Image src={HEAD_HAPPY} alt="Miomi is listening" width={80} height={80} style={{ objectFit: "contain" }} />
-        ) : (
-          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" />
-          </svg>
-        )}
-      </button>
-
-      {recState === "idle" ? (
-        <p style={{ ...font, fontSize: 13, fontWeight: 700, color: MUTED, lineHeight: 1.5, margin: 0 }}>
-          Hear Miomi, then tap the mic and say it — really out loud.<br />
-          Then play both back and compare, ear to ear — your own ear is the best judge.
-        </p>
-      ) : null}
-      {recState === "recording" ? (
-        <p style={{ ...font, fontSize: 13, fontWeight: 700, color: PINK_DEEP, margin: 0 }}>Miomi is listening… tap to stop.</p>
-      ) : null}
-      {recState === "review" ? (
-        <div>
-          <p style={{ ...font, fontSize: 13, fontWeight: 700, color: TEAL_DEEP, margin: "0 0 10px" }}>Miomi listened — here&apos;s what she heard:</p>
-          <SayItCheck text={text} lang={target === "en" ? "en" : "th"} uiThai={false} pron={target !== "en" ? phrase.romanization ?? null : null} />
-        </div>
-      ) : null}
-      {recState === "nomic" ? (
-        <div>
-          <p style={{ ...font, fontSize: 13, fontWeight: 700, color: MUTED, lineHeight: 1.5, margin: "0 0 10px" }}>
-            No mic available — say it out loud anyway, brave and clear.
-          </p>
-          {!done ? (
-            <button onClick={onDone} style={{ ...font, fontSize: 13, fontWeight: 700, padding: "11px 24px", borderRadius: 99, border: "none", cursor: "pointer", background: CTA, color: "#fff", boxShadow: CTA_SHADOW }}>I said it aloud</button>
-          ) : null}
-        </div>
-      ) : null}
+      <p style={{ ...font, fontSize: 13, fontWeight: 700, color: MUTED, lineHeight: 1.5, margin: "0 0 4px" }}>
+        Hear Miomi, then say it out loud — she&apos;ll tell you what she heard.
+      </p>
+      <SayItCheck
+        text={text}
+        lang={target === "en" ? "en" : "th"}
+        uiThai={false}
+        pron={target !== "en" ? phrase.romanization ?? null : null}
+        onRecordingActive={handleActive}
+      />
     </div>
   );
 }
