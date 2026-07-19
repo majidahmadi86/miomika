@@ -108,6 +108,9 @@ export default function RootLayout({
     >
       <head>
         <link rel="icon" type="image/png" href="/manifest-icon-512.png" />
+        {process.env.NEXT_PUBLIC_SUPABASE_URL ? (
+          <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} crossOrigin="anonymous" />
+        ) : null}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("miomika-theme");if(t!=="cool"&&t!=="blush"&&t!=="dark"&&t!=="warm")t="warm";document.documentElement.dataset.theme=t;}catch(e){}})();`,
