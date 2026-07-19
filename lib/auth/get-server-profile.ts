@@ -93,9 +93,29 @@ export async function getServerProfile(): Promise<ServerProfile | null> {
 export async function touchLastSeen(userId: string): Promise<void> {
   try {
     const supabase = await createClient();
+    // STREAK BECOMES REAL (7/19): the column was read everywhere and written
+    // NOWHERE — decorative since birth. This is the one artery every active
+    // day flows through, so it counts here: Bangkok-calendar days, same day
+    // keeps it, consecutive day grows it, a gap resets to 1.
+    const { data } = await supabase
+      .from("profiles")
+      .select("last_seen_at, streak")
+      .eq("id", userId)
+      .single();
+    const now = new Date();
+    const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+    const dayOf = (d: Date) => Math.floor((d.getTime() + BKK_OFFSET_MS) / 86_400_000);
+    const today = dayOf(now);
+    const prevSeen = data?.last_seen_at ? dayOf(new Date(data.last_seen_at as string)) : null;
+    const current = (data?.streak as number | null) ?? 0;
+    let streak: number;
+    if (prevSeen === null) streak = 1;
+    else if (today === prevSeen) streak = current > 0 ? current : 1;
+    else if (today - prevSeen === 1) streak = current + 1;
+    else streak = 1;
     await supabase
       .from("profiles")
-      .update({ last_seen_at: new Date().toISOString() })
+      .update({ last_seen_at: now.toISOString(), streak })
       .eq("id", userId);
   } catch {
     /* swallow — last_seen drift is acceptable */
