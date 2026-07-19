@@ -333,6 +333,14 @@ export class MiomiTurnClient {
     this.tuning = t;
   }
 
+  /** Adjust-menu language switch (7/19 fix): the client held a STALE uiLanguage
+   *  after a save — the page updated but the per-call body kept the old medium,
+   *  so switching worked one direction only. This makes the live session obey. */
+  setSessionLanguage(ui: "th" | "en", target: "th" | "en"): void {
+    this.uiLanguage = ui;
+    this.targetLanguage = target;
+  }
+
   sendKickoff(
     lang: "th" | "en",
     audience: "first_time" | "returning" = "first_time",

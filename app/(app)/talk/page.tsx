@@ -1627,6 +1627,8 @@ function TalkPageInner() {
       conversationLangRef.current = uiLanguage;
       setConversationLang(uiLanguage);
       setUiLang(uiLanguage);
+      // The live client held a stale language — tell it, so the switch is real.
+      clientRef.current?.setSessionLanguage(uiLanguage, targetLanguage);
       syncTeachWordContext();
       setAdjustOpen(false);
     },
