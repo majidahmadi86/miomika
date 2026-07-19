@@ -140,7 +140,7 @@ export function WordCardFull({ word, target, onSpeak, saved, onToggleSave, onCol
         </div>
       ) : null}
 
-      {sayIt ? <SayItCheck text={r.head} lang={r.headLang} uiThai={!r.headThai} pron={r.pron} onRecordingActive={onSayItRecording} /> : null}
+      {sayIt ? <SayItCheck text={r.head} lang={r.headLang} uiThai={!r.headThai} pron={r.pron} wordEn={target === "th" ? r.meaning : r.head} onRecordingActive={onSayItRecording} /> : null}
 
       {r.tip ? (
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: GOLD_BG, borderRadius: 10, padding: "8px 11px", marginTop: 10 }}>

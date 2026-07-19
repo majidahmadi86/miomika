@@ -127,7 +127,7 @@ function MicIcon({ color }: { color: string }) {
   );
 }
 
-export function SayItCheck({ text, lang, uiThai, pron, onRecordingActive }: { text: string; lang: "th" | "en"; uiThai: boolean; pron?: string | null; onRecordingActive?: (active: boolean) => void }) {
+export function SayItCheck({ text, lang, uiThai, pron, wordEn, onRecordingActive }: { text: string; lang: "th" | "en"; uiThai: boolean; pron?: string | null; wordEn?: string | null; onRecordingActive?: (active: boolean) => void }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [heardText, setHeardText] = useState<string>("");
   const c = uiThai ? COPY_TH : COPY_EN;
@@ -138,6 +138,7 @@ export function SayItCheck({ text, lang, uiThai, pron, onRecordingActive }: { te
   const stopRef = useRef<(() => void) | null>(null);
   const timerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
+  const advancedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -190,6 +191,17 @@ export function SayItCheck({ text, lang, uiThai, pron, onRecordingActive }: { te
           (skeleton(raw).length > 0 && lev(skeleton(raw), skeleton(pron)) <= 1);
       }
       setPhase(ok ? "pass" : "almost");
+      if (ok && wordEn && wordEn.trim() && !advancedRef.current) {
+        advancedRef.current = true;
+        // A correct pronunciation advances mastery through the same spiral as
+        // conversational reuse — practice in Learn/cards now moves the dashboard.
+        void fetch("/api/vocab/practiced", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ wordEn: wordEn.trim(), direction: lang === "en" ? "en_to_th" : "th_to_en" }),
+        }).catch(() => { /* mastery bump is best-effort */ });
+      }
     } catch {
       if (mountedRef.current) setPhase("silent");
     }
