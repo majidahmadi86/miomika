@@ -297,6 +297,9 @@ export default async function Page({
                     width={420}
                     height={420}
                     priority
+                    fetchPriority="high"
+                    sizes="(max-width: 640px) 80vw, 420px"
+                    quality={70}
                     className="h-auto w-full"
                   />
                 </div>
