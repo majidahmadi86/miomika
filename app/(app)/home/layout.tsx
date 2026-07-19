@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import { HeroGateRemover } from "./HeroGateRemover";
 
 /**
  * /home is the free-trial door the landing links the world to — it gets real
@@ -14,5 +16,40 @@ export const metadata: Metadata = {
 };
 
 export default function HomeLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return (
+    <>
+      {/* Server-painted hero: production /home shipped an EMPTY body, so LCP
+          could never beat bundle+auth (proven by live fetch + local build).
+          This layer is pure HTML — the cat paints at image speed, then fades
+          the instant the app mounts. Same happy.png as the welcome gate, so
+          the crossfade is seamless. pointer-events none: never blocks input. */}
+      <div
+        id="mio-ssr-hero"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9998,
+          background: "#FAFAF6",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "opacity 0.45s ease",
+          pointerEvents: "none",
+        }}
+      >
+        <Image
+          src="/miomi/happy.png"
+          alt="Miomi"
+          width={210}
+          height={210}
+          priority
+          fetchPriority="high"
+          quality={65}
+          style={{ objectFit: "contain" }}
+        />
+      </div>
+      <HeroGateRemover />
+      {children}
+    </>
+  );
 }
