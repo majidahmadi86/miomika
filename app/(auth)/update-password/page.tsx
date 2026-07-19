@@ -128,7 +128,7 @@ export default function UpdatePasswordPage() {
 
           <div className="mt-3 flex justify-center">
             <div className="miomi-login-float w-[64px] shrink-0 md:w-[80px]">
-              <Image src="/miomi/idle.png" alt="Miomi" width={80} height={80} className="h-auto w-full object-contain" priority />
+              <Image src="/miomi/idle.png" alt="Miomi" width={80} height={80} sizes="120px" quality={70} className="h-auto w-full object-contain" priority />
             </div>
           </div>
 

@@ -191,6 +191,8 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
           width={210}
           height={210}
           priority
+          fetchPriority="high"
+          quality={65}
           style={{ objectFit: "contain" }}
         />
       </div>
