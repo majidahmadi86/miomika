@@ -96,7 +96,7 @@ export function BottomNav() {
                     fontFamily: lang === "en" ? "'Quicksand', sans-serif" : "'Kanit', sans-serif",
                     fontSize: "11px",
                     fontWeight: active ? 600 : 500,
-                    color: active ? "#34A98F" : "#9A8B73",
+                    color: active ? "#2E8F7A" : "#7A7061",
                     lineHeight: 1,
                     letterSpacing: "0.01em",
                     transition: "color 0.18s cubic-bezier(0.4,0,0.2,1)",

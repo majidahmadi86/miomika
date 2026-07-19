@@ -1109,6 +1109,7 @@ export default function HomePage() {
             <div style={{ display: "grid", gridTemplateColumns: "48px 1fr", gap: "10px", padding: "10px 16px 12px", flexShrink: 0, alignItems: "center" }}>
               <button
                 type="button"
+                aria-label={lang === "en" ? "Play with Miomi" : "เล่นกับมีโอมิ"}
                 onClick={handlePlayPress}
                 onPointerDown={(e) => {
                   e.stopPropagation();
