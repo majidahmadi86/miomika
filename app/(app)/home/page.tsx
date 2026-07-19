@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import dynamicImport from "next/dynamic";
 import { Suspense } from "react";
 import { motion, useDragControls, useMotionValue, useReducedMotion, animate } from "framer-motion";
 import { Flame, Gift, Heart, Mic, Sparkles } from "lucide-react";
@@ -15,7 +16,9 @@ import {
 } from "react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
-import { SmartGuide } from "@/components/onboarding/SmartGuide";
+// Stage B (7/19): the guide and below-fold cards load on demand — they were
+// eagerly bundled into the 573KB first paint that held the guest-home LCP.
+const SmartGuide = dynamicImport(() => import("@/components/onboarding/SmartGuide").then((m) => m.SmartGuide), { ssr: false });
 import { GuideEntry } from "@/components/onboarding/GuideEntry";
 import { TierUpgradeChip } from "@/components/layout/TierUpgradeChip";
 import { MiomiCharacter } from "@/components/miomi/MiomiCharacter";
@@ -27,9 +30,9 @@ import type { Language } from "@/lib/i18n/server";
 import { useUILanguage } from "@/lib/i18n/client";
 import { awardDailyBond, deriveBond, STAGE_UP_KEY, stageUpLine } from "@/lib/companion/bond";
 import { pickFeatureMoment, markFeatureMomentSeen } from "@/lib/companion/feature-moments";
-import { ClosenessCard } from "@/components/home/ClosenessCard";
-import { RemembersCard } from "@/components/home/RemembersCard";
-import { MemoryLine } from "@/components/home/MemoryLine";
+const ClosenessCard = dynamicImport(() => import("@/components/home/ClosenessCard").then((m) => m.ClosenessCard), { ssr: false });
+const RemembersCard = dynamicImport(() => import("@/components/home/RemembersCard").then((m) => m.RemembersCard), { ssr: false });
+const MemoryLine = dynamicImport(() => import("@/components/home/MemoryLine").then((m) => m.MemoryLine), { ssr: false });
 const HOME_T = {
   th: { greetCta: "เริ่มฝึกเลย", greetSub: "มาฝึกพูดด้วยกันไหมคะ", bubbleDefault: "พร้อมคุยกับหนูรึยังคะ", talkCta: "เริ่มคุยกับมิโอมิ", talkSub: "พร้อมเมื่อไหร่ กดได้เลยค่า", today: "วันนี้กับมิโอมิ", pickEyebrow: "✦ คำของมิโอมิ", listen: "ฟังเสียง", practice: "ฝึกเลย", streakUnit: "วันต่อกัน", level: "เลเวล", review: "ทบทวนคำศัพท์", reviewSub: "5 คำกำลังรอให้ทวน", rooms: "ห้องสนทนาสดกับมิโอมิ", roomsSub: "ฝึกพูดคุยจริงด้วยเสียง แบบมีเป้าหมาย", invite: "ชวนเพื่อนมาด้วยกัน", invitePre: "คุณและเพื่อนได้เครดิต ", inviteAmount: "฿30", invitePost: " ทั้งคู่" },
   en: { greetCta: "Let's practice", greetSub: "let's get a little practice in", bubbleDefault: "I'm right here whenever you are", talkCta: "Talk with Miomi", talkSub: "tap whenever you're ready", today: "Today with Miomi", pickEyebrow: "✦ Miomi's word", listen: "Listen", practice: "Practice", streakUnit: "day streak", level: "Level", review: "Review words", reviewSub: "5 words to review", rooms: "Live rooms with Miomi", roomsSub: "Practice a real conversation, out loud, with a goal", invite: "Invite a friend", invitePre: "You both get ", inviteAmount: "฿30", invitePost: " credit" },
