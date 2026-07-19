@@ -476,6 +476,12 @@ export function stripForTts(text: string): string {
   s = s.replace(/\bMiomi\b/gi, "Mee-oh-mee");
   s = s.replace(/Mio-?mi/gi, "Mee-oh-mee");
   s = s.replace(/มิโอมิ/g, "มิ-โอ-มิ");
+  // After removing parenthetical asides ("(doo nǎng)"), the sentence's own
+  // punctuation can be left orphaned with a gap before it (" .", " ,") — Chirp3
+  // voices a lone trailing "." as a faint "dot"/click. Reattach or drop it.
+  s = s.replace(/\s+([.,!?;:…])/g, "$1");
+  s = s.replace(/([.,!?;:…])\1+/g, "$1");
+  s = s.replace(/^[\s.,!?;:…]+/, "");
   s = s.replace(/\s+/g, " ").trim();
   return s;
 }
