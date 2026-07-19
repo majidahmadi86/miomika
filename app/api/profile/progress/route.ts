@@ -134,7 +134,12 @@ export async function GET() {
       if (row.session_id) allSessionIds.add(row.session_id as string);
     }
 
-    const streakDays = computeStreak(activityDates);
+    // STREAK SOURCE OF TRUTH (7/19): computeStreak used UTC day boundaries, so
+    // for Bangkok (UTC+7) evening use it saw "no activity today yet" and
+    // returned 0 — the bug behind a daily user showing 0. The profiles.streak
+    // column is written on every exchange with correct Bangkok-day logic
+    // (touchLastSeen), so trust it; fall back to the live count only if null.
+    const streakDays = profile.streak > 0 ? profile.streak : computeStreak(activityDates);
 
     const { data: learningRows, error: learningWordsErr } = await supabase
       .from("vocabulary_user_state")
