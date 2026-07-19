@@ -18,14 +18,6 @@
     "promote:clean": "tsx scripts/promote-clean.ts",
     "predeploy": "tsc --noEmit && npm run lint && npm run check:drift && npm run check:phonetics"
   },
-  "browserslist": [
-    "chrome >= 111",
-    "edge >= 111",
-    "firefox >= 111",
-    "safari >= 16.4",
-    "ios_saf >= 16.4",
-    "and_chr >= 111"
-  ],
   "dependencies": {
     "@google-cloud/speech": "^7.3.1",
     "@google-cloud/text-to-speech": "^6.4.1",
