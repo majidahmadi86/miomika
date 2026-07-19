@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { Kanit, Quicksand, Sarabun } from "next/font/google";
 import { PwaUpdateManager } from "@/components/pwa/PwaUpdateManager";
 import { getBuildId } from "@/lib/pwa/build-id";
@@ -24,16 +23,6 @@ const sarabun = Sarabun({
   weight: ["400", "500", "600"],
   variable: "--font-sarabun",
   display: "swap",
-});
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
 });
 
 export const viewport: Viewport = {
@@ -115,7 +104,7 @@ export default function RootLayout({
     <html
       lang="th"
       suppressHydrationWarning
-      className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} ${geistSans.variable} ${geistMono.variable} overflow-hidden bg-[var(--mk-canvas)] antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
+      className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} overflow-hidden bg-[var(--mk-canvas)] antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
     >
       <head>
         <link rel="icon" type="image/png" href="/manifest-icon-512.png" />

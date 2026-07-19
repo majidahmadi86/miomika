@@ -96,8 +96,8 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-quicksand);
+  --font-mono: ui-monospace, monospace;
   --color-canvas: var(--mk-canvas);
   --color-canvas-tint: var(--mk-canvas-tint);
   --color-surface: var(--mk-surface);
@@ -126,7 +126,7 @@
 
 body {
   color: var(--miomika-foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-quicksand), system-ui, sans-serif;
 }
 
 html,
