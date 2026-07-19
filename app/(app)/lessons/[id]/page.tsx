@@ -4,6 +4,7 @@ import { BookOpen, MessagesSquare, Gamepad2, Target, type LucideIcon } from "luc
 import Image from "next/image";
 import Link from "next/link";
 import { WordCardFull, WordTile as WordGridTile, fromLessonWord } from "@/components/word/WordCard";
+import { SayItCheck } from "@/components/word/SayItCheck";
 import { useParams, useRouter } from "next/navigation";
 import { detectLang, speak } from "@/lib/voice/tts";
 import { sfxAlmost, sfxGold, sfxPop, sfxSilver, sfxSuccess, sfxWrong } from "@/lib/sound/sfx";
@@ -574,14 +575,10 @@ function SayGame({ phrase, target, say, done, onDone }: { phrase: PhraseItem; ta
       {recState === "recording" ? (
         <p style={{ ...font, fontSize: 13, fontWeight: 700, color: PINK_DEEP, margin: 0 }}>Miomi is listening… tap to stop.</p>
       ) : null}
-      {recState === "review" && myUrl ? (
+      {recState === "review" ? (
         <div>
-          <p style={{ ...font, fontSize: 13, fontWeight: 700, color: TEAL_DEEP, margin: "0 0 10px" }}>Now compare, ear to ear:</p>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-            <button onClick={() => say(text)} style={{ ...font, fontSize: 12.5, fontWeight: 700, padding: "10px 18px", borderRadius: 99, border: `1px solid ${PINK}`, background: PINK_SOFT, color: PINK_DEEP, cursor: "pointer" }}>Miomi</button>
-            <button onClick={() => { void new Audio(myUrl).play().catch(() => {}); }} style={{ ...font, fontSize: 12.5, fontWeight: 700, padding: "10px 18px", borderRadius: 99, border: `1px solid ${TEAL}`, background: TEAL_SOFT, color: TEAL_DEEP, cursor: "pointer" }}>Me</button>
-            <button onClick={() => void startRec()} style={{ ...font, fontSize: 12.5, fontWeight: 700, padding: "10px 18px", borderRadius: 99, border: `1px solid ${BORDER}`, background: "#fff", color: MUTED, cursor: "pointer" }}>Again</button>
-          </div>
+          <p style={{ ...font, fontSize: 13, fontWeight: 700, color: TEAL_DEEP, margin: "0 0 10px" }}>Miomi listened — here&apos;s what she heard:</p>
+          <SayItCheck text={text} lang={target === "en" ? "en" : "th"} uiThai={false} pron={target !== "en" ? phrase.romanization ?? null : null} />
         </div>
       ) : null}
       {recState === "nomic" ? (
