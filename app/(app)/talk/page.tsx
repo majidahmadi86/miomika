@@ -2228,6 +2228,7 @@ function TalkPageInner() {
           type="button"
           onClick={() => setAdjustOpen(true)}
           aria-label="Adjust"
+          className="mr-10 sm:mr-[150px]"
           style={{ width: "36px", height: "36px", borderRadius: "50%", background: "transparent", border: "none", color: "#9A8B73", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
