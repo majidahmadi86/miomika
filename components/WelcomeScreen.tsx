@@ -104,20 +104,23 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
   }, [shouldShow, onComplete]);
 
   // SSR: render nothing to avoid hydration mismatch.
-  if (!mounted) return null;
-
-  // While waiting for auth/profile to resolve, show a cream blocking overlay
-  // so home content doesn't flash behind the incoming welcome screen.
-  // Skip the gate if localStorage already has the flag — returning users see
-  // no flicker at all.
-  if (!decided) {
-    let alreadyWelcomed = false;
-    try {
-      alreadyWelcomed = !!localStorage.getItem(WELCOME_LOCAL_STORAGE_KEY);
-    } catch {
-      // private mode — show gate to be safe
+  // SSR + pre-decision: paint the brand moment IMMEDIATELY from server HTML —
+  // the cat is this page's LCP element, so it must never wait for the bundle,
+  // auth, or any state flag (PageSpeed campaign Stage A, 7/19: FCP 1.4s but
+  // LCP 11.7s because the hero was JS-hostage behind a null SSR + cream gate).
+  // The blank cream overlay becomes a branded one: same blocking role, but
+  // with Miomi already there via a pure-CSS entrance. After mount, returning
+  // users (local flag) skip straight to home exactly as before.
+  if (!mounted || !decided) {
+    if (mounted) {
+      let alreadyWelcomed = false;
+      try {
+        alreadyWelcomed = !!localStorage.getItem(WELCOME_LOCAL_STORAGE_KEY);
+      } catch {
+        // private mode — keep the branded gate
+      }
+      if (alreadyWelcomed) return null;
     }
-    if (alreadyWelcomed) return null;
     return (
       <div
         style={{
@@ -125,8 +128,25 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
           inset: 0,
           background: "#FAFAF6",
           zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
-      />
+      >
+        <div style={{ animation: "mkWelcomeIn 0.7s ease both" }}>
+          <Image
+            src="/miomi/happy.png"
+            alt="Miomi"
+            width={210}
+            height={210}
+            priority
+            fetchPriority="high"
+            quality={65}
+            style={{ objectFit: "contain" }}
+          />
+        </div>
+        <style>{`@keyframes mkWelcomeIn { from { opacity: 0; transform: scale(0.92) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }`}</style>
+      </div>
     );
   }
 
@@ -177,11 +197,10 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          opacity: phase >= 1 ? 1 : 0,
-          transform:
-            phase >= 1
-              ? "scale(1) translateY(0px)"
-              : "scale(0.86) translateY(20px)",
+          // The cat is already on stage from the pre-decision branded gate —
+          // stay visible so the handoff into the splash is seamless (no blink).
+          opacity: 1,
+          transform: "scale(1) translateY(0px)",
           transition: "opacity 1.0s ease, transform 1.0s cubic-bezier(0.34,1.56,0.64,1)",
         }}
       >
