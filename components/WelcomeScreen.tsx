@@ -197,10 +197,11 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          // The cat is already on stage from the pre-decision branded gate —
-          // stay visible so the handoff into the splash is seamless (no blink).
-          opacity: 1,
-          transform: "scale(1) translateY(0px)",
+          opacity: phase >= 1 ? 1 : 0,
+          transform:
+            phase >= 1
+              ? "scale(1) translateY(0px)"
+              : "scale(0.86) translateY(20px)",
           transition: "opacity 1.0s ease, transform 1.0s cubic-bezier(0.34,1.56,0.64,1)",
         }}
       >

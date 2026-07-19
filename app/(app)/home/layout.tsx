@@ -44,9 +44,9 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
           height={560}
           priority
           fetchPriority="high"
-          sizes="(max-width: 640px) 100vw, 640px"
+          sizes="(max-width: 640px) 60vw, 320px"
           quality={70}
-          style={{ objectFit: "contain", width: "min(100vw, 640px)", height: "auto" }}
+          style={{ objectFit: "contain", width: "min(60vw, 320px)", height: "auto" }}
         />
       </div>
       <HeroGateRemover />
