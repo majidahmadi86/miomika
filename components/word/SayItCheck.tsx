@@ -127,7 +127,7 @@ function MicIcon({ color }: { color: string }) {
   );
 }
 
-export function SayItCheck({ text, lang, uiThai, pron, wordEn, autoStart, onRecordingActive }: { text: string; lang: "th" | "en"; uiThai: boolean; pron?: string | null; wordEn?: string | null; autoStart?: boolean; onRecordingActive?: (active: boolean) => void }) {
+export function SayItCheck({ text, lang, uiThai, pron, wordEn, autoStart, onRecordingActive, onMasteryAdvanced }: { text: string; lang: "th" | "en"; uiThai: boolean; pron?: string | null; wordEn?: string | null; autoStart?: boolean; onRecordingActive?: (active: boolean) => void; onMasteryAdvanced?: () => void }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [heardText, setHeardText] = useState<string>("");
   const c = uiThai ? COPY_TH : COPY_EN;
@@ -214,7 +214,9 @@ export function SayItCheck({ text, lang, uiThai, pron, wordEn, autoStart, onReco
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ wordEn: wordEn.trim(), direction: lang === "en" ? "en_to_th" : "th_to_en" }),
-        }).catch(() => { /* mastery bump is best-effort */ });
+        })
+          .then((r) => { if (r.ok) onMasteryAdvanced?.(); })
+          .catch(() => { /* mastery bump is best-effort */ });
       }
     } catch {
       if (mountedRef.current) setPhase("silent");

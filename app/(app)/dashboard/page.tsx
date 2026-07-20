@@ -46,21 +46,21 @@ export default function DashboardPage() {
   const lang = useUILanguage();
   const [progress, setProgress] = useState<ProgressData | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const refreshProgress = useCallback(() => {
     void fetch("/api/profile/progress")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: ProgressData | null) => {
-        if (cancelled || !data) return;
+        if (!data) return;
         setProgress(data);
       })
       .catch(() => {
         /* warm zero states remain */
       });
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    refreshProgress();
+  }, [refreshProgress]);
 
   const streakDays = progress?.streakDays ?? 0;
   const wordsMastered = progress?.wordsMastered ?? 0;
@@ -432,6 +432,7 @@ export default function DashboardPage() {
               pron={practiceWord.th_romanization ?? null}
               wordEn={practiceWord.word_en}
               autoStart
+              onMasteryAdvanced={refreshProgress}
             />
           </div>
         </div>
