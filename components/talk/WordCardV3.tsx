@@ -188,6 +188,17 @@ export function WordCardV3({
             {!compactMeaning && !exampleAudioText && (
               <p style={{ fontFamily: uiFont, fontSize: "12px", color: MUTE, margin: "11px 0 0" }}>{isThaiLearner ? "ยังไม่มีคำอธิบายเพิ่มเติมค่ะ" : "More details coming to this word soon."}</p>
             )}
+            {onPronunciationCheck && (
+              <motion.button
+                type="button"
+                onClick={() => onPronunciationCheck(word)}
+                whileTap={{ scale: 0.98 }}
+                style={{ width: "100%", marginTop: "11px", height: "38px", borderRadius: "11px", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}
+              >
+                <Mic style={{ width: "15px", height: "15px", color: "#FFFFFF" }} strokeWidth={2} />
+                <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>{isThaiLearner ? "ลองพูดดูค่า" : "Try saying this"}</span>
+              </motion.button>
+            )}
           </motion.div>
         )}
       </motion.div>
