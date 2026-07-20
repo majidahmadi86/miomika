@@ -127,7 +127,7 @@ function MicIcon({ color }: { color: string }) {
   );
 }
 
-export function SayItCheck({ text, lang, uiThai, pron, wordEn, onRecordingActive }: { text: string; lang: "th" | "en"; uiThai: boolean; pron?: string | null; wordEn?: string | null; onRecordingActive?: (active: boolean) => void }) {
+export function SayItCheck({ text, lang, uiThai, pron, wordEn, autoStart, onRecordingActive }: { text: string; lang: "th" | "en"; uiThai: boolean; pron?: string | null; wordEn?: string | null; autoStart?: boolean; onRecordingActive?: (active: boolean) => void }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [heardText, setHeardText] = useState<string>("");
   const c = uiThai ? COPY_TH : COPY_EN;
@@ -139,6 +139,7 @@ export function SayItCheck({ text, lang, uiThai, pron, wordEn, onRecordingActive
   const timerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const advancedRef = useRef(false);
+  const autoStartedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -173,22 +174,35 @@ export function SayItCheck({ text, lang, uiThai, pron, wordEn, onRecordingActive
       if (!heard) { setHeardText(""); setPhase("silent"); return; }
       setHeardText(raw);
       const targetNorm = normalize(text, lang);
-      // 1) Direct containment in the target script.
-      let ok = heard.includes(targetNorm);
-      // 2) Near-miss in the same script (a missing tone mark or one slipped
-      //    letter must not fail an honest attempt).
+      // Short tonal words are the hard case: single-word Thai STT is unreliable
+      // and an exact match on a 2-3 char word is brutal. Tolerance SCALES with
+      // length but never drops below a fair floor — an honest attempt passes,
+      // gibberish still fails. (7/20 calibration from real Mike failures on
+      // "ช้า"/"ป้ายรถ": correct-sounding tries were rejected.)
+      const tolFor = (len: number) => (len <= 4 ? 1 : Math.max(2, Math.round(len / 4)));
+
+      // 1) Direct containment in the target script (either direction — STT may
+      //    add or drop a neighbouring particle).
+      let ok = heard.includes(targetNorm) || (targetNorm.length > 0 && targetNorm.includes(heard) && heard.length >= Math.ceil(targetNorm.length * 0.7));
+      // 2) Near-miss in the same script (missing tone mark / one slipped letter).
       if (!ok) {
-        const tol = Math.max(1, Math.floor(targetNorm.length / 6));
-        ok = lev(heard, targetNorm) <= tol;
+        ok = lev(heard, targetNorm) <= tolFor(targetNorm.length);
       }
-      // 3) Thai target but Latin transcript (STT returns English homophones):
-      //    fold tone marks and compare against the romanization, generously.
-      if (!ok && lang === "th" && pron && /[a-z]/i.test(raw)) {
-        const a = foldLatin(raw), b = foldLatin(pron);
-        const tol = Math.max(1, Math.floor(b.length / 5));
+      // 3) Thai target but Latin transcript (STT returns romanized/English
+      //    homophones — "Bye Roth" for ป้ายรถ): compare folded romanization AND
+      //    consonant skeletons, both generous, since tones vanish in Latin.
+      if (!ok && lang === "th" && pron) {
+        const rawFold = foldLatin(raw), pronFold = foldLatin(pron);
+        const rawSkel = skeleton(raw), pronSkel = skeleton(pron);
         ok =
-          (b.length > 0 && lev(a, b) <= tol) ||
-          (skeleton(raw).length > 0 && lev(skeleton(raw), skeleton(pron)) <= 1);
+          (pronFold.length > 0 && lev(rawFold, pronFold) <= tolFor(pronFold.length)) ||
+          (rawFold.length > 0 && pronFold.includes(rawFold) && rawFold.length >= 2) ||
+          (pronSkel.length > 0 && lev(rawSkel, pronSkel) <= (pronSkel.length <= 3 ? 1 : 2));
+      }
+      // 4) English target, romanized/loose transcript — same generous fold.
+      if (!ok && lang === "en") {
+        const rawFold = foldLatin(raw), tgtFold = foldLatin(text);
+        ok = tgtFold.length > 0 && lev(rawFold, tgtFold) <= tolFor(tgtFold.length);
       }
       setPhase(ok ? "pass" : "almost");
       if (ok && wordEn && wordEn.trim() && !advancedRef.current) {
@@ -232,6 +246,14 @@ export function SayItCheck({ text, lang, uiThai, pron, wordEn, onRecordingActive
       setPhase("silent");
     }
   };
+
+  useEffect(() => {
+    if (autoStart && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      void start();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onTap = () => {
     if (phase === "listening") { void finishAndCheck(); return; }
