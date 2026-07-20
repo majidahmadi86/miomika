@@ -26,6 +26,19 @@ export default function GlobalError({
 
   useEffect(() => {
     Sentry.captureException(error);
+    // Auto-recover from transient first-load/chunk errors (common right after a
+    // deploy when the service worker briefly serves a stale shell): reload once,
+    // silently. The guard stops a reload loop if the error is genuinely
+    // persistent — then the message below is shown for real.
+    try {
+      const KEY = "mk_global_error_reload";
+      if (!sessionStorage.getItem(KEY)) {
+        sessionStorage.setItem(KEY, "1");
+        window.location.reload();
+      }
+    } catch {
+      /* storage blocked — fall through to the visible message */
+    }
   }, [error]);
 
   return (

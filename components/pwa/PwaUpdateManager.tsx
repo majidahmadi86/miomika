@@ -30,6 +30,17 @@ export function PwaUpdateManager() {
     pathnameRef.current = pathname;
   }, [pathname]);
 
+  // App mounted OK → clear the one-shot error-reload guards so a future
+  // transient error can still self-recover once.
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("mk_global_error_reload");
+      sessionStorage.removeItem("mk_app_error_reload");
+    } catch {
+      /* storage blocked — nothing to clear */
+    }
+  }, []);
+
   const applyUpdate = useCallback(() => {
     if (reloadingRef.current) return;
     reloadingRef.current = true;

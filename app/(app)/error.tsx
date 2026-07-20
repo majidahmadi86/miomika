@@ -35,6 +35,17 @@ export default function AppError({
 
   useEffect(() => {
     Sentry.captureException(error);
+    // Transient first-load/chunk error after a deploy → reload once, silently.
+    // Guard prevents a loop; a genuinely persistent error still shows the card.
+    try {
+      const KEY = "mk_app_error_reload";
+      if (!sessionStorage.getItem(KEY)) {
+        sessionStorage.setItem(KEY, "1");
+        window.location.reload();
+      }
+    } catch {
+      /* storage blocked — fall through to the visible card */
+    }
   }, [error]);
 
   const heading = lang === "th" ? phrase.th : phrase.en;
