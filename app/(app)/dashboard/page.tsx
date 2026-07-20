@@ -431,6 +431,7 @@ export default function DashboardPage() {
               uiThai={lang === "th"}
               pron={practiceWord.th_romanization ?? null}
               wordEn={practiceWord.word_en}
+              autoStart
             />
           </div>
         </div>
