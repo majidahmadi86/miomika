@@ -13,7 +13,8 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StatTile } from "@/components/ui/StatTile";
-import { WordCardV3 } from "@/components/talk/WordCardV3";
+import { WordCardV3, type VocabularyEntry } from "@/components/talk/WordCardV3";
+import { SayItCheck } from "@/components/word/SayItCheck";
 import { useUILanguage } from "@/lib/i18n/client";
 import {
   cardDirectionForTarget,
@@ -69,6 +70,7 @@ export default function DashboardPage() {
   const learningTarget = progress?.learningTargetLanguage ?? "th";
   const activityDates = progress?.activityDates;
 
+  const [practiceWord, setPracticeWord] = useState<VocabularyEntry | null>(null);
   const cardDirection = useMemo(
     () => cardDirectionForTarget(learningTarget),
     [learningTarget],
@@ -341,7 +343,7 @@ export default function DashboardPage() {
                   <>
                     <div className="mt-3 grid grid-cols-1 gap-2 xl:grid-cols-2">
                       {shownWords.map((w) => (
-                        <WordCardV3 key={w.word_en} word={practiceWordToVocabularyEntry(w)} direction={cardDirection} compact onReplayAudio={() => handlePracticeReplay(w)} />
+                        <WordCardV3 key={w.word_en} word={practiceWordToVocabularyEntry(w)} direction={cardDirection} compact onReplayAudio={() => handlePracticeReplay(w)} onPronunciationCheck={(vw) => setPracticeWord(vw)} />
                       ))}
                     </div>
                     {reviewList.length > 6 ? (
@@ -400,6 +402,39 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {practiceWord ? (
+        <div
+          role="dialog"
+          aria-label={lang === "th" ? "ฝึกออกเสียง" : "Pronunciation practice"}
+          onClick={() => setPracticeWord(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(43,40,34,0.34)", display: "flex", alignItems: "center", justifyContent: "center", padding: "18px" }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "380px", background: "#FBF7F0", borderRadius: "20px", padding: "20px", boxShadow: "0 18px 50px rgba(26,26,24,0.24)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+              <span style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", fontWeight: 700, color: "#22574A" }}>
+                {lang === "th" ? "ลองออกเสียงคำนี้" : "Practice saying this"}
+              </span>
+              <button type="button" aria-label={lang === "th" ? "ปิด" : "Close"} onClick={() => setPracticeWord(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "#A89C88", fontSize: "18px", lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ textAlign: "center", marginBottom: "6px" }}>
+              <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: "24px", fontWeight: 700, color: "#1A1A18" }}>
+                {lang === "th" ? practiceWord.word_th : practiceWord.word_en}
+              </div>
+              <div style={{ fontFamily: "'Quicksand', sans-serif", fontSize: "13px", color: "#9A8B73", marginTop: "3px" }}>
+                {lang === "th" ? practiceWord.word_en : practiceWord.word_th}
+              </div>
+            </div>
+            <SayItCheck
+              text={lang === "th" ? practiceWord.word_th : practiceWord.word_en}
+              lang={lang === "th" ? "th" : "en"}
+              uiThai={lang === "th"}
+              pron={practiceWord.th_romanization ?? null}
+              wordEn={practiceWord.word_en}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
