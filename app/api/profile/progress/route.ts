@@ -43,8 +43,15 @@ const ZEROED: ProgressResponse = {
   learningWords: [],
 };
 
+// Bangkok day boundaries (UTC+7): a date-key answers "which calendar day was
+// this, in the user's timezone" — the streak column already counts in Bangkok
+// (touchLastSeen), and the activity CALENDAR dots must agree, or an evening
+// session lights the wrong circle. Shift the instant by +7h, then read UTC
+// parts, so the key flips at Bangkok midnight instead of UTC midnight. (7/19)
+const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+
 function toDateKey(iso: string): string {
-  const d = new Date(iso);
+  const d = new Date(new Date(iso).getTime() + BKK_OFFSET_MS);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
@@ -58,12 +65,12 @@ function computeStreak(dateKeys: string[]): number {
   if (!set.has(today)) return 0;
 
   let streak = 0;
-  const cursor = new Date();
+  let cursorMs = Date.now();
   while (true) {
-    const key = toDateKey(cursor.toISOString());
+    const key = toDateKey(new Date(cursorMs).toISOString());
     if (!set.has(key)) break;
     streak += 1;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
+    cursorMs -= 86_400_000;
   }
   return streak;
 }
