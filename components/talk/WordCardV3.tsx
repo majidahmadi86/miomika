@@ -8,6 +8,7 @@ import { Volume2, Lightbulb, AlertCircle, ChevronDown, ChevronUp, Mic, BookmarkC
 import { getIconForCategory } from "@/lib/talk/imageCategoryMap";
 import { cardMeaningForWord } from "@/lib/talk/teach-word-card";
 import { playWordAudio } from "@/lib/talk/speech";
+import { SayItCheck } from "@/components/word/SayItCheck";
 
 export interface VocabularyEntry {
   id: string;
@@ -63,6 +64,7 @@ export function WordCardV3({
 }: WordCardV3Props) {
   const [expanded, setExpanded] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const [practicing, setPracticing] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [examplePlaying, setExamplePlaying] = useState(false);
 
@@ -188,16 +190,29 @@ export function WordCardV3({
             {!compactMeaning && !exampleAudioText && (
               <p style={{ fontFamily: uiFont, fontSize: "12px", color: MUTE, margin: "11px 0 0" }}>{isThaiLearner ? "ยังไม่มีคำอธิบายเพิ่มเติมค่ะ" : "More details coming to this word soon."}</p>
             )}
-            {onPronunciationCheck && (
+            {onPronunciationCheck && !practicing && (
               <motion.button
                 type="button"
-                onClick={() => onPronunciationCheck(word)}
+                onClick={() => setPracticing(true)}
                 whileTap={{ scale: 0.98 }}
                 style={{ width: "100%", marginTop: "11px", height: "38px", borderRadius: "11px", background: "linear-gradient(135deg, #6ECDB8 0%, #34A98F 100%)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}
               >
                 <Mic style={{ width: "15px", height: "15px", color: "#FFFFFF" }} strokeWidth={2} />
                 <span style={{ fontFamily: uiFont, fontSize: "13px", fontWeight: 600, color: "#FFFFFF" }}>{isThaiLearner ? "ลองพูดดูค่า" : "Try saying this"}</span>
               </motion.button>
+            )}
+            {onPronunciationCheck && practicing && (
+              <div style={{ marginTop: "11px" }}>
+                <SayItCheck
+                  text={isThaiLearner ? word.word_en : word.word_th}
+                  lang={isThaiLearner ? "en" : "th"}
+                  uiThai={isThaiLearner}
+                  pron={isThaiLearner ? null : (word.th_romanization ?? null)}
+                  wordEn={word.word_en}
+                  autoStart
+                  onMasteryAdvanced={() => onPronunciationCheck(word)}
+                />
+              </div>
             )}
           </motion.div>
         )}

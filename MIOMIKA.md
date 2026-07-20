@@ -1541,6 +1541,7 @@ Nightly promotion cron, weekly degradation cron, Mike-only admin UI. Trigger: Ph
 ## 10. State Log (update at end of every session)
 
 | Date | Session | Phase | Shipped | Broken | Next |
+| 2026-07-20 | Cursor — inline Say-It + STT lang | Bond / Vocab | **Removed practice modal** — "Try saying this" records inline on compact card; STT uses headword language (matches `primaryWord`/`audioLang`), not UI lang. Mastery + progress refresh kept. `npm run predeploy` PASS. | — | Mike: Growth reveal → Try saying this → Thai STT on Thai words; Due updates. |
 | 2026-07-20 | Cursor — live Due refresh | Bond / Vocab | **Pronunciation pass** re-fetches `/api/profile/progress` via `onMasteryAdvanced` so the word leaves Due immediately (DB was already updating). `npm run predeploy` PASS. | — | Mike: Growth practice pass → word drops from Due without reload. |
 | 2026-07-20 | Cursor — Say-It tolerance + autoStart | Vocab / Bond | **SayItCheck** length-scaled tolerance for short tonal words + generous romanization/skeleton paths; practice modal `autoStart` records on open. `npm run predeploy` PASS. | — | Mike: Growth practice "ช้า"/"ป้ายรถ" honest tries pass; modal mic starts immediately. |
 | 2026-07-20 | Cursor — compact Try saying this | Bond / Vocab | **Compact WordCardV3** revealed state shows "Try saying this" when `onPronunciationCheck` is set (dashboard review loop was wired but invisible on compact cards). `npm run predeploy` PASS. | — | Mike: Growth due card → reveal → Try saying this → practice modal. |
