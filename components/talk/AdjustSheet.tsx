@@ -247,11 +247,6 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose }: AdjustShe
                   value={draft.memory.personal}
                   onToggle={() => setDraft({ ...draft, memory: { ...draft.memory, personal: !draft.memory.personal } })}
                 />
-                <ToggleRow
-                  label={uiLang === "en" ? "Favorite topics" : "หัวข้อที่ชอบ"}
-                  value={draft.memory.topics}
-                  onToggle={() => setDraft({ ...draft, memory: { ...draft.memory, topics: !draft.memory.topics } })}
-                />
               </Section>
 
               <button
