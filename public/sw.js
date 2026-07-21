@@ -53,14 +53,20 @@ async function networkFirst(request) {
     }
     return response;
   } catch (error) {
-    const cached = await caches.match(request);
+    // Only fall back to a shell from THE CURRENT build's cache. A shell from a
+    // previous build references purged /_next/static chunks and is exactly what
+    // caused the "please refresh" screen — so never serve a cross-build shell.
+    const cache = await caches.open(name);
+    const cached = await cache.match(request);
     if (cached) return cached;
     throw error;
   }
 }
 
 async function cacheFirst(request) {
-  const cached = await caches.match(request);
+  const name = await cacheName();
+  const cache = await caches.open(name);
+  const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
   if (response.ok && request.method === "GET") {
