@@ -1603,6 +1603,21 @@ function TalkPageInner() {
     });
   }, [items]);
 
+  // Reply-language switch from Adjust: update the LIVE session immediately so the
+  // ongoing conversation switches, not just the saved profile. This is the fix
+  // for "stuck in Thai" — the profile updated but the client kept the old medium.
+  const handleReplyLanguageChange = useCallback(
+    (lang: "th" | "en") => {
+      const target = sessionTargetLangRef.current;
+      sessionUiLangRef.current = lang;
+      conversationLangRef.current = lang;
+      setConversationLang(lang);
+      setUiLang(lang);
+      clientRef.current?.setSessionLanguage(lang, target);
+    },
+    [],
+  );
+
   const handleAdjustSave = useCallback(
     (c: TalkConfig) => {
       setConfig(c);
@@ -2593,6 +2608,7 @@ function TalkPageInner() {
         uiLang={uiLang}
         onSave={handleAdjustSave}
         onClose={() => setAdjustOpen(false)}
+        onLanguageChange={handleReplyLanguageChange}
       />
 
       {showGuestSheet && (

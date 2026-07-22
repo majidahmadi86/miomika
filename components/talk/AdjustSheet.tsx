@@ -23,9 +23,13 @@ interface AdjustSheetProps {
   uiLang: "th" | "en";
   onSave: (config: TalkConfig) => void;
   onClose: () => void;
+  /** Fired after the reply-language changes, so the LIVE session switches too —
+   *  without this the profile updated but the ongoing conversation stayed in the
+   *  old language (the "stuck in Thai" bug). */
+  onLanguageChange?: (lang: "th" | "en") => void;
 }
 
-export function AdjustSheet({ open, config, uiLang, onSave, onClose }: AdjustSheetProps) {
+export function AdjustSheet({ open, config, uiLang, onSave, onClose, onLanguageChange }: AdjustSheetProps) {
   const { profile } = useProfile();
   const [draft, setDraft] = useState<TalkConfig>(config);
   const [optimisticReplyLang, setOptimisticReplyLang] = useState<"th" | "en" | null>(null);
@@ -128,6 +132,7 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose }: AdjustShe
                     onClick={() => {
                       if (replyLang === "en") return;
                       setOptimisticReplyLang("en");
+                      onLanguageChange?.("en");
                       void updateUiLanguage("en").then(() => {
                         setLangConfirm("Now replying in English");
                         window.setTimeout(() => setLangConfirm(null), 2500);
@@ -141,6 +146,7 @@ export function AdjustSheet({ open, config, uiLang, onSave, onClose }: AdjustShe
                     onClick={() => {
                       if (replyLang === "th") return;
                       setOptimisticReplyLang("th");
+                      onLanguageChange?.("th");
                       void updateUiLanguage("th").then(() => {
                         setLangConfirm("Now replying in ไทย");
                         window.setTimeout(() => setLangConfirm(null), 2500);
