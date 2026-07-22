@@ -1,4 +1,5 @@
 {
+  "buildCommand": "node scripts/generate-build-version.mjs && next build",
   "crons": [
     {
       "path": "/api/care/dispatch",
