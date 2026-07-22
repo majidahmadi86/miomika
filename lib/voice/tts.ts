@@ -134,6 +134,22 @@ export function unlockTtsPlayback(): void {
   }).catch(() => {});
 }
 
+/** AWAIT the context actually reaching "running" before the FIRST play of a
+ *  session. Without this, resume() is still in-flight when el.play() fires, so
+ *  the first utterance plays into a suspended context = the "no voice on the
+ *  first word" bug users reported. Cheap no-op once already running. */
+async function ensurePlaybackRunning(): Promise<void> {
+  const ctx = getPlaybackCtx();
+  if (!ctx) return;
+  if (ctx.state === "running") return;
+  try {
+    await ctx.resume();
+    __playbackUnlocked = true;
+  } catch {
+    /* best-effort — if it fails the element may still play on its own */
+  }
+}
+
 function disconnectPlaybackSource(): void {
   if (!__playbackSource) return;
   try {
@@ -300,9 +316,8 @@ function playServerAudioChunk(
     el.onended = () => finish(true);
     el.onerror = () => finish(false);
     routeElementThroughPlayback(el);
-    unlockTtsPlayback();
     if (manageSpeakingFlag) setSpeaking(true);
-    void el.play().catch(() => finish(false));
+    void ensurePlaybackRunning().then(() => el.play()).catch(() => finish(false));
   });
 }
 
@@ -412,7 +427,7 @@ async function speakChunkedSequence(
   const el = new Audio();
   __activeAudio = el;
   routeElementThroughPlayback(el);
-  unlockTtsPlayback();
+  await ensurePlaybackRunning();
 
   const firstOk = await playMp3OnElement(el, firstAudio, myGen);
   if (aborted || myGen !== __audioGen) return;
@@ -613,7 +628,7 @@ async function speakSegments(
   const el = new Audio();
   __activeAudio = el;
   routeElementThroughPlayback(el);
-  unlockTtsPlayback();
+  await ensurePlaybackRunning();
 
   // If any segment failed, abandon per-segment and speak the WHOLE reply in one
   // voice — completeness beats per-word voice accuracy for this one reply.
