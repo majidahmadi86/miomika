@@ -38,7 +38,8 @@ import { GUIDANCE_GUEST_LIMIT_HIT, pickPhrase } from "@/lib/voice/warmth";
 import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
-import type { LiveClientCloseDetail, LiveClientErrorDetail, LiveClientMessage, LiveSessionSnapshot } from "@/lib/live/miomi-client";
+import type { LiveClientCallbacks, LiveClientCloseDetail, LiveClientErrorDetail, LiveClientMessage, LiveSessionSnapshot } from "@/lib/live/miomi-client";
+import { MiomiLiveClient } from "@/lib/live/miomi-client";
 import { MediaHandler } from "@/lib/live/media-handler";
 import { isHiddenLiveTranscript, sanitizeUserTranscript } from "@/lib/live/transcript";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
@@ -570,8 +571,16 @@ function TalkPageInner() {
     client.setThreadId(activeThreadIdRef.current);
   }, []);
 
-  const createLiveClient = useCallback((): MiomiTurnClient => {
-    return new MiomiTurnClient({
+  const createLiveClient = useCallback((forRoom: boolean): MiomiTurnClient => {
+    // ENGINE BRANCH (the CS-rooms fix): a Confident Speaking room runs the REAL
+    // audio-native Gemini Live client — it is the only engine that knows the
+    // session brain (scene/objectives/stages prompt, the silent report_stage
+    // progress tool, pace / wrap-up / time-up / session-open messages). The
+    // turn client stubs all of those as no-ops, which is why a room used to
+    // open to silence. Normal /talk stays on the cheap turn pipeline, untouched.
+    // The two clients are drop-in swaps by design (same callbacks, same
+    // sendAudio payload); the cast bridges the nominal types at this one seam.
+    const callbacks: LiveClientCallbacks = {
       onOpen: () => {
         logEvent({ kind: "state", level: "info", message: "live connected" });
       },
@@ -595,7 +604,11 @@ function TalkPageInner() {
           setLiveUiState("error");
         }
       },
-    });
+    };
+    if (forRoom) {
+      return new MiomiLiveClient(callbacks) as unknown as MiomiTurnClient;
+    }
+    return new MiomiTurnClient(callbacks);
   }, [ensureTurnRuntime, openPaywall]);
 
   const primeAudio = useCallback(() => {
@@ -1164,7 +1177,7 @@ function TalkPageInner() {
       if (!mediaRef.current) mediaRef.current = new MediaHandler();
       await mediaRef.current.unlockPlayback();
 
-      const client = createLiveClient();
+      const client = createLiveClient(!!roomSessionRef.current?.plan);
       client.restoreSessionSnapshot(snapshot);
       wireLiveClient(client);
 
@@ -1279,7 +1292,7 @@ function TalkPageInner() {
         clientRef.current.disconnectIntentionally();
         clientRef.current = null;
         liveClientEpochRef.current = null;
-        const client = createLiveClient();
+        const client = createLiveClient(!!roomSessionRef.current?.plan);
         client.restoreSessionSnapshot(snapshot);
         wireLiveClient(client);
         await client.connect({
@@ -1415,7 +1428,7 @@ function TalkPageInner() {
     if (!mediaRef.current) mediaRef.current = new MediaHandler();
     await mediaRef.current.unlockPlayback();
     if (!clientRef.current) {
-      wireLiveClient(createLiveClient());
+      wireLiveClient(createLiveClient(!!roomSessionRef.current?.plan));
     }
 
     try {

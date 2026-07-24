@@ -155,6 +155,21 @@ export class MiomiLiveClient {
   /** Drop the stored resume handle so the NEXT connect starts a fresh server
    *  session that honors the rebuilt contract (e.g. a new pace setting). Used by
    *  the pace toggle, which deliberately wants the new contract, not a resume. */
+  // ── Parity with MiomiTurnClient — /talk calls these on whichever engine it holds ──
+  setThreadId(_id: string | null): void {
+    // Rooms never write to the /talk thread history; a session's record lives in
+    // speaking_sessions and the results screen. Accepted for interface parity.
+  }
+
+  setTuning(_t: { tone?: string; depth?: number; practice?: string[]; memory?: { progress?: boolean; personal?: boolean; topics?: boolean } } | null): void {
+    // A room follows its own session plan contract; the /talk adjust tuning does
+    // not apply inside a room. Accepted for interface parity.
+  }
+
+  setSessionLanguage(_ui: "th" | "en", _target: "th" | "en"): void {
+    // Live-session languages are fixed at connect() by the room plan.
+  }
+
   clearResumeHandle(): void {
     this.resumeHandle = null;
   }
