@@ -415,6 +415,10 @@ export function PlanRow({
     <div
       style={{
         display: "flex",
+        // Mobile safety: the fixed-width segments (name, price, button) must
+        // WRAP on narrow phones — a non-wrapping row here forced the whole
+        // paywall to scroll sideways.
+        flexWrap: "wrap",
         alignItems: "center",
         gap: 11,
         background: "#fff",
@@ -432,7 +436,7 @@ export function PlanRow({
           </span>
         ) : null}
       </span>
-      <span style={{ flex: 1, minWidth: 0, ...sans, fontSize: 11.5, fontWeight: 600, color: "#5a5550", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <span style={{ flex: "1 1 160px", minWidth: 0, ...sans, fontSize: 11.5, fontWeight: 600, color: "#5a5550", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {summary}
       </span>
       <span style={{ flex: "0 0 auto", textAlign: "right" }}>

@@ -275,7 +275,7 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
               </div>
 
               {/* secondary: subscriptions, compact one-line rows */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 9 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 9 }}>
                 <span style={{ ...sans, fontSize: 11, fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--mk-ink-muted, #B0A488)" }}>
                   {lang === "th" ? "หรือสมัครสมาชิก · ห้องทุกเดือน + ทุกอย่าง" : "Or go Pro · rooms every month + all of Miomi"}
                 </span>
