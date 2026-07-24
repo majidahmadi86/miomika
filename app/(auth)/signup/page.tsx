@@ -73,6 +73,7 @@ export default function SignupPage() {
         haveAccount: "มีบัญชีแล้ว? เข้าสู่ระบบค่ะ",
         mismatch: "รหัสผ่านไม่ตรงกันค่ะ",
         errGoogle: "เข้าสู่ระบบด้วย Google ไม่สำเร็จค่ะ ลองอีกครั้งนะคะ",
+        googleConsent: "การสมัครด้วย Google ถือว่าคุณยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัวของเรา",
         successTitle: "เช็คอีเมลของคุณด้วยนะคะ",
         successBody: "เราส่งอีเมลยืนยันไปให้แล้ว กดลิงก์ในอีเมลเพื่อไปต่อได้เลยค่ะ",
         successWarm: "พอกดลิงก์แล้ว เจอกันต่อนะคะ มีโอมิรออยู่เลย",
@@ -100,6 +101,7 @@ export default function SignupPage() {
         haveAccount: "Already have an account? Log in",
         mismatch: "Passwords don't match.",
         errGoogle: "Google sign-in failed. Please try again.",
+        googleConsent: "Signing up with Google means you agree to our Terms & Privacy Policy.",
         successTitle: "Check your email",
         successBody: "We sent you a confirmation email. Click the link inside to continue.",
         successWarm: "Once you click it, Miomi will be waiting for you.",
@@ -114,10 +116,11 @@ export default function SignupPage() {
 
   async function handleGoogle() {
     setError(null);
-    if (!agreed) {
-      setError(t.agreeError);
-      return;
-    }
+    // NO checkbox gate here. Blocking the Google button until "I agree" was
+    // ticked read as a DEAD BUTTON — real users tapped, saw nothing move, and
+    // left without an account. OAuth sign-up consents via the caption under
+    // the button (the standard pattern); the checkbox still guards the email
+    // form below, where the user is reading the form anyway.
     setGoogleLoading(true);
     try {
       const supabase = createClient();
@@ -227,7 +230,7 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={() => void handleGoogle()}
-            disabled={googleLoading || loading || !agreed}
+            disabled={googleLoading || loading}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-line bg-surface py-3 text-sm font-medium text-ink shadow-card transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
@@ -238,6 +241,7 @@ export default function SignupPage() {
             </svg>
             <span>{googleLoading ? t.connecting : t.google}</span>
           </button>
+          <p className="mt-1.5 text-center text-[10.5px] leading-snug text-ink-subtle">{t.googleConsent}</p>
 
           <div className="my-2 flex items-center gap-3">
             <div className="h-px flex-1 bg-line" />
