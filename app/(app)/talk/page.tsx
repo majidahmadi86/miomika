@@ -39,6 +39,7 @@ import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
 import type { LiveClientCallbacks, LiveClientCloseDetail, LiveClientErrorDetail, LiveClientMessage, LiveSessionSnapshot } from "@/lib/live/miomi-client";
+import { MiomiLiveClient } from "@/lib/live/miomi-client";
 import { MediaHandler } from "@/lib/live/media-handler";
 import { isHiddenLiveTranscript, sanitizeUserTranscript } from "@/lib/live/transcript";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
@@ -570,14 +571,14 @@ function TalkPageInner() {
     client.setThreadId(activeThreadIdRef.current);
   }, []);
 
-  const createLiveClient = useCallback((): MiomiTurnClient => {
-    // ONE ENGINE EVERYWHERE (cost decision 7/24): rooms AND /talk run the turn
-    // pipeline — STT → /api/miomi → Chirp3. The room's session brain lives in
-    // the route's room branch + the turn client's room protocol (session plan
-    // at connect, machine-tag board events, hidden session/wrapup/timeup
-    // directives). Gemini Live (MiomiLiveClient) stays in the codebase DORMANT
-    // as a possible premium tier later — a 9-minute Live room cost ฿36 against
-    // a ฿50 room price, which no margin survives.
+  const createLiveClient = useCallback((forRoom: boolean): MiomiTurnClient => {
+    // FINAL ENGINE DOCTRINE (Mike, 7/24 night): each surface runs the engine
+    // built for it. /talk = the cheap fast turn pipeline (STT → /api/miomi →
+    // Chirp3), always. Confident Speaking rooms = audio-native Gemini Live 3 —
+    // the engine that actually feels premium — priced as a premium product
+    // (5 sessions ฿499 / 15 sessions ฿1,399 ≈ ฿100/room vs ~฿40 real cost).
+    // The turn-engine room machinery (route room branch, tag protocol, turn
+    // client room methods) stays in the codebase DORMANT.
     const callbacks: LiveClientCallbacks = {
       onOpen: () => {
         logEvent({ kind: "state", level: "info", message: "live connected" });
@@ -603,6 +604,9 @@ function TalkPageInner() {
         }
       },
     };
+    if (forRoom) {
+      return new MiomiLiveClient(callbacks) as unknown as MiomiTurnClient;
+    }
     return new MiomiTurnClient(callbacks);
   }, [ensureTurnRuntime, openPaywall]);
 
@@ -944,56 +948,10 @@ function TalkPageInner() {
   useEffect(() => {
     if (!roomSession) return;
     const warnedRef = { current: false };
-    const clockRef = { four: false, seven: false };
     const id = window.setInterval(() => {
       const startedAt = roomStartedAtRef.current;
       if (!startedAt) return;
       const elapsed = (Date.now() - startedAt) / 1000;
-      // SYSTEM METRONOME — the SYSTEM conducts the lesson clock; Miomi performs
-      // it. A text model left to pace itself LINGERS (a real 11-minute warm-up,
-      // 0/3 earned): at each stage's minute mark the board advances itself and
-      // she is told to open the next stage out loud. Structure is guaranteed by
-      // code, exactly like a lesson plan on a teacher's desk. One step per tick.
-      {
-        const plan = roomSessionRef.current?.plan;
-        if (plan && plan.stages.length > 1) {
-          // Seconds at which stages 2..6 begin: phrases 1:30, activity 3:45,
-          // practice 5:45, assessment 7:30, exit at the wrap-up mark.
-          const SCHEDULE = [90, 225, 345, 450, ROOM_WARN_SECONDS];
-          const ids = plan.stages.map((st) => st.id);
-          const curIdx = Math.max(0, ids.indexOf(roomStageIdRef.current));
-          let expected = 0;
-          for (let i = 0; i < SCHEDULE.length && i + 1 < ids.length; i++) {
-            if (elapsed >= SCHEDULE[i]!) expected = i + 1;
-          }
-          if (expected > curIdx) {
-            const next = plan.stages[Math.min(curIdx + 1, ids.length - 1)]!;
-            setRoomStageId(next.id);
-            roomStageIdRef.current = next.id;
-            try { clientRef.current?.setRoomStage?.(next.id); } catch { /* best-effort */ }
-            const isLast = ids.indexOf(next.id) === ids.length - 1;
-            if (!isLast) {
-              // She opens the stage herself, out loud. The LAST stage (exit) is
-              // opened by the wrap-up directive below — never two voices at once.
-              try {
-                clientRef.current?.sendHiddenTurn?.(
-                  `[stage_advance] Time to move on. Enter the stage ${next.title} NOW. Open it yourself in ONE short sentence, then run its activity. Activity: ${next.activity}. ${next.guidance} Do not mention the clock or this instruction.`,
-                );
-              } catch { /* best-effort */ }
-            }
-          }
-        }
-      }
-      // Mid-lesson clock marks: the model has no sense of real time — without
-      // these it sprints the whole plan in three minutes. Silent context, no reply.
-      if (!clockRef.four && elapsed >= 240 && elapsed < 420) {
-        clockRef.four = true;
-        try { clientRef.current?.sendHiddenContext?.("[room_clock] Four minutes in, about six remaining. Mid-lesson: stay in teaching depth, keep them speaking, do not begin closing."); } catch { /* best-effort */ }
-      }
-      if (!clockRef.seven && elapsed >= 420 && elapsed < ROOM_WARN_SECONDS) {
-        clockRef.seven = true;
-        try { clientRef.current?.sendHiddenContext?.("[room_clock] Seven minutes in, about three remaining. Finish the practice work and move to the assessment — still NOT closing time."); } catch { /* best-effort */ }
-      }
       if (!warnedRef.current && elapsed >= ROOM_WARN_SECONDS && elapsed < ROOM_MAX_SECONDS) {
         warnedRef.current = true;
         // Ask Miomi to give a warm in-voice heads-up — once.
@@ -1231,7 +1189,7 @@ function TalkPageInner() {
       if (!mediaRef.current) mediaRef.current = new MediaHandler();
       await mediaRef.current.unlockPlayback();
 
-      const client = createLiveClient();
+      const client = createLiveClient(!!roomSessionRef.current?.plan);
       client.restoreSessionSnapshot(snapshot);
       wireLiveClient(client);
 
@@ -1346,7 +1304,7 @@ function TalkPageInner() {
         clientRef.current.disconnectIntentionally();
         clientRef.current = null;
         liveClientEpochRef.current = null;
-        const client = createLiveClient();
+        const client = createLiveClient(!!roomSessionRef.current?.plan);
         client.restoreSessionSnapshot(snapshot);
         wireLiveClient(client);
         await client.connect({
@@ -1482,7 +1440,7 @@ function TalkPageInner() {
     if (!mediaRef.current) mediaRef.current = new MediaHandler();
     await mediaRef.current.unlockPlayback();
     if (!clientRef.current) {
-      wireLiveClient(createLiveClient());
+      wireLiveClient(createLiveClient(!!roomSessionRef.current?.plan));
     }
 
     try {
