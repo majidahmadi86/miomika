@@ -160,7 +160,9 @@ export async function POST(req: NextRequest) {
       const roomLevel = (VALID_ROOM_LEVELS as readonly string[]).includes(String(body?.level))
         ? (String(body.level) as CefrLevel)
         : ("A1" as CefrLevel);
-      const roomPrompt = buildSessionTurnPrompt({ ui: roomUi, target: roomTarget, level: roomLevel, session: room });
+      const roomStageRaw = typeof body?.roomStage === "string" ? body.roomStage.trim().toLowerCase() : "";
+      const roomStage = room.stages.some((st) => st.id === roomStageRaw) ? roomStageRaw : null;
+      const roomPrompt = buildSessionTurnPrompt({ ui: roomUi, target: roomTarget, level: roomLevel, session: room, currentStageId: roomStage });
       const roomMessages = (messages as Array<{ role?: string; content?: string }>)
         .slice(-10)
         .map((m) => ({
@@ -168,7 +170,8 @@ export async function POST(req: NextRequest) {
           content: String(m?.content ?? "").slice(0, 2000),
         }))
         .filter((m) => m.content.trim());
-      const roomResult = await getAIResponse(roomMessages, roomPrompt, roomUi);
+      // Gemini ONLY — Mike's law: Thai teaching never runs on Groq (false Thai).
+      const roomResult = await getAIResponse(roomMessages, roomPrompt, roomUi, { geminiOnly: true });
       const { clean, events } = parseRoomTags(roomResult.content ?? "");
       return NextResponse.json({
         content: clean || (roomResult.content ?? "").trim(),

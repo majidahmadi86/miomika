@@ -18,12 +18,16 @@ import type { CefrLevel } from "@/lib/talk/teaching-mode";
 const TAG_PROTOCOL_LINE =
   "- PROGRESS TAGS (machine-only, invisible): at the very END of your reply, on ONE separate final line, append every tag that applies to THIS turn: [[STAGE:stage_id]] the moment you enter a stage; [[EARN:objective_index]] ONLY when the learner genuinely earned that objective out loud (0-based number); [[NOTE:glow|text]] and [[NOTE:grow|text]] as you close the session (two glow, one grow, in your closing turns); [[HINT:phrase]] for every new phrase you teach beyond the helper list. The system strips these tags before the learner sees anything — NEVER mention them, never read them aloud, never explain them, never put them anywhere except that final line.";
 
+const TTS_SOUND_OUT_LINE =
+  "- SAY THE SOUNDS, UNASKED: for every Thai phrase, say it once naturally, then once again SLOWLY as Thai script with a space between each syllable (for example: ขอ โทษ ครับ) — Thai script is the ONLY thing your voice reads correctly. NEVER speak romanization: any Latin-letter rendering of Thai in your reply gets SPELLED OUT letter by letter by the voice engine and sounds broken. Romanization already appears on the learner's hint drawer and cards — point them there: tap the speaker on the phrase to hear it perfectly, as many times as they like. Do not pronounce a word two different ways; if you slip, correct once and move on.";
+
 const TEXT_ENGINE_RULES = `
 TEXT ENGINE RULES (this room runs on written replies read aloud in her real voice):
 - Everything you write is spoken by TTS exactly as written: plain text only — no emoji, no stage directions, no markdown, nothing in brackets except the machine tags on the final line.
-- SPOKEN THAI IS ALWAYS THAI SCRIPT — never write Thai words in Latin letters inside a sentence. Romanization appears ONLY as a separate slow sound-out in plain lowercase syllables with spaces (no IPA, no tone marks).
+- SPOKEN THAI IS ALWAYS THAI SCRIPT — never write a Thai word in Latin letters anywhere in your reply, not in parentheses, not as a sound-out. The voice engine SPELLS Latin renderings of Thai letter by letter — it sounds broken and confuses the learner. Romanization lives on their hint drawer and cards, never in your speech.
 - One language per sentence. Punctuation is emotion: at most ONE exclamation mark per reply, and none inside taught Thai.
-- Keep every reply SHORT — one to three sentences of your own plus the teaching itself. The learner must speak far more than you; end on ONE clear prompt and wait.`;
+- Keep every reply SHORT — one to three sentences of your own plus the teaching itself. The learner must speak far more than you; end on ONE clear prompt and wait.
+- STOP AT THE HANDOFF: your reply ENDS the moment you hand the learner the floor. NEVER write their answer for them, NEVER react to an attempt that has not happened yet ("That was excellent" before they spoke is forbidden), never stack a second task after the first. One prompt, then silence — their turn.`;
 
 /** The session contract, adapted for the text engine. */
 export function buildSessionTurnPrompt(args: {
@@ -31,14 +35,28 @@ export function buildSessionTurnPrompt(args: {
   target: "th" | "en";
   level: CefrLevel;
   session: SessionPlanContext;
+  /** The stage the SYSTEM currently shows — anchors a text model that has no memory of its own board. */
+  currentStageId?: string | null;
 }): string {
   const base = buildSessionSystemInstruction(args.ui, args.target, args.level, args.session, null);
   // Swap the Live-only "silent tool" paragraph for the tag protocol. If the
   // source line ever gets reworded, the fallback still appends the protocol —
   // the room NEVER runs without a way to move the board.
-  const swapped = base.replace(/- BOOKKEEPING IS SILENT:[^\n]*\n?/, `${TAG_PROTOCOL_LINE}\n`);
-  const withProtocol = swapped.includes("PROGRESS TAGS") ? swapped : `${base}\n${TAG_PROTOCOL_LINE}`;
-  return `${withProtocol}\n${TEXT_ENGINE_RULES}`;
+  let adapted = base.replace(/- BOOKKEEPING IS SILENT:[^\n]*\n?/, `${TAG_PROTOCOL_LINE}\n`);
+  if (!adapted.includes("PROGRESS TAGS")) adapted = `${base}\n${TAG_PROTOCOL_LINE}`;
+  // Swap the native-audio sound-out law (romanized syllables) for the TTS-safe
+  // one (slow THAI-SCRIPT syllables) — Chirp3 spells Latin renderings of Thai
+  // letter by letter, which is exactly the "she spells the phonetics" bug.
+  const soundSwapped = adapted.replace(/- SAY THE SOUNDS, UNASKED:[^\n]*\n?/, `${TTS_SOUND_OUT_LINE}\n`);
+  if (soundSwapped.includes("Thai script is the ONLY thing")) adapted = soundSwapped;
+  else adapted = `${adapted}\n${TTS_SOUND_OUT_LINE}`;
+  const stage = args.currentStageId
+    ? args.session.stages.find((st) => st.id === args.currentStageId)
+    : null;
+  const stageAnchor = stage
+    ? `\nCURRENT STAGE (system truth, trust it over your own memory): you are in "${stage.title}" [${stage.id}]. Stages only ever move FORWARD — never announce, restart, or return to an earlier stage (never "let's do our warm-up" after the warm-up is done).`
+    : "";
+  return `${adapted}\n${TEXT_ENGINE_RULES}${stageAnchor}`;
 }
 
 export type RoomTagEvent = {

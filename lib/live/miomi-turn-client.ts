@@ -114,6 +114,9 @@ export class MiomiTurnClient {
   // Confident Speaking room plan — set at connect, rides on every /api/miomi
   // call so the route runs the session contract instead of the free-chat brain.
   private roomSession: SessionPlanContext | null = null;
+  // The stage the board currently shows — mirrored from our own emitted stage
+  // events (and resume), sent with every call so the model can't drift backward.
+  private roomStageId: string | null = null;
 
   // turn lock — the dropped-turn guard. While a turn is mid-flight
   // (transcribe→miomi→speak) we ignore new endpoints.
@@ -152,6 +155,7 @@ export class MiomiTurnClient {
     this.history = [];
     this.sessionContext = undefined;
     this.roomSession = opts?.session ?? null;
+    this.roomStageId = this.roomSession ? this.roomSession.stages[0]?.id ?? null : null;
     this.resetVad();
     this.connected = true;
     // Warm the neural speech gate now (loads the silero model in the background) so
@@ -456,6 +460,7 @@ export class MiomiTurnClient {
     void this.runHidden(text, {});
   }
   sendSessionResume(lang?: "th" | "en", stageId?: string): void {
+    if (stageId) this.roomStageId = stageId;
     void this.runHidden(buildSessionResumePrompt(lang ?? this.uiLanguage, stageId ?? "warmup"), {});
   }
   sendResume(_lang?: "th" | "en", _nextWord?: string | null): void {
@@ -635,6 +640,7 @@ export class MiomiTurnClient {
           threadId: this.threadId,
           tuning: this.tuning,
           room: this.roomSession ?? undefined,
+          roomStage: this.roomSession ? this.roomStageId ?? undefined : undefined,
         }),
       });
       if (!res.ok) {
@@ -736,6 +742,13 @@ export class MiomiTurnClient {
     // together with the reply — the page's report_stage handler is unchanged.
     if (Array.isArray(reply.roomEvents)) {
       for (const ev of reply.roomEvents) {
+        if (ev.event === "stage" && typeof ev.stage_id === "string" && this.roomSession) {
+          // Mirror forward-only movement so the NEXT call's anchor is truthful.
+          const ids = this.roomSession.stages.map((st) => st.id);
+          const from = this.roomStageId ? ids.indexOf(this.roomStageId) : -1;
+          const to = ids.indexOf(ev.stage_id);
+          if (to >= 0 && to >= from) this.roomStageId = ev.stage_id;
+        }
         this.emit({ type: "tool_call", name: "report_stage", args: ev, result: null } as unknown as LiveClientMessage);
       }
     }

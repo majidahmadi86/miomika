@@ -106,6 +106,7 @@ export async function getAIResponse(
   messages: Message[],
   systemPrompt: string,
   uiLanguage: "th" | "en" = "en",
+  opts?: { geminiOnly?: boolean },
 ): Promise<{ content: string; engine: string; wasFailover: boolean; cappedScope?: "daily" | "turn" }> {
   log("ai.router", "env keys", {
     GROQ_API_KEY: Boolean(process.env.GROQ_API_KEY),
@@ -139,8 +140,12 @@ export async function getAIResponse(
   // accurate-Thai model at cost parity (฿0.028 vs ฿0.029/call, admin 7/17).
   // Groq stays as the fast fallback on Gemini error/timeout; the output guard
   // and library failover below are unchanged.
-  const order: Array<"groq" | "gemini"> =
-    geminiEnabled ? ["gemini", "groq"] : ["groq", "gemini"];
+  // ROOMS LAW (Mike): a Confident Speaking room is core Thai TEACHING — Groq
+  // sometimes invents Thai, so a room may NEVER fall back to it. geminiOnly
+  // pins the order to Gemini alone; the library failover below stays the net.
+  const order: Array<"groq" | "gemini"> = opts?.geminiOnly
+    ? ["gemini"]
+    : geminiEnabled ? ["gemini", "groq"] : ["groq", "gemini"];
 
   for (const engine of order) {
     if (engine === "gemini" && !geminiEnabled) continue;
