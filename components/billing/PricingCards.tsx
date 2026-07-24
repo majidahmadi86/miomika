@@ -149,7 +149,7 @@ function RoomLocked({ lang }: { lang: Lang }) {
         </span>
       </div>
       <div style={{ ...sans, fontSize: 11, fontWeight: 600, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>
-        {lang === "th" ? "ห้องพูดสดกับมีโอมิรอคุณอยู่ในแพ็กโปรนะคะ" : "Live rooms with Miomi are waiting for you on Pro."}
+        {lang === "th" ? "ห้องพูดสดกับมีโอมิ · ซื้อแพ็กห้องได้เลย ไม่ต้องสมัครแพ็กเกจนะคะ" : "Live rooms with Miomi · buy a room pack anytime, no subscription needed."}
       </div>
     </div>
   );

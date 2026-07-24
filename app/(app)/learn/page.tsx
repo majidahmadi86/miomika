@@ -793,9 +793,6 @@ export default function LearnPage() {
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ ...font, display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: ".09em", textTransform: "uppercase", color: "rgba(255,255,255,.92)" }}>
                 Confident Speaking
-                <span style={{ ...font, display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 700, color: "#fff", background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.35)", borderRadius: 6, padding: "2px 6px" }}>
-                  <Crown style={{ width: 9, height: 9 }} strokeWidth={2.6} aria-hidden />PRO
-                </span>
               </span>
               <span style={{ ...font, display: "block", fontSize: 14.5, fontWeight: 700, color: "#fff", marginTop: 2 }}>
                 {courses.length ? `${scenesDone} of ${scenesTotal} sessions spoken` : "Your private speaking room with Miomi"}
