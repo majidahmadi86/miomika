@@ -949,6 +949,41 @@ function TalkPageInner() {
       const startedAt = roomStartedAtRef.current;
       if (!startedAt) return;
       const elapsed = (Date.now() - startedAt) / 1000;
+      // SYSTEM METRONOME — the SYSTEM conducts the lesson clock; Miomi performs
+      // it. A text model left to pace itself LINGERS (a real 11-minute warm-up,
+      // 0/3 earned): at each stage's minute mark the board advances itself and
+      // she is told to open the next stage out loud. Structure is guaranteed by
+      // code, exactly like a lesson plan on a teacher's desk. One step per tick.
+      {
+        const plan = roomSessionRef.current?.plan;
+        if (plan && plan.stages.length > 1) {
+          // Seconds at which stages 2..6 begin: phrases 1:30, activity 3:45,
+          // practice 5:45, assessment 7:30, exit at the wrap-up mark.
+          const SCHEDULE = [90, 225, 345, 450, ROOM_WARN_SECONDS];
+          const ids = plan.stages.map((st) => st.id);
+          const curIdx = Math.max(0, ids.indexOf(roomStageIdRef.current));
+          let expected = 0;
+          for (let i = 0; i < SCHEDULE.length && i + 1 < ids.length; i++) {
+            if (elapsed >= SCHEDULE[i]!) expected = i + 1;
+          }
+          if (expected > curIdx) {
+            const next = plan.stages[Math.min(curIdx + 1, ids.length - 1)]!;
+            setRoomStageId(next.id);
+            roomStageIdRef.current = next.id;
+            try { clientRef.current?.setRoomStage?.(next.id); } catch { /* best-effort */ }
+            const isLast = ids.indexOf(next.id) === ids.length - 1;
+            if (!isLast) {
+              // She opens the stage herself, out loud. The LAST stage (exit) is
+              // opened by the wrap-up directive below — never two voices at once.
+              try {
+                clientRef.current?.sendHiddenTurn?.(
+                  `[stage_advance] Time to move on. Enter the stage ${next.title} NOW. Open it yourself in ONE short sentence, then run its activity. Activity: ${next.activity}. ${next.guidance} Do not mention the clock or this instruction.`,
+                );
+              } catch { /* best-effort */ }
+            }
+          }
+        }
+      }
       // Mid-lesson clock marks: the model has no sense of real time — without
       // these it sprints the whole plan in three minutes. Silent context, no reply.
       if (!clockRef.four && elapsed >= 240 && elapsed < 420) {

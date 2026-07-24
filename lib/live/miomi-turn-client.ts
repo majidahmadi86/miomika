@@ -463,6 +463,12 @@ export class MiomiTurnClient {
     if (stageId) this.roomStageId = stageId;
     void this.runHidden(buildSessionResumePrompt(lang ?? this.uiLanguage, stageId ?? "warmup"), {});
   }
+
+  /** SYSTEM METRONOME: the page advanced the board on the lesson clock —
+   *  keep the per-call CURRENT STAGE anchor truthful. */
+  setRoomStage(id: string): void {
+    if (id) this.roomStageId = id;
+  }
   sendResume(_lang?: "th" | "en", _nextWord?: string | null): void {
     /* PASS2 */
   }
