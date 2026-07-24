@@ -81,9 +81,9 @@ export function PwaUpdateManager() {
       const embedded = readEmbeddedBuildId();
 
       if (remote.buildId && remote.buildId !== embedded) {
-        if (registration.waiting) {
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
-        }
+        // Do NOT skip-wait here. On /talk this activated + cache-purged under a
+        // live session with only a banner shown. applyUpdate() posts
+        // SKIP_WAITING itself, immediately followed by the reload.
         markUpdateReady();
       }
     } catch {

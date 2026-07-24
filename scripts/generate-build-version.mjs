@@ -43,7 +43,11 @@ self.addEventListener("message", (event) => {
 });
 
 self.addEventListener("install", () => {
-  self.skipWaiting();
+  // NO skipWaiting here. The new worker must WAIT until the page explicitly
+  // asks (SKIP_WAITING message sent right before a reload) or every tab is
+  // closed. Auto-activating on install purged the OLD build's caches under a
+  // still-open page; its next lazy-loaded chunk then missed cache AND 404'd on
+  // the new deployment = the "please refresh" screen mid-session.
 });
 
 self.addEventListener("activate", (event) => {

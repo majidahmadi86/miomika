@@ -1,6 +1,6 @@
-/* Miomika service worker — generated 2026-07-22T11:16:06.930Z */
+/* Miomika service worker — generated 2026-07-24T05:23:22.926Z */
 const CACHE_PREFIX = "miomika";
-const BUILD_ID = "04f0634c3892";
+const BUILD_ID = "55530edf7601";
 
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
@@ -9,7 +9,11 @@ self.addEventListener("message", (event) => {
 });
 
 self.addEventListener("install", () => {
-  self.skipWaiting();
+  // NO skipWaiting here. The new worker must WAIT until the page explicitly
+  // asks (SKIP_WAITING message sent right before a reload) or every tab is
+  // closed. Auto-activating on install purged the OLD build's caches under a
+  // still-open page; its next lazy-loaded chunk then missed cache AND 404'd on
+  // the new deployment = the "please refresh" screen mid-session.
 });
 
 self.addEventListener("activate", (event) => {
