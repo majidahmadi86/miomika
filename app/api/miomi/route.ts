@@ -173,8 +173,18 @@ export async function POST(req: NextRequest) {
       // Gemini ONLY — Mike's law: Thai teaching never runs on Groq (false Thai).
       const roomResult = await getAIResponse(roomMessages, roomPrompt, roomUi, { geminiOnly: true });
       const { clean, events } = parseRoomTags(roomResult.content ?? "");
+      // SPEECH SWEEP: quotes, parens and dash runs make the segmented TTS stop
+      // and restart mid-sentence — strip any that slipped past the prompt law.
+      // Intra-word apostrophes (don't, it's) are untouched.
+      const spoken = (clean || (roomResult.content ?? "").trim())
+        .replace(/[“”"()\[\]]+/g, " ")
+        .replace(/…|\.{3,}/g, ". ")
+        .replace(/\s[—–-]+\s/g, ", ")
+        .replace(/\s{2,}/g, " ")
+        .replace(/\s+([,.!?])/g, "$1")
+        .trim();
       return NextResponse.json({
-        content: clean || (roomResult.content ?? "").trim(),
+        content: spoken,
         wordCard: null,
         phraseCard: null,
         creatorAsset: null,
