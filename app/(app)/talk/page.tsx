@@ -1723,6 +1723,11 @@ function TalkPageInner() {
 
   useEffect(() => {
     if (threadBootRef.current) return;
+    // ROOM MODE: a room is its own stage — no thread list, no restored history,
+    // and CRITICALLY no kickoff suppression: this bootstrap sets kickoffSentRef
+    // true while restoring, which silently swallowed the room's [session_open]
+    // tutor opening (the room then behaved like plain talk). Skip it entirely.
+    if (roomSessionRef.current) { threadBootRef.current = true; return; }
     if (isGuest || !profileAuthReady || !profile) return;
     threadBootRef.current = true;
     // Suppress the kickoff SYNCHRONOUSLY: session connect takes ~16ms while this
@@ -2176,6 +2181,19 @@ function TalkPageInner() {
 
   const sortedCanvasItems = useMemo(() => sortTranscriptItems(items), [items]);
 
+  // ROOM STAGE VIEW: a room is a conversation you are IN, not a log you read.
+  // Show only the current exchange — from the learner's last line onward (her
+  // whole reply, cards included). Before the first learner line, show her
+  // opening turn as-is. Normal /talk keeps the full transcript, untouched.
+  const visibleCanvasItems = useMemo(() => {
+    if (!roomSession) return sortedCanvasItems;
+    let lastUser = -1;
+    for (let i = sortedCanvasItems.length - 1; i >= 0; i--) {
+      if (sortedCanvasItems[i]!.kind === "user_said") { lastUser = i; break; }
+    }
+    return lastUser <= 0 ? sortedCanvasItems : sortedCanvasItems.slice(lastUser);
+  }, [roomSession, sortedCanvasItems]);
+
   const micStateForDebug = liveUiState === "connecting" ? "processing" : liveUiState === "listening" ? "listening" : liveUiState === "speaking" ? "speaking" : "idle";
 
   return (
@@ -2183,12 +2201,12 @@ function TalkPageInner() {
     <div
       onPointerDown={handlePointerDown}
       style={{
-        position: "relative",
-        zIndex: 0,
-        flex: 1,
-        minHeight: 0,
-        height: "100%",
-        maxHeight: "100%",
+        // ROOM TAKEOVER: a Confident Speaking room is its OWN full-screen stage —
+        // it covers the nav rail, tabs and every piece of /talk chrome. Normal
+        // /talk keeps its in-shell layout, untouched.
+        ...(roomSession
+          ? { position: "fixed" as const, inset: 0, zIndex: 60, height: "100dvh", maxHeight: "100dvh" }
+          : { position: "relative" as const, zIndex: 0, flex: 1, minHeight: 0, height: "100%", maxHeight: "100%" }),
         display: "flex",
         flexDirection: "column",
         background: roomSession
@@ -2370,6 +2388,20 @@ function TalkPageInner() {
           ) : null}
           {roomHintsOpen ? (
             <div style={{ background: "#FFFFFF", border: "1px solid #C4B5FD", borderRadius: 16, padding: "10px 12px", marginTop: 6, boxShadow: "0 8px 22px rgba(74,65,54,.12)" }}>
+              {(() => {
+                const st = roomSession.plan.stages.find((x) => x.id === roomStageId);
+                return st ? (
+                  <div style={{ borderBottom: "1px solid #EDE8E0", paddingBottom: 6, marginBottom: 6 }}>
+                    <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 9.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#1F7A68", margin: "0 0 3px" }}>
+                      Practicing now
+                    </p>
+                    <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 12.5, fontWeight: 700, color: "#3C352B", margin: 0, lineHeight: 1.4 }}>
+                      {st.title}
+                      <span style={{ fontWeight: 600, color: "#9A8B73" }}> · {st.activity}</span>
+                    </p>
+                  </div>
+                ) : null;
+              })()}
               {roomLearned.length ? (
                 <div style={{ borderBottom: "1px solid #EDE8E0", paddingBottom: 6, marginBottom: 6 }}>
                   <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 9.5, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C2497E", margin: "0 0 4px" }}>
@@ -2431,7 +2463,7 @@ function TalkPageInner() {
               margin: "0 auto",
             }}
           >
-          {sortedCanvasItems.map((item) => {
+          {visibleCanvasItems.map((item) => {
             if (item.kind === "mini_cat") {
               return <MiniCatRow key={item.id} textTh={item.textTh} textEn={item.textEn} uiLang={uiLang} />;
             }
