@@ -116,7 +116,17 @@ export async function createCheckoutSession(params: {
 
 /** Stripe one-time price id for a room pack of the given size (env-configured). */
 export function packPriceId(count: number): string | null {
-  return process.env[`STRIPE_PRICE_PACK_${count}`] ?? null;
+  const direct = process.env[`STRIPE_PRICE_PACK_${count}`];
+  if (direct) return direct;
+  // REPRICED 7/24: identical Stripe prices (฿499 / ฿1,399), fewer premium
+  // Gemini Live sessions per pack (10→5, 30→15). The live env vars keep their
+  // original names so NO Vercel change is needed; the webhook grants credits
+  // from the checkout metadata count, so 5/15 flow through automatically.
+  const legacy: Record<number, string | undefined> = {
+    5: process.env.STRIPE_PRICE_PACK_10,
+    15: process.env.STRIPE_PRICE_PACK_30,
+  };
+  return legacy[count] ?? null;
 }
 
 /**

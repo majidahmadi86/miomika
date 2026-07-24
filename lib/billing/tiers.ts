@@ -108,8 +108,11 @@ export type RoomPack = {
 };
 
 export const ROOM_PACKS: RoomPack[] = [
-  { count: 10, priceTHB: 499 },
-  { count: 30, priceTHB: 1399, tag: { en: "Best value", th: "คุ้มสุด" } },
+  // REPRICED 7/24 (Mike): rooms returned to audio-native Gemini Live 3 — the
+  // premium engine at its real cost (~฿36-40/session measured). Same Stripe
+  // amounts, fewer sessions per pack: ≈฿100/room = ~55% margin after fees.
+  { count: 5, priceTHB: 499 },
+  { count: 15, priceTHB: 1399, tag: { en: "Best value", th: "คุ้มสุด" } },
 ];
 
 /** Per-room price, rounded — for the "฿50 a room" line. */
