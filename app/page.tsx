@@ -71,6 +71,11 @@ const T = {
     aboutTitle: "Made with care in Bangkok",
     aboutBody:
       "Miomika is built by Mikaro Studio, an independent creative technology studio in Bangkok, Thailand. We believe the warmest way to learn a language is not flashcards but a friend, so we built Miomi: a companion who talks with you, teaches you, and genuinely remembers you.",
+    founderName: "Majid Ahmadi",
+    founderRole: "Founder, Mikaro Studio · known as Mike",
+    founderBio:
+      "An educator and builder based in Bangkok. Mike designed Miomika around a simple belief: people start speaking sooner when someone they trust is listening.",
+    founderLink: "Connect on LinkedIn",
     aboutContact: "Questions? Write to us at",
     backToTop: "Back to top",
     footerTagline: "Learn Thai and English with Miomi, your AI companion.",
@@ -129,6 +134,11 @@ const T = {
     aboutTitle: "สร้างด้วยความตั้งใจ ที่กรุงเทพฯ",
     aboutBody:
       "Miomika พัฒนาโดย Mikaro Studio สตูดิโอเทคโนโลยีสร้างสรรค์อิสระในกรุงเทพฯ ประเทศไทย เราเชื่อว่าวิธีเรียนภาษาที่อบอุ่นที่สุดไม่ใช่บัตรคำศัพท์ แต่คือเพื่อนสักคน เราจึงสร้างมีโอมิ เพื่อนที่คุยกับคุณ สอนคุณ และจำคุณได้จริงๆ",
+    founderName: "Majid Ahmadi",
+    founderRole: "ผู้ก่อตั้ง Mikaro Studio · เพื่อนๆ เรียกว่าไมค์",
+    founderBio:
+      "นักการศึกษาและนักสร้างสรรค์ในกรุงเทพฯ ไมค์ออกแบบ Miomika จากความเชื่อง่ายๆ ว่า คนเราจะกล้าเปิดปากพูดเร็วขึ้น เมื่อมีเพื่อนที่ไว้ใจคอยรับฟังอยู่ข้างๆ",
+    founderLink: "ดูโปรไฟล์ LinkedIn",
     aboutContact: "มีคำถาม? เขียนหาเราได้ที่",
     backToTop: "กลับขึ้นด้านบน",
     footerTagline: "เรียนภาษาไทยและอังกฤษกับมีโอมิ เพื่อน AI ของคุณ",
@@ -420,7 +430,30 @@ export default async function Page({
               {t.aboutTitle}
             </h2>
             <p className="mt-3 max-w-2xl leading-relaxed text-ink-muted">{t.aboutBody}</p>
-            <p className="mt-3 text-ink-muted">
+            {/* Founder — real, verifiable person behind the product. */}
+            <div className="mt-6 flex max-w-2xl items-center gap-5 rounded-card bg-surface p-5 shadow-card">
+              <Image
+                src="/founder-mike.jpg"
+                alt="Majid Ahmadi, founder of Mikaro Studio"
+                width={96}
+                height={96}
+                className="h-20 w-20 shrink-0 rounded-2xl object-cover sm:h-24 sm:w-24"
+              />
+              <div>
+                <p className="font-semibold [font-family:var(--font-kanit),sans-serif]">{t.founderName}</p>
+                <p className="mt-0.5 text-sm text-ink-subtle">{t.founderRole}</p>
+                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{t.founderBio}</p>
+                <a
+                  href="https://www.linkedin.com/in/majid-ahmadi86/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block text-sm text-accent underline underline-offset-2"
+                >
+                  {t.founderLink}
+                </a>
+              </div>
+            </div>
+            <p className="mt-4 text-ink-muted">
               {t.aboutContact}{" "}
               <a href="mailto:support@miomika.com" className="text-accent underline underline-offset-2">
                 support@miomika.com
