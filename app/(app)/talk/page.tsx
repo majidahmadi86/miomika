@@ -967,13 +967,16 @@ function TalkPageInner() {
       }
       if (elapsed >= ROOM_MAX_SECONDS) {
         window.clearInterval(id);
-        // End the LIVE voice (stops cost) but keep the learner in the room to read
-        // the transcript. They tap "See results" when ready — no harsh redirect.
+        // Time is up: close the MIC first (no more paid learner turns), ask for
+        // ONE spoken goodbye, show the banner — and only then cut the engine,
+        // with enough grace for the turn pipeline to generate AND speak it.
+        // The learner stays in the room to read back; "See my results" waits.
+        stopContinuousMic();
         try { clientRef.current?.sendRoomTimeUp?.(sessionUiLangRef.current); } catch { /* best-effort */ }
         setRoomTimeUp(true);
         window.setTimeout(() => {
           try { clientRef.current?.disconnectIntentionally(); clientRef.current = null; } catch { /* best-effort */ }
-        }, 9000); // let the turn engine generate + speak ONE short goodbye, then cut
+        }, 20000); // goodbye needs ~4s generation + speech on the turn engine
       }
     }, 5000);
     return () => window.clearInterval(id);
@@ -2197,18 +2200,10 @@ function TalkPageInner() {
 
   const sortedCanvasItems = useMemo(() => sortTranscriptItems(items), [items]);
 
-  // ROOM STAGE VIEW: a room is a conversation you are IN, not a log you read.
-  // Show only the current exchange — from the learner's last line onward (her
-  // whole reply, cards included). Before the first learner line, show her
-  // opening turn as-is. Normal /talk keeps the full transcript, untouched.
-  const visibleCanvasItems = useMemo(() => {
-    if (!roomSession) return sortedCanvasItems;
-    let lastUser = -1;
-    for (let i = sortedCanvasItems.length - 1; i >= 0; i--) {
-      if (sortedCanvasItems[i]!.kind === "user_said") { lastUser = i; break; }
-    }
-    return lastUser <= 0 ? sortedCanvasItems : sortedCanvasItems.slice(lastUser);
-  }, [roomSession, sortedCanvasItems]);
+  // ROOM TRANSCRIPT: the full conversation stays on screen (Mike 7/24 — "I
+  // want to see my conversation"); the room reads like a lesson you can scroll
+  // back through, same as /talk.
+  const visibleCanvasItems = sortedCanvasItems;
 
   const micStateForDebug = liveUiState === "connecting" ? "processing" : liveUiState === "listening" ? "listening" : liveUiState === "speaking" ? "speaking" : "idle";
 
@@ -2331,8 +2326,8 @@ function TalkPageInner() {
                   </div>
                 ) : null}
                 {roomTimeUp ? (
-                  <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: 12, color: "#1F7A68", textAlign: "center", padding: "6px 0", display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
-                    <span>{uiLang === "en" ? "That's our session — take a moment to read back, then see your results." : "ครบเวลาแล้วน้า อ่านทบทวนได้เลย แล้วค่อยกดดูผลลัพธ์"}</span>
+                  <div style={{ fontFamily: "'Sarabun', sans-serif", fontSize: 12, textAlign: "center", padding: "8px 10px", display: "flex", flexDirection: "column", gap: 7, alignItems: "center", background: "rgba(255,255,255,0.94)", borderRadius: 14, color: "#1F7A68", fontWeight: 600, boxShadow: "0 4px 14px rgba(26,26,24,0.10)" }}>
+                    <span>{uiLang === "en" ? "That's our session · take a moment to read back, then see your results." : "ครบเวลาแล้วน้า อ่านทบทวนได้เลย แล้วค่อยกดดูผลลัพธ์"}</span>
                     <button onClick={() => void endRoomSession()} disabled={roomEnding} style={{
                       fontFamily: "'Quicksand', sans-serif", fontSize: 12, fontWeight: 700, padding: "6px 16px",
                       borderRadius: 99, border: "none", background: "linear-gradient(135deg,#6ECDB8,#34A98F)", color: "#FFFFFF", cursor: "pointer",
