@@ -932,7 +932,9 @@ function TalkPageInner() {
     const total = roomSession.plan.objectives.length;
     const allEarned = total > 0 && roomObjectivesDone.length >= total;
     const atExit = roomStageId === "exit";
-    if (allEarned && atExit) {
+    const startedAt = roomStartedAtRef.current;
+    const matured = !!startedAt && (Date.now() - startedAt) / 1000 >= ROOM_WARN_SECONDS;
+    if (allEarned && atExit && matured) {
       lessonClosedRef.current = true;
       try { clientRef.current?.sendLessonComplete?.(sessionUiLangRef.current); } catch { /* best-effort */ }
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot lesson close when exit + all objectives earned
@@ -947,10 +949,21 @@ function TalkPageInner() {
   useEffect(() => {
     if (!roomSession) return;
     const warnedRef = { current: false };
+    const clockRef = { four: false, seven: false };
     const id = window.setInterval(() => {
       const startedAt = roomStartedAtRef.current;
       if (!startedAt) return;
       const elapsed = (Date.now() - startedAt) / 1000;
+      // Mid-lesson clock marks: the model has no sense of real time — without
+      // these it sprints the whole plan in three minutes. Silent context, no reply.
+      if (!clockRef.four && elapsed >= 240 && elapsed < 420) {
+        clockRef.four = true;
+        try { clientRef.current?.sendHiddenContext?.("[room_clock] Four minutes in, about six remaining. Mid-lesson: stay in teaching depth, keep them speaking, do not begin closing."); } catch { /* best-effort */ }
+      }
+      if (!clockRef.seven && elapsed >= 420 && elapsed < ROOM_WARN_SECONDS) {
+        clockRef.seven = true;
+        try { clientRef.current?.sendHiddenContext?.("[room_clock] Seven minutes in, about three remaining. Finish the practice work and move to the assessment — still NOT closing time."); } catch { /* best-effort */ }
+      }
       if (!warnedRef.current && elapsed >= ROOM_WARN_SECONDS && elapsed < ROOM_MAX_SECONDS) {
         warnedRef.current = true;
         // Ask Miomi to give a warm in-voice heads-up — once.
@@ -1077,6 +1090,14 @@ function TalkPageInner() {
       };
       if (args.event === "stage" && typeof args.stage_id === "string") {
         // Stages move FORWARD only — a wobbling brain can never reset the bar.
+        // And the EXIT stage is time-locked: the prompt forbids closing before
+        // the [room_wrapup] signal, but a sprinting model is refused HERE too —
+        // the 10-minute promise is enforced by the system, not by trust.
+        if (args.stage_id === "exit") {
+          const startedAt = roomStartedAtRef.current;
+          const elapsed = startedAt ? (Date.now() - startedAt) / 1000 : 0;
+          if (elapsed < ROOM_WARN_SECONDS) return;
+        }
         const stages = roomSessionRef.current?.plan.stages ?? [];
         const fromIdx = stages.findIndex((s) => s.id === roomStageIdRef.current);
         const toIdx = stages.findIndex((s) => s.id === args.stage_id);
