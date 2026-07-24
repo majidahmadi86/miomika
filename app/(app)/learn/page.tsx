@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { ShareSessionSheet } from "@/components/learn/ShareSessionSheet";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLeft, Compass, Sparkles, type LucideIcon } from "lucide-react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
@@ -277,6 +278,7 @@ export default function LearnPage() {
   const [expandedCourse, setExpandedCourse] = useState<number | null>(null);
   const [activeScenario, setActiveScenario] = useState<{ c: number; s: number } | null>(null);
   const [resultsSession, setResultsSession] = useState<SessionDetail | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [pendingRoom, setPendingRoom] = useState<RoomHandoff | null>(null);
   const [planning, setPlanning] = useState(false);
   const [building, setBuilding] = useState(false);
@@ -854,7 +856,7 @@ export default function LearnPage() {
                   <Image src="/miomi/head-happy.png" alt="Miomi celebrating" width={60} height={60} style={{ objectFit: "contain" }} />
                 </span>
                 <h2 style={{ ...font, fontSize: 18, fontWeight: 700, color: INK_STRONG, margin: "10px 0 0", lineHeight: 1.25 }}>
-                  Session complete{typeof resultsSession.results?.minutes === "number" && resultsSession.results.minutes > 0 ? ` — you spoke for ${resultsSession.results.minutes} minute${resultsSession.results.minutes === 1 ? "" : "s"}.` : ""}
+                  Session complete{typeof resultsSession.results?.minutes === "number" && resultsSession.results.minutes > 0 ? ` · you spoke for ${resultsSession.results.minutes} minute${resultsSession.results.minutes === 1 ? "" : "s"}.` : ""}
                 </h2>
                 <p style={{ ...font, fontSize: 12, fontWeight: 600, color: MUTED, margin: "4px 0 0" }}>
                   {resultsSession.library.title_en} · {resultsSession.library.cefr_level} · {(resultsSession.results?.objectives_done ?? []).length} of {resultsSession.library.plan.objectives.length} objectives earned
@@ -929,10 +931,11 @@ export default function LearnPage() {
                 <p style={{ ...font, fontSize: 11, fontWeight: 600, color: INK, lineHeight: 1.45, margin: 0 }}>
                   <b>Share this session</b> — earn ฿30 when a friend joins Miomika
                 </p>
-                <button onClick={() => { try { void navigator.share?.({ title: "Miomika", text: `I just finished a Confident Speaking session with Miomi ${resultsSession.library?.title_en ?? ""}`, url: "https://miomika.com" }); } catch { /* share sheet optional */ } }} style={{
+                <button onClick={() => setShareOpen(true)} style={{
                   ...font, display: "inline-flex", alignItems: "center", gap: 5, border: "1.5px solid #34A98F", background: "#FFFFFF",
                   color: TEAL_DEEP, borderRadius: 99, padding: "7px 13px", fontSize: 11, fontWeight: 700, cursor: "pointer", flexShrink: 0,
                 }}>Share</button>
+                <ShareSessionSheet open={shareOpen} onClose={() => setShareOpen(false)} sessionTitle={resultsSession.library?.title_en ?? ""} />
               </div>
 
               <div style={{ display: "flex", gap: 8 }}>
