@@ -32,6 +32,12 @@
 import { logEvent } from "@/lib/debug/event-bus";
 import { log, logError } from "@/lib/debug/log";
 import { speakReply, killAllAudio, isSpeakingNow } from "@/lib/voice/tts";
+import {
+  buildRoomPacePrompt,
+  buildSessionKickoffPrompt,
+  buildSessionResumePrompt,
+  type SessionPlanContext,
+} from "@/lib/live/live-config";
 // Reuse the engine-we-stand-in-for's OWN parameter types (callbacks, connect
 // opts, sendAudio payload) via TS utilities. Nothing is guessed or redefined —
 // the page's existing callbacks object + call sites line up by construction, and
@@ -72,6 +78,8 @@ type MiomiResponse = {
   sessionContext?: unknown;
   replyLanguage?: "th" | "en";
   limitReached?: "daily";
+  /** Confident Speaking room: board events the route parsed from machine tags. */
+  roomEvents?: Array<{ event: string; stage_id?: string; objective_index?: number; note_kind?: string; note?: string }>;
   [k: string]: unknown;
 };
 
@@ -103,6 +111,9 @@ export class MiomiTurnClient {
   // conversation state fed back to /api/miomi
   private history: ChatMessage[] = [];
   private sessionContext: unknown = undefined;
+  // Confident Speaking room plan — set at connect, rides on every /api/miomi
+  // call so the route runs the session contract instead of the free-chat brain.
+  private roomSession: SessionPlanContext | null = null;
 
   // turn lock — the dropped-turn guard. While a turn is mid-flight
   // (transcribe→miomi→speak) we ignore new endpoints.
@@ -140,6 +151,7 @@ export class MiomiTurnClient {
     this.level = (opts?.level as string) ?? null;
     this.history = [];
     this.sessionContext = undefined;
+    this.roomSession = opts?.session ?? null;
     this.resetVad();
     this.connected = true;
     // Warm the neural speech gate now (loads the silero model in the background) so
@@ -382,8 +394,10 @@ export class MiomiTurnClient {
     );
   }
 
-  sendSessionKickoff(_lang?: "th" | "en"): void {
-    this.sendKickoff(this.uiLanguage, "returning");
+  sendSessionKickoff(lang?: "th" | "en"): void {
+    // ROOM OPENING: the tutor names the scene and starts stage one — never the
+    // companion "you're back~" hello this used to delegate to.
+    void this.runHidden(buildSessionKickoffPrompt(lang ?? this.uiLanguage), { isKickoff: true });
   }
 
   // ---- hidden / scripted turns -------------------------------------------
@@ -414,23 +428,35 @@ export class MiomiTurnClient {
   // ---- PASS2 stubs (interface satisfied so /talk compiles & runs) ---------
   // These keep the heartbeat shippable; each gets real behaviour in pass 2.
 
-  sendRoomPace(_v?: unknown): void {
-    /* PASS2 */
+  sendRoomPace(lang?: "th" | "en", slow?: boolean): void {
+    this.sendHiddenContext(buildRoomPacePrompt(lang ?? this.uiLanguage, slow === true));
   }
-  sendPaceChange(_lang?: "th" | "en", _slow?: boolean): void {
-    /* PASS2 */
+  sendPaceChange(lang?: "th" | "en", slow?: boolean): void {
+    this.sendHiddenContext(buildRoomPacePrompt(lang ?? this.uiLanguage, slow === true));
   }
-  sendRoomWrapUp(_v?: unknown): void {
-    /* PASS2 */
+  sendRoomWrapUp(lang?: "th" | "en"): void {
+    const l = lang ?? this.uiLanguage;
+    const text = l === "th"
+      ? "[room_wrapup] เหลือเวลาอีกประมาณสองนาทีในห้องนี้ — ค่อยๆ พาผู้เรียนไปปิดท้าย: สรุปสั้นๆ อบอุ่น ทำ exit ticket แล้วบอกลาอย่างอบอุ่น ห้ามเริ่มหัวข้อใหม่"
+      : "[room_wrapup] About two minutes left in this room — gently guide toward closing now: a short warm recap, do the exit ticket, then a warm goodbye. Do NOT start anything new.";
+    void this.runHidden(text, {});
   }
-  sendLessonComplete(_v?: unknown): void {
-    /* PASS2 */
+  sendLessonComplete(lang?: "th" | "en"): void {
+    const l = lang ?? this.uiLanguage;
+    const text = l === "th"
+      ? "[lesson_complete] ผู้เรียนทำครบทุกเป้าหมายแล้ว — พูดปิดท้ายอบอุ่นสั้นๆ หนึ่งครั้ง ชมสิ่งที่เขาทำได้จริงแล้วบอกลา ห้ามถามคำถามใหม่ ห้ามสอนเพิ่ม ห้ามชวนทำต่อ"
+      : "[lesson_complete] The learner earned every objective — give ONE short warm closing: a specific compliment on what they did, then goodbye. Do NOT ask a new question, do NOT teach more, do NOT invite another round.";
+    void this.runHidden(text, {});
   }
-  sendRoomTimeUp(_v?: unknown): void {
-    /* PASS2 */
+  sendRoomTimeUp(lang?: "th" | "en"): void {
+    const l = lang ?? this.uiLanguage;
+    const text = l === "th"
+      ? "[room_timeup] ครบเวลาของห้องนี้แล้ว — พูดปิดท้ายอบอุ่นสั้นๆ หนึ่งประโยค ชมเขาแล้วบอกลา ห้ามถามคำถามใหม่ ห้ามสอนเพิ่ม"
+      : "[room_timeup] Time is up for this room — say ONE short warm closing line: a quick compliment and goodbye. Do NOT ask any new question, do NOT teach anything more.";
+    void this.runHidden(text, {});
   }
-  sendSessionResume(_lang?: "th" | "en", _stageId?: string): void {
-    /* PASS2 — no reconnect in turn mode */
+  sendSessionResume(lang?: "th" | "en", stageId?: string): void {
+    void this.runHidden(buildSessionResumePrompt(lang ?? this.uiLanguage, stageId ?? "warmup"), {});
   }
   sendResume(_lang?: "th" | "en", _nextWord?: string | null): void {
     /* PASS2 */
@@ -608,6 +634,7 @@ export class MiomiTurnClient {
           sessionContext: this.sessionContext,
           threadId: this.threadId,
           tuning: this.tuning,
+          room: this.roomSession ?? undefined,
         }),
       });
       if (!res.ok) {
@@ -703,6 +730,14 @@ export class MiomiTurnClient {
         args: {},
         result: reply.wordCard,
       } as LiveClientMessage);
+    }
+
+    // Room board events ride ahead of the bubble so stages/objectives land
+    // together with the reply — the page's report_stage handler is unchanged.
+    if (Array.isArray(reply.roomEvents)) {
+      for (const ev of reply.roomEvents) {
+        this.emit({ type: "tool_call", name: "report_stage", args: ev, result: null } as unknown as LiveClientMessage);
+      }
     }
 
     // model_transcript flips the orb to "speaking" + writes the bubble
