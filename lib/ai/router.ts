@@ -106,7 +106,7 @@ export async function getAIResponse(
   messages: Message[],
   systemPrompt: string,
   uiLanguage: "th" | "en" = "en",
-  opts?: { geminiOnly?: boolean },
+  opts?: { geminiOnly?: boolean; maxTokens?: number },
 ): Promise<{ content: string; engine: string; wasFailover: boolean; cappedScope?: "daily" | "turn" }> {
   log("ai.router", "env keys", {
     GROQ_API_KEY: Boolean(process.env.GROQ_API_KEY),
@@ -147,13 +147,16 @@ export async function getAIResponse(
     ? ["gemini"]
     : geminiEnabled ? ["gemini", "groq"] : ["groq", "gemini"];
 
+  const replyTokens = opts?.maxTokens ?? MAX_REPLY_TOKENS;
   for (const engine of order) {
-    if (engine === "gemini" && !geminiEnabled) continue;
+    // geminiOnly (rooms) calls Gemini REGARDLESS of the fallback flag — a room
+    // must never silently degrade to the library because of an env toggle.
+    if (engine === "gemini" && !geminiEnabled && !opts?.geminiOnly) continue;
     try {
       const content =
         engine === "groq"
-          ? await withTimeout(callGroq(recent, systemPrompt), GROQ_TIMEOUT_MS, "groq")
-          : await withTimeout(callGemini(recent, systemPrompt), GEMINI_TIMEOUT_MS, "gemini");
+          ? await withTimeout(callGroq(recent, systemPrompt, replyTokens), GROQ_TIMEOUT_MS, "groq")
+          : await withTimeout(callGemini(recent, systemPrompt, replyTokens), GEMINI_TIMEOUT_MS, "gemini");
       if (content) {
         // OUTPUT GUARD — a garbage reply (mojibake, language flip, repetition
         // loop) is treated exactly like a provider failure: the next engine in
@@ -184,14 +187,15 @@ export async function getAIResponse(
 // ─── GROQ CALL ────────────────────────────────────────────────────────────────
 async function callGroq(
   messages: Message[],
-  systemPrompt: string
+  systemPrompt: string,
+  maxTokens: number = MAX_REPLY_TOKENS
 ): Promise<string> {
   const groq = getGroq();
   if (!groq) throw new Error("GROQ_API_KEY missing — Groq disabled");
   const started = Date.now();
   const response = await groq.chat.completions.create({
     model: GROQ_MODEL,
-    max_tokens: MAX_REPLY_TOKENS,
+    max_tokens: maxTokens,
     temperature: 0.85,
     messages: [
       { role: "system", content: systemPrompt },
@@ -245,7 +249,8 @@ async function callGeminiWithModel(
   gemini: GoogleGenAI,
   model: string,
   messages: Message[],
-  systemPrompt: string
+  systemPrompt: string,
+  maxTokens: number = MAX_REPLY_TOKENS
 ): Promise<string> {
   const history = messages.slice(0, -1).map((m) => ({
     role: m.role === "assistant" ? "model" : "user",
@@ -256,7 +261,7 @@ async function callGeminiWithModel(
     model,
     config: {
       systemInstruction: systemPrompt,
-      maxOutputTokens: MAX_REPLY_TOKENS,
+      maxOutputTokens: maxTokens,
       // 0.6: cooler than 0.85 — Gemini padded replies and drifted past the
       // brevity laws at high temperature. Warmth survives; rambling does not.
       temperature: 0.6,
@@ -277,7 +282,8 @@ async function callGeminiWithModel(
 }
 async function callGemini(
   messages: Message[],
-  systemPrompt: string
+  systemPrompt: string,
+  maxTokens: number = MAX_REPLY_TOKENS
 ): Promise<string> {
   const gemini = getGemini();
   if (!gemini) throw new Error("Gemini (Vertex) unavailable — GCP_SERVICE_ACCOUNT_JSON / GCP_PROJECT_ID missing");
@@ -286,7 +292,8 @@ async function callGemini(
       gemini,
       geminiModelInUse,
       messages,
-      systemPrompt
+      systemPrompt,
+      maxTokens
     );
     return content;
   } catch (error) {
@@ -298,7 +305,7 @@ async function callGemini(
     console.warn(
       `Gemini ${GEMINI_MODEL} not found; using ${fallback}`
     );
-    return callGeminiWithModel(gemini, fallback, messages, systemPrompt);
+    return callGeminiWithModel(gemini, fallback, messages, systemPrompt, maxTokens);
   }
 }
 // ─── MARKDOWN STRIPPER ────────────────────────────────────────────────────────

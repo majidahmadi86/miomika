@@ -171,7 +171,10 @@ export async function POST(req: NextRequest) {
         }))
         .filter((m) => m.content.trim());
       // Gemini ONLY — Mike's law: Thai teaching never runs on Groq (false Thai).
-      const roomResult = await getAIResponse(roomMessages, roomPrompt, roomUi, { geminiOnly: true });
+      // 120 output tokens is the PHYSICAL brevity wall — roughly two short
+      // sentences plus one taught phrase. The 90/10 talk ratio dies here, not
+      // in a prompt plea. (Also: faster generation AND faster TTS = less lag.)
+      const roomResult = await getAIResponse(roomMessages, roomPrompt, roomUi, { geminiOnly: true, maxTokens: 120 });
       const { clean, events } = parseRoomTags(roomResult.content ?? "");
       // SPEECH SWEEP: quotes, parens and dash runs make the segmented TTS stop
       // and restart mid-sentence — strip any that slipped past the prompt law.
