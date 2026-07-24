@@ -415,10 +415,6 @@ export function PlanRow({
     <div
       style={{
         display: "flex",
-        // Mobile safety: the fixed-width segments (name, price, button) must
-        // WRAP on narrow phones — a non-wrapping row here forced the whole
-        // paywall to scroll sideways.
-        flexWrap: "wrap",
         alignItems: "center",
         gap: 11,
         background: "#fff",
@@ -428,23 +424,29 @@ export function PlanRow({
         boxShadow: featured ? "0 4px 12px rgba(52,169,143,.1)" : "none",
       }}
     >
-      <span style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ ...sans, fontSize: 13.5, fontWeight: featured ? 800 : 700, color: featured ? TEAL_DEEP : INK }}>{t(plan.name, lang)}</span>
-        {featured ? (
-          <span style={{ ...sans, fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: "#fff", background: TEAL, borderRadius: 99, padding: "2px 7px" }}>
-            {lang === "th" ? "ยอดนิยม" : "Popular"}
-          </span>
-        ) : null}
+      {/* LEFT column shrinks + truncates; RIGHT column (price + button) is
+          fixed-width. Two columns instead of one long row: the row can never
+          outgrow a phone, so the paywall never scrolls sideways. */}
+      <span style={{ flex: "1 1 auto", minWidth: 0 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+          <span style={{ ...sans, fontSize: 13.5, fontWeight: featured ? 800 : 700, color: featured ? TEAL_DEEP : INK }}>{t(plan.name, lang)}</span>
+          {featured ? (
+            <span style={{ ...sans, fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: "#fff", background: TEAL, borderRadius: 99, padding: "2px 7px" }}>
+              {lang === "th" ? "ยอดนิยม" : "Popular"}
+            </span>
+          ) : null}
+        </span>
+        <span style={{ display: "block", marginTop: 2, ...sans, fontSize: 11.5, fontWeight: 600, color: "#5a5550", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {summary}
+        </span>
       </span>
-      <span style={{ flex: "1 1 160px", minWidth: 0, ...sans, fontSize: 11.5, fontWeight: 600, color: "#5a5550", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {summary}
-      </span>
-      <span style={{ flex: "0 0 auto", textAlign: "right" }}>
-        <b style={{ ...sans, fontSize: 15, fontWeight: 800, color: INK }}>
-          ฿{(showYearly ? yearly! : plan.priceTHB!).toLocaleString()}
-        </b>
-        <span style={{ ...sans, fontSize: 10, color: MUTED, fontWeight: 600 }}>{showYearly ? (lang === "th" ? "/ปี" : "/yr") : (lang === "th" ? "/เดือน" : "/mo")}</span>
-      </span>
+      <span style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 9 }}>
+        <span style={{ textAlign: "right" }}>
+          <b style={{ ...sans, fontSize: 15, fontWeight: 800, color: INK }}>
+            ฿{(showYearly ? yearly! : plan.priceTHB!).toLocaleString()}
+          </b>
+          <span style={{ ...sans, fontSize: 10, color: MUTED, fontWeight: 600 }}>{showYearly ? (lang === "th" ? "/ปี" : "/yr") : (lang === "th" ? "/เดือน" : "/mo")}</span>
+        </span>
       <button
         onClick={onSelect}
         disabled={loading}
@@ -464,6 +466,7 @@ export function PlanRow({
       >
         {loading ? (lang === "th" ? "…" : "…") : lang === "th" ? "เลือก" : "Choose"}
       </button>
+      </span>
     </div>
   );
 }
