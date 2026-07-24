@@ -22,9 +22,12 @@ const VALID_LEVELS = ["A1", "A2", "B1", "B2", "C1"];
 const REGISTERS = ["polite", "everyday", "casual", "genz", "social"] as const;
 const ADVANCED_REGISTERS = new Set(["genz", "social"]);
 // CONFIDENT SPEAKING is a PAID feature — live Gemini sessions cost ~฿3/min, so
-// free users get ZERO live sessions (they'd cost us with no revenue). All
-// scenarios + custom (ESP) sessions are Pro-only; free users hit the paywall.
-const FREE_SCENARIOS_PER_COURSE = 0;
+// nobody gets a free room. But rooms are PAY-PER-ROOM, not subscription-locked:
+// entry flows through the monthly allowance (Pro 1 / Pro Max 3 / free 0) and
+// then purchased pack credits — so ANY signed-in user who buys a room pack can
+// speak. Blocking free users outright made packs unbuyable-in-effect: the money
+// was on the paywall but a paid pack still could not open a door. Only custom
+// (ESP) sessions stay Pro-only — that is the premium differentiator.
 const STAGE_IDS = ["warmup", "phrases", "activity", "practice", "assessment", "exit"] as const;
 const ACTIVITY_LIBRARY =
   "roleplay, storytelling, debate (B1+ only), interview simulation, describe-and-guess, summarize-back, opinion round, register switch, shadowing, pronunciation drill, minimal pairs, tongue twisters";
@@ -187,12 +190,8 @@ export async function POST(req: NextRequest) {
     const scenarioPos = Number(body?.scenario_position ?? 0);
     let topic = "";
     if (coursePos > 0 && scenarioPos > 0) {
-      if (scenarioPos > FREE_SCENARIOS_PER_COURSE) {
-        const tier = await userTier(supabase, profile.id);
-        if (tier !== "pro" && tier !== "pro_max") {
-          return NextResponse.json({ ok: false, reason: "pro_required" }, { status: 200 });
-        }
-      }
+      // No tier gate here: standard scenarios are pay-per-room. The allowance +
+      // pack-credit ledger below is the one and only bouncer.
       const { data: spk } = await supabase
         .from("speaking_courses")
         .select("plan")
@@ -226,7 +225,8 @@ export async function POST(req: NextRequest) {
     // SESSION LIFECYCLE (all tiers, incl. pack buyers): a scenario is entered
     // ONCE. Re-entry resumes the same session or shows its summary — it never
     // re-runs a live session, because live minutes cost real money. New rooms
-    // are capped by a monthly budget (Pro 1, Pro Max 3; free is blocked above).
+    // are capped by the monthly allowance (Pro 1, Pro Max 3, free 0) and then
+    // by purchased pack credits; out of both → rooms_limit → the packs paywall.
     // ──────────────────────────────────────────────────────────────────────
     if (coursePos > 0 && scenarioPos > 0) {
       // Finished already? (goals_done >= 3, tracked on the course progress.)
