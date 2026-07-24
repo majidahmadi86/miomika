@@ -646,6 +646,16 @@ export default function LearnPage() {
         openPaywall("rooms");
         return;
       }
+      if (j.reason === "session_spent") {
+        // ONE-TIME USE: this room already ended — show its summary, never re-run.
+        setSpeakMsg(null);
+        try {
+          const sr = await fetch(`/api/speaking/session?id=${encodeURIComponent(id)}`);
+          const sj = (await sr.json()) as { session?: SessionDetail | null };
+          if (sj.session?.library) setResultsSession(sj.session);
+        } catch { /* summary is best-effort */ }
+        return;
+      }
       const lib = j.session?.library;
       if (j.session && lib) {
         setSpeakMsg(null);

@@ -246,7 +246,7 @@ export async function POST(req: NextRequest) {
       // Newest session row for this exact scenario, if any.
       const { data: prior } = await supabase
         .from("speaking_sessions")
-        .select("id, plan_snapshot")
+        .select("id, plan_snapshot, status, completed_at")
         .eq("user_id", profile.id)
         .eq("course_position", coursePos)
         .eq("scenario_position", scenarioPos)
@@ -254,8 +254,15 @@ export async function POST(req: NextRequest) {
         .limit(1)
         .maybeSingle();
 
-      if (alreadyDone) {
-        // Summary-only: never re-run a finished scenario (no cost, all tiers).
+      // ONE-TIME USE LAW: a room is spent the moment its session ENDED — by the
+      // 10-minute clock, by "End session", or by finishing the plan — no matter
+      // how many objectives were earned. Ended → summary only, forever, every
+      // tier. The ONLY door back into live is a session that never ended
+      // (crash/refresh/left mid-way) — that resume is free because entry
+      // already consumed the allowance or pack credit.
+      const priorEnded = !!prior && ((prior.status as string) === "completed" || !!prior.completed_at);
+      if (alreadyDone || priorEnded) {
+        // Summary-only: never re-run a finished room (no cost, all tiers).
         return NextResponse.json(
           { ok: true, completed: true, sessionId: (prior?.id as string) ?? null },
           { status: 200 },
@@ -469,13 +476,12 @@ export async function GET(req: NextRequest) {
     const supabase = await createServiceClient();
     const id = (req.nextUrl.searchParams.get("id") ?? "").trim();
     if (id) {
-      // Re-entering a LIVE room (run=1) requires a current paid plan — a
-      // downgraded account can't walk back into a room it opened while Pro.
-      // (Plain summary views omit run=1 and stay open to every tier.)
+      // Re-entering a LIVE room (run=1): the gate is the session's own STATUS,
+      // not the tier — entry already consumed an allowance or a pack credit, so
+      // ANY signed-in owner may resume a session that never ended (crash /
+      // refresh / left mid-way). An ENDED session can never re-run live for
+      // anyone; it is served below as data and the client shows the summary.
       const forRun = req.nextUrl.searchParams.get("run") === "1";
-      if (forRun && profile.tier !== "pro" && profile.tier !== "pro_max") {
-        return NextResponse.json({ session: null, reason: "pro_required" });
-      }
       const { data, error } = await supabase
         .from("speaking_sessions")
         .select("id, library_id, course_position, scenario_position, status, results, created_at, completed_at, plan_snapshot")
@@ -484,6 +490,9 @@ export async function GET(req: NextRequest) {
         .maybeSingle();
       if (error) throw error;
       if (!data) return NextResponse.json({ session: null });
+      if (forRun && ((data.status as string) === "completed" || data.completed_at)) {
+        return NextResponse.json({ session: null, reason: "session_spent" });
+      }
       // Library if it still exists; otherwise the frozen snapshot — user
       // history never depends on the shared library's lifecycle.
       let lib: Record<string, unknown> | null = null;
