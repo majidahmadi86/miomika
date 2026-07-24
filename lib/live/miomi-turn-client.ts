@@ -599,6 +599,9 @@ export class MiomiTurnClient {
     // practising Thai (or code-switching) — forcing the UI language made Whisper
     // hear "สวัสดีค่ะ" as broken English. Auto lets it transcribe what was actually said.
     form.append("language", "auto");
+    // ROOM EARS: tell the route the practice language so a garbage auto-detect
+    // (Thai attempts heard as Chinese/Korean) gets ONE retry pinned to it.
+    if (this.roomSession) form.append("room_target", this.targetLanguage);
     const ctrl = new AbortController();
     const t = window.setTimeout(() => ctrl.abort(), 8000);
     try {

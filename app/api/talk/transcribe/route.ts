@@ -376,10 +376,12 @@ export async function POST(request: NextRequest) {
 
   let audioBlob: File;
   let clientLang: FormDataEntryValue | null = null;
+  let clientRoomTarget: FormDataEntryValue | null = null;
   try {
     const form = await request.formData();
     const audio = form.get("audio");
     clientLang = form.get("language");
+    clientRoomTarget = form.get("room_target");
     if (!(audio instanceof File)) {
       return NextResponse.json({ error: "audio_field_missing" }, { status: 400 });
     }
@@ -397,6 +399,10 @@ export async function POST(request: NextRequest) {
       : langHint === "en" || langHint === "en-US"
         ? "en"
         : null;
+  // Confident Speaking room: the practice language. Used ONLY to retry a
+  // transcript whose auto-detect landed in a wrong script entirely.
+  const roomTarget: ExplicitLang =
+    clientRoomTarget === "th" ? "th" : clientRoomTarget === "en" ? "en" : null;
   log("voice.transcribe", "lang mode", { explicit: explicitLang ?? "auto-bilingual" });
 
   if (audioBlob.size > 2_000_000) {
@@ -441,7 +447,16 @@ export async function POST(request: NextRequest) {
   if (groqKey) {
     try {
       const recognizeStart = Date.now();
-      const text = await transcribeWithGroq(audioBlob, explicitLang);
+      let text = await transcribeWithGroq(audioBlob, explicitLang);
+      // WRONG-SCRIPT RETRY (rooms): Whisper auto-detect sometimes hears a
+      // Thai-accented attempt as Chinese/Korean/Japanese. Neither the learner
+      // nor Miomi can use that — one retry pinned to the room's practice
+      // language fixes it, and only fires on actual garbage (cheap).
+      if (roomTarget && text && /[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/.test(text)) {
+        log("voice.transcribe", "wrong-script transcript in a room — retrying pinned", { preview: text.slice(0, 40), pinned: roomTarget });
+        const retried = await transcribeWithGroq(audioBlob, roomTarget);
+        if (retried) text = retried;
+      }
       const recognizeMs = Date.now() - recognizeStart;
       // Usage ledger: STT is a paid call — record it (kind "stt") so voice usage
       // is visible per user in llm_usage and the admin cost tab.
