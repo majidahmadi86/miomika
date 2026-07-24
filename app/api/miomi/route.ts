@@ -27,6 +27,8 @@ import { getServerProfile, touchLastSeen } from "@/lib/auth/get-server-profile";
 import { saveExchange, touchThread } from "@/lib/brain/memory";
 import { readBrainState, type BrainState } from "@/lib/brain/state";
 import { buildBrainPrompt } from "@/lib/brain/prompt";
+import { buildSessionTurnPrompt, parseRoomTags, sanitizeRoomPlan, type RoomTagEvent } from "@/lib/brain/session-prompt";
+import type { CefrLevel } from "@/lib/talk/teaching-mode";
 import { buildMemoryContext } from "@/lib/ai/memory-context";
 import { fetchUserMemories, extractAndStoreMemories } from "@/lib/ai/memory-store";
 import { detectExplicitUiLanguageRequest } from "@/lib/brain/language";
@@ -71,6 +73,8 @@ type MiomiResponse = {
   pronunciationLesson: PronunciationLesson | null;
   replyLanguage: "th" | "en";
   userSpeaksLanguage: "th" | "en";
+  /** Confident Speaking room only: board events parsed from the reply's machine tags. */
+  roomEvents?: RoomTagEvent[];
   guestHandoff?: boolean;
   /** Set when a member hit their per-day chat cap — client shows the upgrade prompt. */
   limitReached?: "daily";
@@ -134,6 +138,56 @@ export async function POST(req: NextRequest) {
 
     if (serverUserId) {
       void touchLastSeen(serverUserId);
+    }
+
+    // ── CONFIDENT SPEAKING ROOM (turn engine) ────────────────────────────────
+    // A room is a scripted premium lesson, not free chat: ONE lean model call
+    // per turn under the session contract, board events via machine tags. None
+    // of the free-chat pipeline below (router, library, word cards, mastery,
+    // memories, threads) applies — that keeps a full 10-minute room at roughly
+    // a tenth of the Gemini Live cost that made rooms unprofitable.
+    if (body?.room && typeof body.room === "object") {
+      if (!profile) {
+        return NextResponse.json({ error: "Rooms are for members." }, { status: 401 });
+      }
+      const room = sanitizeRoomPlan(body.room);
+      if (!room) {
+        return NextResponse.json({ error: "Invalid room plan." }, { status: 400 });
+      }
+      const roomUi: "th" | "en" = clientUiLanguage ?? "en";
+      const roomTarget: "th" | "en" = clientTargetLanguage ?? (roomUi === "th" ? "en" : "th");
+      const VALID_ROOM_LEVELS = ["A1", "A2", "B1", "B2", "C1"] as const;
+      const roomLevel = (VALID_ROOM_LEVELS as readonly string[]).includes(String(body?.level))
+        ? (String(body.level) as CefrLevel)
+        : ("A1" as CefrLevel);
+      const roomPrompt = buildSessionTurnPrompt({ ui: roomUi, target: roomTarget, level: roomLevel, session: room });
+      const roomMessages = (messages as Array<{ role?: string; content?: string }>)
+        .slice(-10)
+        .map((m) => ({
+          role: (m?.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+          content: String(m?.content ?? "").slice(0, 2000),
+        }))
+        .filter((m) => m.content.trim());
+      const roomResult = await getAIResponse(roomMessages, roomPrompt, roomUi);
+      const { clean, events } = parseRoomTags(roomResult.content ?? "");
+      return NextResponse.json({
+        content: clean || (roomResult.content ?? "").trim(),
+        wordCard: null,
+        phraseCard: null,
+        creatorAsset: null,
+        sessionContext: clientSessionContext ?? {},
+        servedVia: `room__${roomResult.engine}`,
+        wasFailover: roomResult.wasFailover,
+        intent: null,
+        sessionMode: "room",
+        needsClarification: false,
+        masteryEvent: null,
+        pronunciationLesson: null,
+        replyLanguage: roomUi,
+        userSpeaksLanguage: roomUi,
+        roomEvents: events,
+        limitReached: roomResult.cappedScope === "daily" ? ("daily" as const) : undefined,
+      } satisfies MiomiResponse);
     }
 
     // ── STAGE 1: Reconstruct session state (server-resolved identity) ────────
