@@ -39,7 +39,6 @@ import { logEvent } from "@/lib/debug/event-bus";
 import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { TalkErrorBoundary } from "@/components/error/TalkErrorBoundary";
 import type { LiveClientCallbacks, LiveClientCloseDetail, LiveClientErrorDetail, LiveClientMessage, LiveSessionSnapshot } from "@/lib/live/miomi-client";
-import { MiomiLiveClient } from "@/lib/live/miomi-client";
 import { MediaHandler } from "@/lib/live/media-handler";
 import { isHiddenLiveTranscript, sanitizeUserTranscript } from "@/lib/live/transcript";
 import { GUEST_EXCHANGE_LIMIT } from "@/lib/ai/limits";
@@ -571,15 +570,14 @@ function TalkPageInner() {
     client.setThreadId(activeThreadIdRef.current);
   }, []);
 
-  const createLiveClient = useCallback((forRoom: boolean): MiomiTurnClient => {
-    // ENGINE BRANCH (the CS-rooms fix): a Confident Speaking room runs the REAL
-    // audio-native Gemini Live client — it is the only engine that knows the
-    // session brain (scene/objectives/stages prompt, the silent report_stage
-    // progress tool, pace / wrap-up / time-up / session-open messages). The
-    // turn client stubs all of those as no-ops, which is why a room used to
-    // open to silence. Normal /talk stays on the cheap turn pipeline, untouched.
-    // The two clients are drop-in swaps by design (same callbacks, same
-    // sendAudio payload); the cast bridges the nominal types at this one seam.
+  const createLiveClient = useCallback((): MiomiTurnClient => {
+    // ONE ENGINE EVERYWHERE (cost decision 7/24): rooms AND /talk run the turn
+    // pipeline — STT → /api/miomi → Chirp3. The room's session brain lives in
+    // the route's room branch + the turn client's room protocol (session plan
+    // at connect, machine-tag board events, hidden session/wrapup/timeup
+    // directives). Gemini Live (MiomiLiveClient) stays in the codebase DORMANT
+    // as a possible premium tier later — a 9-minute Live room cost ฿36 against
+    // a ฿50 room price, which no margin survives.
     const callbacks: LiveClientCallbacks = {
       onOpen: () => {
         logEvent({ kind: "state", level: "info", message: "live connected" });
@@ -605,9 +603,6 @@ function TalkPageInner() {
         }
       },
     };
-    if (forRoom) {
-      return new MiomiLiveClient(callbacks) as unknown as MiomiTurnClient;
-    }
     return new MiomiTurnClient(callbacks);
   }, [ensureTurnRuntime, openPaywall]);
 
@@ -978,7 +973,7 @@ function TalkPageInner() {
         setRoomTimeUp(true);
         window.setTimeout(() => {
           try { clientRef.current?.disconnectIntentionally(); clientRef.current = null; } catch { /* best-effort */ }
-        }, 6000); // let her finish ONE short goodbye line, then cut the voice
+        }, 9000); // let the turn engine generate + speak ONE short goodbye, then cut
       }
     }, 5000);
     return () => window.clearInterval(id);
@@ -1198,7 +1193,7 @@ function TalkPageInner() {
       if (!mediaRef.current) mediaRef.current = new MediaHandler();
       await mediaRef.current.unlockPlayback();
 
-      const client = createLiveClient(!!roomSessionRef.current?.plan);
+      const client = createLiveClient();
       client.restoreSessionSnapshot(snapshot);
       wireLiveClient(client);
 
@@ -1313,7 +1308,7 @@ function TalkPageInner() {
         clientRef.current.disconnectIntentionally();
         clientRef.current = null;
         liveClientEpochRef.current = null;
-        const client = createLiveClient(!!roomSessionRef.current?.plan);
+        const client = createLiveClient();
         client.restoreSessionSnapshot(snapshot);
         wireLiveClient(client);
         await client.connect({
@@ -1449,7 +1444,7 @@ function TalkPageInner() {
     if (!mediaRef.current) mediaRef.current = new MediaHandler();
     await mediaRef.current.unlockPlayback();
     if (!clientRef.current) {
-      wireLiveClient(createLiveClient(!!roomSessionRef.current?.plan));
+      wireLiveClient(createLiveClient());
     }
 
     try {
