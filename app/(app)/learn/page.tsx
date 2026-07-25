@@ -1781,13 +1781,14 @@ export default function LearnPage() {
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(31,30,28,0.55)", padding: 20 }}>
           <div style={{ maxWidth: 360, width: "100%", background: "#FFFDF8", borderRadius: 20, padding: "24px 22px", boxShadow: "0 12px 40px rgba(0,0,0,0.18)", fontFamily: "'Sarabun', sans-serif", color: "#3A332B" }}>
             <h3 style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 18, fontWeight: 700, margin: "0 0 12px", color: "#1F7A68" }}>How Speaking Rooms work</h3>
-            <ul style={{ margin: "0 0 18px", padding: "0 0 0 18px", fontSize: 14, lineHeight: 1.6 }}>
-              <li>Each room is one <strong>10-minute</strong> live speaking session with Miomi.</li>
-              <li>Re-doing a lesson starts a fresh session and uses another room from your pack.</li>
-              <li>Your results, notes, and phrase sounds stay saved — review them anytime, free.</li>
+            <ul style={{ margin: "0 0 18px", padding: "0 0 0 18px", fontSize: 13.5, lineHeight: 1.6 }}>
+              <li>Each room is one live <strong>10-minute</strong> lesson with Miomi as your tutor. Speak as much as you can · she leads the stages, you do the talking.</li>
+              <li>Stuck? Tap <strong>Hints</strong> for the scene phrases with sound, anytime.</li>
+              <li>Around minute 8 she wraps up; at 10 the mic closes and she says goodbye.</li>
+              <li>Every room is <strong>one-time</strong>. If you leave mid-way you can resume where you stopped · once it ends, your results, notes and phrase sounds stay saved forever, free.</li>
             </ul>
             <button onClick={acceptRoomIntro} style={{ width: "100%", fontFamily: "'Quicksand', sans-serif", fontSize: 14, fontWeight: 700, padding: "11px 0", borderRadius: 99, border: "none", background: "linear-gradient(135deg,#6ECDB8,#34A98F)", color: "#FFFFFF", cursor: "pointer" }}>
-              Got it — enter my room
+              Got it · enter my room
             </button>
           </div>
         </div>
