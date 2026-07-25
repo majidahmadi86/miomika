@@ -38,9 +38,15 @@ export default function AppError({
     // Transient first-load/chunk error after a deploy → reload once, silently.
     // Guard prevents a loop; a genuinely persistent error still shows the card.
     try {
+      // WINDOW guard, not once-forever: the old flag allowed ONE silent
+      // recovery per browser session — with frequent deploys, the SECOND
+      // chunk error hours later showed this card ("please refresh"). Now any
+      // error auto-heals silently unless the LAST reload was under a minute
+      // ago — that minute is what stops a genuine boot-loop.
       const KEY = "mk_app_error_reload";
-      if (!sessionStorage.getItem(KEY)) {
-        sessionStorage.setItem(KEY, "1");
+      const last = Number(sessionStorage.getItem(KEY) || 0);
+      if (Date.now() - last > 60_000) {
+        sessionStorage.setItem(KEY, String(Date.now()));
         window.location.reload();
       }
     } catch {

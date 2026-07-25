@@ -31,9 +31,13 @@ export default function GlobalError({
     // silently. The guard stops a reload loop if the error is genuinely
     // persistent — then the message below is shown for real.
     try {
+      // WINDOW guard, not once-forever — see app/(app)/error.tsx. Any
+      // deploy-era chunk error heals silently; only a sub-minute loop
+      // surfaces the visible message.
       const KEY = "mk_global_error_reload";
-      if (!sessionStorage.getItem(KEY)) {
-        sessionStorage.setItem(KEY, "1");
+      const last = Number(sessionStorage.getItem(KEY) || 0);
+      if (Date.now() - last > 60_000) {
+        sessionStorage.setItem(KEY, String(Date.now()));
         window.location.reload();
       }
     } catch {
