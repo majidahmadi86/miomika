@@ -548,6 +548,7 @@ export default function LearnPage() {
   }, [scenarioBuilding, viewLevel, refresh, openPaywall]);
 
   const [roomIntro, setRoomIntro] = useState<RoomHandoff | null>(null);
+  const [guestRoomInvite, setGuestRoomInvite] = useState(false);
   const doWalkIn = useCallback((handoff: RoomHandoff): boolean => {
     try {
       window.sessionStorage.setItem("miomika.room_session", JSON.stringify(handoff));
@@ -795,9 +796,11 @@ export default function LearnPage() {
           ) : null}
         </div>
 
-        {/* CONFIDENT SPEAKING — flagship */}
-        {authReady && !isGuest ? (
-          <button onClick={() => { setSurface("Speak"); setActiveScenario(null); setResultsSession(null); setPendingRoom(null); }} style={{
+        {/* CONFIDENT SPEAKING — flagship. Guests see it too (they could not
+            even DISCOVER the premium product before); their tap opens the
+            quick-register invitation instead of the Speak surface. */}
+        {authReady ? (
+          <button onClick={() => { if (isGuest) { setGuestRoomInvite(true); return; } setSurface("Speak"); setActiveScenario(null); setResultsSession(null); setPendingRoom(null); }} style={{
             display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
             background: "linear-gradient(135deg,#34A98F 0%,#1F7A68 100%)", border: "none", borderRadius: 18,
             padding: "14px 15px", marginBottom: 12, cursor: "pointer",
@@ -1789,6 +1792,22 @@ export default function LearnPage() {
         )}
         </div>
       </div>
+      {guestRoomInvite ? (
+        <div onClick={() => setGuestRoomInvite(false)} style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(31,30,28,0.55)", padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 360, width: "100%", background: "#FFFDF8", borderRadius: 20, padding: "24px 22px", boxShadow: "0 12px 40px rgba(0,0,0,0.18)", fontFamily: "'Sarabun', sans-serif", color: "#3A332B" }}>
+            <h3 style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 18, fontWeight: 700, margin: "0 0 10px", color: "#1F7A68" }}>Confident Speaking rooms</h3>
+            <p style={{ fontSize: 13.5, lineHeight: 1.6, margin: "0 0 16px" }}>
+              Live <strong>10-minute speaking lessons</strong> with Miomi as your private tutor · real scenes, real speaking, honest coaching, results you keep forever. Create your free account in 30 seconds, then grab a room pack and walk in.
+            </p>
+            <button onClick={() => router.push("/signup")} style={{ width: "100%", fontFamily: "'Quicksand', sans-serif", fontSize: 14, fontWeight: 700, padding: "11px 0", borderRadius: 99, border: "none", background: "linear-gradient(135deg,#6ECDB8,#34A98F)", color: "#FFFFFF", cursor: "pointer" }}>
+              Create my free account
+            </button>
+            <button onClick={() => setGuestRoomInvite(false)} style={{ width: "100%", marginTop: 8, fontFamily: "'Quicksand', sans-serif", fontSize: 12.5, fontWeight: 700, padding: "9px 0", borderRadius: 99, border: "1px solid #E3DCCE", background: "transparent", color: "#8A7E6C", cursor: "pointer" }}>
+              Maybe later
+            </button>
+          </div>
+        </div>
+      ) : null}
       {roomIntro ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(31,30,28,0.55)", padding: 20 }}>
           <div style={{ maxWidth: 360, width: "100%", background: "#FFFDF8", borderRadius: 20, padding: "24px 22px", boxShadow: "0 12px 40px rgba(0,0,0,0.18)", fontFamily: "'Sarabun', sans-serif", color: "#3A332B" }}>
