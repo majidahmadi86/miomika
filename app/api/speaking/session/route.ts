@@ -565,7 +565,7 @@ export async function PATCH(req: NextRequest) {
     const supabase = await createServiceClient();
     const { data: row, error: rowErr } = await supabase
       .from("speaking_sessions")
-      .select("id, results, status")
+      .select("id, results, status, plan_snapshot")
       .eq("id", id)
       .eq("user_id", profile.id)
       .maybeSingle();
@@ -607,6 +607,37 @@ export async function PATCH(req: NextRequest) {
     if (upErr) {
       console.error("[api/speaking/session] results update failed:", upErr.message);
       return NextResponse.json({ ok: false, reason: "store_failed" }, { status: 200 });
+    }
+
+    // DASHBOARD SAVE (Mike's room law #4): a finished room deposits its phrase
+    // menu into the learner's review system — phrase_user_state is
+    // self-contained (rooms teach scenario phrases that live in no bank), so
+    // each row carries its own Thai, English and romanization for the due
+    // cards. Upsert keeps existing mastery on repeat exposure. Best-effort:
+    // a failed save never breaks the results screen.
+    if (status === "completed") {
+      try {
+        const snap = (row.plan_snapshot ?? {}) as { phrases?: Array<{ th?: string; en?: string; romanization?: string | null }> };
+        const rows = (Array.isArray(snap.phrases) ? snap.phrases : [])
+          .map((ph) => ({
+            user_id: profile.id,
+            phrase_th: String(ph?.th ?? "").trim().slice(0, 200),
+            phrase_en: String(ph?.en ?? "").trim().slice(0, 200),
+            romanization: ph?.romanization ? String(ph.romanization).slice(0, 200) : null,
+            source: "room",
+            session_id: id,
+          }))
+          .filter((r) => r.phrase_th && r.phrase_en)
+          .slice(0, 12);
+        if (rows.length) {
+          const { error: phraseErr } = await supabase
+            .from("phrase_user_state")
+            .upsert(rows, { onConflict: "user_id,phrase_th", ignoreDuplicates: true });
+          if (phraseErr) console.error("[api/speaking/session] phrase save failed:", phraseErr.message);
+        }
+      } catch (phraseErr) {
+        console.error("[api/speaking/session] phrase save failed:", phraseErr);
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (err) {

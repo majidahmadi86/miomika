@@ -30,6 +30,8 @@ export type ProgressResponse = {
   learningTargetLanguage: "th" | "en" | null;
   activityDates: string[];
   learningWords: LearningWord[];
+  /** Phrases deposited by Confident Speaking rooms — self-contained rows (no bank join). */
+  learningPhrases: LearningWord[];
 };
 
 const ZEROED: ProgressResponse = {
@@ -41,6 +43,7 @@ const ZEROED: ProgressResponse = {
   learningTargetLanguage: null,
   activityDates: [],
   learningWords: [],
+  learningPhrases: [],
 };
 
 // Bangkok day boundaries (UTC+7): a date-key answers "which calendar day was
@@ -148,6 +151,16 @@ export async function GET() {
     // (touchLastSeen), so trust it; fall back to the live count only if null.
     const streakDays = profile.streak > 0 ? profile.streak : computeStreak(activityDates);
 
+    // Room phrases live in their own self-contained table — a scenario phrase
+    // exists in no bank, so each row carries its own display fields.
+    const { data: phraseRows } = await supabase
+      .from("phrase_user_state")
+      .select("phrase_th, phrase_en, romanization, mastery_level, next_spiral_at")
+      .eq("user_id", profile.id)
+      .is("mastered_at", null)
+      .order("learned_at", { ascending: false })
+      .limit(30);
+
     const { data: learningRows, error: learningWordsErr } = await supabase
       .from("vocabulary_user_state")
       .select("word_en, mastery_level, next_spiral_at")
@@ -216,6 +229,19 @@ export async function GET() {
       })
       .filter((w): w is LearningWord => w !== null);
 
+    const learningPhrases: LearningWord[] = (phraseRows ?? []).map((row) => ({
+      word_en: (row.phrase_en as string) ?? "",
+      word_th: (row.phrase_th as string) ?? "",
+      th_romanization: (row.romanization as string | null) ?? null,
+      en_ipa: null,
+      emoji: null,
+      cefr_level: null,
+      example_th: null,
+      example_en: null,
+      mastery_level: (row.mastery_level as number) ?? 0,
+      next_spiral_at: (row.next_spiral_at as string | null) ?? null,
+    }));
+
     const payload: ProgressResponse = {
       wordsMastered: wordsMastered ?? 0,
       wordsLearning: wordsLearning ?? 0,
@@ -225,6 +251,7 @@ export async function GET() {
       learningTargetLanguage,
       activityDates: Array.from(new Set(activityDates)),
       learningWords,
+      learningPhrases,
     };
 
     return NextResponse.json(payload);

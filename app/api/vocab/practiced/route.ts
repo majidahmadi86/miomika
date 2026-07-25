@@ -26,6 +26,37 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     const supabase = await createServiceClient();
+
+    // PHRASE-FIRST: room phrases live in phrase_user_state (self-contained,
+    // keyed by the same English gloss SayItCheck posts). If this "word" is one
+    // of the member's room phrases, advance ITS spiral (same semantics as the
+    // word RPC: +1 level, mastered at 3, next review 1d/3d/7d) and stop —
+    // never feed a multi-word phrase into the word RPC.
+    const { data: phraseRow } = await supabase
+      .from("phrase_user_state")
+      .select("id, mastery_level")
+      .eq("user_id", profile.id)
+      .eq("phrase_en", wordEn)
+      .limit(1)
+      .maybeSingle();
+    if (phraseRow) {
+      const level = Math.min(3, ((phraseRow.mastery_level as number) ?? 0) + 1);
+      const days = level >= 3 ? 0 : level === 2 ? 7 : level === 1 ? 3 : 1;
+      const { error: phraseErr } = await supabase
+        .from("phrase_user_state")
+        .update({
+          mastery_level: level,
+          next_spiral_at: new Date(Date.now() + days * 86_400_000).toISOString(),
+          mastered_at: level >= 3 ? new Date().toISOString() : null,
+        })
+        .eq("id", phraseRow.id);
+      if (phraseErr) {
+        console.error("[vocab/practiced] phrase advance failed:", phraseErr.message);
+        return NextResponse.json({ ok: false }, { status: 200 });
+      }
+      return NextResponse.json({ ok: true, phrase: true, mastered: level >= 3 });
+    }
+
     const { data, error } = await supabase.rpc("advance_word_mastery", {
       p_user_id: profile.id,
       p_word_en: wordEn,

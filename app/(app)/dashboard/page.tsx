@@ -65,6 +65,7 @@ export default function DashboardPage() {
   const wordsMastered = progress?.wordsMastered ?? 0;
   const conversationCount = progress?.conversationCount ?? 0;
   const learningWords = progress?.learningWords ?? [];
+  const learningPhrases = progress?.learningPhrases ?? [];
   const cefrLevel = progress?.cefrLevel ?? null;
   const learningTarget = progress?.learningTargetLanguage ?? "th";
   const activityDates = progress?.activityDates;
@@ -354,13 +355,29 @@ export default function DashboardPage() {
                   <p className="mt-5 text-center text-[12px] text-ink-muted">{t.allCaughtUp}</p>
                 )}
               </>
-            ) : (
+            ) : null}
+            {learningPhrases.length > 0 ? (
+              <div className="mt-5">
+                <h4 className="text-[12.5px] font-semibold text-ink">
+                  {lang === "en" ? "From your speaking rooms" : "จากห้องฝึกพูดของคุณ"}
+                </h4>
+                <p className="mt-0.5 text-[11px] text-ink-subtle">
+                  {lang === "en" ? "Phrases Miomi taught in your rooms · say them to lock them in" : "วลีที่มีโอมิสอนในห้อง · ฝึกออกเสียงเพื่อจำให้แม่น"}
+                </p>
+                <div className="mt-2.5 grid grid-cols-1 gap-2 xl:grid-cols-2">
+                  {learningPhrases.slice(0, 6).map((ph) => (
+                    <WordCardV3 key={ph.word_th} word={practiceWordToVocabularyEntry(ph)} direction={cardDirection} compact onReplayAudio={() => handlePracticeReplay(ph)} onPronunciationCheck={() => refreshProgress()} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {learningWords.length === 0 && learningPhrases.length === 0 ? (
               <div className="mt-5 flex flex-col items-center text-center">
                 <BookOpen className="h-7 w-7 text-ink-subtle" strokeWidth={1.75} aria-hidden />
                 <p className="mt-2.5 text-[12px] text-ink-muted">{t.reviewEmpty}</p>
                 <Link href="/talk" className="mt-4 inline-flex rounded-full px-6 py-2.5 text-[13px] font-semibold text-white shadow-cta" style={{ background: "linear-gradient(135deg, var(--mk-accent-grad-from) 0%, var(--mk-accent-grad-to) 100%)" }}>{t.startLearning}</Link>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-4">
