@@ -10,7 +10,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShareSessionSheet } from "@/components/learn/ShareSessionSheet";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLeft, Compass, Sparkles, type LucideIcon } from "lucide-react";
+import { Flame, ShieldCheck, Lock, Medal, Mic, Crown, Volume2, Check, ChevronLeft, Compass, Sparkles, Ticket, type LucideIcon } from "lucide-react";
 import { useGuestExploration } from "@/components/guest/GuestExplorationContext";
 import { usePaywall } from "@/components/billing/Paywall";
 import { useProfile } from "@/lib/auth/use-profile";
@@ -186,6 +186,20 @@ function MedalDot({ gold }: { gold: boolean }) {
       background: gold ? GOLD_GRAD : SILVER_GRAD, flex: "0 0 18px",
       boxShadow: gold ? "0 2px 6px rgba(201,169,110,.4)" : "0 2px 6px rgba(150,160,175,.4)",
     }} />
+  );
+}
+
+function RoomChip() {
+  // Rooms are pay-per-room for EVERYONE (packs), not a Pro feature — the old
+  // PRO crown here was a lie after independence shipped. One room = one ticket.
+  return (
+    <span style={{
+      ...font, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700,
+      letterSpacing: ".05em", color: "#fff", background: "linear-gradient(135deg,#34A98F,#1F7A68)", borderRadius: 7, padding: "3px 8px",
+      boxShadow: "0 2px 8px rgba(31,122,104,.35)", flex: "0 0 auto",
+    }}>
+      <Ticket style={{ width: 10, height: 10 }} strokeWidth={2.6} aria-hidden />1 ROOM
+    </span>
   );
 }
 
@@ -959,7 +973,7 @@ export default function LearnPage() {
               </button>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
                 <h2 style={{ ...font, fontSize: 17, fontWeight: 700, color: INK_STRONG, margin: 0 }}>{pendingRoom.title_en}</h2>
-                <ProChip />
+                <RoomChip />
               </div>
               <div style={{ background: "#FEF1E3", border: "1px solid #F4D9BC", borderRadius: 18, padding: "13px 14px", marginBottom: 12 }}>
                 <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: "#7A4F26", margin: 0, lineHeight: 1.55 }}>
@@ -1016,9 +1030,7 @@ export default function LearnPage() {
               </button>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
                 <h2 style={{ ...font, fontSize: 17, fontWeight: 700, color: INK_STRONG, margin: 0 }}>{activeScene.title_en}</h2>
-                {activeScenario.s === 1 ? (
-                  <span style={{ ...font, fontSize: 9.5, fontWeight: 700, letterSpacing: ".05em", color: "#3E7A66", background: "#EBFBF4", borderRadius: 7, padding: "3px 8px", flex: "0 0 auto" }}>FREE SESSION</span>
-                ) : <ProChip />}
+                <RoomChip />
               </div>
               <div style={{ background: "#FEF1E3", border: "1px solid #F4D9BC", borderRadius: 18, padding: "13px 14px", marginBottom: 12 }}>
                 <p style={{ ...font, fontSize: 12.5, fontWeight: 600, color: "#7A4F26", margin: 0, lineHeight: 1.55 }}>
@@ -1175,7 +1187,7 @@ export default function LearnPage() {
                           {courseDone} of {c.scenario_titles?.length ?? 4} sessions spoken
                         </span>
                       </span>
-                      {!isPro ? <ProChip /> : null}
+                      {!isPro ? <RoomChip /> : null}
                     </button>
                     {isOpen ? (
                       <div style={{ borderTop: `1px solid ${BORDER}`, padding: "4px 13px 12px 16px" }}>
@@ -1202,12 +1214,12 @@ export default function LearnPage() {
                                 </span>
                               </span>
                               {needsPro ? (
-                                <button onClick={() => openPaywall("rooms")} aria-label="Unlocks with Pro" style={{
+                                <button onClick={() => openPaywall("rooms")} aria-label="Unlock with a room pack" style={{
                                   width: 32, height: 32, borderRadius: "50%", flex: "0 0 32px",
                                   display: "flex", alignItems: "center", justifyContent: "center",
-                                  border: "1px solid #EADFC0", background: "#FBF6EA", cursor: "pointer",
+                                  border: "1px solid #C9E8DE", background: "#EBFBF4", cursor: "pointer",
                                 }}>
-                                  <Crown style={{ width: 14, height: 14, color: "#BE9233" }} strokeWidth={2.4} aria-hidden />
+                                  <Ticket style={{ width: 14, height: 14, color: "#1F7A68" }} strokeWidth={2.4} aria-hidden />
                                 </button>
                               ) : built ? (
                                 <button onClick={() => setActiveScenario({ c: c.position, s: pos })} style={{
