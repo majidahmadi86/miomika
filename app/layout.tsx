@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Kanit, Quicksand, Sarabun } from "next/font/google";
-import { PwaUpdateManager } from "@/components/pwa/PwaUpdateManager";
 import { getBuildId } from "@/lib/pwa/build-id";
 import "./globals.css";
 
@@ -125,7 +124,11 @@ export default function RootLayout({
             __html: `window.__MIOMIKA_BUILD_ID__=${JSON.stringify(buildId)};`,
           }}
         />
-        <PwaUpdateManager />
+        {/* PWA service worker RETIRED 7/26 — its cache layer manufactured the
+            "please refresh" bug class. public/sw.js is now a self-destructor
+            that cleans up every previously-installed device; browsers
+            revalidate registered workers on navigation, so the cleanup
+            reaches them without any register() call. */}
       </body>
     </html>
   );
