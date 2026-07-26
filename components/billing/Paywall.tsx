@@ -17,6 +17,7 @@ import {
   type TierId,
 } from "@/lib/billing/tiers";
 import { PlanCard, RoomPackCard, PlanRow, PricingToggle } from "@/components/billing/PricingCards";
+import { isNativeApp } from "@/lib/platform/native";
 
 export type PaywallReason = "daily_limit" | "custom_course" | "rooms" | "generic";
 type Billing = "monthly" | "yearly";
@@ -103,6 +104,13 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
 
   const startCheckout = async (planId: TierId) => {
     if (loadingPlan) return;
+    // STORE COMPLIANCE (mobile app): digital goods may not be sold through an
+    // outside payment system inside the app. The app sells nothing; purchases
+    // live on miomika.com in a browser and everything owned works in the app.
+    if (isNativeApp()) {
+      setError(lang === "th" ? "การซื้อทำได้ที่ miomika.com ในเบราว์เซอร์ของคุณ ทุกอย่างที่ซื้อไว้ใช้งานในแอปนี้ได้ทันทีค่ะ" : "Purchases are available on miomika.com in your web browser. Everything you own there works right here in the app.");
+      return;
+    }
     setError(null);
     setLoadingPlan(planId);
     const fallback =
@@ -128,6 +136,10 @@ function PaywallSheet({ reason, onClose }: { reason: PaywallReason; onClose: () 
 
   const buyPack = async (count: number) => {
     if (loadingPack !== null) return;
+    if (isNativeApp()) {
+      setError(lang === "th" ? "การซื้อทำได้ที่ miomika.com ในเบราว์เซอร์ของคุณ ทุกอย่างที่ซื้อไว้ใช้งานในแอปนี้ได้ทันทีค่ะ" : "Purchases are available on miomika.com in your web browser. Everything you own there works right here in the app.");
+      return;
+    }
     setError(null);
     setLoadingPack(count);
     const fallback =

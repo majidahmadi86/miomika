@@ -19,6 +19,7 @@ import {
   type TierId,
 } from "@/lib/billing/tiers";
 import { PlanCard, RoomPackCard, PricingSectionLabel, PricingToggle } from "@/components/billing/PricingCards";
+import { isNativeApp } from "@/lib/platform/native";
 
 type Billing = "monthly" | "yearly";
 
@@ -55,6 +56,11 @@ export default function PricingPage() {
   async function startCheckout(planId: TierId) {
     if (planId === "free") {
       router.push("/signup");
+      return;
+    }
+    // STORE COMPLIANCE (mobile app): the app sells nothing — see lib/platform/native.
+    if (isNativeApp()) {
+      setErr("Purchases are available on miomika.com in your web browser. Everything you own there works right here in the app.");
       return;
     }
     setErr(null);
