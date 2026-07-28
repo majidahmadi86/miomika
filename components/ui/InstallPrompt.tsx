@@ -18,6 +18,24 @@ function isStandalone(): boolean {
   return window.matchMedia("(display-mode: standalone)").matches;
 }
 
+/**
+ * The PWA install prompt RETIRES on Android now that the real app exists on
+ * Google Play: offering a second, weaker "install" would put two Miomika
+ * icons on the same phone and confuse everyone (Mike, 7/28). Desktop keeps
+ * the PWA prompt (no Play Store there). Inside the native shell it is
+ * suppressed outright. When production goes live, this same spot becomes the
+ * "Get it on Google Play" banner.
+ */
+function suppressOnThisDevice(): boolean {
+  try {
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+    if (cap?.isNativePlatform?.()) return true;
+    return /Android/i.test(navigator.userAgent);
+  } catch {
+    return false;
+  }
+}
+
 function getDismissRecord(): DismissRecord | null {
   try {
     const raw = localStorage.getItem(DISMISS_KEY);
@@ -71,6 +89,7 @@ export function InstallPrompt() {
       }, 5000);
     };
 
+    if (suppressOnThisDevice()) return;
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);

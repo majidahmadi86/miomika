@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -22,7 +21,6 @@ const AmbientBackground = dynamic(
 );
 
 export default function LoginPage() {
-  const router = useRouter();
   const isThai = useUILanguage() === "th";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -97,15 +95,17 @@ export default function LoginPage() {
           .eq("id", signInData.user.id)
           .maybeSingle();
         if (prof && !prof.onboarding_completed_at) {
-          router.push("/onboarding");
-          router.refresh();
+          // FULL page navigation after auth (not the client router): the fresh
+          // session cookies are then guaranteed to ride the very first request
+          // on every platform. The client-router push raced them in the app's
+          // WebView — the "I have to log in twice" bug.
+          window.location.assign("/onboarding");
           return;
         }
       }
       const destination = getPostLoginPath();
       clearRedirectTo();
-      router.push(destination);
-      router.refresh();
+      window.location.assign(destination);
     } finally {
       setLoading(false);
     }
