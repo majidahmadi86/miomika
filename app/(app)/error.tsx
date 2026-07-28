@@ -74,6 +74,12 @@ export default function AppError({
         {heading}
       </h1>
       <p className="mt-1 text-center text-sm text-[#9A8B73]">{sub}</p>
+      {/* DIAGNOSTIC CONFESSION — see app/global-error.tsx: one screenshot
+          names the culprit instead of another blind fix. */}
+      <p className="mt-4 max-w-xs break-words text-center text-[11px] text-[#C4B8A4]">
+        {String(error?.name ?? "Error")}: {String(error?.message ?? "unknown").slice(0, 160)}
+        {error?.digest ? ` · ${error.digest}` : ""}
+      </p>
       <div className="mt-8 flex w-full max-w-xs flex-col gap-3">
         <button
           type="button"

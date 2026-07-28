@@ -67,6 +67,32 @@ export default function GlobalError({
         <p style={{ marginTop: "8px", fontSize: "14px", color: "#9A8B73", textAlign: "center" }}>
           Please refresh the page.
         </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          style={{
+            marginTop: "24px",
+            width: "100%",
+            maxWidth: "280px",
+            padding: "12px 0",
+            fontSize: "14px",
+            fontWeight: 600,
+            color: "#FFFFFF",
+            background: "linear-gradient(135deg, #6ECDB8, #34A98F)",
+            border: "none",
+            borderRadius: "999px",
+            cursor: "pointer",
+          }}
+        >
+          ลองอีกครั้ง · Try again
+        </button>
+        {/* DIAGNOSTIC CONFESSION: this card only stays visible for PERSISTENT
+            errors (the silent reload already failed). Print the real cause so
+            a single user screenshot names the culprit — no more blind fixes. */}
+        <p style={{ marginTop: "20px", fontSize: "11px", color: "#C4B8A4", textAlign: "center", maxWidth: "320px", wordBreak: "break-word" }}>
+          {String(error?.name ?? "Error")}: {String(error?.message ?? "unknown").slice(0, 160)}
+          {error?.digest ? ` · ${error.digest}` : ""}
+        </p>
       </body>
     </html>
   );
