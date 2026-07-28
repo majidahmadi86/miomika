@@ -63,3 +63,8 @@ NEXT_SESSION_PROMPT.md
 PHASE1_WEEK1.md
 PHASE1_WEEK2.md
 PHASE1_WEEK3.md
+
+# Android release signing ? never committed
+android/key.properties
+android/*.jks
+android/app/*.jks
