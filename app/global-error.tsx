@@ -46,7 +46,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="th">
+    <html lang="th" translate="no">
       <body
         style={{
           background: "#FAFAF6",

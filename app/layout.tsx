@@ -101,10 +101,18 @@ export default function RootLayout({
   return (
     <html
       lang="th"
+      translate="no"
       suppressHydrationWarning
       className={`${kanit.variable} ${quicksand.variable} ${sarabun.variable} overflow-hidden bg-[var(--mk-canvas)] antialiased md:h-auto md:max-h-none md:overflow-visible md:min-h-screen`}
     >
       <head>
+        {/* NOTRANSLATE — the root cause of the "please refresh" crash on phones:
+            Chrome/WebView auto-translate rewrites the DOM under React (wrapping
+            Thai text in its own tags) → "NotFoundError: removeChild ... not a
+            child of this node", persistently, on every reload. Beyond the
+            crash: machine-translating a language-TEACHING app garbles the
+            lessons themselves. Miomika is the translator. */}
+        <meta name="google" content="notranslate" />
         <link rel="icon" type="image/png" href="/manifest-icon-512.png" />
         {process.env.NEXT_PUBLIC_SUPABASE_URL ? (
           <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} crossOrigin="anonymous" />
