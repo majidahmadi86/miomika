@@ -282,6 +282,13 @@ export function buildSessionLiveConfig(
 ): LiveConnectConfig {
   return {
     responseModalities: [Modality.AUDIO],
+    // PHYSICAL BREVITY WALL (rooms). Prompt laws alone never held: the model
+    // drifts back to monologues and steals the learner's speaking time. On the
+    // Live API audio output is billed/counted at roughly 25 tokens per second
+    // of speech, so 600 tokens is a hard ceiling of about 24 seconds per turn.
+    // A normal 3-sentence teaching turn is 10-15s and never touches this; only
+    // a genuine monologue gets cut. This is a WALL, not a plea.
+    maxOutputTokens: 600,
     inputAudioTranscription: {},
     outputAudioTranscription: {},
     speechConfig: {
