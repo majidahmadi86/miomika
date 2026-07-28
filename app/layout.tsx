@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { NativeSplashGate } from "@/components/system/NativeSplashGate";
 import { Kanit, Quicksand, Sarabun } from "next/font/google";
 import { getBuildId } from "@/lib/pwa/build-id";
 import "./globals.css";
@@ -132,6 +133,7 @@ export default function RootLayout({
             __html: `window.__MIOMIKA_BUILD_ID__=${JSON.stringify(buildId)};`,
           }}
         />
+        <NativeSplashGate />
         {/* PWA service worker RETIRED 7/26 — its cache layer manufactured the
             "please refresh" bug class. public/sw.js is now a self-destructor
             that cleans up every previously-installed device; browsers
