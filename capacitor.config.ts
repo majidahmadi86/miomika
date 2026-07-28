@@ -5,7 +5,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * Every Vercel deploy updates the app instantly; there is no second codebase.
  */
 const config: CapacitorConfig = {
-  appId: "com.mikarostudio.miomika",
+  appId: "com.miomika.app",
   appName: "Miomika",
   webDir: "mobile/www",
   server: {

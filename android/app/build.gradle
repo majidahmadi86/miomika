@@ -4,7 +4,10 @@ android {
     namespace = "com.mikarostudio.miomika"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.mikarostudio.miomika"
+        // Store identity (permanent from the first Play upload). The internal
+        // namespace below stays com.mikarostudio.miomika on purpose — it is
+        // invisible to users and changing it would mean moving MainActivity.
+        applicationId "com.miomika.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
