@@ -157,13 +157,24 @@ export default function SignupPage() {
     try {
       const supabase = createClient();
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: origin ? `${origin}/onboarding` : undefined },
       });
       if (signUpError) {
         setError(getSignupError(signUpError.message, isThai));
+        return;
+      }
+      // TELL THE TRUTH (Mike 7/28): this used to ALWAYS show "check your email"
+      // even though Supabase signs the person in immediately when email
+      // confirmation is off — they saw a dead-end screen, waited for a mail
+      // that was never sent, and many left with a working account they never
+      // used. A session in the response means the account is LIVE: walk them
+      // straight into onboarding. The confirmation screen now appears ONLY
+      // when Supabase really is waiting for a click (no session returned).
+      if (signUpData?.session) {
+        window.location.assign("/onboarding");
         return;
       }
       setSuccess(true);
