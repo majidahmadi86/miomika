@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { isNativeApp } from "@/lib/platform/native";
 import { waitForAuthCookie } from "@/lib/supabase/wait-for-auth-cookie";
 import Image from "next/image";
 import Link from "next/link";
@@ -122,6 +123,35 @@ export default function LoginPage() {
       const supabase = createClient();
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const next = encodeURIComponent(getPostLoginPath());
+      // NATIVE APP: Google OAuth must NOT navigate this WebView — the shell
+      // ejects foreign hosts (accounts.google.com) to Chrome, stranding the
+      // session outside the app (the "opens in Chrome" shame + both login
+      // bugs). Instead: open Google in an in-app Custom Tab; when it finishes
+      // on miomika.com/auth/callback, the App Link routes that URL back INTO
+      // the app, where the session is created in the app's own cookies.
+      if (isNativeApp()) {
+        const { data: oauthData, error: oauthErr } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${origin}/auth/callback?next=${next}`,
+            queryParams: { prompt: "select_account", access_type: "offline" },
+            skipBrowserRedirect: true,
+          },
+        });
+        if (oauthErr || !oauthData?.url) {
+          setError(t.errGoogle);
+          setGoogleLoading(false);
+          return;
+        }
+        try {
+          const cap = (window as unknown as { Capacitor?: { Plugins?: { Browser?: { open?: (o: { url: string }) => Promise<void> } } } }).Capacitor;
+          await cap?.Plugins?.Browser?.open?.({ url: oauthData.url });
+        } catch {
+          window.location.assign(oauthData.url);
+        }
+        setGoogleLoading(false);
+        return;
+      }
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

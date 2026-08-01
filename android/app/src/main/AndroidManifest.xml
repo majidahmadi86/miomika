@@ -18,6 +18,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- APP LINKS: https://miomika.com opens THE APP. This is what
+                 brings Google sign-in home — the OAuth Custom Tab finishes on
+                 miomika.com/auth/callback, and this filter routes that URL
+                 back INTO the app instead of leaving the user stranded in
+                 Chrome. Verified against /.well-known/assetlinks.json. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="miomika.com" />
+            </intent-filter>
         </activity>
 
         <provider

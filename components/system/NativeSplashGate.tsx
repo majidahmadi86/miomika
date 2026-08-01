@@ -13,6 +13,18 @@ import { isNativeApp } from "@/lib/platform/native";
 export function NativeSplashGate() {
   useEffect(() => {
     if (!isNativeApp()) return;
+    // After Google OAuth returns via the App Link, the Custom Tab that hosted
+    // it may linger behind the app — close it whenever the app resumes or a
+    // deep link opens us. Best-effort on every count.
+    try {
+      const cap = (window as unknown as {
+        Capacitor?: { Plugins?: { App?: { addListener?: (ev: string, cb: () => void) => void }; Browser?: { close?: () => Promise<void> } } };
+      }).Capacitor;
+      const closeTab = () => { void cap?.Plugins?.Browser?.close?.().catch(() => {}); };
+      cap?.Plugins?.App?.addListener?.("resume", closeTab);
+      cap?.Plugins?.App?.addListener?.("appUrlOpen", closeTab);
+      closeTab();
+    } catch { /* best-effort */ }
     // Two animation frames = the first real paint is on screen.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
