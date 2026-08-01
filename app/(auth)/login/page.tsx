@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { waitForAuthCookie } from "@/lib/supabase/wait-for-auth-cookie";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -88,6 +89,9 @@ export default function LoginPage() {
       // signup from before the confirm-route fix) is routed through /onboarding
       // first. Do NOT clear the stored redirect — /onboarding honors it after
       // completing.
+      // Never navigate before the session cookie is provably readable — the
+      // WebView race outlived the full-page-navigation fix (Mike, 8/1).
+      await waitForAuthCookie(supabase);
       if (signInData.user) {
         const { data: prof } = await supabase
           .from("profiles")

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { waitForAuthCookie } from "@/lib/supabase/wait-for-auth-cookie";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -174,6 +175,7 @@ export default function SignupPage() {
       // straight into onboarding. The confirmation screen now appears ONLY
       // when Supabase really is waiting for a click (no session returned).
       if (signUpData?.session) {
+        await waitForAuthCookie(supabase);
         window.location.assign("/onboarding");
         return;
       }
