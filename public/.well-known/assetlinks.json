@@ -4,7 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.miomika.app",
-      "sha256_cert_fingerprints": ["REPLACE_WITH_SHA256_FROM_PLAY_CONSOLE"]
+      "sha256_cert_fingerprints": ["D9:B0:38:9E:EA:BF:36:55:13:44:FC:89:BF:E7:48:F3:61:24:C6:7D:93:D5:8C:27:07:2D:02:67:BF:CA:FD:34"]
     }
   }
 ]
