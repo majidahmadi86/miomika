@@ -137,7 +137,10 @@ export default function SignupPage() {
         const { data: oauthData, error: oauthErr } = await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
-            redirectTo: `${origin}/auth/callback?next=/onboarding`,
+            // Custom scheme, not https: browsers hand THIS to the app even
+            // mid-redirect. The app replays it against /auth/callback in its
+            // own cookie jar (see NativeSplashGate).
+            redirectTo: `com.miomika.app://auth-callback?next=/onboarding`,
             queryParams: { prompt: "select_account", access_type: "offline" },
             skipBrowserRedirect: true,
           },

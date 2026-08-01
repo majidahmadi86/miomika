@@ -29,6 +29,20 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="miomika.com" />
             </intent-filter>
+            <!-- OAUTH RETURN DOOR: server redirects inside a browser tab do
+                 NOT trigger https App Links (those fire on tapped links only)
+                 — the documented Supabase-on-Capacitor pattern hands the
+                 OAuth callback to the app via a custom scheme, which browsers
+                 DO follow mid-redirect. The app receives
+                 com.miomika.app://auth-callback?code=... via appUrlOpen and
+                 replays it against /auth/callback INSIDE the app's own
+                 cookie jar, where the PKCE verifier lives. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.miomika.app" />
+            </intent-filter>
         </activity>
 
         <provider

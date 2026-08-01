@@ -18,11 +18,29 @@ export function NativeSplashGate() {
     // deep link opens us. Best-effort on every count.
     try {
       const cap = (window as unknown as {
-        Capacitor?: { Plugins?: { App?: { addListener?: (ev: string, cb: () => void) => void }; Browser?: { close?: () => Promise<void> } } };
+        Capacitor?: {
+          Plugins?: {
+            App?: { addListener?: (ev: string, cb: (data?: { url?: string }) => void) => void };
+            Browser?: { close?: () => Promise<void> };
+          };
+        };
       }).Capacitor;
       const closeTab = () => { void cap?.Plugins?.Browser?.close?.().catch(() => {}); };
-      cap?.Plugins?.App?.addListener?.("resume", closeTab);
-      cap?.Plugins?.App?.addListener?.("appUrlOpen", closeTab);
+      cap?.Plugins?.App?.addListener?.("resume", () => closeTab());
+      // THE OAUTH RETURN DOOR. Google finishes in the Custom Tab and
+      // redirects to com.miomika.app://auth-callback?code=... — the OS hands
+      // that URL here. Replaying it against /auth/callback INSIDE this
+      // WebView is the whole point: the PKCE verifier cookie lives in the
+      // app's jar, so the code exchange succeeds HERE and the session is
+      // created in the app — never stranded in an outside browser again.
+      cap?.Plugins?.App?.addListener?.("appUrlOpen", (data?: { url?: string }) => {
+        closeTab();
+        const url = data?.url ?? "";
+        if (url.startsWith("com.miomika.app://auth-callback")) {
+          const qs = url.includes("?") ? url.slice(url.indexOf("?") + 1) : "";
+          window.location.assign(`/auth/callback${qs ? `?${qs}` : ""}`);
+        }
+      });
       closeTab();
     } catch { /* best-effort */ }
     // Two animation frames = the first real paint is on screen.
