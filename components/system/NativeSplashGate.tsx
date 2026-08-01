@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { isNativeApp } from "@/lib/platform/native";
 
 /**
@@ -11,6 +11,10 @@ import { isNativeApp } from "@/lib/platform/native";
  * strand the splash). No-op everywhere except inside the Capacitor shell.
  */
 export function NativeSplashGate() {
+  // True while the OAuth return is being replayed against /auth/callback —
+  // covers the 1-2s where the old page (usually /login) would flash before
+  // the signed-in navigation lands. A branded curtain instead of confusion.
+  const [signingIn, setSigningIn] = useState(false);
   useEffect(() => {
     if (!isNativeApp()) return;
     // After Google OAuth returns via the App Link, the Custom Tab that hosted
@@ -37,6 +41,7 @@ export function NativeSplashGate() {
         closeTab();
         const url = data?.url ?? "";
         if (url.startsWith("com.miomika.app://auth-callback")) {
+          setSigningIn(true);
           const qs = url.includes("?") ? url.slice(url.indexOf("?") + 1) : "";
           let next = "/home";
           try {
@@ -74,5 +79,13 @@ export function NativeSplashGate() {
       });
     });
   }, []);
-  return null;
+  if (!signingIn) return null;
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#FFFDF8" }}>
+      <div style={{ width: 42, height: 42, borderRadius: "50%", border: "3px solid #C9E8DE", borderTopColor: "#34A98F", animation: "mkspin 0.9s linear infinite" }} />
+      <p style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 15, fontWeight: 600, color: "#1F7A68", margin: 0 }}>Signing you in…</p>
+      <p style={{ fontFamily: "'Sarabun', sans-serif", fontSize: 13, color: "#8A7E6C", margin: 0 }}>กำลังพาเข้าสู่ระบบค่ะ</p>
+      <style>{`@keyframes mkspin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 }
