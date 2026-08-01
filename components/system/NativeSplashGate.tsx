@@ -33,12 +33,29 @@ export function NativeSplashGate() {
       // WebView is the whole point: the PKCE verifier cookie lives in the
       // app's jar, so the code exchange succeeds HERE and the session is
       // created in the app — never stranded in an outside browser again.
-      cap?.Plugins?.App?.addListener?.("appUrlOpen", (data?: { url?: string }) => {
+      cap?.Plugins?.App?.addListener?.("appUrlOpen", (data?: { url?: string; canGoBack?: boolean }) => {
         closeTab();
         const url = data?.url ?? "";
         if (url.startsWith("com.miomika.app://auth-callback")) {
           const qs = url.includes("?") ? url.slice(url.indexOf("?") + 1) : "";
-          window.location.assign(`/auth/callback${qs ? `?${qs}` : ""}`);
+          let next = "/home";
+          try {
+            next = localStorage.getItem("mk_native_next") || "/home";
+            localStorage.removeItem("mk_native_next");
+          } catch { /* best-effort */ }
+          window.location.assign(`/auth/callback?${qs}${qs ? "&" : ""}next=${encodeURIComponent(next)}`);
+        }
+      });
+      // A REAL APP'S BACK BUTTON: registering this listener takes over
+      // Android's back press — go back in history when there is history,
+      // minimize to the home screen when there is none. Without it the press
+      // did nothing at the root and users felt trapped (Mike, 8/1).
+      cap?.Plugins?.App?.addListener?.("backButton", (data?: { url?: string; canGoBack?: boolean }) => {
+        const appApi = cap?.Plugins?.App as unknown as { minimizeApp?: () => Promise<void>; exitApp?: () => Promise<void> } | undefined;
+        if (data?.canGoBack ?? window.history.length > 1) {
+          window.history.back();
+        } else {
+          void appApi?.minimizeApp?.().catch(() => appApi?.exitApp?.());
         }
       });
       closeTab();

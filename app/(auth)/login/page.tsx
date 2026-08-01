@@ -130,13 +130,18 @@ export default function LoginPage() {
       // on miomika.com/auth/callback, the App Link routes that URL back INTO
       // the app, where the session is created in the app's own cookies.
       if (isNativeApp()) {
+        // Destination rides localStorage, NOT the redirect URL: the allow-list
+        // must see the EXACT registered string, no query attached, so it can
+        // never fall back to the Site URL again (that fallback is what dumped
+        // the session into the browser tab).
+        try { localStorage.setItem("mk_native_next", getPostLoginPath()); } catch { /* best-effort */ }
         const { data: oauthData, error: oauthErr } = await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
             // Custom scheme, not https: browsers hand THIS to the app even
             // mid-redirect. The app replays it against /auth/callback in its
             // own cookie jar (see NativeSplashGate).
-            redirectTo: `com.miomika.app://auth-callback?next=${next}`,
+            redirectTo: "com.miomika.app://auth-callback",
             queryParams: { prompt: "select_account", access_type: "offline" },
             skipBrowserRedirect: true,
           },
