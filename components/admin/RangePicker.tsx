@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, type CSSProperties, type FormEvent } from "react";
 import type { RangePreset } from "@/lib/admin/time-range";
+import { adminPalette, FONT_DISPLAY, tint } from "@/components/admin/ui";
 
 const PRESETS: { id: RangePreset; label: string }[] = [
   { id: "24h", label: "24h" },
@@ -32,7 +33,6 @@ export default function RangePicker() {
   const navigate = useCallback(
     (preset: RangePreset, customFrom?: string, customTo?: string) => {
       const next = new URLSearchParams(sp.toString());
-      // Drop stale custom bounds when switching to a preset.
       next.delete("from");
       next.delete("to");
       if (preset === "custom") {
@@ -56,46 +56,45 @@ export default function RangePicker() {
 
   const seg: CSSProperties = {
     display: "inline-flex",
-    border: "0.5px solid #EDE8E0",
-    borderRadius: 8,
+    borderRadius: 99,
     overflow: "hidden",
-    background: "#FBFAF6",
+    background: tint(adminPalette.teal, 0.06),
+    border: `0.5px solid ${tint(adminPalette.teal, 0.18)}`,
+    padding: 2,
+    gap: 1,
   };
   const btn = (on: boolean): CSSProperties => ({
-    padding: "5px 10px",
+    padding: "5px 11px",
     fontSize: 12,
     fontWeight: on ? 700 : 500,
-    fontFamily: "inherit",
+    fontFamily: FONT_DISPLAY,
     border: "none",
     cursor: "pointer",
-    background: on ? "#EAF6F1" : "transparent",
-    color: on ? "#1F7A68" : "#6b675f",
-    borderRight: "0.5px solid #EDE8E0",
+    borderRadius: 99,
+    background: on ? adminPalette.teal : "transparent",
+    color: on ? "#fff" : adminPalette.muted,
   });
   const input: CSSProperties = {
     padding: "4px 8px",
-    border: "0.5px solid #D9D3C8",
-    borderRadius: 6,
+    border: `0.5px solid ${adminPalette.line}`,
+    borderRadius: 8,
     fontSize: 12,
     fontFamily: "inherit",
     background: "#fff",
-    color: "#2A2A28",
+    color: adminPalette.ink,
   };
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       <div style={seg} role="group" aria-label="Time range">
-        {PRESETS.map((p, i) => (
+        {PRESETS.map((p) => (
           <button
             key={p.id}
             type="button"
-            style={{ ...btn(active === p.id), borderRight: i === PRESETS.length - 1 ? "none" : btn(false).borderRight }}
+            style={btn(active === p.id)}
             onClick={() => {
-              if (p.id === "custom") {
-                navigate("custom", from || undefined, to || undefined);
-              } else {
-                navigate(p.id);
-              }
+              if (p.id === "custom") navigate("custom", from || undefined, to || undefined);
+              else navigate(p.id);
             }}
           >
             {p.label}
@@ -105,19 +104,19 @@ export default function RangePicker() {
       {active === "custom" && (
         <form onSubmit={onCustomSubmit} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={input} aria-label="From date" />
-          <span style={{ fontSize: 11, color: "#9A8B73" }}>·</span>
+          <span style={{ fontSize: 11, color: adminPalette.muted }}>·</span>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={input} aria-label="To date" />
           <button
             type="submit"
             style={{
-              padding: "4px 10px",
+              padding: "4px 12px",
               fontSize: 12,
               fontWeight: 700,
-              fontFamily: "inherit",
-              border: "0.5px solid #C9E5DC",
-              background: "#EAF6F1",
-              color: "#1F7A68",
-              borderRadius: 6,
+              fontFamily: FONT_DISPLAY,
+              border: "none",
+              background: adminPalette.teal,
+              color: "#fff",
+              borderRadius: 99,
               cursor: "pointer",
             }}
           >
