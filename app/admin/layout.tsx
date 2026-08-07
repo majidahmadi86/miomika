@@ -8,18 +8,24 @@ import { adminPalette, FONT_DISPLAY, tint } from "@/components/admin/ui";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Scroll root: globals.css locks html/body overflow:hidden below md.
+ * This layout owns a flex column at 100dvh; only the content pane scrolls
+ * (flex-1 min-h-0 overflow-y-auto) · same lesson as /pricing.
+ */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   await requireAdmin();
   return (
     <div
+      className="flex h-[100dvh] flex-col"
       style={{
         fontFamily: FONT_DISPLAY,
         background: adminPalette.canvas,
-        minHeight: "100vh",
         color: adminPalette.ink,
       }}
     >
       <div
+        className="shrink-0"
         style={{
           display: "flex",
           alignItems: "center",
@@ -28,8 +34,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           padding: "10px 14px",
           background: "#fff",
           flexWrap: "wrap",
-          borderBottom: "none",
-          boxShadow: `inset 0 -1px 0 transparent`,
           position: "relative",
         }}
       >
@@ -74,10 +78,17 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </a>
         </div>
       </div>
-      <Suspense fallback={null}>
-        <AdminNav />
-      </Suspense>
-      <div style={{ maxWidth: 1180, margin: "0 auto" }}>{children}</div>
+      <div className="shrink-0">
+        <Suspense fallback={null}>
+          <AdminNav />
+        </Suspense>
+      </div>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto pb-8"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        <div style={{ maxWidth: 1180, margin: "0 auto" }}>{children}</div>
+      </div>
       <style>{`
         tr.admin-tr:hover > td { background: ${tint(adminPalette.teal, 0.04)} !important; }
       `}</style>
