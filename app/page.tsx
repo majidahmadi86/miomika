@@ -53,14 +53,30 @@ const T = {
     ],
     howTry: "Try it now →",
     insideEyebrow: "Inside Miomika",
-    inside: [
-      "Voice conversations in Thai and English",
-      "Hundreds of words and phrases across 27 topics",
-      "CEFR course library from A1 to C1",
-      "Chat, Teach and Translate modes",
-      "Streaks, bonding and a memory that grows",
-      "Live speaking rooms on paid plans",
+    insideShots: [
+      {
+        src: "/press/shot-talk.png",
+        alt: "Miomika voice conversation with Miomi",
+        caption: "Real voice conversation with Miomi",
+        width: 1500,
+        height: 1142,
+      },
+      {
+        src: "/press/shot-card.png",
+        alt: "Word card taught during a Miomika conversation",
+        caption: "Words taught in the flow of talk",
+        width: 1717,
+        height: 1204,
+      },
+      {
+        src: "/press/shot-growth.png",
+        alt: "Miomika growth tracking screen",
+        caption: "Your growth, tracked honestly",
+        width: 1405,
+        height: 1083,
+      },
     ],
+    insideLive: "Live at miomika.com and in closed testing on Google Play.",
     pricingEyebrow: "Simple pricing in Thai baht",
     pricingNote: "Cancel anytime. Full details on the pricing page.",
     perMonth: "/month",
@@ -115,15 +131,31 @@ const T = {
       },
     ],
     howTry: "ลองเลย →",
-    insideEyebrow: "ใน Miomika มีอะไรบ้าง",
-    inside: [
-      "สนทนาด้วยเสียงทั้งภาษาไทยและอังกฤษ",
-      "คำศัพท์และวลีหลายร้อยคำใน 27 หัวข้อ",
-      "คลังคอร์ส CEFR ตั้งแต่ A1 ถึง C1",
-      "โหมดคุยเล่น สอน และแปลภาษา",
-      "สตรีค ความผูกพัน และความทรงจำที่เติบโต",
-      "ห้องพูดสดสำหรับแพ็กเกจแบบชำระเงิน",
+    insideEyebrow: "Inside Miomika",
+    insideShots: [
+      {
+        src: "/press/shot-talk.png",
+        alt: "สนทนาด้วยเสียงกับมีโอมิใน Miomika",
+        caption: "Real voice conversation with Miomi",
+        width: 1500,
+        height: 1142,
+      },
+      {
+        src: "/press/shot-card.png",
+        alt: "การ์ดคำศัพท์ที่สอนระหว่างคุยใน Miomika",
+        caption: "Words taught in the flow of talk",
+        width: 1717,
+        height: 1204,
+      },
+      {
+        src: "/press/shot-growth.png",
+        alt: "หน้าจอติดตามการเติบโตใน Miomika",
+        caption: "Your growth, tracked honestly",
+        width: 1405,
+        height: 1083,
+      },
     ],
+    insideLive: "Live at miomika.com and in closed testing on Google Play.",
     pricingEyebrow: "ราคาเข้าใจง่าย เป็นเงินบาท",
     pricingNote: "ยกเลิกได้ทุกเมื่อ ดูรายละเอียดทั้งหมดได้ที่หน้าราคา",
     perMonth: "/เดือน",
@@ -360,19 +392,40 @@ export default async function Page({
             </div>
           </section>
 
-          {/* ── Inside Miomika ── */}
-          <section data-reveal className="py-6">
-            <p className="text-sm font-medium uppercase tracking-wide text-accent">{t.insideEyebrow}</p>
-            <ul className="mt-5 flex flex-wrap gap-2.5">
-              {t.inside.map((item) => (
-                <li
-                  key={item}
-                  className="rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink-muted"
+          {/* ── Inside Miomika (live product screenshots) ── */}
+          <section data-reveal className="py-12" aria-labelledby="inside-heading">
+            <h2
+              id="inside-heading"
+              className="text-2xl font-semibold [font-family:var(--font-kanit),sans-serif]"
+            >
+              {t.insideEyebrow}
+            </h2>
+            <div className="mt-6 grid gap-5 sm:grid-cols-2 md:grid-cols-3">
+              {t.insideShots.map((shot) => (
+                <figure
+                  key={shot.src}
+                  className="overflow-hidden rounded-card border border-line bg-surface shadow-card"
                 >
-                  {item}
-                </li>
+                  <div className="relative aspect-[4/3] bg-surface-2 p-3 sm:p-4">
+                    <div className="relative h-full w-full overflow-hidden rounded-[18px] border border-line bg-canvas shadow-card">
+                      <Image
+                        src={shot.src}
+                        alt={shot.alt}
+                        width={shot.width}
+                        height={shot.height}
+                        loading="lazy"
+                        sizes="(max-width: 640px) 90vw, (max-width: 768px) 45vw, 300px"
+                        className="h-full w-full object-cover object-top"
+                      />
+                    </div>
+                  </div>
+                  <figcaption className="border-t border-line px-4 py-3 text-sm leading-snug text-ink-muted">
+                    {shot.caption}
+                  </figcaption>
+                </figure>
               ))}
-            </ul>
+            </div>
+            <p className="mt-5 text-sm text-ink-subtle">{t.insideLive}</p>
           </section>
 
           {/* ── Pricing (live data from lib/billing/tiers) ── */}
