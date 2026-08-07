@@ -2,8 +2,10 @@ import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/service";
 import UserActions from "@/components/admin/UserActions";
 import { THB_PER_USD, COST_ALERT_THB_7D } from "@/lib/admin/cost";
-import { parseRange, withRange } from "@/lib/admin/time-range";
+import { parseRange, rangeIso, withRange } from "@/lib/admin/time-range";
+import { costSeries } from "@/lib/admin/metrics";
 import AdminPageHeader, { adminCard, adminPagePad } from "@/components/admin/AdminPageHeader";
+import { AdminBarChart } from "@/components/admin/Chart";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +26,7 @@ export default async function UserCockpitPage({
 }) {
   const { id } = await params;
   const range = parseRange(await searchParams);
+  const { fromIso, toIso } = rangeIso(range);
   const supabase = await createServiceClient();
 
   const { data: u } = await supabase
@@ -33,22 +36,25 @@ export default async function UserCockpitPage({
     .maybeSingle();
 
   if (!u) {
-    return <div style={{ padding: "40px 18px", color: "#9A8B73" }}>User not found. <Link href={withRange("/admin/users", range.queryString)} style={{ color: "#2C8E76" }}>back to users</Link></div>;
+    return (
+      <div style={{ padding: "40px 18px", color: "#9A8B73" }}>
+        User not found. <Link href={withRange("/admin/users", range.queryString)} style={{ color: "#2C8E76" }}>back to users</Link>
+      </div>
+    );
   }
 
-  const now = new Date();
-  const since7 = new Date(now.getTime() - 7 * 864e5).toISOString();
-  const monthStart = new Date(now);
+  const monthStart = new Date(range.to);
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
 
-  const [usageRes, roomsRes, refAsReferrer, refAsReferred, roomLedger, baktLedger] = await Promise.all([
-    supabase.from("llm_usage").select("est_cost_usd, ok").eq("user_id", id).gte("created_at", since7).limit(20000),
+  const [usageRes, roomsRes, refAsReferrer, refAsReferred, roomLedger, baktLedger, userCostSeries] = await Promise.all([
+    supabase.from("llm_usage").select("est_cost_usd, ok").eq("user_id", id).gte("created_at", fromIso).lte("created_at", toIso).limit(20000),
     supabase.from("speaking_sessions").select("id", { count: "exact", head: true }).eq("user_id", id).gte("created_at", monthStart.toISOString()),
     supabase.from("referral_conversions").select("id", { count: "exact", head: true }).eq("referrer_id", id),
     supabase.from("referral_conversions").select("rewarded").eq("referred_id", id).maybeSingle(),
     supabase.from("room_credit_ledger").select("delta, reason, created_at").eq("user_id", id).order("created_at", { ascending: false }).limit(6),
     supabase.from("credit_ledger").select("delta, reason, created_at").eq("user_id", id).order("created_at", { ascending: false }).limit(6),
+    costSeries(range, id),
   ]);
 
   const usage = (usageRes.data ?? []) as { est_cost_usd: number | string; ok: boolean }[];
@@ -64,13 +70,12 @@ export default async function UserCockpitPage({
   const paid = (u.tier ?? "free") !== "free" || ["active", "trialing", "past_due"].includes(u.subscription_status ?? "");
   const pendingReferral = refAsReferred.data ? refAsReferred.data.rewarded === false && paid : false;
 
-  // Health flags
   type Flag = { sev: "danger" | "warning"; text: string };
   const flags: Flag[] = [];
   if (BAD_STATUS.includes(u.subscription_status ?? "")) flags.push({ sev: "danger", text: `Payment ${u.subscription_status} · last charge failed. Check Stripe; manual set-tier if needed.` });
   if ((u.tier ?? "free") === "free" && ["active", "trialing", "past_due"].includes(u.subscription_status ?? "")) flags.push({ sev: "danger", text: "Subscription looks active but tier is free · webhook drift. Set the correct tier below." });
   if (pendingReferral) flags.push({ sev: "warning", text: "Referral unrewarded · this user paid but the ฿30 reward never fired. Use Reward below." });
-  if (costThb > COST_ALERT_THB_7D) flags.push({ sev: "warning", text: `High AI cost: ฿${costThb} in 7 days. Worth a look for abuse or a loop.` });
+  if (costThb > COST_ALERT_THB_7D) flags.push({ sev: "warning", text: `High AI cost: ฿${costThb} in range. Worth a look for abuse or a loop.` });
 
   const card: React.CSSProperties = adminCard;
   const kv = (k: string, v: React.ReactNode) => (
@@ -113,7 +118,7 @@ export default async function UserCockpitPage({
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         <div style={card}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Account</div>
           {kv("Tier", u.tier ?? "free")}
@@ -127,7 +132,7 @@ export default async function UserCockpitPage({
           {u.stripe_customer_id ? kv("Stripe", <a href={`${stripeBase}/customers/${u.stripe_customer_id}`} target="_blank" rel="noreferrer" style={{ color: "#2C8E76" }}>open customer</a>) : null}
         </div>
         <div style={card}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Last 7 days</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>In range</div>
           {kv("AI cost", <span style={{ color: costThb > COST_ALERT_THB_7D ? "#854F0B" : "#2A2A28" }}>฿{costThb} (${cost.toFixed(2)})</span>)}
           {kv("AI calls", usage.length)}
           {kv("Failed calls", fails)}
@@ -135,7 +140,12 @@ export default async function UserCockpitPage({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ ...card, marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>AI cost in range</div>
+        <AdminBarChart data={userCostSeries} bucket={range.bucket} name="฿ cost" color="#C9A96E" height={180} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         <div style={card}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Room credit ledger</div>
           {(roomLedger.data ?? []).length === 0 ? <div style={{ fontSize: 12, color: "#B0A488" }}>No entries.</div> :

@@ -6,7 +6,15 @@ import AdminPageHeader, { adminCard, adminPagePad, adminTd, adminTh } from "@/co
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ACTIONS = ["set_tier", "grant_room_credits", "grant_referral_credit", "reward_referral", "add_note"];
+const ACTIONS = [
+  "set_tier",
+  "grant_room_credits",
+  "grant_referral_credit",
+  "adjust_room_credits",
+  "adjust_referral_credit_baht",
+  "reward_referral",
+  "add_note",
+];
 
 function fmt(d: string | null | undefined) {
   if (!d) return "·";

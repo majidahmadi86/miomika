@@ -10,10 +10,12 @@ const TIERS = ["free", "pro", "pro_max"];
 
 /**
  * POST { userId, action, value? }
- * action in: set_tier | grant_room_credits | grant_referral_credit | reward_referral | add_note
+ * action in: set_tier | grant_room_credits | grant_referral_credit |
+ *   adjust_room_credits | adjust_referral_credit_baht | reward_referral | add_note
  * Admin grants update the balance + write an audit row (the credit ledgers are reserved for
  * system events — purchase/consume/refund, referral_earned/spent — so admin grants live in the
  * audit log, which is the record of who changed what). reward_referral replays the webhook earn.
+ * adjust_* require value JSON { amount, reason }.
  */
 export async function POST(req: Request) {
   const admin = await getAdminProfile();
@@ -61,6 +63,40 @@ export async function POST(req: Request) {
         const next = Math.max(0, (target.referral_credit_baht ?? 0) + n);
         await supabase.from("profiles").update({ referral_credit_baht: next }).eq("id", userId);
         detail = `referral credit ${n > 0 ? "+" : ""}${n} baht (now ${next})`;
+        break;
+      }
+      case "adjust_room_credits": {
+        let amount = 0;
+        let reason = "";
+        try {
+          const parsed = typeof body.value === "string" ? JSON.parse(body.value) as { amount?: number; reason?: string } : (body.value as unknown as { amount?: number; reason?: string });
+          amount = Math.trunc(Number(parsed?.amount));
+          reason = String(parsed?.reason ?? "").trim().slice(0, 500);
+        } catch {
+          return NextResponse.json({ error: "bad_payload" }, { status: 400 });
+        }
+        if (!Number.isFinite(amount) || amount === 0) return NextResponse.json({ error: "bad_amount" }, { status: 400 });
+        if (!reason) return NextResponse.json({ error: "reason_required" }, { status: 400 });
+        const next = Math.max(0, (target.room_credits ?? 0) + amount);
+        await supabase.from("profiles").update({ room_credits: next }).eq("id", userId);
+        detail = `adjust room credits ${amount > 0 ? "+" : ""}${amount} (now ${next}) · ${reason}`;
+        break;
+      }
+      case "adjust_referral_credit_baht": {
+        let amount = 0;
+        let reason = "";
+        try {
+          const parsed = typeof body.value === "string" ? JSON.parse(body.value) as { amount?: number; reason?: string } : (body.value as unknown as { amount?: number; reason?: string });
+          amount = Math.trunc(Number(parsed?.amount));
+          reason = String(parsed?.reason ?? "").trim().slice(0, 500);
+        } catch {
+          return NextResponse.json({ error: "bad_payload" }, { status: 400 });
+        }
+        if (!Number.isFinite(amount) || amount === 0) return NextResponse.json({ error: "bad_amount" }, { status: 400 });
+        if (!reason) return NextResponse.json({ error: "reason_required" }, { status: 400 });
+        const next = Math.max(0, (target.referral_credit_baht ?? 0) + amount);
+        await supabase.from("profiles").update({ referral_credit_baht: next }).eq("id", userId);
+        detail = `adjust referral credit ${amount > 0 ? "+" : ""}${amount} baht (now ${next}) · ${reason}`;
         break;
       }
       case "reward_referral": {
