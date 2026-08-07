@@ -1,9 +1,10 @@
-"use client";
-
 import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
-/** Admin-only semantic palette · dense cockpit. */
+/** Admin-only semantic palette · dense cockpit.
+ * Shared server+client module (no "use client") so server pages can call tint()
+ * and render these presentational primitives without an RSC boundary error.
+ */
 export const adminPalette = {
   teal: "#34A98F",
   mint: "#7BD4BE",
