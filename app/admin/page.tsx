@@ -9,11 +9,12 @@ import { AdminBarChart, AdminLineChart } from "@/components/admin/Chart";
 import { KpiCard, adminPalette, FONT_DISPLAY } from "@/components/admin/ui";
 import { AttentionStrip } from "@/components/admin/AttentionStrip";
 import Watchboard from "@/components/admin/Watchboard";
+import Pulse from "@/components/admin/Pulse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Command-center Overview · Pulse lands in v3 commit 4. */
+/** Command-center Overview · fits 1280×800 without scroll on desktop. */
 export default async function AdminOverviewPage({
   searchParams,
 }: {
@@ -79,8 +80,10 @@ export default async function AdminOverviewPage({
       </div>
 
       <div className="admin-cc-row">
-        <div style={{ ...panel, minHeight: 180, color: adminPalette.subtle, fontSize: 12.5, fontFamily: FONT_DISPLAY }}>
-          Live pulse · landing next
+        <div style={{ ...panel, maxHeight: 240, overflow: "hidden" }}>
+          <Suspense fallback={<div style={{ fontSize: 12, color: adminPalette.muted }}>pulse…</div>}>
+            <Pulse />
+          </Suspense>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, minWidth: 0 }}>
           <div style={panel}>
