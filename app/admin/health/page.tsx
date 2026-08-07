@@ -83,7 +83,7 @@ export default async function AdminHealthPage({
   });
 
   const lastStripe = (webhookLatest.data ?? [])[0] as { created_at: string; type: string | null; ok: boolean } | undefined;
-  const stripeLagMs = lastStripe ? Date.now() - new Date(lastStripe.created_at).getTime() : Infinity;
+  const stripeLagMs = lastStripe ? range.to.getTime() - new Date(lastStripe.created_at).getTime() : Infinity;
   const stripeLagWarn = stripeLagMs > 24 * 3600e3;
 
   const failRows: FailRow[] = [];

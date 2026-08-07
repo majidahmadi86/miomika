@@ -93,7 +93,6 @@ export function AdminAreaChart({
   dataKey = "v",
   xKey = "t",
   height = 120,
-  bucket,
   color = TEAL,
 }: Common & { dataKey?: string; color?: string }) {
   const id = `fill-${dataKey}-${color.replace("#", "")}`;

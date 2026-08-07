@@ -53,15 +53,13 @@ async function loadAttentionAndHealth() {
   const free = Math.max(0, total - paid);
   const mrr = proCount * MONTHLY_THB.pro + proMaxCount * MONTHLY_THB.pro_max;
 
-  let cost7 = 0;
   const perUser = new Map<string, number>();
   {
     const { data } = await supabase.from("llm_usage").select("est_cost_usd, user_id").gte("created_at", since7).limit(50000);
     for (const r of (data ?? []) as { est_cost_usd: number | string; user_id: string | null }[]) {
       const v = typeof r.est_cost_usd === "string" ? parseFloat(r.est_cost_usd) : r.est_cost_usd;
-      if (!Number.isFinite(v)) continue;
-      cost7 += v;
-      if (r.user_id) perUser.set(r.user_id, (perUser.get(r.user_id) ?? 0) + v);
+      if (!Number.isFinite(v) || !r.user_id) continue;
+      perUser.set(r.user_id, (perUser.get(r.user_id) ?? 0) + v);
     }
   }
 
