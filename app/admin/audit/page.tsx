@@ -1,7 +1,18 @@
 import Link from "next/link";
+import { ScrollText } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { parseRange, rangeIso, withRange } from "@/lib/admin/time-range";
 import AdminPageHeader, { adminCard, adminPagePad, adminTd, adminTh } from "@/components/admin/AdminPageHeader";
+import {
+  ActionChip,
+  Avatar,
+  filterPanel,
+  applyBtn,
+  inputStyle,
+  adminPalette,
+  FONT_DISPLAY,
+  tint,
+} from "@/components/admin/ui";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,8 +65,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
   if (q) qp.set("q", q);
   const exportHref = `/api/admin/audit/export?${qp.toString()}`;
 
-  const input: React.CSSProperties = { padding: "6px 8px", border: "0.5px solid #D9D3C8", borderRadius: 6, fontSize: 12.5, fontFamily: "inherit" };
-  const lbl: React.CSSProperties = { fontSize: 11, color: "#9A8B73", display: "block", marginBottom: 3 };
+  const lbl: React.CSSProperties = { fontSize: 11, color: adminPalette.muted, display: "block", marginBottom: 3 };
 
   return (
     <div style={adminPagePad}>
@@ -63,13 +73,25 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
         title="Audit"
         rangeLabel={range.label}
         actions={
-          <a href={exportHref} style={{ fontSize: 12.5, fontWeight: 600, color: "#1F7A68", border: "0.5px solid #C9E5DC", background: "#EAF6F1", padding: "6px 12px", borderRadius: 6, textDecoration: "none" }}>
+          <a
+            href={exportHref}
+            style={{
+              fontSize: 12.5,
+              fontWeight: 700,
+              fontFamily: FONT_DISPLAY,
+              color: "#fff",
+              background: adminPalette.teal,
+              padding: "7px 14px",
+              borderRadius: 8,
+              textDecoration: "none",
+            }}
+          >
             Download CSV
           </a>
         }
       />
 
-      <form method="get" style={{ ...adminCard, marginBottom: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+      <form method="get" style={{ ...filterPanel, marginBottom: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         <input type="hidden" name="range" value={range.preset} />
         {range.preset === "custom" && (
           <>
@@ -79,54 +101,70 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
         )}
         <div>
           <label style={lbl}>Action</label>
-          <select name="action" defaultValue={action} style={input}>
+          <select name="action" defaultValue={action} style={inputStyle}>
             <option value="">all actions</option>
             {ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
         <div>
           <label style={lbl}>User id</label>
-          <input type="text" name="target" defaultValue={target} placeholder="target user id" style={{ ...input, width: 180 }} />
+          <input type="text" name="target" defaultValue={target} placeholder="target user id" style={{ ...inputStyle, width: 180 }} />
         </div>
         <div>
           <label style={lbl}>Search</label>
-          <input type="text" name="q" defaultValue={q} placeholder="admin email or detail" style={{ ...input, width: 180 }} />
+          <input type="text" name="q" defaultValue={q} placeholder="admin email or detail" style={{ ...inputStyle, width: 180 }} />
         </div>
-        <button type="submit" style={{ padding: "7px 14px", border: "0.5px solid #C9E5DC", background: "#EAF6F1", color: "#1F7A68", borderRadius: 6, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Filter</button>
-        <a href={withRange("/admin/audit", range.queryString)} style={{ fontSize: 12, color: "#9A8B73", textDecoration: "none", padding: "7px 4px" }}>reset</a>
+        <button type="submit" style={applyBtn}>Filter</button>
+        <a href={withRange("/admin/audit", range.queryString)} style={{ fontSize: 12, color: adminPalette.muted, textDecoration: "none", padding: "7px 4px" }}>reset</a>
       </form>
 
       <div style={adminCard}>
-        <div style={{ fontSize: 11, color: "#B0A488", marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: adminPalette.subtle, marginBottom: 8 }}>
           {rows.length} entr{rows.length === 1 ? "y" : "ies"}
           {rows.length === 500 ? " (showing latest 500 · narrow the filters or export)" : ""}
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={adminTh}>When</th>
-                <th style={adminTh}>Admin</th>
-                <th style={adminTh}>Action</th>
-                <th style={adminTh}>Target</th>
-                <th style={adminTh}>Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr><td style={adminTd} colSpan={5}><span style={{ color: "#B0A488" }}>No matching entries.</span></td></tr>
-              ) : rows.map((r, i) => (
-                <tr key={i}>
-                  <td style={{ ...adminTd, whiteSpace: "nowrap", color: "#6b675f" }}>{fmt(r.created_at)}</td>
-                  <td style={adminTd}>{r.admin_email || "·"}</td>
-                  <td style={adminTd}><span style={{ background: "#F2EEE7", padding: "1px 7px", borderRadius: 99, fontSize: 11 }}>{r.action}</span></td>
-                  <td style={adminTd}>{r.target_user_id ? <Link href={withRange(`/admin/users/${r.target_user_id}`, range.queryString)} style={{ color: "#2C8E76" }}>{r.target_user_id.slice(0, 8)}</Link> : "·"}</td>
-                  <td style={{ ...adminTd, color: "#4a4742" }}>{r.detail || "·"}</td>
+        {rows.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 16px", color: adminPalette.subtle }}>
+            <ScrollText size={36} strokeWidth={1.75} style={{ margin: "0 auto 12px", opacity: 0.55 }} />
+            <div style={{ fontSize: 13.5, fontFamily: FONT_DISPLAY, fontWeight: 600 }}>No matching entries.</div>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={adminTh}>When</th>
+                  <th style={adminTh}>Admin</th>
+                  <th style={adminTh}>Action</th>
+                  <th style={adminTh}>Target</th>
+                  <th style={adminTh}>Detail</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} style={{ background: i % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
+                    <td style={{ ...adminTd, whiteSpace: "nowrap", color: adminPalette.muted }}>{fmt(r.created_at)}</td>
+                    <td style={adminTd}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <Avatar email={r.admin_email} name={r.admin_email} size={26} />
+                        <span style={{ fontSize: 12.5 }}>{r.admin_email || "·"}</span>
+                      </div>
+                    </td>
+                    <td style={adminTd}><ActionChip action={r.action} /></td>
+                    <td style={adminTd}>
+                      {r.target_user_id ? (
+                        <Link href={withRange(`/admin/users/${r.target_user_id}`, range.queryString)} style={{ color: adminPalette.teal, fontWeight: 600, textDecoration: "none" }}>
+                          {r.target_user_id.slice(0, 8)}
+                        </Link>
+                      ) : "·"}
+                    </td>
+                    <td style={{ ...adminTd, color: "#4a4742" }}>{r.detail || "·"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

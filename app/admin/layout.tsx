@@ -78,6 +78,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <AdminNav />
       </Suspense>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>{children}</div>
+      <style>{`
+        tr.admin-tr:hover > td { background: ${tint(adminPalette.teal, 0.04)} !important; }
+      `}</style>
     </div>
   );
 }

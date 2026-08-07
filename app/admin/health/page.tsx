@@ -4,6 +4,8 @@ import { providerOkSeries, rateLimitSeries } from "@/lib/admin/metrics";
 import AdminPageHeader, { adminCard, adminPagePad } from "@/components/admin/AdminPageHeader";
 import { AdminLineChart, AdminBarChart } from "@/components/admin/Chart";
 import ExpandableFailTable, { type FailRow } from "@/components/admin/ExpandableFailTable";
+import { StatusPill, IconChip, PROVIDER_COLORS, adminPalette, FONT_DISPLAY } from "@/components/admin/ui";
+import { Webhook, RotateCcw } from "lucide-react";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -126,17 +128,8 @@ export default async function AdminHealthPage({
     }
   }
 
-  const pillStyle = (tone: Pill["tone"]): React.CSSProperties => ({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "4px 10px",
-    borderRadius: 99,
-    fontSize: 12,
-    fontWeight: 700,
-    background: tone === "ok" ? "#E3F4EE" : tone === "warn" ? "#FAEEDA" : "#FCEBEB",
-    color: tone === "ok" ? "#1D7A63" : tone === "warn" ? "#854F0B" : "#A32D2D",
-  });
+  const pillTone = (tone: Pill["tone"]): "ok" | "warn" | "error" =>
+    tone === "ok" ? "ok" : tone === "warn" ? "warn" : "error";
 
   return (
     <div style={adminPagePad}>
@@ -144,27 +137,24 @@ export default async function AdminHealthPage({
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         {pills.map((p) => (
-          <span key={p.label} style={pillStyle(p.tone)}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "currentColor" }} />
-            {p.label}
-          </span>
+          <StatusPill key={p.label} tone={pillTone(p.tone)} label={p.label} />
         ))}
       </div>
 
       <div style={{ ...adminCard, marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Provider ok-rate</div>
-        <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 8 }}>From llm_usage.ok · % successful calls per bucket</div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Provider ok-rate</div>
+        <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 8 }}>From llm_usage.ok · % successful calls per bucket</div>
         {okChart.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "#B0A488" }}>No AI calls in range.</div>
+          <div style={{ fontSize: 12.5, color: adminPalette.subtle }}>No AI calls in range.</div>
         ) : (
           <AdminLineChart
             data={okChart}
             bucket={range.bucket}
             height={220}
-            series={providers.map((p, i) => ({
+            series={providers.map((p) => ({
               key: p,
               name: p,
-              color: ["#34A98F", "#C9A96E", "#7F77DD", "#D8533D"][i % 4],
+              color: PROVIDER_COLORS[p] ?? adminPalette.violet,
             }))}
           />
         )}
@@ -172,32 +162,38 @@ export default async function AdminHealthPage({
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         <div style={adminCard}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Webhook recency</div>
-          <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 8 }}>Stripe only (webhook_events has no multi-provider amounts)</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <IconChip icon={Webhook} color={adminPalette.sky} />
+            <div style={{ fontSize: 13, fontWeight: 700, fontFamily: FONT_DISPLAY }}>Webhook recency</div>
+          </div>
+          <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 8 }}>Stripe only (webhook_events has no multi-provider amounts)</div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "6px 0" }}>
-            <span style={{ color: "#6b675f" }}>Stripe</span>
-            <span style={{ fontWeight: 600, color: stripeLagWarn ? "#854F0B" : "#2A2A28" }}>
+            <span style={{ color: adminPalette.muted }}>Stripe</span>
+            <span style={{ fontWeight: 700, fontFamily: FONT_DISPLAY, color: stripeLagWarn ? adminPalette.amber : adminPalette.ink }}>
               {lastStripe ? `${ago(lastStripe.created_at)}${lastStripe.ok ? "" : " · last failed"}` : "no events"}
               {stripeLagWarn ? " · lag warning" : ""}
             </span>
           </div>
           {lastStripe ? (
-            <div style={{ fontSize: 11, color: "#B0A488" }}>Last type: {lastStripe.type || "·"} · {fmt(lastStripe.created_at)}</div>
+            <div style={{ fontSize: 11, color: adminPalette.subtle }}>Last type: {lastStripe.type || "·"} · {fmt(lastStripe.created_at)}</div>
           ) : null}
         </div>
         <div style={adminCard}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Room auto-refunds</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: refunds.length ? "#854F0B" : "#1F7A68" }}>{refunds.length}</div>
-          <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 8 }}>room_credit_ledger reason=refund in range</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <IconChip icon={RotateCcw} color={adminPalette.teal} />
+            <div style={{ fontSize: 13, fontWeight: 700, fontFamily: FONT_DISPLAY }}>Room auto-refunds</div>
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 700, fontFamily: FONT_DISPLAY, color: refunds.length ? adminPalette.amber : adminPalette.teal }}>{refunds.length}</div>
+          <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 8 }}>room_credit_ledger reason=refund in range</div>
           {refunds.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: "#B0A488" }}>None.</div>
+            <div style={{ fontSize: 12.5, color: adminPalette.subtle }}>None.</div>
           ) : (
             <div style={{ maxHeight: 160, overflowY: "auto" }}>
               {refunds.slice(0, 12).map((r, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, padding: "3px 0", gap: 8 }}>
-                  <span style={{ color: "#6b675f", overflow: "hidden", textOverflow: "ellipsis" }}>{r.user_id.slice(0, 8)} · {r.ref || "·"}</span>
-                  <span style={{ color: "#1F7A68", flexShrink: 0 }}>+{r.delta}</span>
-                  <span style={{ color: "#B0A488", flexShrink: 0 }}>{fmt(r.created_at)}</span>
+                  <span style={{ color: adminPalette.muted, overflow: "hidden", textOverflow: "ellipsis" }}>{r.user_id.slice(0, 8)} · {r.ref || "·"}</span>
+                  <span style={{ color: adminPalette.teal, flexShrink: 0 }}>+{r.delta}</span>
+                  <span style={{ color: adminPalette.subtle, flexShrink: 0 }}>{fmt(r.created_at)}</span>
                 </div>
               ))}
             </div>
@@ -206,17 +202,17 @@ export default async function AdminHealthPage({
       </div>
 
       <div style={{ ...adminCard, marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Rate-limit hits</div>
-        <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Rate-limit hits</div>
+        <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 8 }}>
           Sum of rate_limit_hits.count by {range.bucket} (updated_at)
           {rlSeries.every((p) => p.v === 0) ? ` · no hits in range` : ""}
         </div>
-        <AdminBarChart data={rlSeries} bucket={range.bucket} name="Hits" color="#7F77DD" height={180} />
+        <AdminBarChart data={rlSeries} bucket={range.bucket} name="Hits" color={adminPalette.violet} height={180} />
       </div>
 
       <div style={adminCard}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Latest failed / error events</div>
-        <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 8 }}>llm_usage ok=false + webhook_events ok=false · tap row for payload</div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Latest failed / error events</div>
+        <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 8 }}>llm_usage ok=false + webhook_events ok=false · tap row for payload</div>
         <ExpandableFailTable rows={topFails} />
       </div>
     </div>

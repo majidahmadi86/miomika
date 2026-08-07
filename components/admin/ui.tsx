@@ -430,9 +430,11 @@ export function GuestChip() {
         fontSize: 10,
         fontWeight: 700,
         fontFamily: FONT_DISPLAY,
-        padding: "1px 7px",
+        padding: "4px 8px",
         borderRadius: 99,
-        marginLeft: 6,
+        display: "inline-flex",
+        alignItems: "center",
+        flexShrink: 0,
       }}
     >
       guest

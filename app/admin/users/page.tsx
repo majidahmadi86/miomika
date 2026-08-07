@@ -1,8 +1,23 @@
 import Link from "next/link";
+import { Users, Coins, Sparkles, DoorOpen, Wallet } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { parseRange, rangeIso, withRange } from "@/lib/admin/time-range";
 import { costByUserInRange } from "@/lib/admin/metrics";
-import AdminPageHeader, { adminCard, adminKpi, adminPagePad, adminTd, adminTh } from "@/components/admin/AdminPageHeader";
+import AdminPageHeader, { adminPagePad, adminTd, adminTh } from "@/components/admin/AdminPageHeader";
+import {
+  KpiCard,
+  TierBadge,
+  Avatar,
+  ActivityDot,
+  activityTone,
+  CostBar,
+  filterPanel,
+  applyBtn,
+  inputStyle,
+  adminPalette,
+  FONT_DISPLAY,
+  tint,
+} from "@/components/admin/ui";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -151,16 +166,9 @@ export default async function AdminUsersPage({
   };
 
   const exportHref = `/api/admin/users/export?${filterQs.toString()}`;
-
-  const tierPill = (t: string | null) => {
-    const v = t ?? "free";
-    const bg = v === "pro_max" ? "#EAD9F6" : v === "pro" ? "#D8F0E8" : "#F0EBE3";
-    const fg = v === "pro_max" ? "#7A3FA0" : v === "pro" ? "#1F7A68" : "#9A8B73";
-    return <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99 }}>{v}</span>;
-  };
-
-  const input: React.CSSProperties = { fontFamily: "inherit", fontSize: 12.5, padding: "7px 10px", borderRadius: 8, border: "0.5px solid #EDE8E0", background: "#fff" };
+  const maxCost = Math.max(1, ...pageRows.map((r) => Math.round(costs.get(r.id) ?? 0)));
   const sortMark = (col: string) => (sort === col ? (dir === "asc" ? " ↑" : " ↓") : "");
+  const nowMs = range.to.getTime();
 
   return (
     <div style={adminPagePad}>
@@ -168,21 +176,21 @@ export default async function AdminUsersPage({
         title="Users"
         rangeLabel={range.label}
         actions={
-          <a href={exportHref} style={{ fontSize: 12.5, fontWeight: 600, color: "#1F7A68", border: "0.5px solid #C9E5DC", background: "#EAF6F1", padding: "6px 12px", borderRadius: 6, textDecoration: "none" }}>
+          <a href={exportHref} style={{ fontSize: 12.5, fontWeight: 700, fontFamily: FONT_DISPLAY, color: "#fff", background: adminPalette.teal, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>
             Download CSV
           </a>
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 12 }}>
-        <div style={adminKpi}><div style={{ fontSize: 18, fontWeight: 700 }}>{total}</div><div style={{ fontSize: 11, color: "#9A8B73" }}>matched</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 18, fontWeight: 700, color: "#1F7A68" }}>{paid}</div><div style={{ fontSize: 11, color: "#9A8B73" }}>paid</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 18, fontWeight: 700 }}>{counts.pro} / {counts.pro_max}</div><div style={{ fontSize: 11, color: "#9A8B73" }}>Pro / Max</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 18, fontWeight: 700 }}>{withRoomCredits}</div><div style={{ fontSize: 11, color: "#9A8B73" }}>room credits</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 18, fontWeight: 700 }}>{withReferralCredit}</div><div style={{ fontSize: 11, color: "#9A8B73" }}>฿ credit</div></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginBottom: 12 }}>
+        <KpiCard color={adminPalette.sky} icon={Users} label="Matched" value={String(total)} />
+        <KpiCard color={adminPalette.gold} icon={Coins} label="Paid" value={String(paid)} />
+        <KpiCard color={adminPalette.violet} icon={Sparkles} label="Pro / Max" value={`${counts.pro} / ${counts.pro_max}`} />
+        <KpiCard color={adminPalette.teal} icon={DoorOpen} label="Room credits" value={String(withRoomCredits)} />
+        <KpiCard color={adminPalette.gold} icon={Wallet} label="฿ credit" value={String(withReferralCredit)} />
       </div>
 
-      <form method="get" style={{ ...adminCard, display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+      <form method="get" style={{ ...filterPanel, display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
         <input type="hidden" name="range" value={range.preset} />
         {range.preset === "custom" && (
           <>
@@ -193,12 +201,12 @@ export default async function AdminUsersPage({
         <input type="hidden" name="sort" value={sort} />
         <input type="hidden" name="dir" value={dir} />
         <div style={{ flex: "1 1 200px" }}>
-          <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 3 }}>Search</div>
-          <input type="text" name="q" defaultValue={q} placeholder="email, name, referral, Stripe, id" style={{ ...input, width: "100%" }} />
+          <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 3, fontFamily: FONT_DISPLAY }}>Search</div>
+          <input type="text" name="q" defaultValue={q} placeholder="email, name, referral, Stripe, id" style={{ ...inputStyle, width: "100%" }} />
         </div>
         <div>
-          <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 3 }}>Tier</div>
-          <select name="tier" defaultValue={tierFilter} style={input}>
+          <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 3, fontFamily: FONT_DISPLAY }}>Tier</div>
+          <select name="tier" defaultValue={tierFilter} style={inputStyle}>
             <option value="">All</option>
             <option value="free">Free</option>
             <option value="pro">Pro</option>
@@ -206,33 +214,33 @@ export default async function AdminUsersPage({
           </select>
         </div>
         <div>
-          <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 3 }}>Activity</div>
-          <select name="activity" defaultValue={activity} style={input}>
+          <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 3, fontFamily: FONT_DISPLAY }}>Activity</div>
+          <select name="activity" defaultValue={activity} style={inputStyle}>
             <option value="">Any</option>
             <option value="active">Active in range</option>
             <option value="inactive">Inactive in range</option>
           </select>
         </div>
         <div>
-          <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 3 }}>Min cost ฿</div>
-          <input type="number" name="high_cost" defaultValue={highCost > 0 ? highCost : ""} placeholder="e.g. 200" style={{ ...input, width: 90 }} />
+          <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 3, fontFamily: FONT_DISPLAY }}>Min cost ฿</div>
+          <input type="number" name="high_cost" defaultValue={highCost > 0 ? highCost : ""} placeholder="e.g. 200" style={{ ...inputStyle, width: 90 }} />
         </div>
-        <label style={{ fontSize: 12, color: "#6b675f", display: "flex", alignItems: "center", gap: 4, paddingBottom: 8 }}>
+        <label style={{ fontSize: 12, color: adminPalette.muted, display: "flex", alignItems: "center", gap: 4, paddingBottom: 8 }}>
           <input type="checkbox" name="has_rooms" value="1" defaultChecked={hasRooms} /> rooms &gt; 0
         </label>
-        <label style={{ fontSize: 12, color: "#6b675f", display: "flex", alignItems: "center", gap: 4, paddingBottom: 8 }}>
+        <label style={{ fontSize: 12, color: adminPalette.muted, display: "flex", alignItems: "center", gap: 4, paddingBottom: 8 }}>
           <input type="checkbox" name="has_referral" value="1" defaultChecked={hasReferral} /> ฿ credit &gt; 0
         </label>
-        <button type="submit" style={{ fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, padding: "7px 14px", borderRadius: 8, border: "0.5px solid #C9E5DC", background: "#EAF6F1", color: "#1F7A68", cursor: "pointer" }}>Apply</button>
+        <button type="submit" style={applyBtn}>Apply</button>
       </form>
 
       {error ? (
-        <p style={{ color: "#A32D2D", fontSize: 13 }}>Couldn&apos;t load users: {error.message}</p>
+        <p style={{ color: adminPalette.rose, fontSize: 13 }}>Couldn&apos;t load users: {error.message}</p>
       ) : pageRows.length === 0 ? (
-        <p style={{ color: "#9A8B73", fontSize: 13 }}>No users match.</p>
+        <p style={{ color: adminPalette.muted, fontSize: 13 }}>No users match.</p>
       ) : (
         <>
-          <div style={{ overflowX: "auto", border: "0.5px solid #EDE8E0", borderRadius: 10, background: "#fff" }}>
+          <div style={{ overflowX: "auto", border: `0.5px solid ${adminPalette.line}`, borderRadius: 12, background: "#fff" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
@@ -246,33 +254,41 @@ export default async function AdminUsersPage({
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((r) => {
+                {pageRows.map((r, idx) => {
                   const cost = Math.round(costs.get(r.id) ?? 0);
                   return (
-                    <tr key={r.id}>
+                    <tr key={r.id} className="admin-tr" style={{ background: idx % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
                       <td style={adminTd}>
-                        <Link href={withRange(`/admin/users/${r.id}`, range.queryString)} style={{ textDecoration: "none" }}>
-                          <div style={{ fontWeight: 700, color: "#2C8E76" }}>{r.display_name || "·"}</div>
-                          <div style={{ fontSize: 11, color: "#9A8B73" }}>{r.email || r.id.slice(0, 8)}</div>
+                        <Link href={withRange(`/admin/users/${r.id}`, range.queryString)} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
+                          <Avatar name={r.display_name} email={r.email} />
+                          <div>
+                            <div style={{ fontWeight: 700, color: adminPalette.teal, fontFamily: FONT_DISPLAY }}>{r.display_name || "·"}</div>
+                            <div style={{ fontSize: 11, color: adminPalette.muted }}>{r.email || r.id.slice(0, 8)}</div>
+                          </div>
                         </Link>
                       </td>
-                      <td style={adminTd}>{tierPill(r.tier)}</td>
+                      <td style={adminTd}><TierBadge tier={r.tier} /></td>
                       <td style={adminTd}>{r.subscription_status || "·"}</td>
                       <td style={adminTd}>{r.room_credits ?? 0}</td>
                       <td style={adminTd}>{r.referral_credit_baht ? `฿${r.referral_credit_baht}` : "·"}</td>
-                      <td style={{ ...adminTd, fontVariantNumeric: "tabular-nums", color: cost >= 200 ? "#854F0B" : undefined }}>฿{cost}</td>
-                      <td style={adminTd}>{ago(r.last_seen_at)}</td>
+                      <td style={adminTd}><CostBar value={cost} max={maxCost} /></td>
+                      <td style={adminTd}>
+                        <span style={{ display: "inline-flex", alignItems: "center" }}>
+                          <ActivityDot tone={activityTone(r.last_seen_at, nowMs)} />
+                          {ago(r.last_seen_at)}
+                        </span>
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, fontSize: 12, color: "#9A8B73" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, fontSize: 12, color: adminPalette.muted }}>
             <span>Page {pageSafe} of {pages} · {total} users</span>
             <div style={{ display: "flex", gap: 8 }}>
-              {pageSafe > 1 ? <a href={pageHref(pageSafe - 1)} style={{ color: "#1F7A68", fontWeight: 600, textDecoration: "none" }}>Prev</a> : null}
-              {pageSafe < pages ? <a href={pageHref(pageSafe + 1)} style={{ color: "#1F7A68", fontWeight: 600, textDecoration: "none" }}>Next</a> : null}
+              {pageSafe > 1 ? <a href={pageHref(pageSafe - 1)} style={{ color: adminPalette.teal, fontWeight: 600, textDecoration: "none" }}>Prev</a> : null}
+              {pageSafe < pages ? <a href={pageHref(pageSafe + 1)} style={{ color: adminPalette.teal, fontWeight: 600, textDecoration: "none" }}>Next</a> : null}
             </div>
           </div>
         </>

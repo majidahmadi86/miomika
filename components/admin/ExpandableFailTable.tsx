@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { adminTd, adminTh } from "@/components/admin/AdminPageHeader";
+import { adminPalette, tint } from "@/components/admin/ui";
 
 export type FailRow = {
   source: string;
@@ -14,7 +15,7 @@ export type FailRow = {
 export default function ExpandableFailTable({ rows }: { rows: FailRow[] }) {
   const [open, setOpen] = useState<number | null>(null);
   if (rows.length === 0) {
-    return <div style={{ fontSize: 12.5, color: "#B0A488" }}>No failed events in range.</div>;
+    return <div style={{ fontSize: 12.5, color: adminPalette.subtle }}>No failed events in range.</div>;
   }
   return (
     <div style={{ overflowX: "auto" }}>
@@ -32,16 +33,31 @@ export default function ExpandableFailTable({ rows }: { rows: FailRow[] }) {
             <Fragment key={i}>
               <tr
                 onClick={() => setOpen(open === i ? null : i)}
-                style={{ cursor: r.payload ? "pointer" : "default" }}
+                style={{
+                  cursor: r.payload ? "pointer" : "default",
+                  background: tint(adminPalette.rose, 0.04),
+                  borderLeft: `3px solid ${adminPalette.rose}`,
+                }}
               >
-                <td style={{ ...adminTd, whiteSpace: "nowrap", fontSize: 11, color: "#6b675f" }}>{r.when}</td>
+                <td style={{ ...adminTd, whiteSpace: "nowrap", fontSize: 11, color: adminPalette.muted }}>{r.when}</td>
                 <td style={adminTd}>{r.source}</td>
                 <td style={adminTd}>{r.label}</td>
-                <td style={{ ...adminTd, color: "#A32D2D", fontSize: 12 }}>{(r.detail ?? "·").slice(0, 80)}</td>
+                <td style={{ ...adminTd, color: adminPalette.rose, fontSize: 12 }}>{(r.detail ?? "·").slice(0, 80)}</td>
               </tr>
               {open === i && r.payload ? (
                 <tr>
-                  <td colSpan={4} style={{ ...adminTd, background: "#FBFAF6", fontFamily: "ui-monospace, monospace", fontSize: 11, whiteSpace: "pre-wrap", color: "#4a4742" }}>
+                  <td
+                    colSpan={4}
+                    style={{
+                      ...adminTd,
+                      background: tint(adminPalette.rose, 0.06),
+                      fontFamily: "ui-monospace, monospace",
+                      fontSize: 11,
+                      whiteSpace: "pre-wrap",
+                      color: "#4a4742",
+                      borderLeft: `3px solid ${adminPalette.rose}`,
+                    }}
+                  >
                     {r.payload}
                   </td>
                 </tr>

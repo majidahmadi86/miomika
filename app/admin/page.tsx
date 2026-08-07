@@ -1,11 +1,13 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { UserPlus, Users, Coins, Flame } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { THB_PER_USD, COST_ALERT_THB_7D } from "@/lib/admin/cost";
 import { parseRange, withRange } from "@/lib/admin/time-range";
 import { overviewMetrics } from "@/lib/admin/metrics";
-import AdminPageHeader, { adminCard, adminKpi, adminPagePad } from "@/components/admin/AdminPageHeader";
-import { AdminBarChart, AdminLineChart, AdminSparkline } from "@/components/admin/Chart";
+import AdminPageHeader, { adminCard, adminPagePad } from "@/components/admin/AdminPageHeader";
+import { AdminBarChart, AdminLineChart } from "@/components/admin/Chart";
+import { KpiCard, StatusPill, adminPalette, FONT_DISPLAY, tint } from "@/components/admin/ui";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,13 +24,6 @@ function ago(d: string | null | undefined): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
-}
-
-function deltaLabel(pct: number | null): { text: string; color: string } {
-  if (pct === null) return { text: "n/a vs prior", color: "#9A8B73" };
-  if (pct === 0) return { text: "0% vs prior", color: "#9A8B73" };
-  const sign = pct > 0 ? "+" : "";
-  return { text: `${sign}${pct}% vs prior`, color: pct > 0 ? "#1F7A68" : "#A32D2D" };
 }
 
 type Flagged = { id: string; email: string | null; display_name: string | null; tier: string | null; subscription_status: string | null };
@@ -140,31 +135,12 @@ export default async function AdminOverviewPage({
   const section: CSSProperties = adminCard;
   const who = (f: Flagged) => f.display_name || f.email || f.id.slice(0, 8);
 
-  const kpi = (
-    label: string,
-    display: string,
-    kpiData: { deltaPct: number | null; spark: { t: string; v: number }[] },
-    color?: string,
-  ) => {
-    const d = deltaLabel(kpiData.deltaPct);
-    return (
-      <div style={adminKpi}>
-        <div style={{ fontSize: 11.5, color: "#9A8B73" }}>{label}</div>
-        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2, color: color ?? "#2A2A28" }}>{display}</div>
-        <div style={{ fontSize: 11, color: d.color, marginTop: 2 }}>{d.text}</div>
-        <div style={{ marginTop: 4 }}>
-          <AdminSparkline data={kpiData.spark} color={color ?? "#34A98F"} />
-        </div>
-      </div>
-    );
-  };
-
   const tierBar = (label: string, n: number, color: string) => (
     <div style={{ marginBottom: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
-        <span style={{ color: "#6b675f" }}>{label}</span><span>{n}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3, fontFamily: FONT_DISPLAY }}>
+        <span style={{ color: adminPalette.muted }}>{label}</span><span style={{ fontWeight: 700 }}>{n}</span>
       </div>
-      <div style={{ height: 6, background: "#F2EEE7", borderRadius: 99 }}>
+      <div style={{ height: 6, background: tint(color, 0.12), borderRadius: 99 }}>
         <div style={{ height: 6, width: `${attn.total > 0 ? Math.round((n / attn.total) * 100) : 0}%`, background: color, borderRadius: 99 }} />
       </div>
     </div>
@@ -174,82 +150,82 @@ export default async function AdminOverviewPage({
     <div style={adminPagePad}>
       <AdminPageHeader title="Overview" rangeLabel={range.label} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginBottom: 12 }}>
-        {kpi("Signups", Math.round(metrics.signups.value).toLocaleString(), metrics.signups)}
-        {kpi("Active users", Math.round(metrics.active.value).toLocaleString(), metrics.active)}
-        {kpi("Pack revenue", `฿${Math.round(metrics.revenue.value).toLocaleString()}`, metrics.revenue, "#1F7A68")}
-        {kpi("AI cost", `฿${Math.round(metrics.cost.value).toLocaleString()}`, metrics.cost, "#854F0B")}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
+        <KpiCard color={adminPalette.teal} icon={UserPlus} label="Signups" value={Math.round(metrics.signups.value).toLocaleString()} deltaPct={metrics.signups.deltaPct} spark={metrics.signups.spark} />
+        <KpiCard color={adminPalette.mint} icon={Users} label="Active users" value={Math.round(metrics.active.value).toLocaleString()} deltaPct={metrics.active.deltaPct} spark={metrics.active.spark} />
+        <KpiCard color={adminPalette.gold} icon={Coins} label="Pack revenue" value={`฿${Math.round(metrics.revenue.value).toLocaleString()}`} deltaPct={metrics.revenue.deltaPct} spark={metrics.revenue.spark} />
+        <KpiCard color={adminPalette.amber} icon={Flame} label="AI cost" value={`฿${Math.round(metrics.cost.value).toLocaleString()}`} deltaPct={metrics.cost.deltaPct} invertDelta spark={metrics.cost.spark} />
       </div>
 
       <div style={{ ...section, marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Cost vs pack revenue</div>
-        <div style={{ fontSize: 11, color: "#9A8B73", marginBottom: 8 }}>AI cost (฿) · room-pack purchases (฿). Subscription charge amounts are not stored in webhook_events or credit_ledger.</div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, fontFamily: FONT_DISPLAY }}>Cost vs pack revenue</div>
+        <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 8 }}>AI cost (฿) · room-pack purchases (฿). Subscription charge amounts are not stored in webhook_events or credit_ledger.</div>
         <AdminLineChart
           data={dual}
           bucket={range.bucket}
           height={240}
+          area
+          glowDots
           series={[
-            { key: "cost", name: "AI cost", color: "#C9A96E" },
-            { key: "revenue", name: "Pack revenue", color: "#34A98F" },
+            { key: "cost", name: "AI cost", color: adminPalette.amber },
+            { key: "revenue", name: "Pack revenue", color: adminPalette.teal },
           ]}
         />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         <div style={section}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Signups</div>
-          <AdminBarChart data={metrics.signupsSeries} bucket={range.bucket} name="Signups" height={200} />
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Signups</div>
+          <AdminBarChart data={metrics.signupsSeries} bucket={range.bucket} name="Signups" color={adminPalette.teal} height={200} />
         </div>
         <div style={section}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Active users</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Active users</div>
           <AdminLineChart
             data={metrics.activeSeries}
             bucket={range.bucket}
             height={200}
-            series={[{ key: "v", name: "Active", color: "#34A98F" }]}
+            area
+            series={[{ key: "v", name: "Active", color: adminPalette.mint }]}
           />
         </div>
       </div>
 
       <div style={{ ...section, marginBottom: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>Pipeline health</span>
-          <span style={{ fontSize: 11, color: "#9A8B73" }}>last 24h · {attn.calls24.toLocaleString()} AI calls</span>
+          <span style={{ fontSize: 13, fontWeight: 700, fontFamily: FONT_DISPLAY }}>Pipeline health</span>
+          <span style={{ fontSize: 11, color: adminPalette.muted }}>last 24h · {attn.calls24.toLocaleString()} AI calls</span>
         </div>
-        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
           {attn.providers.length === 0 ? (
-            <span style={{ fontSize: 12.5, color: "#B0A488" }}>No AI calls in the last 24h.</span>
+            <span style={{ fontSize: 12.5, color: adminPalette.subtle }}>No AI calls in the last 24h.</span>
           ) : attn.providers.map((p) => {
             const up = p.okPct !== null && p.okPct >= 80;
             return (
-              <span key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: up ? "#1D9E75" : "#D8533D" }} />
-                <b style={{ fontWeight: 600 }}>{p.name}</b>
-                <span style={{ color: "#9A8B73" }}>{p.okPct}% ok · {p.calls}</span>
-              </span>
+              <StatusPill
+                key={p.name}
+                tone={up ? "ok" : "error"}
+                label={`${p.name} · ${p.okPct}% · ${p.calls}`}
+              />
             );
           })}
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
-            <span style={{ color: "#6b675f" }}>error rate</span>
-            <b style={{ fontWeight: 600, color: attn.errorRate24 > 10 ? "#A32D2D" : "#2A2A28" }}>{attn.errorRate24}%</b>
-          </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
-            <span style={{ color: "#6b675f" }}>last Stripe webhook</span>
-            {attn.lastWebhook ? (
-              <b style={{ fontWeight: 600, color: attn.lastWebhook.ok ? "#2A2A28" : "#A32D2D" }}>
-                {ago(attn.lastWebhook.created_at)}{attn.lastWebhook.ok ? "" : " · failed"}
-              </b>
-            ) : <span style={{ color: "#B0A488" }}>none yet</span>}
-          </span>
+          <StatusPill tone={attn.errorRate24 > 10 ? "error" : "ok"} label={`error rate ${attn.errorRate24}%`} />
+          {attn.lastWebhook ? (
+            <StatusPill
+              tone={attn.lastWebhook.ok ? (ago(attn.lastWebhook.created_at).includes("d") ? "warn" : "ok") : "error"}
+              label={`Stripe · ${ago(attn.lastWebhook.created_at)}${attn.lastWebhook.ok ? "" : " · failed"}`}
+            />
+          ) : (
+            <StatusPill tone="warn" label="Stripe · none yet" />
+          )}
         </div>
         {attn.recentEvents.length > 0 && (
-          <div style={{ marginTop: 10, borderTop: "0.5px solid #F2EEE7", paddingTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ marginTop: 6, borderTop: `0.5px solid ${adminPalette.lineSoft}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
             {attn.recentEvents.map((e, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
-                <span style={{ color: "#6b675f" }}>
-                  <span style={{ color: e.ok ? "#1D9E75" : "#D8533D" }}>{e.ok ? "●" : "○"}</span> {e.type || "·"}
+                <span style={{ color: adminPalette.muted }}>
+                  <span style={{ color: e.ok ? adminPalette.teal : adminPalette.rose }}>●</span> {e.type || "·"}
                 </span>
-                <span style={{ color: "#B0A488" }}>{ago(e.created_at)}</span>
+                <span style={{ color: adminPalette.subtle }}>{ago(e.created_at)}</span>
               </div>
             ))}
           </div>
@@ -258,38 +234,38 @@ export default async function AdminOverviewPage({
 
       <div style={{ ...section, marginBottom: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>Needs attention</span>
-          <span style={{ fontSize: 11, color: "#9A8B73" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, fontFamily: FONT_DISPLAY }}>Needs attention</span>
+          <span style={{ fontSize: 11, color: adminPalette.muted }}>
             {attn.failed.length + attn.drifted.length + attn.hotUsers.length} item
             {attn.failed.length + attn.drifted.length + attn.hotUsers.length === 1 ? "" : "s"}
           </span>
         </div>
         {attn.failed.length === 0 && attn.drifted.length === 0 && attn.hotUsers.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "#1F7A68", padding: "6px 0" }}>All clear · no payment failures or tier drift.</div>
+          <div style={{ fontSize: 12.5, color: adminPalette.teal, padding: "6px 0" }}>All clear · no payment failures or tier drift.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {attn.failed.map((f) => (
-              <div key={`f-${f.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#FCEBEB", borderRadius: 8 }}>
-                <span style={{ flex: 1, fontSize: 12.5, color: "#A32D2D" }}>
+              <div key={`f-${f.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: tint(adminPalette.rose, 0.1), borderLeft: `3px solid ${adminPalette.rose}`, borderRadius: 8 }}>
+                <span style={{ flex: 1, fontSize: 12.5, color: adminPalette.rose }}>
                   <b>{who(f)}</b> · payment {f.subscription_status} ({f.tier})
                 </span>
-                <Link href={withRange(`/admin/users?q=${encodeURIComponent(f.email ?? "")}`, range.queryString)} style={{ fontSize: 12, color: "#A32D2D", fontWeight: 600 }}>Open</Link>
+                <Link href={withRange(`/admin/users?q=${encodeURIComponent(f.email ?? "")}`, range.queryString)} style={{ fontSize: 12, color: adminPalette.rose, fontWeight: 600 }}>Open</Link>
               </div>
             ))}
             {attn.drifted.map((f) => (
-              <div key={`d-${f.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#FAEEDA", borderRadius: 8 }}>
-                <span style={{ flex: 1, fontSize: 12.5, color: "#854F0B" }}>
+              <div key={`d-${f.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: tint(adminPalette.amber, 0.12), borderLeft: `3px solid ${adminPalette.amber}`, borderRadius: 8 }}>
+                <span style={{ flex: 1, fontSize: 12.5, color: "#9A6A12" }}>
                   <b>{who(f)}</b> · sub {f.subscription_status} but tier is free (webhook drift)
                 </span>
-                <Link href={withRange(`/admin/users?q=${encodeURIComponent(f.email ?? "")}`, range.queryString)} style={{ fontSize: 12, color: "#854F0B", fontWeight: 600 }}>Open</Link>
+                <Link href={withRange(`/admin/users?q=${encodeURIComponent(f.email ?? "")}`, range.queryString)} style={{ fontSize: 12, color: "#9A6A12", fontWeight: 600 }}>Open</Link>
               </div>
             ))}
             {attn.hotUsers.map((h) => (
-              <div key={`h-${h.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#FAEEDA", borderRadius: 8 }}>
-                <span style={{ flex: 1, fontSize: 12.5, color: "#854F0B" }}>
+              <div key={`h-${h.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: tint(adminPalette.amber, 0.12), borderLeft: `3px solid ${adminPalette.amber}`, borderRadius: 8 }}>
+                <span style={{ flex: 1, fontSize: 12.5, color: "#9A6A12" }}>
                   <b>{h.display_name || h.email || h.id.slice(0, 8)}</b> · high AI cost ฿{h.thb} in 7d
                 </span>
-                <Link href={withRange(`/admin/users/${h.id}`, range.queryString)} style={{ fontSize: 12, color: "#854F0B", fontWeight: 600 }}>Open</Link>
+                <Link href={withRange(`/admin/users/${h.id}`, range.queryString)} style={{ fontSize: 12, color: "#9A6A12", fontWeight: 600 }}>Open</Link>
               </div>
             ))}
           </div>
@@ -298,19 +274,19 @@ export default async function AdminOverviewPage({
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <div style={section}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Users by tier</div>
-          {tierBar("Free", attn.free, "#B4B2A9")}
-          {tierBar("Pro", attn.proCount, "#1D9E75")}
-          {tierBar("Pro Max", attn.proMaxCount, "#7F77DD")}
-          <div style={{ fontSize: 11, color: "#9A8B73", marginTop: 8 }}>MRR est. ฿{attn.mrr.toLocaleString()} · {attn.paid} paid</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: FONT_DISPLAY }}>Users by tier</div>
+          {tierBar("Free", attn.free, adminPalette.slate)}
+          {tierBar("Pro", attn.proCount, adminPalette.teal)}
+          {tierBar("Pro Max", attn.proMaxCount, adminPalette.violet)}
+          <div style={{ fontSize: 11, color: adminPalette.muted, marginTop: 8 }}>MRR est. ฿{attn.mrr.toLocaleString()} · {attn.paid} paid</div>
         </div>
         <div style={section}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Quick links</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: FONT_DISPLAY }}>Quick links</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5 }}>
-            <Link href={withRange("/admin/users", range.queryString)} style={{ color: "#2C8E76", fontWeight: 600 }}>Browse + manage users</Link>
-            <Link href={withRange("/admin/usage", range.queryString)} style={{ color: "#2C8E76", fontWeight: 600 }}>AI cost &amp; usage</Link>
-            <Link href={withRange("/admin/revenue", range.queryString)} style={{ color: "#2C8E76", fontWeight: 600 }}>Revenue</Link>
-            <Link href={withRange("/admin/audit", range.queryString)} style={{ color: "#2C8E76", fontWeight: 600 }}>Audit log</Link>
+            <Link href={withRange("/admin/users", range.queryString)} style={{ color: adminPalette.teal, fontWeight: 600 }}>Browse + manage users</Link>
+            <Link href={withRange("/admin/usage", range.queryString)} style={{ color: adminPalette.teal, fontWeight: 600 }}>AI cost &amp; usage</Link>
+            <Link href={withRange("/admin/revenue", range.queryString)} style={{ color: adminPalette.teal, fontWeight: 600 }}>Revenue</Link>
+            <Link href={withRange("/admin/audit", range.queryString)} style={{ color: adminPalette.teal, fontWeight: 600 }}>Audit log</Link>
           </div>
         </div>
       </div>

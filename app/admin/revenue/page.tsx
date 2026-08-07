@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { Coins, Users, Package, Wallet } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ROOM_PACKS } from "@/lib/billing/tiers";
 import { parseRange, withRange } from "@/lib/admin/time-range";
-import AdminPageHeader, { adminCard, adminKpi, adminPagePad, adminTd, adminTh } from "@/components/admin/AdminPageHeader";
+import AdminPageHeader, { adminCard, adminPagePad, adminTd, adminTh } from "@/components/admin/AdminPageHeader";
+import { KpiCard, TierBadge, Avatar, adminPalette, FONT_DISPLAY, tint } from "@/components/admin/ui";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,57 +68,59 @@ export default async function AdminRevenuePage({
 
   const paying = (payingRes.data ?? []) as { id: string; email: string | null; display_name: string | null; tier: string | null; subscription_status: string | null; onboarding_completed_at: string | null }[];
 
-  const tierPill = (t: string | null) => {
-    const m: Record<string, { bg: string; fg: string }> = { pro: { bg: "#E3F4EE", fg: "#1D7A63" }, pro_max: { bg: "#CECBF6", fg: "#3C3489" } };
-    const c = m[t ?? ""] ?? { bg: "#F2EEE7", fg: "#6b675f" };
-    return <span style={{ background: c.bg, color: c.fg, fontSize: 11, padding: "1px 8px", borderRadius: 99 }}>{t ?? "·"}</span>;
-  };
-
   const danger = (s: string | null | undefined) => ["past_due", "unpaid", "incomplete"].includes(s ?? "");
 
   return (
     <div style={adminPagePad}>
       <AdminPageHeader title="Revenue" rangeLabel={range.label} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 12 }}>
-        <div style={adminKpi}><div style={{ fontSize: 11.5, color: "#9A8B73" }}>MRR (est.)</div><div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>฿{mrr.toLocaleString()}</div><div style={{ fontSize: 11, color: "#9A8B73" }}>paid tiers × monthly</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 11.5, color: "#9A8B73" }}>Paying users</div><div style={{ fontSize: 20, fontWeight: 700, marginTop: 2, color: "#1F7A68" }}>{paid}</div><div style={{ fontSize: 11, color: "#9A8B73" }}>{proCount} pro · {proMaxCount} pro max</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 11.5, color: "#9A8B73" }}>Pack revenue</div><div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>฿{packRevenue.toLocaleString()}</div><div style={{ fontSize: 11, color: "#9A8B73" }}>one-time, to date</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 11.5, color: "#9A8B73" }}>Referral credit out</div><div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>฿{referralOutstanding.toLocaleString()}</div><div style={{ fontSize: 11, color: "#9A8B73" }}>unspent liability</div></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
+        <KpiCard color={adminPalette.gold} icon={Coins} label="MRR (est.)" value={`฿${mrr.toLocaleString()}`} sub="paid tiers × monthly" />
+        <KpiCard color={adminPalette.violet} icon={Users} label="Paying users" value={String(paid)} sub={`${proCount} pro · ${proMaxCount} pro max`} />
+        <KpiCard color={adminPalette.gold} icon={Package} label="Pack revenue" value={`฿${packRevenue.toLocaleString()}`} sub="one-time, to date" />
+        <KpiCard color={adminPalette.amber} icon={Wallet} label="Referral credit out" value={`฿${referralOutstanding.toLocaleString()}`} sub="unspent liability" />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         <div style={adminCard}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Subscription status</div>
-          {statuses.length === 0 ? <div style={{ fontSize: 12.5, color: "#B0A488" }}>No subscriptions yet.</div> :
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: FONT_DISPLAY }}>Subscription status</div>
+          {statuses.length === 0 ? <div style={{ fontSize: 12.5, color: adminPalette.subtle }}>No subscriptions yet.</div> :
             statuses.map(([s, n]) => (
               <div key={s} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}>
-                <span style={{ color: danger(s) ? "#A32D2D" : "#6b675f" }}>{s}</span>
-                <span style={{ fontWeight: 600 }}>{n}</span>
+                <span style={{ color: danger(s) ? adminPalette.rose : adminPalette.muted }}>{s}</span>
+                <span style={{ fontWeight: 700, fontFamily: FONT_DISPLAY }}>{n}</span>
               </div>
             ))}
         </div>
         <div style={adminCard}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Referral program</div>
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}><span style={{ color: "#6b675f" }}>Granted (all-time)</span><span style={{ color: "#1F7A68", fontWeight: 600 }}>฿{referralGranted.toLocaleString()}</span></div>
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}><span style={{ color: "#6b675f" }}>Spent on checkouts</span><span style={{ fontWeight: 600 }}>฿{referralSpent.toLocaleString()}</span></div>
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}><span style={{ color: "#6b675f" }}>Outstanding</span><span style={{ fontWeight: 600 }}>฿{referralOutstanding.toLocaleString()}</span></div>
-          <div style={{ fontSize: 11, color: "#B0A488", marginTop: 6 }}>Granted = ฿30 x 2 per converted referral. Spent reduces real charge revenue.</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: FONT_DISPLAY }}>Referral program</div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}><span style={{ color: adminPalette.muted }}>Granted (all-time)</span><span style={{ color: adminPalette.gold, fontWeight: 700, fontFamily: FONT_DISPLAY }}>฿{referralGranted.toLocaleString()}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}><span style={{ color: adminPalette.muted }}>Spent on checkouts</span><span style={{ color: adminPalette.teal, fontWeight: 700, fontFamily: FONT_DISPLAY }}>฿{referralSpent.toLocaleString()}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}><span style={{ color: adminPalette.muted }}>Outstanding</span><span style={{ color: adminPalette.amber, fontWeight: 700, fontFamily: FONT_DISPLAY }}>฿{referralOutstanding.toLocaleString()}</span></div>
+          <div style={{ fontSize: 11, color: adminPalette.subtle, marginTop: 6 }}>Granted = ฿30 x 2 per converted referral. Spent reduces real charge revenue.</div>
         </div>
       </div>
 
       <div style={adminCard}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Paying users ({paid})</div>
-        {paying.length === 0 ? <div style={{ fontSize: 12.5, color: "#B0A488" }}>No paying users yet.</div> : (
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: FONT_DISPLAY }}>Paying users ({paid})</div>
+        {paying.length === 0 ? <div style={{ fontSize: 12.5, color: adminPalette.subtle }}>No paying users yet.</div> : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr><th style={adminTh}>User</th><th style={adminTh}>Tier</th><th style={adminTh}>Status</th><th style={adminTh}>Joined</th></tr></thead>
               <tbody>
-                {paying.map((u) => (
-                  <tr key={u.id}>
-                    <td style={adminTd}><Link href={withRange(`/admin/users/${u.id}`, range.queryString)} style={{ textDecoration: "none" }}><span style={{ fontWeight: 600, color: "#2C8E76" }}>{u.display_name || "·"}</span><span style={{ color: "#9A8B73", fontSize: 11 }}> · {u.email || u.id.slice(0, 8)}</span></Link></td>
-                    <td style={adminTd}>{tierPill(u.tier)}</td>
-                    <td style={{ ...adminTd, color: danger(u.subscription_status) ? "#A32D2D" : "#2A2A28" }}>{u.subscription_status || "·"}</td>
+                {paying.map((u, idx) => (
+                  <tr key={u.id} style={{ background: idx % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
+                    <td style={adminTd}>
+                      <Link href={withRange(`/admin/users/${u.id}`, range.queryString)} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
+                        <Avatar name={u.display_name} email={u.email} />
+                        <div>
+                          <span style={{ fontWeight: 700, color: adminPalette.teal, fontFamily: FONT_DISPLAY }}>{u.display_name || "·"}</span>
+                          <div style={{ color: adminPalette.muted, fontSize: 11 }}>{u.email || u.id.slice(0, 8)}</div>
+                        </div>
+                      </Link>
+                    </td>
+                    <td style={adminTd}><TierBadge tier={u.tier} /></td>
+                    <td style={{ ...adminTd, color: danger(u.subscription_status) ? adminPalette.rose : adminPalette.ink }}>{u.subscription_status || "·"}</td>
                     <td style={adminTd}>{fmtDate(u.onboarding_completed_at)}</td>
                   </tr>
                 ))}
@@ -126,7 +130,7 @@ export default async function AdminRevenuePage({
         )}
       </div>
 
-      <div style={{ fontSize: 11, color: "#B0A488", marginTop: 10 }}>MRR assumes monthly billing. Pack &amp; referral totals are all-time (range filter lands in a later pass).</div>
+      <div style={{ fontSize: 11, color: adminPalette.subtle, marginTop: 10 }}>MRR assumes monthly billing. Pack &amp; referral totals are all-time (range filter lands in a later pass).</div>
     </div>
   );
 }

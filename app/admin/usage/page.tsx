@@ -1,9 +1,22 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { Flame, PhoneCall, AlertTriangle, Hash } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { COST_ALERT_THB_7D, THB_PER_USD } from "@/lib/admin/cost";
 import { parseRange, rangeIso, withRange } from "@/lib/admin/time-range";
-import AdminPageHeader, { adminCard, adminKpi, adminPagePad, adminTd, adminTh } from "@/components/admin/AdminPageHeader";
+import AdminPageHeader, { adminCard, adminPagePad, adminTd, adminTh } from "@/components/admin/AdminPageHeader";
+import {
+  KpiCard,
+  Avatar,
+  CostBar,
+  GuestChip,
+  filterPanel,
+  applyBtn,
+  inputStyle,
+  adminPalette,
+  FONT_DISPLAY,
+  tint,
+} from "@/components/admin/ui";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +61,7 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
     return (
       <div style={adminPagePad}>
         <AdminPageHeader title="Cost" rangeLabel={range.label} />
-        <p style={{ color: "#A32D2D", fontSize: 13 }}>Query error: {error.message}</p>
+        <p style={{ color: adminPalette.rose, fontSize: 13 }}>Query error: {error.message}</p>
       </div>
     );
   }
@@ -65,9 +78,9 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
     for (const p of (ps ?? []) as { id: string; email: string | null; display_name: string | null }[]) prof.set(p.id, { email: p.email, name: p.display_name });
   }
   const who = (id: string | null) => {
-    if (!id) return { label: "· guest / none", sub: "" };
+    if (!id) return { label: "guest", sub: "", email: null as string | null, name: null as string | null, guest: true };
     const p = prof.get(id);
-    return { label: p?.name || p?.email || id, sub: p?.email && p?.name ? p.email : "" };
+    return { label: p?.name || p?.email || id, sub: p?.email && p?.name ? p.email : "", email: p?.email ?? null, name: p?.name ?? null, guest: false };
   };
 
   const tot = sum(rows);
@@ -79,6 +92,7 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
   const byUser = grp((r) => r.user_id ?? "∅");
   const byFn = grp((r) => r.fn);
   const byApi = grp((r) => `${r.provider} · ${r.model}`);
+  const maxUserCost = Math.max(0, ...byUser.map((u) => u.cost));
 
   const invG = new Map<string, { fn: string; calls: number; cost: number }>();
   for (const r of rows) { const k = `${r.fn}|${r.user_id ?? "-"}|${r.created_at}`; const g = invG.get(k) ?? { fn: r.fn, calls: 0, cost: 0 }; g.calls++; g.cost += n(r.est_cost_usd); invG.set(k, g); }
@@ -90,15 +104,16 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
   const daysArr = [...dayMap.entries()].map(([d, rs]) => ({ d, ...sum(rs) })).sort((a, b) => (a.d < b.d ? 1 : -1));
   const fails = rows.filter((r) => !r.ok).slice(0, 30);
 
-  const failC = (a: number, b: number) => (b > 0 && a / b > 0.2 ? "#A32D2D" : "#2A2A28");
+  const failHigh = tot.calls > 0 && tot.fails / tot.calls > 0.2;
   const thN: CSSProperties = { ...adminTh, textAlign: "right" };
   const tdN: CSSProperties = { ...adminTd, textAlign: "right", fontVariantNumeric: "tabular-nums", fontFamily: "ui-monospace, monospace" };
+  const lbl: CSSProperties = { fontSize: 11, color: adminPalette.muted, display: "block", marginBottom: 3 };
 
   return (
     <div style={adminPagePad}>
       <AdminPageHeader title="Cost" rangeLabel={`${range.label} · UTC · ฿ ≈ USD×${THB_PER_USD}`} />
 
-      <form method="GET" style={{ ...adminCard, marginBottom: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <form method="GET" style={{ ...filterPanel, marginBottom: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
         <input type="hidden" name="range" value={range.preset} />
         {range.preset === "custom" && (
           <>
@@ -106,44 +121,82 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
             <input type="hidden" name="to" value={range.to.toISOString()} />
           </>
         )}
-        <label style={{ fontSize: 12, color: "#6b675f" }}>Service
-          <select name="fn" defaultValue={fFn} style={{ marginLeft: 6, padding: "5px 8px", borderRadius: 6, border: "0.5px solid #D9D3C8", fontSize: 12.5, fontFamily: "inherit" }}>
+        <div>
+          <label style={lbl}>Service</label>
+          <select name="fn" defaultValue={fFn} style={inputStyle}>
             <option value="">all</option>{fnOptions.map((f) => <option key={f} value={f}>{f}</option>)}
           </select>
-        </label>
-        <label style={{ fontSize: 12, color: "#6b675f" }}>API
-          <select name="provider" defaultValue={fProv} style={{ marginLeft: 6, padding: "5px 8px", borderRadius: 6, border: "0.5px solid #D9D3C8", fontSize: 12.5, fontFamily: "inherit" }}>
+        </div>
+        <div>
+          <label style={lbl}>API</label>
+          <select name="provider" defaultValue={fProv} style={inputStyle}>
             <option value="">all</option>{provOptions.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
-        </label>
-        <button type="submit" style={{ padding: "6px 12px", borderRadius: 6, border: "0.5px solid #C9E5DC", background: "#EAF6F1", color: "#1F7A68", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Apply</button>
+        </div>
+        <button type="submit" style={applyBtn}>Apply</button>
       </form>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginBottom: 12 }}>
-        <div style={adminKpi}><div style={{ fontSize: 11, color: "#9A8B73" }}>Cost</div><div style={{ fontSize: 18, fontWeight: 700 }}>{baht(tot.cost)}</div><div style={{ color: "#B0A488", fontSize: 11 }}>{usd(tot.cost)}</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 11, color: "#9A8B73" }}>Calls</div><div style={{ fontSize: 18, fontWeight: 700 }}>{tot.calls}</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 11, color: "#9A8B73" }}>Fail rate</div><div style={{ fontSize: 18, fontWeight: 700, color: failC(tot.fails, tot.calls) }}>{pct(tot.fails, tot.calls)}</div><div style={{ color: "#B0A488", fontSize: 11 }}>{tot.fails} failed</div></div>
-        <div style={adminKpi}><div style={{ fontSize: 11, color: "#9A8B73" }}>Tokens</div><div style={{ fontSize: 18, fontWeight: 700 }}>{tot.tok.toLocaleString()}</div></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 12 }}>
+        <KpiCard color={adminPalette.amber} icon={Flame} label="Cost" value={baht(tot.cost)} sub={usd(tot.cost)} />
+        <KpiCard color={adminPalette.sky} icon={PhoneCall} label="Calls" value={String(tot.calls)} />
+        <KpiCard
+          color={failHigh ? adminPalette.rose : adminPalette.teal}
+          icon={AlertTriangle}
+          label="Fail rate"
+          value={pct(tot.fails, tot.calls)}
+          sub={`${tot.fails} failed`}
+        />
+        <KpiCard color={adminPalette.sky} icon={Hash} label="Tokens" value={tot.tok.toLocaleString()} />
       </div>
 
       <div style={{ ...adminCard, marginBottom: 10 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Per user</div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Per user</div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={adminTh}>User</th><th style={adminTh}>Email</th><th style={thN}>Calls</th><th style={thN}>Fails</th><th style={thN}>Tokens</th><th style={thN}>Cost</th></tr></thead>
-            <tbody>{byUser.map((u) => {
+            <tbody>{byUser.map((u, idx) => {
               const w = who(u.rs[0].user_id);
               const thb = Math.round(u.cost * THB_PER_USD);
               const hot = thb >= COST_ALERT_THB_7D;
               const id = u.rs[0].user_id;
               return (
-                <tr key={u.k}>
-                  <td style={adminTd}>{id ? <Link href={withRange(`/admin/users/${id}`, range.queryString)} style={{ color: "#1f7a68" }}>{w.label}</Link> : w.label}{hot ? <span style={{ marginLeft: 6, fontSize: 10, background: "#FAEEDA", color: "#854F0B", padding: "1px 6px", borderRadius: 99 }}>hot</span> : null}</td>
-                  <td style={{ ...adminTd, color: "#9A8B73", fontSize: 11 }}>{w.sub}</td>
+                <tr
+                  key={u.k}
+                  style={{
+                    background: idx % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined,
+                  }}
+                >
+                  <td style={adminTd}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {w.guest ? (
+                        <GuestChip />
+                      ) : (
+                        <Avatar name={w.name} email={w.email} />
+                      )}
+                      <div>
+                        {id ? (
+                          <Link href={withRange(`/admin/users/${id}`, range.queryString)} style={{ color: adminPalette.teal, fontWeight: 700, fontFamily: FONT_DISPLAY, textDecoration: "none" }}>
+                            {w.label}
+                          </Link>
+                        ) : (
+                          <span style={{ fontWeight: 700, fontFamily: FONT_DISPLAY }}>{w.label}</span>
+                        )}
+                        {hot ? (
+                          <span style={{ marginLeft: 6, fontSize: 10, background: tint(adminPalette.amber, 0.18), color: "#854F0B", padding: "1px 6px", borderRadius: 99, fontWeight: 700 }}>hot</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ ...adminTd, color: adminPalette.muted, fontSize: 11 }}>{w.sub || "·"}</td>
                   <td style={tdN}>{u.calls}</td>
-                  <td style={{ ...tdN, color: failC(u.fails, u.calls) }}>{u.fails}</td>
+                  <td style={{ ...tdN, color: u.fails / Math.max(1, u.calls) > 0.2 ? adminPalette.rose : adminPalette.ink }}>{u.fails}</td>
                   <td style={tdN}>{u.tok.toLocaleString()}</td>
-                  <td style={{ ...tdN, color: hot ? "#854F0B" : undefined }}>{baht(u.cost)}</td>
+                  <td style={{ ...tdN, color: hot ? "#854F0B" : undefined }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                      <CostBar value={u.cost} max={maxUserCost} />
+                      <span>{baht(u.cost)}</span>
+                    </div>
+                  </td>
                 </tr>
               );
             })}</tbody>
@@ -153,16 +206,16 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         <div style={adminCard}>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Per service</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Per service</div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={adminTh}>Function</th><th style={thN}>Calls</th><th style={thN}>Fails</th><th style={thN}>Avg/inv</th><th style={thN}>Cost</th></tr></thead>
-            <tbody>{byFn.map((r) => {
+            <tbody>{byFn.map((r, idx) => {
               const iv = invFn.get(r.k);
               return (
-                <tr key={r.k}>
+                <tr key={r.k} style={{ background: idx % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
                   <td style={adminTd}>{r.k}</td>
                   <td style={tdN}>{r.calls}</td>
-                  <td style={{ ...tdN, color: failC(r.fails, r.calls) }}>{r.fails}</td>
+                  <td style={{ ...tdN, color: r.fails / Math.max(1, r.calls) > 0.2 ? adminPalette.rose : adminPalette.ink }}>{r.fails}</td>
                   <td style={tdN}>{iv ? baht(iv.cost / iv.inv) : "·"}</td>
                   <td style={tdN}>{baht(r.cost)}</td>
                 </tr>
@@ -171,14 +224,14 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
           </table>
         </div>
         <div style={adminCard}>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Per API</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Per API</div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={adminTh}>API</th><th style={thN}>Calls</th><th style={thN}>Fails</th><th style={thN}>Tokens</th><th style={thN}>Cost</th></tr></thead>
-            <tbody>{byApi.map((r) => (
-              <tr key={r.k}>
+            <tbody>{byApi.map((r, idx) => (
+              <tr key={r.k} style={{ background: idx % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
                 <td style={adminTd}>{r.k}</td>
                 <td style={tdN}>{r.calls}</td>
-                <td style={{ ...tdN, color: failC(r.fails, r.calls) }}>{r.fails}</td>
+                <td style={{ ...tdN, color: r.fails / Math.max(1, r.calls) > 0.2 ? adminPalette.rose : adminPalette.ink }}>{r.fails}</td>
                 <td style={tdN}>{r.tok.toLocaleString()}</td>
                 <td style={tdN}>{baht(r.cost)}</td>
               </tr>
@@ -189,30 +242,30 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <div style={adminCard}>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Daily totals</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Daily totals</div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th style={adminTh}>Day</th><th style={thN}>Calls</th><th style={thN}>Fail %</th><th style={thN}>Cost</th></tr></thead>
-            <tbody>{daysArr.map((r) => (
-              <tr key={r.d}>
+            <tbody>{daysArr.map((r, idx) => (
+              <tr key={r.d} style={{ background: idx % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
                 <td style={adminTd}>{r.d}</td>
                 <td style={tdN}>{r.calls}</td>
-                <td style={{ ...tdN, color: failC(r.fails, r.calls) }}>{pct(r.fails, r.calls)}</td>
+                <td style={{ ...tdN, color: r.fails / Math.max(1, r.calls) > 0.2 ? adminPalette.rose : adminPalette.ink }}>{pct(r.fails, r.calls)}</td>
                 <td style={tdN}>{baht(r.cost)}</td>
               </tr>
             ))}</tbody>
           </table>
         </div>
         <div style={adminCard}>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Recent failures</div>
-          {fails.length === 0 ? <p style={{ color: "#9A8B73", fontSize: 12.5 }}>No failures.</p> : (
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Recent failures</div>
+          {fails.length === 0 ? <p style={{ color: adminPalette.subtle, fontSize: 12.5 }}>No failures.</p> : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr><th style={adminTh}>When</th><th style={adminTh}>Fn</th><th style={adminTh}>User</th><th style={adminTh}>Error</th></tr></thead>
               <tbody>{fails.map((r, i) => (
-                <tr key={i}>
+                <tr key={i} style={{ background: tint(adminPalette.rose, 0.04), borderLeft: `3px solid ${adminPalette.rose}` }}>
                   <td style={{ ...adminTd, whiteSpace: "nowrap", fontSize: 11 }}>{r.created_at.slice(5, 19).replace("T", " ")}</td>
                   <td style={{ ...adminTd, fontSize: 11 }}>{r.fn}</td>
                   <td style={{ ...adminTd, fontSize: 11 }}>{who(r.user_id).label}</td>
-                  <td style={{ ...adminTd, fontSize: 11, color: "#A32D2D" }}>{(r.meta?.error ?? "").slice(0, 70)}</td>
+                  <td style={{ ...adminTd, fontSize: 11, color: adminPalette.rose }}>{(r.meta?.error ?? "").slice(0, 70)}</td>
                 </tr>
               ))}</tbody>
             </table>
