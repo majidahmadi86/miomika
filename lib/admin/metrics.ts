@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { ROOM_PACKS } from "@/lib/billing/tiers";
 import { THB_PER_USD } from "@/lib/admin/cost";
+import { isInternalEmail, internalEmailSet } from "@/lib/admin/internal";
 import {
   bucketStart,
   emptyBuckets,
@@ -34,22 +35,23 @@ function deltaPct(cur: number, prev: number): number | null {
   return Math.round(((cur - prev) / prev) * 100);
 }
 
-/** Paginate auth.admin.listUsers and collect created_at in [from, to]. */
+/** Paginate auth.admin.listUsers · exclude internal emails from growth metrics. */
 async function listAuthCreatedAts(
   supabase: Awaited<ReturnType<typeof createServiceClient>>,
   from: Date,
   to: Date,
 ): Promise<Date[]> {
+  const internal = internalEmailSet();
   const out: Date[] = [];
   const fromMs = from.getTime();
   const toMs = to.getTime();
-  // listUsers is newest-first; stop once we pass `from`.
   for (let page = 1; page <= 50; page++) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
     if (error || !data?.users?.length) break;
     let olderThanWindow = false;
     for (const u of data.users) {
       if (!u.created_at) continue;
+      if (isInternalEmail(u.email, internal)) continue;
       const t = new Date(u.created_at).getTime();
       if (t > toMs) continue;
       if (t < fromMs) {
@@ -59,7 +61,6 @@ async function listAuthCreatedAts(
       out.push(new Date(u.created_at));
     }
     if (data.users.length < 1000) break;
-    // If the oldest user on this page is still newer than `from`, keep going.
     const oldest = data.users[data.users.length - 1]?.created_at;
     if (oldest && new Date(oldest).getTime() < fromMs && olderThanWindow) break;
   }
@@ -89,13 +90,15 @@ export async function signupsSeries(range: ParsedRange): Promise<SeriesPoint[]> 
 export async function activeUsersSeries(range: ParsedRange): Promise<SeriesPoint[]> {
   const supabase = await createServiceClient();
   const { fromIso, toIso } = rangeIso(range);
+  const internal = internalEmailSet();
   const { data } = await supabase
     .from("profiles")
-    .select("last_seen_at")
+    .select("last_seen_at, email")
     .gte("last_seen_at", fromIso)
     .lte("last_seen_at", toIso)
     .limit(50000);
-  const dates = ((data ?? []) as { last_seen_at: string }[])
+  const dates = ((data ?? []) as { last_seen_at: string; email: string | null }[])
+    .filter((r) => !isInternalEmail(r.email, internal))
     .map((r) => new Date(r.last_seen_at))
     .filter((d) => Number.isFinite(d.getTime()));
   return bucketCounts(dates, range.from, range.to, range.bucket);
@@ -103,20 +106,30 @@ export async function activeUsersSeries(range: ParsedRange): Promise<SeriesPoint
 
 /**
  * Pack purchase revenue in THB, derived from room_credit_ledger purchase rows
- * × ROOM_PACKS prices. credit_ledger / webhook_events do NOT store payment amounts.
+ * × ROOM_PACKS prices. Excludes internal accounts. credit_ledger / webhook_events
+ * do NOT store payment amounts.
  */
 export async function revenueSeries(range: ParsedRange): Promise<SeriesPoint[]> {
   const supabase = await createServiceClient();
   const { fromIso, toIso } = rangeIso(range);
+  const internal = internalEmailSet();
   const { data } = await supabase
     .from("room_credit_ledger")
-    .select("delta, created_at, reason")
+    .select("delta, created_at, reason, user_id")
     .eq("reason", "purchase")
     .gte("created_at", fromIso)
     .lte("created_at", toIso)
     .limit(50000);
+  const rows = (data ?? []) as { delta: number; created_at: string; user_id: string | null }[];
+  const ids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))] as string[];
+  const emailById = new Map<string, string | null>();
+  if (ids.length) {
+    const { data: ps } = await supabase.from("profiles").select("id, email").in("id", ids);
+    for (const p of (ps ?? []) as { id: string; email: string | null }[]) emailById.set(p.id, p.email);
+  }
   const byBucket = new Map<string, number>();
-  for (const r of (data ?? []) as { delta: number; created_at: string }[]) {
+  for (const r of rows) {
+    if (r.user_id && isInternalEmail(emailById.get(r.user_id) ?? null, internal)) continue;
     const thb = PACK_PRICE.get(r.delta) ?? 0;
     if (!thb) continue;
     const key = bucketStart(new Date(r.created_at), range.bucket).toISOString();

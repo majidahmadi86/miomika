@@ -10,6 +10,7 @@ import {
   Avatar,
   CostBar,
   GuestChip,
+  InternalChip,
   filterPanel,
   applyBtn,
   inputStyle,
@@ -17,6 +18,7 @@ import {
   FONT_DISPLAY,
   tint,
 } from "@/components/admin/ui";
+import { isInternalEmail, internalEmailSet } from "@/lib/admin/internal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,6 +86,7 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
   };
 
   const tot = sum(rows);
+  const internal = internalEmailSet();
   const grp = (keyFn: (r: UsageRow) => string) => {
     const m = new Map<string, UsageRow[]>();
     for (const r of rows) { const k = keyFn(r); const a = m.get(k) ?? []; a.push(r); m.set(k, a); }
@@ -174,16 +177,19 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
                         <Avatar name={w.name} email={w.email} />
                       )}
                       <div>
-                        {id ? (
-                          <Link href={withRange(`/admin/users/${id}`, range.queryString)} style={{ color: adminPalette.teal, fontWeight: 700, fontFamily: FONT_DISPLAY, textDecoration: "none" }}>
-                            {w.label}
-                          </Link>
-                        ) : (
-                          <span style={{ fontWeight: 700, fontFamily: FONT_DISPLAY }}>{w.label}</span>
-                        )}
-                        {hot ? (
-                          <span style={{ marginLeft: 6, fontSize: 10, background: tint(adminPalette.amber, 0.18), color: "#854F0B", padding: "1px 6px", borderRadius: 99, fontWeight: 700 }}>hot</span>
-                        ) : null}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          {id ? (
+                            <Link href={withRange(`/admin/users/${id}`, range.queryString)} style={{ color: adminPalette.teal, fontWeight: 700, fontFamily: FONT_DISPLAY, textDecoration: "none" }}>
+                              {w.label}
+                            </Link>
+                          ) : (
+                            <span style={{ fontWeight: 700, fontFamily: FONT_DISPLAY }}>{w.label}</span>
+                          )}
+                          {!w.guest && isInternalEmail(w.email, internal) ? <InternalChip /> : null}
+                          {hot ? (
+                            <span style={{ fontSize: 10, background: tint(adminPalette.amber, 0.18), color: "#854F0B", padding: "1px 6px", borderRadius: 99, fontWeight: 700 }}>hot</span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </td>

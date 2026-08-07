@@ -11,6 +11,7 @@ import {
   ActivityDot,
   activityTone,
   CostBar,
+  InternalChip,
   filterPanel,
   applyBtn,
   inputStyle,
@@ -18,6 +19,7 @@ import {
   FONT_DISPLAY,
   tint,
 } from "@/components/admin/ui";
+import { isInternalEmail, internalEmailSet } from "@/lib/admin/internal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +61,7 @@ export default async function AdminUsersPage({
 }) {
   const sp = await searchParams;
   const range = parseRange(sp);
+  const internal = internalEmailSet();
   const { fromIso } = rangeIso(range);
 
   const qRaw = one(sp.q).trim();
@@ -262,7 +265,10 @@ export default async function AdminUsersPage({
                         <Link href={withRange(`/admin/users/${r.id}`, range.queryString)} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
                           <Avatar name={r.display_name} email={r.email} />
                           <div>
-                            <div style={{ fontWeight: 700, color: adminPalette.teal, fontFamily: FONT_DISPLAY }}>{r.display_name || "·"}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ fontWeight: 700, color: adminPalette.teal, fontFamily: FONT_DISPLAY }}>{r.display_name || "·"}</div>
+                              {isInternalEmail(r.email, internal) ? <InternalChip /> : null}
+                            </div>
                             <div style={{ fontSize: 11, color: adminPalette.muted }}>{r.email || r.id.slice(0, 8)}</div>
                           </div>
                         </Link>

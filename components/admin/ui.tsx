@@ -443,6 +443,27 @@ export function GuestChip() {
   );
 }
 
+export function InternalChip() {
+  return (
+    <span
+      style={{
+        background: tint(adminPalette.slate, 0.14),
+        color: adminPalette.slate,
+        fontSize: 10,
+        fontWeight: 700,
+        fontFamily: FONT_DISPLAY,
+        padding: "2px 7px",
+        borderRadius: 99,
+        display: "inline-flex",
+        alignItems: "center",
+        flexShrink: 0,
+      }}
+    >
+      internal
+    </span>
+  );
+}
+
 export const adminTokens = {
   ...adminPalette,
   tealStrong: "#1F7A68",
