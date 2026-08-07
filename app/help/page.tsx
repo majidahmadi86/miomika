@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { ChevronDown } from "lucide-react";
 
-export const metadata = { title: "Help — Miomika" };
+export const metadata = { title: "Help · Miomika" };
 
 type QA = { q: string; a: string; steps?: string[]; link?: { href: string; label: string } };
 type Cat = { title: string; items: QA[] };
@@ -138,8 +138,8 @@ const HELP_TH: Cat[] = [
 ];
 
 const UI = {
-  en: { title: "Help center", intro: "Everything about using Miomika — getting started, talking and lessons, your plan, fixing problems, and your data.", still: "Still need help? Email ", terms: "Terms of Service", privacy: "Privacy Policy" },
-  th: { title: "ศูนย์ช่วยเหลือ", intro: "ทุกอย่างเกี่ยวกับการใช้ Miomika — เริ่มต้นใช้งาน การพูดและบทเรียน แพ็กเกจ การแก้ปัญหา และข้อมูลของคุณ", still: "ยังต้องการความช่วยเหลือ? อีเมล ", terms: "ข้อกำหนดการให้บริการ", privacy: "นโยบายความเป็นส่วนตัว" },
+  en: { title: "Help center", intro: "Everything about using Miomika · getting started, talking and lessons, your plan, fixing problems, and your data.", still: "Still need help? Email ", terms: "Terms of Service", privacy: "Privacy Policy" },
+  th: { title: "ศูนย์ช่วยเหลือ", intro: "ทุกอย่างเกี่ยวกับการใช้ Miomika · เริ่มต้นใช้งาน การพูดและบทเรียน แพ็กเกจ การแก้ปัญหา และข้อมูลของคุณ", still: "ยังต้องการความช่วยเหลือ? อีเมล ", terms: "ข้อกำหนดการให้บริการ", privacy: "นโยบายความเป็นส่วนตัว" },
 };
 
 export default async function HelpPage() {

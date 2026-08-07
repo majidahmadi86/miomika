@@ -22,17 +22,17 @@ type Lang = "en" | "th";
 
 const T = {
   en: {
-    login: "Log in",
-    tryFree: "Try Miomi free",
+    login: "Sign in",
+    tryFree: "Start free",
     navHow: "How it works",
     navPricing: "Pricing",
     navHelp: "Help",
     heroTitle: "A friend who remembers you",
     heroSub:
       "Miomi is a voice-first AI companion who teaches you Thai or English by talking with you. A little conversation every day, and every conversation she knows you a bit better.",
-    heroCta: "Talk to Miomi free",
-    heroCta2: "See pricing",
-    heroNote: "No sign-up needed to try. Works in your browser, in Thai and English.",
+    heroCta: "Start free",
+    heroCta2: "Sign in",
+    heroNote: "Live now at miomika.com. Works in your browser, in Thai and English.",
     bubble: "Hello! I am Miomi, meow~",
     demoEyebrow: "What talking to Miomi feels like",
     demoCaption:
@@ -52,7 +52,7 @@ const T = {
         body: "Miomi keeps what you tell her: your name, your week, the words you struggle with. Come back tomorrow and she picks up right where you left off.",
       },
     ],
-    howTry: "Try it now →",
+    howTry: "See it live →",
     insideEyebrow: "Inside Miomika",
     insideShots: [
       {
@@ -100,16 +100,16 @@ const T = {
   },
   th: {
     login: "เข้าสู่ระบบ",
-    tryFree: "ลองคุยกับมีโอมิฟรี",
+    tryFree: "เริ่มฟรี",
     navHow: "ใช้งานอย่างไร",
     navPricing: "ราคา",
     navHelp: "ช่วยเหลือ",
     heroTitle: "เพื่อนที่จำคุณได้",
     heroSub:
       "มีโอมิคือเพื่อน AI ที่สอนภาษาอังกฤษหรือภาษาไทยด้วยการพูดคุยกับคุณจริงๆ คุยกันวันละนิด แล้วมีโอมิจะรู้จักคุณมากขึ้นทุกวัน",
-    heroCta: "คุยกับมีโอมิฟรี",
-    heroCta2: "ดูราคา",
-    heroNote: "ลองได้เลยไม่ต้องสมัคร ใช้งานในเบราว์เซอร์ ทั้งภาษาไทยและอังกฤษ",
+    heroCta: "เริ่มฟรี",
+    heroCta2: "เข้าสู่ระบบ",
+    heroNote: "พร้อมใช้งานแล้วที่ miomika.com ใช้งานในเบราว์เซอร์ ทั้งภาษาไทยและอังกฤษ",
     bubble: "สวัสดีค่ะ หนูชื่อมีโอมิ เมี้ยว~",
     demoEyebrow: "คุยกับมีโอมิเป็นแบบนี้",
     demoCaption:
@@ -129,7 +129,7 @@ const T = {
         body: "มีโอมิจำสิ่งที่คุณเล่าให้ฟัง ทั้งชื่อของคุณ เรื่องราวในสัปดาห์ และคำที่คุณยังไม่คล่อง กลับมาพรุ่งนี้แล้วคุยต่อจากเดิมได้เลย",
       },
     ],
-    howTry: "ลองเลย →",
+    howTry: "ดูของจริง →",
     insideEyebrow: "Inside Miomika",
     insideShots: [
       {
@@ -287,7 +287,7 @@ export default async function Page({
                 {t.login}
               </Link>
               <Link
-                href="/home"
+                href="/signup"
                 className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-accent-contrast shadow-cta hover:bg-accent-hover"
               >
                 {t.tryFree}
@@ -309,13 +309,13 @@ export default async function Page({
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <Link
-                  href="/home"
+                  href="/signup"
                   className="rounded-full bg-accent px-6 py-3 text-base font-medium text-accent-contrast shadow-cta hover:bg-accent-hover"
                 >
                   {t.heroCta}
                 </Link>
                 <Link
-                  href="/pricing"
+                  href="/login"
                   className="rounded-full border border-line-strong px-6 py-3 text-base font-medium text-ink hover:bg-surface"
                 >
                   {t.heroCta2}
@@ -519,7 +519,7 @@ export default async function Page({
           long pages never strand the visitor at the bottom. */}
       <div id="mk-dock">
         <Link
-          href="/home"
+          href="/signup"
           className="rounded-full bg-accent px-5 py-3 text-sm font-medium text-accent-contrast shadow-cta hover:bg-accent-hover"
         >
           {t.heroCta}
