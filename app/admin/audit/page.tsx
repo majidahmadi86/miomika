@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ScrollText } from "lucide-react";
-import { createServiceClient } from "@/lib/supabase/service";
 import { parseRange, rangeIso, withRange } from "@/lib/admin/time-range";
+import { loadProfilesByIds, queryAuditLog } from "@/lib/admin/audit-query";
 import AdminPageHeader, { adminCard, adminPagePad, adminTd, adminTh } from "@/components/admin/AdminPageHeader";
 import {
   ActionChip,
@@ -40,28 +40,16 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
   const range = parseRange(sp);
   const { fromIso, toIso } = rangeIso(range);
   const action = one(sp.action);
-  const target = one(sp.target);
   const q = one(sp.q);
 
-  const supabase = await createServiceClient();
-  let query = supabase
-    .from("admin_audit_log")
-    .select("created_at, admin_email, action, target_user_id, detail")
-    .gte("created_at", fromIso)
-    .lte("created_at", toIso)
-    .order("created_at", { ascending: false })
-    .limit(500);
-  if (action) query = query.eq("action", action);
-  if (target) query = query.eq("target_user_id", target);
-  if (q) query = query.or(`admin_email.ilike.%${q}%,detail.ilike.%${q}%`);
-  const { data } = await query;
-  const rows = (data ?? []) as { created_at: string; admin_email: string | null; action: string; target_user_id: string | null; detail: string | null }[];
+  const { rows } = await queryAuditLog({ fromIso, toIso, action, q, limit: 500 });
+  const targetIds = rows.map((r) => r.target_user_id).filter(Boolean) as string[];
+  const profiles = await loadProfilesByIds(targetIds);
 
   const qp = new URLSearchParams();
   qp.set("from", range.from.toISOString().slice(0, 10));
   qp.set("to", range.to.toISOString().slice(0, 10));
   if (action) qp.set("action", action);
-  if (target) qp.set("target", target);
   if (q) qp.set("q", q);
   const exportHref = `/api/admin/audit/export?${qp.toString()}`;
 
@@ -99,20 +87,22 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
             <input type="hidden" name="to" value={range.to.toISOString()} />
           </>
         )}
+        <div style={{ flex: "1 1 220px" }}>
+          <label style={lbl}>Search</label>
+          <input
+            type="text"
+            name="q"
+            defaultValue={q}
+            placeholder="name, email, admin, or detail…"
+            style={{ ...inputStyle, width: "100%" }}
+          />
+        </div>
         <div>
           <label style={lbl}>Action</label>
           <select name="action" defaultValue={action} style={inputStyle}>
             <option value="">all actions</option>
             {ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
-        </div>
-        <div>
-          <label style={lbl}>User id</label>
-          <input type="text" name="target" defaultValue={target} placeholder="target user id" style={inputStyle} />
-        </div>
-        <div>
-          <label style={lbl}>Search</label>
-          <input type="text" name="q" defaultValue={q} placeholder="admin email or detail" style={inputStyle} />
         </div>
         <button type="submit" className="admin-apply" style={applyBtn}>Filter</button>
         <a href={withRange("/admin/audit", range.queryString)} style={{ fontSize: 12, color: adminPalette.muted, textDecoration: "none", padding: "10px 4px" }}>reset</a>
@@ -126,7 +116,9 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
         {rows.length === 0 ? (
           <div style={{ textAlign: "center", padding: "48px 16px", color: adminPalette.subtle }}>
             <ScrollText size={36} strokeWidth={1.75} style={{ margin: "0 auto 12px", opacity: 0.55 }} />
-            <div style={{ fontSize: 13.5, fontFamily: FONT_DISPLAY, fontWeight: 600 }}>No matching entries.</div>
+            <div style={{ fontSize: 13.5, fontFamily: FONT_DISPLAY, fontWeight: 600 }}>
+              No admin actions in this range · all quiet.
+            </div>
           </div>
         ) : (
           <div className="admin-table-scroll">
@@ -141,26 +133,40 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
-                  <tr key={i} style={{ background: i % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
-                    <td style={{ ...adminTd, whiteSpace: "nowrap", color: adminPalette.muted }}>{fmt(r.created_at)}</td>
-                    <td style={adminTd}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Avatar email={r.admin_email} name={r.admin_email} size={26} />
-                        <span style={{ fontSize: 12.5 }}>{r.admin_email || "·"}</span>
-                      </div>
-                    </td>
-                    <td style={adminTd}><ActionChip action={r.action} /></td>
-                    <td style={adminTd}>
-                      {r.target_user_id ? (
-                        <Link href={withRange(`/admin/users/${r.target_user_id}`, range.queryString)} style={{ color: adminPalette.teal, fontWeight: 600, textDecoration: "none" }}>
-                          {r.target_user_id.slice(0, 8)}
-                        </Link>
-                      ) : "·"}
-                    </td>
-                    <td style={{ ...adminTd, color: "#4a4742" }}>{r.detail || "·"}</td>
-                  </tr>
-                ))}
+                {rows.map((r, i) => {
+                  const p = r.target_user_id ? profiles.get(r.target_user_id) : undefined;
+                  return (
+                    <tr key={i} style={{ background: i % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
+                      <td style={{ ...adminTd, whiteSpace: "nowrap", color: adminPalette.muted }}>{fmt(r.created_at)}</td>
+                      <td style={adminTd}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Avatar email={r.admin_email} name={r.admin_email} size={26} />
+                          <span style={{ fontSize: 12.5 }}>{r.admin_email || "·"}</span>
+                        </div>
+                      </td>
+                      <td style={adminTd}><ActionChip action={r.action} /></td>
+                      <td style={adminTd}>
+                        {r.target_user_id ? (
+                          <Link
+                            href={withRange(`/admin/users/${r.target_user_id}`, range.queryString)}
+                            style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}
+                          >
+                            <Avatar name={p?.display_name} email={p?.email} size={26} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 700, color: adminPalette.teal, fontFamily: FONT_DISPLAY, fontSize: 12.5 }}>
+                                {p?.display_name || p?.email || r.target_user_id}
+                              </div>
+                              {p?.email && p?.display_name ? (
+                                <div style={{ fontSize: 11, color: adminPalette.muted }}>{p.email}</div>
+                              ) : null}
+                            </div>
+                          </Link>
+                        ) : "·"}
+                      </td>
+                      <td style={{ ...adminTd, color: "#4a4742" }}>{r.detail || "·"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
