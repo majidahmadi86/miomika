@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PLANS } from "@/lib/billing/tiers";
+import { PublicSiteFooter } from "@/components/marketing/PublicSiteFooter";
 
 /**
  * Public landing page (miomika.com). Server-rendered, zero client JS, fully
@@ -88,14 +89,12 @@ const T = {
     aboutBody:
       "Miomika is built by Mikaro Studio, an independent creative technology studio in Bangkok, Thailand. We believe the warmest way to learn a language is not flashcards but a friend, so we built Miomi: a companion who talks with you, teaches you, and genuinely remembers you.",
     founderName: "Majid Ahmadi",
-    founderRole: "Founder, Mikaro Studio · known as Mike",
+    founderRole: "Founder, known as Mike · Bangkok, Thailand",
     founderBio:
       "An educator and builder based in Bangkok. Mike designed Miomika around a simple belief: people start speaking sooner when someone they trust is listening.",
-    founderLink: "Connect on LinkedIn",
+    founderLink: "LinkedIn ↗",
     aboutContact: "Questions? Write to us at",
     backToTop: "Back to top",
-    footerTagline: "Learn Thai and English with Miomi, your AI companion.",
-    footerLinks: { pricing: "Pricing", help: "Help center", terms: "Terms", privacy: "Privacy" },
     langSwitch: "ไทย",
     langHref: "/?lang=th",
   },
@@ -167,14 +166,12 @@ const T = {
     aboutBody:
       "Miomika พัฒนาโดย Mikaro Studio สตูดิโอเทคโนโลยีสร้างสรรค์อิสระในกรุงเทพฯ ประเทศไทย เราเชื่อว่าวิธีเรียนภาษาที่อบอุ่นที่สุดไม่ใช่บัตรคำศัพท์ แต่คือเพื่อนสักคน เราจึงสร้างมีโอมิ เพื่อนที่คุยกับคุณ สอนคุณ และจำคุณได้จริงๆ",
     founderName: "Majid Ahmadi",
-    founderRole: "ผู้ก่อตั้ง Mikaro Studio · เพื่อนๆ เรียกว่าไมค์",
+    founderRole: "Founder, known as Mike · Bangkok, Thailand",
     founderBio:
       "นักการศึกษาและนักสร้างสรรค์ในกรุงเทพฯ ไมค์ออกแบบ Miomika จากความเชื่อง่ายๆ ว่า คนเราจะกล้าเปิดปากพูดเร็วขึ้น เมื่อมีเพื่อนที่ไว้ใจคอยรับฟังอยู่ข้างๆ",
-    founderLink: "ดูโปรไฟล์ LinkedIn",
+    founderLink: "LinkedIn ↗",
     aboutContact: "มีคำถาม? เขียนหาเราได้ที่",
     backToTop: "กลับขึ้นด้านบน",
-    footerTagline: "เรียนภาษาไทยและอังกฤษกับมีโอมิ เพื่อน AI ของคุณ",
-    footerLinks: { pricing: "ราคา", help: "ศูนย์ช่วยเหลือ", terms: "ข้อกำหนด", privacy: "ความเป็นส่วนตัว" },
     langSwitch: "EN",
     langHref: "/?lang=en",
   },
@@ -483,7 +480,7 @@ export default async function Page({
               {t.aboutTitle}
             </h2>
             <p className="mt-3 max-w-2xl leading-relaxed text-ink-muted">{t.aboutBody}</p>
-            {/* Founder — real, verifiable person behind the product. */}
+            {/* Founder: real, verifiable person behind the product. */}
             <div className="mt-6 flex max-w-2xl items-center gap-5 rounded-card bg-surface p-5 shadow-card">
               <Image
                 src="/founder-mike.jpg"
@@ -499,7 +496,7 @@ export default async function Page({
                 <a
                   href="https://www.linkedin.com/in/majid-ahmadi86/"
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="me noopener"
                   className="mt-2 inline-block text-sm text-accent underline underline-offset-2"
                 >
                   {t.founderLink}
@@ -514,27 +511,8 @@ export default async function Page({
             </p>
           </section>
 
-          {/* ── Footer ── */}
-          <footer className="border-t border-line py-10">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-lg font-semibold text-earned-strong [font-family:var(--font-kanit),sans-serif]">
-                  Miomika
-                </p>
-                <p className="mt-1 max-w-xs text-sm text-ink-muted">{t.footerTagline}</p>
-              </div>
-              <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-muted">
-                <Link href="/pricing" className="hover:text-ink">{t.footerLinks.pricing}</Link>
-                <Link href="/help" className="hover:text-ink">{t.footerLinks.help}</Link>
-                <Link href="/legal/terms" className="hover:text-ink">{t.footerLinks.terms}</Link>
-                <Link href="/legal/privacy" className="hover:text-ink">{t.footerLinks.privacy}</Link>
-              </nav>
-            </div>
-            <p className="mt-8 text-xs text-ink-subtle">
-              © 2026 Mikaro Studio · Bangkok, Thailand · support@miomika.com
-            </p>
-          </footer>
         </div>
+        <PublicSiteFooter />
       </div>
 
       {/* Quick-access dock: the app is never more than one tap away, and
