@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
@@ -25,6 +26,7 @@ const TABS: { label: string; href: string; icon: LucideIcon }[] = [
 export default function AdminNav() {
   const path = usePathname();
   const sp = useSearchParams();
+  const stripRef = useRef<HTMLDivElement>(null);
   const rangeQs = (() => {
     const range = sp.get("range") || "7d";
     const from = sp.get("from");
@@ -39,8 +41,15 @@ export default function AdminNav() {
     return `range=${range}`;
   })();
 
+  useEffect(() => {
+    const el = stripRef.current?.querySelector<HTMLElement>("[data-active='1']");
+    el?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [path]);
+
   return (
     <div
+      ref={stripRef}
+      className="admin-hscroll"
       style={{
         display: "flex",
         gap: 2,
@@ -48,7 +57,6 @@ export default function AdminNav() {
         borderBottom: `0.5px solid ${adminPalette.line}`,
         background: "#fff",
         fontSize: 12.5,
-        overflowX: "auto",
         fontFamily: FONT_DISPLAY,
       }}
     >
@@ -59,16 +67,19 @@ export default function AdminNav() {
           <a
             key={t.href}
             href={withRange(t.href, rangeQs)}
+            data-active={active ? "1" : "0"}
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              padding: "8px 12px",
+              padding: "10px 12px",
               fontWeight: active ? 700 : 500,
               color: active ? adminPalette.teal : adminPalette.muted,
               borderBottom: active ? `3px solid ${adminPalette.teal}` : "3px solid transparent",
               whiteSpace: "nowrap",
               textDecoration: "none",
+              flexShrink: 0,
+              scrollSnapAlign: "start",
             }}
           >
             <Icon size={14} strokeWidth={1.75} style={{ opacity: active ? 1 : 0.6 }} />

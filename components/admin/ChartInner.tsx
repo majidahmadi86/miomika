@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -29,6 +30,18 @@ type Common = {
   height?: number;
   bucket?: TimeBucket;
 };
+
+function useChartHeight(preferred = 220): number {
+  const [h, setH] = useState(preferred);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setH(mq.matches ? Math.min(preferred, 200) : preferred);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [preferred]);
+  return h;
+}
 
 function axisTick(bucket: TimeBucket | undefined) {
   return (iso: string) => (bucket ? formatBucketLabel(iso, bucket) : iso.slice(5, 16));
@@ -98,6 +111,15 @@ function LegendChips({ payload }: { payload?: { value?: string; color?: string }
   );
 }
 
+const xAxisProps = (bucket: TimeBucket | undefined) => ({
+  tickFormatter: axisTick(bucket),
+  tick: { fontSize: 11, fill: MUTED },
+  axisLine: false as const,
+  tickLine: false as const,
+  minTickGap: 28,
+  interval: "preserveStartEnd" as const,
+});
+
 export function AdminLineChart({
   data,
   series,
@@ -108,13 +130,13 @@ export function AdminLineChart({
   glowDots,
 }: Common & {
   series: { key: string; color?: string; name?: string }[];
-  /** Render as gradient areas instead of lines. */
   area?: boolean;
   glowDots?: boolean;
 }) {
+  const h = useChartHeight(height);
   if (area) {
     return (
-      <ResponsiveContainer width="100%" height={height}>
+      <ResponsiveContainer width="100%" height={h}>
         <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <defs>
             {series.map((s) => {
@@ -129,7 +151,7 @@ export function AdminLineChart({
             })}
           </defs>
           <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
-          <XAxis dataKey={xKey} tickFormatter={axisTick(bucket)} tick={{ fontSize: 11, fill: MUTED }} axisLine={false} tickLine={false} minTickGap={28} />
+          <XAxis dataKey={xKey} {...xAxisProps(bucket)} />
           <YAxis tick={{ fontSize: 11, fill: MUTED }} axisLine={false} tickLine={false} width={36} />
           <Tooltip content={<CustomTooltip bucket={bucket} />} />
           {series.length > 1 ? <Legend content={<LegendChips />} /> : null}
@@ -156,10 +178,10 @@ export function AdminLineChart({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={h}>
       <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
-        <XAxis dataKey={xKey} tickFormatter={axisTick(bucket)} tick={{ fontSize: 11, fill: MUTED }} axisLine={false} tickLine={false} minTickGap={28} />
+        <XAxis dataKey={xKey} {...xAxisProps(bucket)} />
         <YAxis tick={{ fontSize: 11, fill: MUTED }} axisLine={false} tickLine={false} width={36} />
         <Tooltip content={<CustomTooltip bucket={bucket} />} />
         {series.length > 1 ? <Legend content={<LegendChips />} /> : null}
@@ -192,11 +214,12 @@ export function AdminBarChart({
   color = adminPalette.teal,
   name,
 }: Common & { dataKey?: string; color?: string; name?: string }) {
+  const h = useChartHeight(height);
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={h}>
       <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke={GRID} strokeDasharray="2 4" vertical={false} />
-        <XAxis dataKey={xKey} tickFormatter={axisTick(bucket)} tick={{ fontSize: 11, fill: MUTED }} axisLine={false} tickLine={false} minTickGap={28} />
+        <XAxis dataKey={xKey} {...xAxisProps(bucket)} />
         <YAxis tick={{ fontSize: 11, fill: MUTED }} axisLine={false} tickLine={false} width={36} />
         <Tooltip content={<CustomTooltip bucket={bucket} />} />
         <Bar dataKey={dataKey} name={name ?? dataKey} fill={color} radius={[6, 6, 0, 0]} maxBarSize={28} />

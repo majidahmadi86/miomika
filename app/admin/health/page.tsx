@@ -160,7 +160,7 @@ export default async function AdminHealthPage({
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+      <div className="admin-two-col" style={{ marginBottom: 10 }}>
         <div style={adminCard}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <IconChip icon={Webhook} color={adminPalette.sky} />

@@ -95,7 +95,7 @@ export default async function AdminRevenuePage({
     <div style={adminPagePad}>
       <AdminPageHeader title="Revenue" rangeLabel={range.label} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 4 }}>
+      <div className="admin-kpi-grid" style={{ marginBottom: 4 }}>
         <KpiCard color={adminPalette.gold} icon={Coins} label="MRR (est.)" value={`฿${mrr.toLocaleString()}`} sub="paid tiers × monthly" />
         <KpiCard color={adminPalette.violet} icon={Users} label="Paying users" value={String(paid)} sub={`${proCount} pro · ${proMaxCount} pro max`} />
         <KpiCard color={adminPalette.gold} icon={Package} label="Pack revenue" value={`฿${packRevenue.toLocaleString()}`} sub="one-time, to date" />
@@ -122,7 +122,7 @@ export default async function AdminRevenuePage({
         </details>
       ) : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+      <div className="admin-two-col" style={{ marginBottom: 10 }}>
         <div style={adminCard}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: FONT_DISPLAY }}>Subscription status</div>
           {statuses.length === 0 ? <div style={{ fontSize: 12.5, color: adminPalette.subtle }}>No subscriptions yet.</div> :
@@ -145,8 +145,8 @@ export default async function AdminRevenuePage({
       <div style={adminCard}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: FONT_DISPLAY }}>Paying users ({paid})</div>
         {externalPaying.length === 0 ? <div style={{ fontSize: 12.5, color: adminPalette.subtle }}>No paying users yet.</div> : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="admin-table-scroll">
+            <table>
               <thead><tr><th style={adminTh}>User</th><th style={adminTh}>Tier</th><th style={adminTh}>Status</th><th style={adminTh}>Joined</th></tr></thead>
               <tbody>
                 {externalPaying.map((u, idx) => (

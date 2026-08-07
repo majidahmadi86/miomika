@@ -18,8 +18,8 @@ export default function ExpandableFailTable({ rows }: { rows: FailRow[] }) {
     return <div style={{ fontSize: 12.5, color: adminPalette.subtle }}>No failed events in range.</div>;
   }
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+    <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }} className="admin-table-scroll">
+      <table>
         <thead>
           <tr>
             <th style={adminTh}>When</th>

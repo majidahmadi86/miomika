@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/admin/guard";
 import AdminNav from "@/components/admin/AdminNav";
-import RangePicker from "@/components/admin/RangePicker";
+import AdminHeader from "@/components/admin/AdminHeader";
 import { adminPalette, FONT_DISPLAY, tint } from "@/components/admin/ui";
 
 export const runtime = "nodejs";
@@ -24,73 +24,62 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         color: adminPalette.ink,
       }}
     >
-      <div
-        className="shrink-0"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "10px 14px",
-          background: "#fff",
-          flexWrap: "wrap",
-          position: "relative",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 1,
-            background: `linear-gradient(90deg, ${tint(adminPalette.teal, 0.45)}, ${tint(adminPalette.gold, 0.45)})`,
-            opacity: 0.55,
-          }}
-        />
-        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em", fontFamily: FONT_DISPLAY }}>
-            <span style={{ color: adminPalette.gold }}>Miomika</span>
-            <span style={{ color: adminPalette.ink, fontWeight: 600 }}> admin</span>
+      <Suspense
+        fallback={
+          <div className="shrink-0" style={{ padding: 14, background: "#fff", fontSize: 12, color: adminPalette.muted }}>
+            Miomika admin
           </div>
-          <Suspense fallback={<span style={{ fontSize: 11, color: adminPalette.muted }}>range…</span>}>
-            <RangePicker />
-          </Suspense>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <form method="get" action="/admin/users">
-            <input
-              name="q"
-              placeholder="Search anyone…"
-              style={{
-                padding: "5px 10px",
-                border: `0.5px solid ${adminPalette.line}`,
-                borderRadius: 99,
-                fontSize: 12,
-                fontFamily: "inherit",
-                width: 170,
-                background: adminPalette.canvas,
-              }}
-            />
-          </form>
-          <a href="/home" style={{ fontSize: 12, color: adminPalette.muted, textDecoration: "none" }}>
-            back to app
-          </a>
-        </div>
-      </div>
+        }
+      >
+        <AdminHeader />
+      </Suspense>
       <div className="shrink-0">
         <Suspense fallback={null}>
           <AdminNav />
         </Suspense>
       </div>
       <div
-        className="min-h-0 flex-1 overflow-y-auto pb-8"
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-8"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
-        <div style={{ maxWidth: 1180, margin: "0 auto" }}>{children}</div>
+        <div style={{ maxWidth: 1180, margin: "0 auto", width: "100%" }}>{children}</div>
       </div>
       <style>{`
         tr.admin-tr:hover > td { background: ${tint(adminPalette.teal, 0.04)} !important; }
+        .admin-hscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-snap-type: x proximity; }
+        .admin-hscroll::-webkit-scrollbar { display: none; }
+        .admin-kpi-grid { display: grid; gap: 10px; grid-template-columns: 1fr; margin-bottom: 12px; }
+        @media (min-width: 640px) { .admin-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1024px) { .admin-kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+        .admin-two-col { display: grid; gap: 10px; grid-template-columns: 1fr; }
+        @media (min-width: 768px) { .admin-two-col { grid-template-columns: 1fr 1fr; } }
+        .admin-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .admin-table-scroll > table { min-width: 640px; width: 100%; border-collapse: collapse; }
+        .admin-filter { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+        .admin-filter > div, .admin-filter > label { width: 100%; }
+        .admin-filter select, .admin-filter input[type="text"], .admin-filter input[type="number"] { width: 100%; box-sizing: border-box; }
+        .admin-filter .admin-apply { width: 100%; }
+        @media (min-width: 768px) {
+          .admin-filter { flex-direction: row; flex-wrap: wrap; align-items: flex-end; }
+          .admin-filter > div, .admin-filter > label { width: auto; }
+          .admin-filter .admin-apply { width: auto; }
+        }
+        .admin-check { min-height: 40px; display: flex; align-items: center; gap: 8px; }
+        .admin-users-table { display: none; }
+        .admin-users-cards { display: flex; flex-direction: column; gap: 8px; }
+        @media (min-width: 768px) {
+          .admin-users-table { display: block; }
+          .admin-users-cards { display: none; }
+        }
+        .admin-user-card {
+          display: block; text-decoration: none; color: inherit;
+          background: #fff; border: 0.5px solid ${adminPalette.line}; border-radius: 12px; padding: 12px;
+        }
+        .admin-actions-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+        @media (max-width: 767px) {
+          .admin-actions-row { flex-direction: column; align-items: stretch; }
+          .admin-actions-row > button, .admin-actions-row > select, .admin-actions-row > input { width: 100%; box-sizing: border-box; }
+        }
       `}</style>
     </div>
   );

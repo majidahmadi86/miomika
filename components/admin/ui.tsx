@@ -75,7 +75,7 @@ export const adminTd: CSSProperties = {
 };
 
 export const adminPagePad: CSSProperties = {
-  padding: "14px 16px 56px",
+  padding: "14px 12px 24px",
 };
 
 export const filterPanel: CSSProperties = {
@@ -88,7 +88,7 @@ export const applyBtn: CSSProperties = {
   fontFamily: FONT_DISPLAY,
   fontSize: 12.5,
   fontWeight: 700,
-  padding: "7px 14px",
+  padding: "10px 14px",
   borderRadius: 8,
   border: "none",
   background: adminPalette.teal,

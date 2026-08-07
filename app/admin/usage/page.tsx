@@ -116,7 +116,7 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
     <div style={adminPagePad}>
       <AdminPageHeader title="Cost" rangeLabel={`${range.label} · UTC · ฿ ≈ USD×${THB_PER_USD}`} />
 
-      <form method="GET" style={{ ...filterPanel, marginBottom: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+      <form method="GET" className="admin-filter" style={{ ...filterPanel, marginBottom: 12 }}>
         <input type="hidden" name="range" value={range.preset} />
         {range.preset === "custom" && (
           <>
@@ -136,10 +136,10 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
             <option value="">all</option>{provOptions.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
-        <button type="submit" style={applyBtn}>Apply</button>
+        <button type="submit" className="admin-apply" style={applyBtn}>Apply</button>
       </form>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 12 }}>
+      <div className="admin-kpi-grid">
         <KpiCard color={adminPalette.amber} icon={Flame} label="Cost" value={baht(tot.cost)} sub={usd(tot.cost)} />
         <KpiCard color={adminPalette.sky} icon={PhoneCall} label="Calls" value={String(tot.calls)} />
         <KpiCard
@@ -154,8 +154,8 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
 
       <div style={{ ...adminCard, marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Per user</div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="admin-table-scroll">
+          <table>
             <thead><tr><th style={adminTh}>User</th><th style={adminTh}>Email</th><th style={thN}>Calls</th><th style={thN}>Fails</th><th style={thN}>Tokens</th><th style={thN}>Cost</th></tr></thead>
             <tbody>{byUser.map((u, idx) => {
               const w = who(u.rs[0].user_id);
@@ -210,10 +210,11 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+      <div className="admin-two-col" style={{ marginBottom: 10 }}>
         <div style={adminCard}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Per service</div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="admin-table-scroll">
+          <table>
             <thead><tr><th style={adminTh}>Function</th><th style={thN}>Calls</th><th style={thN}>Fails</th><th style={thN}>Avg/inv</th><th style={thN}>Cost</th></tr></thead>
             <tbody>{byFn.map((r, idx) => {
               const iv = invFn.get(r.k);
@@ -228,10 +229,12 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
               );
             })}</tbody>
           </table>
+          </div>
         </div>
         <div style={adminCard}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Per API</div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="admin-table-scroll">
+          <table>
             <thead><tr><th style={adminTh}>API</th><th style={thN}>Calls</th><th style={thN}>Fails</th><th style={thN}>Tokens</th><th style={thN}>Cost</th></tr></thead>
             <tbody>{byApi.map((r, idx) => (
               <tr key={r.k} style={{ background: idx % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
@@ -243,13 +246,15 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
               </tr>
             ))}</tbody>
           </table>
+          </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div className="admin-two-col">
         <div style={adminCard}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Daily totals</div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="admin-table-scroll">
+          <table>
             <thead><tr><th style={adminTh}>Day</th><th style={thN}>Calls</th><th style={thN}>Fail %</th><th style={thN}>Cost</th></tr></thead>
             <tbody>{daysArr.map((r, idx) => (
               <tr key={r.d} style={{ background: idx % 2 === 1 ? tint(adminPalette.ink, 0.02) : undefined }}>
@@ -260,11 +265,13 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
               </tr>
             ))}</tbody>
           </table>
+          </div>
         </div>
         <div style={adminCard}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Recent failures</div>
           {fails.length === 0 ? <p style={{ color: adminPalette.subtle, fontSize: 12.5 }}>No failures.</p> : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div className="admin-table-scroll">
+            <table>
               <thead><tr><th style={adminTh}>When</th><th style={adminTh}>Fn</th><th style={adminTh}>User</th><th style={adminTh}>Error</th></tr></thead>
               <tbody>{fails.map((r, i) => (
                 <tr key={i} style={{ background: tint(adminPalette.rose, 0.04), borderLeft: `3px solid ${adminPalette.rose}` }}>
@@ -275,6 +282,7 @@ export default async function AdminUsagePage({ searchParams }: { searchParams: P
                 </tr>
               ))}</tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

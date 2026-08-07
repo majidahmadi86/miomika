@@ -91,7 +91,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
         }
       />
 
-      <form method="get" style={{ ...filterPanel, marginBottom: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+      <form method="get" className="admin-filter" style={{ ...filterPanel, marginBottom: 10 }}>
         <input type="hidden" name="range" value={range.preset} />
         {range.preset === "custom" && (
           <>
@@ -108,14 +108,14 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
         </div>
         <div>
           <label style={lbl}>User id</label>
-          <input type="text" name="target" defaultValue={target} placeholder="target user id" style={{ ...inputStyle, width: 180 }} />
+          <input type="text" name="target" defaultValue={target} placeholder="target user id" style={inputStyle} />
         </div>
         <div>
           <label style={lbl}>Search</label>
-          <input type="text" name="q" defaultValue={q} placeholder="admin email or detail" style={{ ...inputStyle, width: 180 }} />
+          <input type="text" name="q" defaultValue={q} placeholder="admin email or detail" style={inputStyle} />
         </div>
-        <button type="submit" style={applyBtn}>Filter</button>
-        <a href={withRange("/admin/audit", range.queryString)} style={{ fontSize: 12, color: adminPalette.muted, textDecoration: "none", padding: "7px 4px" }}>reset</a>
+        <button type="submit" className="admin-apply" style={applyBtn}>Filter</button>
+        <a href={withRange("/admin/audit", range.queryString)} style={{ fontSize: 12, color: adminPalette.muted, textDecoration: "none", padding: "10px 4px" }}>reset</a>
       </form>
 
       <div style={adminCard}>
@@ -129,8 +129,8 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
             <div style={{ fontSize: 13.5, fontFamily: FONT_DISPLAY, fontWeight: 600 }}>No matching entries.</div>
           </div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="admin-table-scroll">
+            <table>
               <thead>
                 <tr>
                   <th style={adminTh}>When</th>

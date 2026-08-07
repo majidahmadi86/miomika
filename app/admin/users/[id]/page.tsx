@@ -118,7 +118,7 @@ export default async function UserCockpitPage({
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+      <div className="admin-two-col" style={{ marginBottom: 10 }}>
         <div style={card}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Account</div>
           {kv("Tier", u.tier ?? "free")}
@@ -142,10 +142,10 @@ export default async function UserCockpitPage({
 
       <div style={{ ...card, marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>AI cost in range</div>
-        <AdminBarChart data={userCostSeries} bucket={range.bucket} name="฿ cost" color="#C9A96E" height={180} />
+        <AdminBarChart data={userCostSeries} bucket={range.bucket} name="฿ cost" color="#C9A96E" height={200} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+      <div className="admin-two-col" style={{ marginBottom: 10 }}>
         <div style={card}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Room credit ledger</div>
           {(roomLedger.data ?? []).length === 0 ? <div style={{ fontSize: 12, color: "#B0A488" }}>No entries.</div> :

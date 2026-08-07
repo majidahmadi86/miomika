@@ -185,7 +185,7 @@ export default async function AdminUsersPage({
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginBottom: 12 }}>
+      <div className="admin-kpi-grid">
         <KpiCard color={adminPalette.sky} icon={Users} label="Matched" value={String(total)} />
         <KpiCard color={adminPalette.gold} icon={Coins} label="Paid" value={String(paid)} />
         <KpiCard color={adminPalette.violet} icon={Sparkles} label="Pro / Max" value={`${counts.pro} / ${counts.pro_max}`} />
@@ -193,7 +193,7 @@ export default async function AdminUsersPage({
         <KpiCard color={adminPalette.gold} icon={Wallet} label="฿ credit" value={String(withReferralCredit)} />
       </div>
 
-      <form method="get" style={{ ...filterPanel, display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+      <form method="get" className="admin-filter" style={{ ...filterPanel, marginBottom: 12 }}>
         <input type="hidden" name="range" value={range.preset} />
         {range.preset === "custom" && (
           <>
@@ -226,15 +226,15 @@ export default async function AdminUsersPage({
         </div>
         <div>
           <div style={{ fontSize: 11, color: adminPalette.muted, marginBottom: 3, fontFamily: FONT_DISPLAY }}>Min cost ฿</div>
-          <input type="number" name="high_cost" defaultValue={highCost > 0 ? highCost : ""} placeholder="e.g. 200" style={{ ...inputStyle, width: 90 }} />
+          <input type="number" name="high_cost" defaultValue={highCost > 0 ? highCost : ""} placeholder="e.g. 200" style={inputStyle} />
         </div>
-        <label style={{ fontSize: 12, color: adminPalette.muted, display: "flex", alignItems: "center", gap: 4, paddingBottom: 8 }}>
-          <input type="checkbox" name="has_rooms" value="1" defaultChecked={hasRooms} /> rooms &gt; 0
+        <label className="admin-check" style={{ fontSize: 12, color: adminPalette.muted }}>
+          <input type="checkbox" name="has_rooms" value="1" defaultChecked={hasRooms} style={{ width: 18, height: 18 }} /> rooms &gt; 0
         </label>
-        <label style={{ fontSize: 12, color: adminPalette.muted, display: "flex", alignItems: "center", gap: 4, paddingBottom: 8 }}>
-          <input type="checkbox" name="has_referral" value="1" defaultChecked={hasReferral} /> ฿ credit &gt; 0
+        <label className="admin-check" style={{ fontSize: 12, color: adminPalette.muted }}>
+          <input type="checkbox" name="has_referral" value="1" defaultChecked={hasReferral} style={{ width: 18, height: 18 }} /> ฿ credit &gt; 0
         </label>
-        <button type="submit" style={applyBtn}>Apply</button>
+        <button type="submit" className="admin-apply" style={applyBtn}>Apply</button>
       </form>
 
       {error ? (
@@ -243,8 +243,43 @@ export default async function AdminUsersPage({
         <p style={{ color: adminPalette.muted, fontSize: 13 }}>No users match.</p>
       ) : (
         <>
-          <div style={{ overflowX: "auto", border: `0.5px solid ${adminPalette.line}`, borderRadius: 12, background: "#fff" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="admin-users-cards">
+            {pageRows.map((r) => {
+              const cost = Math.round(costs.get(r.id) ?? 0);
+              return (
+                <Link
+                  key={r.id}
+                  href={withRange(`/admin/users/${r.id}`, range.queryString)}
+                  className="admin-user-card"
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <Avatar name={r.display_name} email={r.email} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 700, color: adminPalette.teal, fontFamily: FONT_DISPLAY }}>{r.display_name || "·"}</span>
+                        <TierBadge tier={r.tier} />
+                        {isInternalEmail(r.email, internal) ? <InternalChip /> : null}
+                      </div>
+                      <div style={{ fontSize: 11, color: adminPalette.muted, overflow: "hidden", textOverflow: "ellipsis" }}>{r.email || r.id.slice(0, 8)}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px", fontSize: 12 }}>
+                    <div><span style={{ color: adminPalette.muted }}>Sub </span>{r.subscription_status || "·"}</div>
+                    <div><span style={{ color: adminPalette.muted }}>Rooms </span>{r.room_credits ?? 0}</div>
+                    <div><span style={{ color: adminPalette.muted }}>฿ credit </span>{r.referral_credit_baht ? `฿${r.referral_credit_baht}` : "·"}</div>
+                    <div><span style={{ color: adminPalette.muted }}>Cost </span>฿{cost}</div>
+                    <div style={{ gridColumn: "1 / -1", display: "inline-flex", alignItems: "center" }}>
+                      <span style={{ color: adminPalette.muted, marginRight: 4 }}>Last seen </span>
+                      <ActivityDot tone={activityTone(r.last_seen_at, nowMs)} />
+                      {ago(r.last_seen_at)}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+          <div className="admin-users-table admin-table-scroll" style={{ border: `0.5px solid ${adminPalette.line}`, borderRadius: 12, background: "#fff" }}>
+            <table>
               <thead>
                 <tr>
                   <th style={adminTh}>User</th>

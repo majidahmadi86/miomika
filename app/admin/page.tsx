@@ -150,7 +150,7 @@ export default async function AdminOverviewPage({
     <div style={adminPagePad}>
       <AdminPageHeader title="Overview" rangeLabel={range.label} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
+      <div className="admin-kpi-grid">
         <KpiCard color={adminPalette.teal} icon={UserPlus} label="Signups" value={Math.round(metrics.signups.value).toLocaleString()} deltaPct={metrics.signups.deltaPct} spark={metrics.signups.spark} />
         <KpiCard color={adminPalette.mint} icon={Users} label="Active users" value={Math.round(metrics.active.value).toLocaleString()} deltaPct={metrics.active.deltaPct} spark={metrics.active.spark} />
         <KpiCard color={adminPalette.gold} icon={Coins} label="Pack revenue" value={`฿${Math.round(metrics.revenue.value).toLocaleString()}`} deltaPct={metrics.revenue.deltaPct} spark={metrics.revenue.spark} />
@@ -173,7 +173,7 @@ export default async function AdminOverviewPage({
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+      <div className="admin-two-col" style={{ marginBottom: 10 }}>
         <div style={section}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, fontFamily: FONT_DISPLAY }}>Signups</div>
           <AdminBarChart data={metrics.signupsSeries} bucket={range.bucket} name="Signups" color={adminPalette.teal} height={200} />
@@ -272,7 +272,7 @@ export default async function AdminOverviewPage({
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div className="admin-two-col">
         <div style={section}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: FONT_DISPLAY }}>Users by tier</div>
           {tierBar("Free", attn.free, adminPalette.slate)}
