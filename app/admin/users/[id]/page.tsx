@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/service";
 import UserActions from "@/components/admin/UserActions";
 import { THB_PER_USD, COST_ALERT_THB_7D } from "@/lib/admin/cost";
+import { parseRange, withRange } from "@/lib/admin/time-range";
+import AdminPageHeader, { adminCard, adminPagePad } from "@/components/admin/AdminPageHeader";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,12 +11,19 @@ export const dynamic = "force-dynamic";
 const BAD_STATUS = ["past_due", "unpaid", "incomplete", "incomplete_expired"];
 
 function fmt(d: string | null | undefined) {
-  if (!d) return "—";
+  if (!d) return "·";
   return new Date(d).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export default async function UserCockpitPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function UserCockpitPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const range = parseRange(await searchParams);
   const supabase = await createServiceClient();
 
   const { data: u } = await supabase
@@ -24,7 +33,7 @@ export default async function UserCockpitPage({ params }: { params: Promise<{ id
     .maybeSingle();
 
   if (!u) {
-    return <div style={{ padding: "40px 18px", color: "#9A8B73" }}>User not found. <Link href="/admin/users" style={{ color: "#2C8E76" }}>← back to users</Link></div>;
+    return <div style={{ padding: "40px 18px", color: "#9A8B73" }}>User not found. <Link href={withRange("/admin/users", range.queryString)} style={{ color: "#2C8E76" }}>back to users</Link></div>;
   }
 
   const now = new Date();
@@ -58,12 +67,12 @@ export default async function UserCockpitPage({ params }: { params: Promise<{ id
   // Health flags
   type Flag = { sev: "danger" | "warning"; text: string };
   const flags: Flag[] = [];
-  if (BAD_STATUS.includes(u.subscription_status ?? "")) flags.push({ sev: "danger", text: `Payment ${u.subscription_status} — last charge failed. Check Stripe; manual set-tier if needed.` });
-  if ((u.tier ?? "free") === "free" && ["active", "trialing", "past_due"].includes(u.subscription_status ?? "")) flags.push({ sev: "danger", text: "Subscription looks active but tier is free — webhook drift. Set the correct tier below." });
-  if (pendingReferral) flags.push({ sev: "warning", text: "Referral unrewarded — this user paid but the ฿30 reward never fired. Use \u201cReward\u201d below." });
-  if (costThb > COST_ALERT_THB_7D) flags.push({ sev: "warning", text: `High AI cost: \u0e3f${costThb} in 7 days. Worth a look for abuse or a loop.` });
+  if (BAD_STATUS.includes(u.subscription_status ?? "")) flags.push({ sev: "danger", text: `Payment ${u.subscription_status} · last charge failed. Check Stripe; manual set-tier if needed.` });
+  if ((u.tier ?? "free") === "free" && ["active", "trialing", "past_due"].includes(u.subscription_status ?? "")) flags.push({ sev: "danger", text: "Subscription looks active but tier is free · webhook drift. Set the correct tier below." });
+  if (pendingReferral) flags.push({ sev: "warning", text: "Referral unrewarded · this user paid but the ฿30 reward never fired. Use Reward below." });
+  if (costThb > COST_ALERT_THB_7D) flags.push({ sev: "warning", text: `High AI cost: ฿${costThb} in 7 days. Worth a look for abuse or a loop.` });
 
-  const card: React.CSSProperties = { background: "#fff", border: "0.5px solid #EDE8E0", borderRadius: 12, padding: 14 };
+  const card: React.CSSProperties = adminCard;
   const kv = (k: string, v: React.ReactNode) => (
     <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}>
       <span style={{ color: "#6b675f" }}>{k}</span><span style={{ color: "#2A2A28", textAlign: "right" }}>{v}</span>
@@ -72,23 +81,27 @@ export default async function UserCockpitPage({ params }: { params: Promise<{ id
   const stripeBase = "https://dashboard.stripe.com";
 
   return (
-    <div style={{ padding: "16px 18px 60px" }}>
-      <Link href="/admin/users" style={{ fontSize: 12.5, color: "#9A8B73", textDecoration: "none" }}>← all users</Link>
+    <div style={adminPagePad}>
+      <AdminPageHeader
+        title={u.display_name || u.email || "User"}
+        rangeLabel={range.label}
+        actions={<Link href={withRange("/admin/users", range.queryString)} style={{ fontSize: 12.5, color: "#9A8B73", textDecoration: "none" }}>all users</Link>}
+      />
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "10px 0 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 12px" }}>
         <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#E7F3EF", color: "#1F7A68", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15 }}>
           {(u.display_name || u.email || "?").slice(0, 2).toUpperCase()}
         </div>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{u.display_name || "—"}</div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{u.display_name || "·"}</div>
           <div style={{ fontSize: 12, color: "#9A8B73" }}>{u.email || u.id}</div>
         </div>
       </div>
 
-      <div style={{ ...card, marginBottom: 12 }}>
+      <div style={{ ...card, marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Account health</div>
         {flags.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "#1F7A68" }}>All clear — no problems detected on this account.</div>
+          <div style={{ fontSize: 12.5, color: "#1F7A68" }}>All clear · no problems detected on this account.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {flags.map((f, i) => (
@@ -104,14 +117,14 @@ export default async function UserCockpitPage({ params }: { params: Promise<{ id
         <div style={card}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Account</div>
           {kv("Tier", u.tier ?? "free")}
-          {kv("Sub status", <span style={{ color: BAD_STATUS.includes(u.subscription_status ?? "") ? "#A32D2D" : "#2A2A28" }}>{u.subscription_status || "—"}</span>)}
+          {kv("Sub status", <span style={{ color: BAD_STATUS.includes(u.subscription_status ?? "") ? "#A32D2D" : "#2A2A28" }}>{u.subscription_status || "·"}</span>)}
           {kv("Room credits", u.room_credits ?? 0)}
           {kv("฿ credit", `฿${u.referral_credit_baht ?? 0}`)}
-          {kv("Referral code", u.referral_code || "—")}
+          {kv("Referral code", u.referral_code || "·")}
           {kv("Invited", invitedCount)}
           {kv("Joined", fmt(u.onboarding_completed_at))}
           {kv("Last seen", fmt(u.last_seen_at))}
-          {u.stripe_customer_id ? kv("Stripe", <a href={`${stripeBase}/customers/${u.stripe_customer_id}`} target="_blank" rel="noreferrer" style={{ color: "#2C8E76" }}>open customer →</a>) : null}
+          {u.stripe_customer_id ? kv("Stripe", <a href={`${stripeBase}/customers/${u.stripe_customer_id}`} target="_blank" rel="noreferrer" style={{ color: "#2C8E76" }}>open customer</a>) : null}
         </div>
         <div style={card}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Last 7 days</div>
@@ -150,7 +163,7 @@ export default async function UserCockpitPage({ params }: { params: Promise<{ id
       <UserActions userId={u.id} hasPendingReferral={pendingReferral} />
 
       <div style={{ marginTop: 10, textAlign: "right" }}>
-        <a href={`/admin/audit?target=${u.id}`} style={{ fontSize: 12, color: "#9A8B73", textDecoration: "none" }}>view this user&apos;s audit history →</a>
+        <a href={withRange(`/admin/audit?target=${u.id}`, range.queryString)} style={{ fontSize: 12, color: "#9A8B73", textDecoration: "none" }}>view this user&apos;s audit history</a>
       </div>
     </div>
   );

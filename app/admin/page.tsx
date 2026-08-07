@@ -2,6 +2,8 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/service";
 import { THB_PER_USD, COST_ALERT_THB_7D } from "@/lib/admin/cost";
+import { parseRange, withRange } from "@/lib/admin/time-range";
+import AdminPageHeader, { adminCard, adminKpi, adminPagePad } from "@/components/admin/AdminPageHeader";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +13,7 @@ const MONTHLY_THB: Record<string, number> = { pro: 299, pro_max: 699 };
 const BAD_STATUS = ["past_due", "unpaid", "incomplete", "incomplete_expired"];
 
 function ago(d: string | null | undefined): string {
-  if (!d) return "—";
+  if (!d) return "·";
   const ms = Date.now() - new Date(d).getTime();
   const m = Math.floor(ms / 60000);
   if (m < 1) return "just now";
@@ -126,14 +128,20 @@ async function loadPipelineHealth(supabase: Awaited<ReturnType<typeof createServ
   return { providers, calls24, errorRate24, lastWebhook, recentEvents };
 }
 
-export default async function AdminOverviewPage() {
+export default async function AdminOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const range = parseRange(sp);
   const { total, proCount, proMaxCount, activeToday, signups7, paid, free, mrr, conversion, cost7, cost7Thb, failed, drifted, hotUsers, providers, calls24, errorRate24, lastWebhook, recentEvents } = await loadOverviewData();
 
-  const card: CSSProperties = { background: "#fff", borderRadius: 8, padding: "12px 14px" };
-  const lbl: CSSProperties = { fontSize: 12, color: "#9A8B73" };
-  const big: CSSProperties = { fontSize: 22, fontWeight: 700, marginTop: 2 };
+  const card: CSSProperties = adminKpi;
+  const lbl: CSSProperties = { fontSize: 11.5, color: "#9A8B73" };
+  const big: CSSProperties = { fontSize: 20, fontWeight: 700, marginTop: 2 };
   const sub: CSSProperties = { fontSize: 11, marginTop: 1 };
-  const section: CSSProperties = { background: "#fff", border: "0.5px solid #EDE8E0", borderRadius: 12, padding: 14 };
+  const section: CSSProperties = adminCard;
 
   const tierBar = (label: string, n: number, color: string) => (
     <div style={{ marginBottom: 8 }}>
@@ -149,8 +157,9 @@ export default async function AdminOverviewPage() {
   const who = (f: Flagged) => f.display_name || f.email || f.id.slice(0, 8);
 
   return (
-    <div style={{ padding: "16px 18px 60px" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 16 }}>
+    <div style={adminPagePad}>
+      <AdminPageHeader title="Overview" rangeLabel={range.label} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 12 }}>
         <div style={card}><div style={lbl}>Users</div><div style={big}>{total.toLocaleString()}</div><div style={{ ...sub, color: "#1F7A68" }}>+{signups7} in 7d</div></div>
         <div style={card}><div style={lbl}>Paid</div><div style={{ ...big, color: "#1F7A68" }}>{paid}</div><div style={{ ...sub, color: "#9A8B73" }}>{conversion}% conversion</div></div>
         <div style={card}><div style={lbl}>MRR (est.)</div><div style={big}>฿{mrr.toLocaleString()}</div><div style={{ ...sub, color: "#9A8B73" }}>monthly-equiv</div></div>
@@ -189,7 +198,7 @@ export default async function AdminOverviewPage() {
           <div style={{ marginTop: 10, borderTop: "0.5px solid #F2EEE7", paddingTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
             {recentEvents.map((e, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
-                <span style={{ color: "#6b675f" }}><span style={{ color: e.ok ? "#1D9E75" : "#D8533D" }}>{e.ok ? "●" : "○"}</span> {e.type || "—"}</span>
+                <span style={{ color: "#6b675f" }}><span style={{ color: e.ok ? "#1D9E75" : "#D8533D" }}>{e.ok ? "●" : "○"}</span> {e.type || "·"}</span>
                 <span style={{ color: "#B0A488" }}>{ago(e.created_at)}</span>
               </div>
             ))}
@@ -204,38 +213,38 @@ export default async function AdminOverviewPage() {
         </div>
 
         {failed.length === 0 && drifted.length === 0 && hotUsers.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "#1F7A68", padding: "6px 0" }}>All clear — no payment failures or tier drift.</div>
+          <div style={{ fontSize: 12.5, color: "#1F7A68", padding: "6px 0" }}>All clear · no payment failures or tier drift.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {failed.map((f) => (
               <div key={`f-${f.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#FCEBEB", borderRadius: 8 }}>
                 <span style={{ flex: 1, fontSize: 12.5, color: "#A32D2D" }}>
-                  <b>{who(f)}</b> — payment {f.subscription_status} ({f.tier})
+                  <b>{who(f)}</b> · payment {f.subscription_status} ({f.tier})
                 </span>
-                <Link href={`/admin/users?q=${encodeURIComponent(f.email ?? "")}`} style={{ fontSize: 12, color: "#A32D2D", fontWeight: 600 }}>Open →</Link>
+                <Link href={withRange(`/admin/users?q=${encodeURIComponent(f.email ?? "")}`, range.queryString)} style={{ fontSize: 12, color: "#A32D2D", fontWeight: 600 }}>Open</Link>
               </div>
             ))}
             {drifted.map((f) => (
               <div key={`d-${f.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#FAEEDA", borderRadius: 8 }}>
                 <span style={{ flex: 1, fontSize: 12.5, color: "#854F0B" }}>
-                  <b>{who(f)}</b> — sub {f.subscription_status} but tier is free (webhook drift)
+                  <b>{who(f)}</b> · sub {f.subscription_status} but tier is free (webhook drift)
                 </span>
-                <Link href={`/admin/users?q=${encodeURIComponent(f.email ?? "")}`} style={{ fontSize: 12, color: "#854F0B", fontWeight: 600 }}>Open →</Link>
+                <Link href={withRange(`/admin/users?q=${encodeURIComponent(f.email ?? "")}`, range.queryString)} style={{ fontSize: 12, color: "#854F0B", fontWeight: 600 }}>Open</Link>
               </div>
             ))}
             {hotUsers.map((h) => (
               <div key={`h-${h.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#FAEEDA", borderRadius: 8 }}>
                 <span style={{ flex: 1, fontSize: 12.5, color: "#854F0B" }}>
-                  <b>{h.display_name || h.email || h.id.slice(0, 8)}</b> — high AI cost ฿{h.thb} in 7d
+                  <b>{h.display_name || h.email || h.id.slice(0, 8)}</b> · high AI cost ฿{h.thb} in 7d
                 </span>
-                <Link href={`/admin/users/${h.id}`} style={{ fontSize: 12, color: "#854F0B", fontWeight: 600 }}>Open →</Link>
+                <Link href={withRange(`/admin/users/${h.id}`, range.queryString)} style={{ fontSize: 12, color: "#854F0B", fontWeight: 600 }}>Open</Link>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <div style={section}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Users by tier</div>
           {tierBar("Free", free, "#B4B2A9")}
@@ -245,9 +254,10 @@ export default async function AdminOverviewPage() {
         <div style={section}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Quick links</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5 }}>
-            <Link href="/admin/users" style={{ color: "#2C8E76", fontWeight: 600 }}>Browse + manage users →</Link>
-            <Link href="/admin/usage" style={{ color: "#2C8E76", fontWeight: 600 }}>AI cost &amp; usage breakdown →</Link>
-            <span style={{ color: "#B0A488" }}>Revenue &amp; Audit tabs — coming in the next pass.</span>
+            <Link href={withRange("/admin/users", range.queryString)} style={{ color: "#2C8E76", fontWeight: 600 }}>Browse + manage users</Link>
+            <Link href={withRange("/admin/usage", range.queryString)} style={{ color: "#2C8E76", fontWeight: 600 }}>AI cost &amp; usage breakdown</Link>
+            <Link href={withRange("/admin/revenue", range.queryString)} style={{ color: "#2C8E76", fontWeight: 600 }}>Revenue</Link>
+            <Link href={withRange("/admin/audit", range.queryString)} style={{ color: "#2C8E76", fontWeight: 600 }}>Audit log</Link>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { withRange } from "@/lib/admin/time-range";
 
 const TABS = [
   { label: "Overview", href: "/admin" },
@@ -12,19 +13,44 @@ const TABS = [
 
 export default function AdminNav() {
   const path = usePathname();
+  const sp = useSearchParams();
+  const rangeQs = (() => {
+    const range = sp.get("range") || "7d";
+    const from = sp.get("from");
+    const to = sp.get("to");
+    if (range === "custom" && (from || to)) {
+      const p = new URLSearchParams();
+      p.set("range", "custom");
+      if (from) p.set("from", from);
+      if (to) p.set("to", to);
+      return p.toString();
+    }
+    return `range=${range}`;
+  })();
+
   return (
-    <div style={{ display: "flex", gap: 2, padding: "8px 12px 0", borderBottom: "0.5px solid #EDE8E0", background: "#fff", fontSize: 13, overflowX: "auto" }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 2,
+        padding: "6px 12px 0",
+        borderBottom: "0.5px solid #EDE8E0",
+        background: "#fff",
+        fontSize: 12.5,
+        overflowX: "auto",
+      }}
+    >
       {TABS.map((t) => {
         const active = t.href === "/admin" ? path === "/admin" : path.startsWith(t.href);
         return (
           <a
             key={t.href}
-            href={t.href}
+            href={withRange(t.href, rangeQs)}
             style={{
-              padding: "8px 14px",
-              fontWeight: active ? 600 : 400,
-              color: active ? "#2C8E76" : "#6b675f",
-              borderBottom: active ? "2px solid #2C8E76" : "2px solid transparent",
+              padding: "7px 12px",
+              fontWeight: active ? 700 : 500,
+              color: active ? "#1F7A68" : "#6b675f",
+              borderBottom: active ? "2px solid #34A98F" : "2px solid transparent",
               whiteSpace: "nowrap",
               textDecoration: "none",
             }}
