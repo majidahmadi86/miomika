@@ -7,7 +7,13 @@ import { adminPalette, FONT_DISPLAY, tint, applyBtn, inputStyle } from "@/compon
 
 function Dot({ status }: { status: ServiceLive["status"] }) {
   const c =
-    status === "ok" ? adminPalette.teal : status === "stale" ? adminPalette.amber : adminPalette.slate;
+    status === "ok"
+      ? adminPalette.teal
+      : status === "stale"
+        ? adminPalette.amber
+        : status === "down"
+          ? adminPalette.rose
+          : adminPalette.slate;
   return (
     <span
       style={{

@@ -208,6 +208,26 @@ export async function buildAttentionItems(range: ParsedRange): Promise<Attention
     }
   }
 
+  // Supabase keep-alive heartbeat older than 3 days (free plan pauses after 7 idle days)
+  {
+    const { data, error } = await supabase
+      .from("system_heartbeat")
+      .select("beat_at")
+      .eq("id", "main")
+      .maybeSingle();
+    if (!error) {
+      const beatAt = (data as { beat_at: string } | null)?.beat_at ?? null;
+      if (!beatAt || Date.now() - new Date(beatAt).getTime() > 3 * 864e5) {
+        items.push({
+          severity: "action",
+          title: "Supabase heartbeat stale",
+          detail: `Last beat ${agoLabel(beatAt)} · check the /api/cron/heartbeat Vercel cron before the project pauses`,
+          href: withRange("/admin", range.queryString) + "#watchboard",
+        });
+      }
+    }
+  }
+
   // Reminders due within 14 days (table may not exist yet)
   try {
     const today = new Date();

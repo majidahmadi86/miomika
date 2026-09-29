@@ -1,7 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { rangeIso, type ParsedRange } from "@/lib/admin/time-range";
 
-export type ServiceStatus = "ok" | "stale" | "unknown";
+export type ServiceStatus = "ok" | "stale" | "down" | "unknown";
 
 export type ServiceLive = {
   id: string;
@@ -86,7 +86,31 @@ export async function buildWatchboard(range: ParsedRange): Promise<{
     }
   }
 
+  // Keep-alive heartbeat written daily by /api/cron/heartbeat
+  let heartbeatAt: string | null = null;
+  let heartbeatKnown = false;
+  {
+    const { data, error } = await supabase
+      .from("system_heartbeat")
+      .select("beat_at")
+      .eq("id", "main")
+      .maybeSingle();
+    if (!error) {
+      heartbeatKnown = true;
+      heartbeatAt = (data as { beat_at: string } | null)?.beat_at ?? null;
+    }
+  }
+
   const day = 864e5;
+  const heartbeatAge = heartbeatAt ? Date.now() - new Date(heartbeatAt).getTime() : null;
+  const heartbeatStatus: ServiceStatus = !heartbeatKnown
+    ? "unknown"
+    : heartbeatAge === null || heartbeatAge > 5 * day
+      ? "down"
+      : heartbeatAge > 36 * 3600e3
+        ? "stale"
+        : "ok";
+
   const services: ServiceLive[] = [
     {
       id: "gemini",
@@ -127,6 +151,16 @@ export async function buildWatchboard(range: ParsedRange): Promise<{
       name: "Supabase",
       status: "ok",
       line: "serving",
+    },
+    {
+      id: "supabase_heartbeat",
+      name: "Supabase heartbeat",
+      status: heartbeatStatus,
+      line: heartbeatKnown
+        ? heartbeatAt
+          ? `last beat · ${ago(heartbeatAt)}`
+          : "no beat recorded"
+        : "system_heartbeat unavailable",
     },
     {
       id: "vercel",
