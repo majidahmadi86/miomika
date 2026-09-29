@@ -40,6 +40,28 @@ import { SmartGuide, openSmartGuide } from "@/components/onboarding/SmartGuide";
 
 const DEFAULT_AVATAR = "/characters/miomi/companion/companion-idle.png";
 
+// Web push lives on its own push-only worker (public/push-sw.js). It never
+// controls pages, so `navigator.serviceWorker.ready` would wait forever here.
+const PUSH_SW_SCOPE = "/push/";
+
+async function pushRegistration(): Promise<ServiceWorkerRegistration> {
+  const existing = await navigator.serviceWorker.getRegistration(PUSH_SW_SCOPE);
+  if (existing?.active) return existing;
+  const reg = existing ?? (await navigator.serviceWorker.register("/push-sw.js", { scope: PUSH_SW_SCOPE }));
+  if (reg.active) return reg;
+  const worker = reg.installing ?? reg.waiting;
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("push worker activation timeout")), 10_000);
+    worker?.addEventListener("statechange", () => {
+      if (worker.state === "activated") {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+  });
+  return reg;
+}
+
 const CEFR: { id: string; pro: boolean }[] = [
   { id: "A1", pro: false },
   { id: "A2", pro: false },
@@ -333,8 +355,8 @@ export default function MePage() {
     (async () => {
       try {
         if (!("serviceWorker" in navigator) || typeof Notification === "undefined") return;
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
+        const reg = await navigator.serviceWorker.getRegistration(PUSH_SW_SCOPE);
+        const sub = reg ? await reg.pushManager.getSubscription() : null;
         if (!cancelled) setNotifyOn(Boolean(sub) && Notification.permission === "granted");
       } catch {
         /* ignore */
@@ -481,7 +503,7 @@ export default function MePage() {
           mirror(false);
           return;
         }
-        const reg = await navigator.serviceWorker.ready;
+        const reg = await pushRegistration();
         const pad = "=".repeat((4 - (vapid.length % 4)) % 4);
         const b64 = (vapid + pad).replace(/-/g, "+").replace(/_/g, "/");
         const raw = window.atob(b64);
@@ -503,8 +525,8 @@ export default function MePage() {
 
     try {
       if ("serviceWorker" in navigator) {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
+        const reg = await navigator.serviceWorker.getRegistration(PUSH_SW_SCOPE);
+        const sub = reg ? await reg.pushManager.getSubscription() : null;
         if (sub) {
           await fetch("/api/push/subscribe", {
             method: "DELETE",
