@@ -9,6 +9,7 @@ import { assembleMemberContext } from "@/lib/live/member-context";
 import { LIVE_MODEL } from "@/lib/live/live-config";
 import { liveTokenDurations } from "@/lib/live/token-policy";
 import { log, logError } from "@/lib/debug/log";
+import { checkRateLimit, identityFromRequest } from "@/lib/security/rate-limit";
 
 let tokenClient: GoogleGenAI | null = null;
 
@@ -27,9 +28,25 @@ function getTokenClient(): GoogleGenAI | null {
  * Guests allowed (shorter cap as cost backstop, never 401). Do not expose the API key client-side.
  * Do not change without re-verifying the full /talk + guest flow.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const profile = await getServerProfile();
   const isGuest = !profile;
+
+  // Each token is a paid Gemini Live session. Guests have no minute budget,
+  // so cap them per IP (burst + daily); members get a burst cap only.
+  const ip = identityFromRequest(request);
+  const limits = await Promise.all(
+    isGuest
+      ? [checkRateLimit("live-token-guest", ip, 3), checkRateLimit("live-token-guest-day", ip, 15, 86_400)]
+      : [checkRateLimit("live-token", profile.id, 6)],
+  );
+  const blocked = limits.find((l) => !l.allowed);
+  if (blocked) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(blocked.retryAfterSeconds) } },
+    );
+  }
 
   const client = getTokenClient();
   if (!client) {
@@ -105,6 +122,6 @@ export async function GET() {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logError("live-token", "mint failed", err, { error: msg, guest: isGuest });
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Token mint failed" }, { status: 500 });
   }
 }

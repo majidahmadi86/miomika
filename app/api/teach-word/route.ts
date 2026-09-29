@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
+import { checkRateLimit, identityFromRequest } from "@/lib/security/rate-limit";
 import { withBudget } from "@/lib/usage/ledger";
 import {
   normalizeLearningTarget,
@@ -43,6 +44,14 @@ function levelFromCookie(req: NextRequest): string | null {
  * Guests: A1 plan only, no save, never 401.
  */
 export async function POST(req: NextRequest) {
+  // Word generation can hit Gemini for guests too; bound the call rate per IP.
+  const rl = await checkRateLimit("teach-word", identityFromRequest(req), 30);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
   let topicHint = "";
   let excludeTopics: string[] = [];
   let rebuildPlan = false;

@@ -14,6 +14,7 @@ type StripeObject = {
   customer?: string | null;
   subscription?: string | null;
   status?: string;
+  payment_status?: string;
   current_period_end?: number;
   items?: { data?: Array<{ price?: { id?: string } }> };
 };
@@ -57,8 +58,13 @@ export async function POST(req: Request) {
   try {
     const supabase = await createServiceClient();
 
-    if (type === "checkout.session.completed") {
+    if (
+      (type === "checkout.session.completed" && obj.payment_status !== "unpaid") ||
+      type === "checkout.session.async_payment_succeeded"
+    ) {
       // The customer just paid. Link Stripe ids and grant the tier they bought.
+      // A delayed method (bank transfer, PromptPay) completes checkout as
+      // "unpaid"; that grants nothing until async_payment_succeeded arrives.
       const userId = obj.metadata?.user_id ?? obj.client_reference_id ?? null;
       const plan = obj.metadata?.plan;
       if (userId && (plan === "pro" || plan === "pro_max")) {

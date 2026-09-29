@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
+import { checkRateLimit, identityFromRequest } from "@/lib/security/rate-limit";
 import {
   normalizeLearningTarget,
   normalizeUiLanguage,
@@ -33,6 +34,14 @@ function parseIntroducedIdx(body: unknown): number {
  * Guests + members: plan-based when lesson_plan is present. Never 401 guests.
  */
 export async function POST(req: NextRequest) {
+  // Word generation can hit Gemini for guests too; bound the call rate per IP.
+  const rl = await checkRateLimit("review-word", identityFromRequest(req), 30);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
   let bodyLearningTarget: string | null = null;
   let bodyExclude: string[] = [];
   let clientLessonPlan: string[] = [];

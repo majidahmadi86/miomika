@@ -101,8 +101,12 @@ export async function POST(request: NextRequest) {
     body.voice === "male" ? "male" : "female";
 
   const mapped = mapVoice(lang, voicePref);
-  const explicitVoiceName =
-    typeof body.voiceName === "string" ? body.voiceName.trim() : "";
+  // An explicit voice may only pick another Chirp3-HD voice in the same
+  // language, never an arbitrary (pricier) Google voice.
+  const rawVoiceName = typeof body.voiceName === "string" ? body.voiceName.trim() : "";
+  const explicitVoiceName = new RegExp(`^${mapped.languageCode}-Chirp3-HD-[A-Za-z]+$`).test(rawVoiceName)
+    ? rawVoiceName
+    : "";
   const voiceName = explicitVoiceName || mapped.voiceName;
   const languageCode = mapped.languageCode;
 

@@ -37,7 +37,7 @@ export async function GET(request: Request) {
   const expected = expectedSig(userId);
   const valid =
     userId.length > 0 &&
-    sig.length === expected.length &&
+    /^[0-9a-f]{64}$/.test(sig) &&
     crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 
   if (!valid || !process.env.CRON_SECRET) {

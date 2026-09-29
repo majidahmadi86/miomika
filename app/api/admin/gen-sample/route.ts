@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const profile = await getServerProfile();
   const admins = (process.env.ADMIN_EMAILS || "")
     .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-  const email = profile?.email?.toLowerCase() ?? null;
+  const email = profile?.auth_email?.toLowerCase() ?? null;
   if (!email || !admins.includes(email)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }

@@ -8,7 +8,7 @@ import { getServerProfile } from "@/lib/auth/get-server-profile";
 export async function GET() {
   const profile = await getServerProfile();
   const allow = (process.env.ADMIN_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-  const email = profile?.email?.toLowerCase() ?? "";
+  const email = profile?.auth_email?.toLowerCase() ?? "";
   const isAdmin = (email !== "" && allow.includes(email)) || process.env.NODE_ENV === "development";
   if (!profile || !isAdmin) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });

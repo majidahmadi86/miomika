@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isCronAuthorized } from "@/lib/security/safe-compare";
 import { composeCareEmail, composeCarePush } from "@/lib/care/moments";
 import { sendCarePush, type PushRow } from "@/lib/care/push";
 
@@ -44,8 +45,7 @@ function bangkokDaysAway(lastSeenIso: string): number {
 }
 
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!RESEND_API_KEY) {

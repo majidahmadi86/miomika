@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin/guard";
 import { Coins, Users, Package, Wallet } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ROOM_PACKS } from "@/lib/billing/tiers";
@@ -32,6 +33,8 @@ export default async function AdminRevenuePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // Defense in depth: the layout gates too, but a page must not rely on it.
+  await requireAdmin();
   const sp = await searchParams;
   const range = parseRange(sp);
   const supabase = await createServiceClient();

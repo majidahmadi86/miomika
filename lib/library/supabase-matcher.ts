@@ -299,7 +299,7 @@ export async function updateLibraryQuality(
   signal: "continued" | "engaged_positively" | "flagged",
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createServiceClient();
     const columnMap = {
       continued: "times_continued",
       engaged_positively: "times_user_engaged_positively",

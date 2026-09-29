@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { requireAdmin } from "@/lib/admin/guard";
 import { UserPlus, Users, Coins, Flame } from "lucide-react";
 import { parseRange } from "@/lib/admin/time-range";
 import { overviewMetrics } from "@/lib/admin/metrics";
@@ -20,6 +21,8 @@ export default async function AdminOverviewPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // Defense in depth: the layout gates too, but a page must not rely on it.
+  await requireAdmin();
   const sp = await searchParams;
   const range = parseRange(sp);
   const [metrics, attention, watch] = await Promise.all([

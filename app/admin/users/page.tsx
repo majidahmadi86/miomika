@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin/guard";
 import { Users, Coins, Sparkles, DoorOpen, Wallet } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { parseRange, rangeIso, withRange } from "@/lib/admin/time-range";
@@ -59,6 +60,8 @@ export default async function AdminUsersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // Defense in depth: the layout gates too, but a page must not rely on it.
+  await requireAdmin();
   const sp = await searchParams;
   const range = parseRange(sp);
   const internal = internalEmailSet();

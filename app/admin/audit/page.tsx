@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin/guard";
 import { ScrollText } from "lucide-react";
 import { parseRange, rangeIso, withRange } from "@/lib/admin/time-range";
 import { loadProfilesByIds, queryAuditLog } from "@/lib/admin/audit-query";
@@ -36,6 +37,8 @@ function one(v: string | string[] | undefined): string {
 }
 
 export default async function AdminAuditPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // Defense in depth: the layout gates too, but a page must not rely on it.
+  await requireAdmin();
   const sp = await searchParams;
   const range = parseRange(sp);
   const { fromIso, toIso } = rangeIso(range);

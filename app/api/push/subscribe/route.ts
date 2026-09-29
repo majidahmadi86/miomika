@@ -1,6 +1,25 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { logError } from "@/lib/debug/log";
+
+const PUSH_HOSTS = [
+  /^fcm\.googleapis\.com$/,
+  /^android\.googleapis\.com$/,
+  /^updates\.push\.services\.mozilla\.com$/,
+  /(^|\.)push\.services\.mozilla\.com$/,
+  /(^|\.)notify\.windows\.com$/,
+  /^web\.push\.apple\.com$/,
+];
+
+function isPushServiceEndpoint(endpoint: string): boolean {
+  try {
+    const u = new URL(endpoint);
+    return u.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(u.hostname));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Save or remove the browser's push subscription for the signed-in user.
@@ -32,6 +51,10 @@ export async function POST(request: Request) {
   if (!endpoint || !p256dh || !auth) {
     return NextResponse.json({ error: "missing fields" }, { status: 400 });
   }
+  // The care cron later POSTs to this URL, so only accept real push services.
+  if (!isPushServiceEndpoint(endpoint)) {
+    return NextResponse.json({ error: "invalid endpoint" }, { status: 400 });
+  }
 
   const admin = await createServiceClient();
   const { error } = await admin
@@ -41,7 +64,8 @@ export async function POST(request: Request) {
       { onConflict: "endpoint" },
     );
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logError("push/subscribe", "upsert failed", error);
+    return NextResponse.json({ error: "save failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

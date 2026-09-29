@@ -9,11 +9,12 @@ function emailIsAdmin(email: string | null | undefined): boolean {
 
 /**
  * Pages: gate the whole route, or render 404 (we don't reveal the console exists).
- * Access = email in ADMIN_EMAILS, or any signed-in user in local dev.
+ * Access = login email (auth.users, not the user-editable profiles.email) in
+ * ADMIN_EMAILS, or any signed-in user in local dev.
  */
 export async function requireAdmin(): Promise<ServerProfile> {
   const profile = await getServerProfile();
-  if (!profile || !emailIsAdmin(profile.email)) notFound();
+  if (!profile || !emailIsAdmin(profile.auth_email)) notFound();
   return profile;
 }
 
@@ -23,6 +24,6 @@ export async function requireAdmin(): Promise<ServerProfile> {
  */
 export async function getAdminProfile(): Promise<ServerProfile | null> {
   const profile = await getServerProfile();
-  if (!profile || !emailIsAdmin(profile.email)) return null;
+  if (!profile || !emailIsAdmin(profile.auth_email)) return null;
   return profile;
 }

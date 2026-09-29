@@ -12,6 +12,8 @@ export type JourneyStage =
 export interface ServerProfile {
   id: string;
   email: string | null;
+  /** Login email from auth.getUser(). Use this, never `email`, for access checks. */
+  auth_email: string | null;
   display_name: string | null;
   tier: Tier;
   journey_stage: JourneyStage;
@@ -62,6 +64,7 @@ export async function getServerProfile(): Promise<ServerProfile | null> {
   return {
     id: data.id as string,
     email: (data.email as string | null) ?? user.email ?? null,
+    auth_email: user.email ?? null,
     display_name: (data.display_name as string | null) ?? null,
     tier: ((data.tier as Tier) ?? "free"),
     journey_stage: ((data.journey_stage as JourneyStage) ?? "unspecified"),

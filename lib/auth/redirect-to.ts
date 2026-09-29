@@ -16,6 +16,14 @@ const BLOCKED_PREFIXES = [
 /** Same-origin app paths only — blocks open redirects. */
 export function isValidAppRedirect(path: string): boolean {
   if (!path.startsWith("/") || path.startsWith("//")) return false;
+  // Browsers treat a backslash like "/" and strip tabs/newlines, so
+  // "/\evil.com" or "/<TAB>/evil.com" would still leave the site.
+  if (/[\\\s]/.test(path)) return false;
+  try {
+    if (new URL(path, "https://app.invalid").origin !== "https://app.invalid") return false;
+  } catch {
+    return false;
+  }
   if (BLOCKED_PREFIXES.some((b) => path === b || path.startsWith(`${b}/`) || path.startsWith(`${b}?`))) {
     return false;
   }

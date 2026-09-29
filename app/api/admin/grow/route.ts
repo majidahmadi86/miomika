@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 import { NextResponse, type NextRequest } from "next/server";
+import { safeEqual } from "@/lib/security/safe-compare";
 import { getServerProfile } from "@/lib/auth/get-server-profile";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callGeminiJson, generateWordCard } from "@/lib/brain/word-content";
@@ -19,12 +20,12 @@ const NOTE_BLANK = ["use_when","do_not_use_when","cultural_warning","miomi_pronu
 
 export async function GET(req: NextRequest) {
   const provided = req.headers.get("x-grow-key");
-  const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
-  const okKey = !!provided && ((svcKey && provided === svcKey) || (process.env.GROW_TOKEN && provided === process.env.GROW_TOKEN));
+  // Script access via a dedicated GROW_TOKEN only; never accept the service-role key as a header.
+  const okKey = safeEqual(provided, process.env.GROW_TOKEN);
   if (!okKey) {
     const profile = await getServerProfile();
     const admins = (process.env.ADMIN_EMAILS || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
-    const email = profile?.email?.toLowerCase() ?? null;
+    const email = profile?.auth_email?.toLowerCase() ?? null;
     if (!email || !admins.includes(email)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
   const started = Date.now();

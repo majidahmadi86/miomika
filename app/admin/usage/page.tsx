@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { requireAdmin } from "@/lib/admin/guard";
 import Link from "next/link";
 import { Flame, PhoneCall, AlertTriangle, Hash } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -43,6 +44,8 @@ function sum(rs: UsageRow[]) {
 }
 
 export default async function AdminUsagePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // Defense in depth: the layout gates too, but a page must not rely on it.
+  await requireAdmin();
   const sp = await searchParams;
   const range = parseRange(sp);
   const { fromIso, toIso } = rangeIso(range);

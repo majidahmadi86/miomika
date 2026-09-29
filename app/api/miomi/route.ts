@@ -17,6 +17,7 @@ import {
 import { classifyIntentAdvanced } from "@/lib/ai/intents";
 import { cefrToLevel } from "@/lib/ai/vocabulary";
 import { GUEST_EXCHANGE_LIMIT, DAILY_EXCHANGE_CAPS } from "@/lib/ai/limits";
+import { checkRateLimit, identityFromRequest } from "@/lib/security/rate-limit";
 import {
   pickPhrase,
   GUIDANCE_GUEST_LIMIT_HIT,
@@ -221,6 +222,27 @@ export async function POST(req: NextRequest) {
         intentFamilyDistribution: clientSessionContext.intentFamilyDistribution ?? {},
         creatorOutputs: clientSessionContext.creatorOutputs ?? [],
       };
+    }
+    // Identity is server-resolved only; the spread above must never flip these.
+    state.isGuest = serverIsGuest;
+    state.userId = serverUserId;
+
+    // Guests have no account to budget against and exchangeNumber comes from
+    // the client, so bound them by IP too: a burst limit, plus a daily cap that
+    // lands them on the normal "sign up to keep talking" reply.
+    if (serverIsGuest) {
+      const ip = identityFromRequest(req);
+      const [burst, daily] = await Promise.all([
+        checkRateLimit("miomi-guest", ip, 10),
+        checkRateLimit("miomi-guest-day", ip, GUEST_EXCHANGE_LIMIT * 6, 86_400),
+      ]);
+      if (!burst.allowed) {
+        return NextResponse.json(
+          { error: "rate_limited" },
+          { status: 429, headers: { "Retry-After": String(burst.retryAfterSeconds) } },
+        );
+      }
+      if (!daily.allowed) state.exchangeNumber = Math.max(state.exchangeNumber, GUEST_EXCHANGE_LIMIT);
     }
 
     log("miomi", "start", { userInput: userInput.slice(0, 80), exchange: state.exchangeNumber });

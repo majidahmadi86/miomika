@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { requireAdmin } from "@/lib/admin/guard";
 import { parseRange, rangeIso } from "@/lib/admin/time-range";
 import { providerOkSeries, rateLimitSeries } from "@/lib/admin/metrics";
 import AdminPageHeader, { adminCard, adminPagePad } from "@/components/admin/AdminPageHeader";
@@ -31,6 +32,8 @@ export default async function AdminHealthPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // Defense in depth: the layout gates too, but a page must not rely on it.
+  await requireAdmin();
   const sp = await searchParams;
   const range = parseRange(sp);
   const { fromIso, toIso } = rangeIso(range);

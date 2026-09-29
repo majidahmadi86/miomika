@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireAdmin } from "@/lib/admin/guard";
 import { createServiceClient } from "@/lib/supabase/service";
 import UserActions from "@/components/admin/UserActions";
 import { THB_PER_USD, COST_ALERT_THB_7D } from "@/lib/admin/cost";
@@ -24,6 +25,8 @@ export default async function UserCockpitPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // Defense in depth: the layout gates too, but a page must not rely on it.
+  await requireAdmin();
   const { id } = await params;
   const range = parseRange(await searchParams);
   const { fromIso, toIso } = rangeIso(range);
